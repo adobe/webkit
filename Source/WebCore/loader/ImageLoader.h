@@ -64,6 +64,7 @@ public:
 
 protected:
     virtual void notifyFinished(CachedResource*);
+    virtual void didReceiveData(CachedResource*);
 
 private:
     virtual void dispatchLoadEvent() = 0;
@@ -72,6 +73,10 @@ private:
     friend class ImageEventSender;
     void dispatchPendingBeforeLoadEvent();
     void dispatchPendingLoadEvent();
+
+    void dispatchLoadStartEvent();
+    void dispatchProgressEvent(CachedResource*);
+    void dispatchLoadEndEvent();
 
     RenderImageResource* renderImageResource();
     void updateRenderer();
@@ -83,6 +88,12 @@ private:
     bool m_firedLoad : 1;
     bool m_imageComplete : 1;
     bool m_loadManually : 1;
+
+    bool m_progressEventsAllowedInitialized : 1;
+    bool m_progressEventsAllowed : 1;
+    bool m_firedLoadStart : 1;
+    bool m_firedProgress : 1;
+    bool m_firedLoadEnd : 1;
 };
 
 }

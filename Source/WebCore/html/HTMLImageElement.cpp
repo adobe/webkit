@@ -126,6 +126,14 @@ void HTMLImageElement::parseAttribute(Attribute* attr)
         setAttributeEventListener(eventNames().abortEvent, createAttributeEventListener(this, attr));
     else if (attrName == onloadAttr)
         setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attr));
+// Hackaton - Progress Event
+    else if (attrName == onprogressAttr)
+        setAttributeEventListener(eventNames().progressEvent, createAttributeEventListener(this, attr));
+    else if (attrName == onloadstartAttr)
+        setAttributeEventListener(eventNames().loadstartEvent, createAttributeEventListener(this, attr));
+    else if (attrName == onloadendAttr)
+        setAttributeEventListener(eventNames().loadendEvent, createAttributeEventListener(this, attr));
+// Hackaton - Progress Event
     else if (attrName == onbeforeloadAttr)
         setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attr));
     else if (attrName == compositeAttr) {

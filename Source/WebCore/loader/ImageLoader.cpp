@@ -31,9 +31,11 @@
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
+#include "ProgressEvent.h"
 #include "RenderImage.h"
 #include "ScriptCallStack.h"
 #include "SecurityOrigin.h"
+#include "SharedBuffer.h"
 
 #if ENABLE(SVG)
 #include "RenderSVGImage.h"
@@ -107,6 +109,11 @@ ImageLoader::ImageLoader(Element* element)
     , m_firedLoad(true)
     , m_imageComplete(true)
     , m_loadManually(false)
+    , m_progressEventsAllowedInitialized(false)
+    , m_progressEventsAllowed(false)
+    , m_firedLoadStart(true)
+    , m_firedProgress(true)
+    , m_firedLoadEnd(true)
 {
 }
 
@@ -203,6 +210,10 @@ void ImageLoader::updateFromElement()
         m_firedLoad = !newImage;
         m_imageComplete = !newImage;
 
+        m_firedLoadStart = !newImage;
+        m_firedProgress = !newImage;
+        m_firedLoadEnd = !newImage;
+        
         if (newImage) {
             if (!m_element->document()->hasListenerType(Document::BEFORELOAD_LISTENER))
                 dispatchPendingBeforeLoadEvent();
@@ -227,6 +238,55 @@ void ImageLoader::updateFromElementIgnoringPreviousError()
     // Clear previous error.
     m_failedLoadURL = AtomicString();
     updateFromElement();
+}
+    
+void ImageLoader::dispatchLoadStartEvent()
+{
+    if (!m_firedLoadStart) {
+        m_firedLoadStart = true;
+        element()->dispatchEvent(ProgressEvent::create(eventNames().loadstartEvent, false, 0, 0));
+    }
+}
+
+void ImageLoader::dispatchProgressEvent(CachedResource* resource)
+{
+    if (!m_progressEventsAllowedInitialized) {
+        m_progressEventsAllowedInitialized = true;
+        m_progressEventsAllowed = element()->document()->securityOrigin()->canRequest(image()->response().url()) 
+        || resource->passesAccessControlCheck(m_element->document()->securityOrigin());
+    }
+    
+    dispatchLoadStartEvent();
+    
+    if (!m_firedProgress)
+        m_firedProgress = true;
+    
+    bool lengthComputable = false;
+    unsigned long long loaded = 0;
+    unsigned long long total = 0;
+
+    long long expectedContentLength = resource->response().expectedContentLength();
+    unsigned contentLength = resource->data()->size();
+
+    if (m_progressEventsAllowed && expectedContentLength > 0 && contentLength <= expectedContentLength) {
+        lengthComputable = true;
+        loaded = contentLength;
+        total = expectedContentLength;
+    }
+
+    element()->dispatchEvent(ProgressEvent::create(eventNames().progressEvent, lengthComputable, loaded, total));
+}
+
+void ImageLoader::dispatchLoadEndEvent()
+{
+    if (!m_firedProgress)
+        dispatchProgressEvent(m_image.get());
+    element()->dispatchEvent(ProgressEvent::create(eventNames().loadendEvent, false, 0, 0));
+}
+
+void ImageLoader::didReceiveData(CachedResource* resource)
+{
+    dispatchProgressEvent(resource);
 }
 
 void ImageLoader::notifyFinished(CachedResource* resource)
@@ -336,7 +396,10 @@ void ImageLoader::dispatchPendingLoadEvent()
     if (!m_element->document()->attached())
         return;
     m_firedLoad = true;
+    if (!m_firedProgress)
+        dispatchProgressEvent(m_image.get());
     dispatchLoadEvent();
+    dispatchLoadEndEvent();
 }
 
 void ImageLoader::dispatchPendingBeforeLoadEvents()

@@ -147,6 +147,10 @@ DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, error);
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, focus);
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, load);
 
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, loadstart);
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, progress);
+DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, loadend);
+
 PassRefPtr<Node> Element::cloneNode(bool deep)
 {
     return deep ? cloneElementWithChildren() : cloneElementWithoutChildren();

@@ -200,6 +200,7 @@ onload
 onloadeddata
 onloadedmetadata
 onloadstart
+onloadend
 onmousedown
 onmousemove
 onmouseout

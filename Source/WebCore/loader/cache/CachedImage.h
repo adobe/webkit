@@ -104,7 +104,7 @@ private:
     void decodedDataDeletionTimerFired(Timer<CachedImage>*);
     virtual PurgePriority purgePriority() const { return PurgeFirst; }
     void checkShouldPaintBrokenImage();
-
+    void checkNotifyProgress();
     RefPtr<Image> m_image;
 #if ENABLE(SVG)
     OwnPtr<SVGImageCache> m_svgImageCache;

@@ -81,6 +81,10 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
+    
+    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(loadstart);
+    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(progress);
+    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(loadend);
 
     // These four attribute event handler attributes are overridden by HTMLBodyElement
     // and HTMLFrameSetElement to forward to the DOMWindow.

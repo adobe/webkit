@@ -76,6 +76,9 @@ public:
     bool hasPendingActivity() const { return !m_imageLoader.haveFiredLoadEvent(); }
 
     virtual bool canContainRangeEndPoint() const { return false; }
+    
+    // Progress Event - is this necessary?
+    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(blur);
 
 protected:
     HTMLImageElement(const QualifiedName&, Document*, HTMLFormElement* = 0);

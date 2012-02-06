@@ -166,6 +166,10 @@ module core {
         attribute [NotEnumerable] EventListener onselect;
         attribute [NotEnumerable] EventListener onsubmit;
 
+        attribute [DontEnum] EventListener onloadstart;
+        attribute [DontEnum] EventListener onprogress;
+        attribute [DontEnum] EventListener onloadend;
+
         // attribute [NotEnumerable] EventListener oncanplay;
         // attribute [NotEnumerable] EventListener oncanplaythrough;
         // attribute [NotEnumerable] EventListener ondurationchange;
