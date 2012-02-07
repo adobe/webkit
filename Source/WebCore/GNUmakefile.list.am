@@ -2390,6 +2390,8 @@ webcore_sources += \
 	Source/WebCore/inspector/InspectorFrontendClientLocal.h \
 	Source/WebCore/inspector/InspectorFrontendHost.cpp \
 	Source/WebCore/inspector/InspectorFrontendHost.h \
+	Source/WebCore/inspector/InspectorHistory.cpp \
+	Source/WebCore/inspector/InspectorHistory.h \
 	Source/WebCore/inspector/InspectorIndexedDBAgent.h \
 	Source/WebCore/inspector/InspectorIndexedDBAgent.cpp \
 	Source/WebCore/inspector/InspectorInstrumentation.cpp \
@@ -5360,6 +5362,7 @@ webcore_sources += \
 	Source/WebCore/platform/audio/AudioResamplerKernel.cpp \
 	Source/WebCore/platform/audio/AudioResamplerKernel.h \
 	Source/WebCore/platform/audio/AudioSourceProvider.h \
+	Source/WebCore/platform/audio/AudioSourceProviderClient.h \
 	Source/WebCore/platform/audio/AudioUtilities.cpp \
 	Source/WebCore/platform/audio/AudioUtilities.h \
 	Source/WebCore/platform/audio/Biquad.cpp \
@@ -5752,14 +5755,14 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.h \
-        Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.cpp \
-        Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.h \
-        Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
-        Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.cpp \
+	Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
+	Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperPlatformLayer.h
 webcoregtk_sources += \
-	Source/WebCore/platform/graphics/cairo/TextureMapperGLCairo.cpp \
-	Source/WebCore/platform/graphics/cairo/TextureMapperGLCairo.h
+	Source/WebCore/platform/graphics/gtk/WindowGLContextGLX.cpp \
+	Source/WebCore/platform/graphics/gtk/WindowGLContext.h
 endif  # END USE_TEXTURE_MAPPER_GL
 endif  # USE_ACCELERATED_COMPOSITING
 
@@ -5767,6 +5770,9 @@ endif  # USE_ACCELERATED_COMPOSITING
 # Shadow DOM support
 # ---
 if ENABLE_SHADOW_DOM
+webcore_sources += \
+	Source/WebCore/html/shadow/HTMLShadowElement.cpp \
+	Source/WebCore/html/shadow/HTMLShadowElement.h
 webcore_built_sources += \
 	DerivedSources/WebCore/JSHTMLShadowElement.cpp \
 	DerivedSources/WebCore/JSHTMLShadowElement.h

@@ -134,6 +134,9 @@ public:
 #endif
 
     bool hasAttributes() const;
+    // This variant will not update the potentially invalid attributes. To be used when not interested
+    // in style attribute or one of the SVG animation attributes.
+    bool hasAttributesWithoutUpdate() const;
 
     bool hasAttribute(const String& name) const;
     bool hasAttributeNS(const String& namespaceURI, const String& localName) const;
@@ -152,6 +155,13 @@ public:
     // The value will already be lowercased if the document is in compatibility mode,
     // so this function is not suitable for non-style uses.
     const AtomicString& idForStyleResolution() const;
+
+    // Internal methods that assume the existence of attribute storage, one should use hasAttributes()
+    // before calling them.
+    size_t attributeCount() const;
+    Attribute* attributeItem(unsigned index) const;
+    Attribute* getAttributeItem(const QualifiedName&) const;
+    void removeAttribute(unsigned index);
 
     void scrollIntoView(bool alignToTop = true);
     void scrollIntoViewIfNeeded(bool centerIfNeeded = true);
@@ -181,7 +191,7 @@ public:
     PassRefPtr<ClientRect> getBoundingClientRect();
     
     // Returns the absolute bounding box translated into screen coordinates:
-    LayoutRect screenRect() const;
+    IntRect screenRect() const;
 
     void removeAttribute(const String& name);
     void removeAttributeNS(const String& namespaceURI, const String& localName);
@@ -235,6 +245,9 @@ public:
 
     ElementAttributeData* attributeData() const { return m_attributeMap ? m_attributeMap->attributeData() : 0; }
     ElementAttributeData* ensureAttributeData() const { return ensureUpdatedAttributes()->attributeData(); }
+
+    // FIXME: This method should be removed once AttributeData is moved to Element.
+    ElementAttributeData* ensureAttributeDataWithoutUpdate() const { return ensureAttributeMap()->attributeData(); }
 
     void setAttributesFromElement(const Element&);
 
@@ -597,6 +610,11 @@ inline const AtomicString& Element::fastGetAttribute(const QualifiedName& name) 
     return nullAtom;
 }
 
+inline bool Element::hasAttributesWithoutUpdate() const
+{
+    return m_attributeMap && !m_attributeMap->isEmpty();
+}
+
 inline const AtomicString& Element::idForStyleResolution() const
 {
     ASSERT(hasID());
@@ -620,6 +638,30 @@ inline const AtomicString& Element::getIdAttribute() const
 inline void Element::setIdAttribute(const AtomicString& value)
 {
     setAttribute(document()->idAttributeName(), value);
+}
+
+inline size_t Element::attributeCount() const
+{
+    ASSERT(m_attributeMap);
+    return m_attributeMap->length();
+}
+
+inline Attribute* Element::attributeItem(unsigned index) const
+{
+    ASSERT(m_attributeMap);
+    return m_attributeMap->attributeItem(index);
+}
+
+inline Attribute* Element::getAttributeItem(const QualifiedName& name) const
+{
+    ASSERT(m_attributeMap);
+    return m_attributeMap->getAttributeItem(name);
+}
+
+inline void Element::removeAttribute(unsigned index)
+{
+    ASSERT(m_attributeMap);
+    m_attributeMap->removeAttribute(index);
 }
 
 inline NamedNodeMap* Element::ensureAttributeMap() const

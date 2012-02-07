@@ -39,6 +39,7 @@ ManagedTexture::ManagedTexture(TextureManager* manager)
     , m_format(0)
     , m_textureId(0)
 {
+    m_textureManager->registerTexture(this);
 }
 
 ManagedTexture::ManagedTexture(TextureManager* manager, TextureToken token, IntSize size, unsigned format, unsigned textureId)
@@ -48,21 +49,41 @@ ManagedTexture::ManagedTexture(TextureManager* manager, TextureToken token, IntS
     , m_format(format)
     , m_textureId(textureId)
 {
+    m_textureManager->registerTexture(this);
 }
 
 ManagedTexture::~ManagedTexture()
 {
+    if (!m_textureManager)
+        return;
+    m_textureManager->unregisterTexture(this);
     if (m_token)
         m_textureManager->releaseToken(m_token);
 }
 
+void ManagedTexture::setTextureManager(TextureManager* manager)
+{
+    if (manager == m_textureManager)
+        return;
+
+    if (m_textureManager)
+        m_textureManager->unregisterTexture(this);
+    m_textureManager = manager;
+    clear();
+    if (m_textureManager)
+        m_textureManager->registerTexture(this);
+}
+
 bool ManagedTexture::isValid(const IntSize& size, unsigned format)
 {
-    return m_token && size == m_size && format == m_format && m_textureManager->hasTexture(m_token);
+    return m_token && size == m_size && format == m_format && m_textureManager && m_textureManager->hasTexture(m_token);
 }
 
 bool ManagedTexture::reserve(const IntSize& size, unsigned format)
 {
+    if (!m_textureManager)
+        return false;
+
     if (!m_token)
         m_token = m_textureManager->getToken();
 
@@ -83,7 +104,7 @@ bool ManagedTexture::reserve(const IntSize& size, unsigned format)
 
 void ManagedTexture::unreserve()
 {
-    if (!m_token)
+    if (!m_token || !m_textureManager)
         return;
 
     m_textureManager->unprotectTexture(m_token);
@@ -111,13 +132,17 @@ void ManagedTexture::framebufferTexture2D(GraphicsContext3D* context, TextureAll
 PassOwnPtr<ManagedTexture> ManagedTexture::steal()
 {
     OwnPtr<ManagedTexture> texture = adoptPtr(new ManagedTexture(m_textureManager, m_token, m_size, m_format, m_textureId));
+    clear();
+    return texture.release();
+}
+
+void ManagedTexture::clear()
+{
     m_token = 0;
     m_size = IntSize();
     m_format = 0;
     m_textureId = 0;
-    return texture.release();
 }
-
 
 }
 

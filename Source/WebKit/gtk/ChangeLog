@@ -1,3 +1,89 @@
+2012-02-06  Martin Robinson  <mrobinson@igalia.com> and Nayan Kumar K  <nayankk@motorola.com>
+
+        [GTK] Add TextureMapperGL implementation
+        https://bugs.webkit.org/show_bug.cgi?id=75308
+
+        Reviewed by Alejandro G. Castro.
+
+        * GNUmakefile.am: Add AcceleratedCompositingContextGL to the list.
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        (AcceleratedCompositingContext): Added some members for AcceleratedCompositingContextGL.
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp: Added empty implementations
+        for GraphicsLayerClient. This is only used for the GL variant.
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp: Added.
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::performAllPendingScrolls): Update the root layer while scrolling.
+        (WebKit::ChromeClient::paint): Update the root layer after painting.
+        * webkit/webkitwebsettings.cpp: Added an enable-accelerated-compositing setting.
+        * webkit/webkitwebsettingsprivate.h: Ditto.
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_draw): Call into TextureMapper now.
+        (webkit_web_view_realize): Use gdk_window_ensure_native here.
+        (webkit_web_view_update_settings): Support the new enable-accelerated-compositing setting.
+        (webkit_web_view_settings_notify): Ditto.
+
+2012-02-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Do not try to chdir to the directory where the executable is in
+        only if the path is absolute. This makes tests runnable from
+        anywhere.
+
+        Reviewed by Martin Robinson.
+
+        * tests/test_utils.c:
+        (testutils_relative_chdir):
+
+2012-02-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Unreviewed fix for the new API test that is failing -
+        WEBKIT_INSPECTOR_PATH needs to be set, since we do not install our
+        builds.
+
+        * tests/testwebinspector.c:
+        (main):
+
+2012-02-05  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Insta-crash when closing browser with inspector window opened
+        https://bugs.webkit.org/show_bug.cgi?id=50744
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am:
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        (WebKit::InspectorClient::releaseFrontendPage): also let go of the
+        frontend client when releasing the frontend page;
+        (WebKit::InspectorFrontendClient::~InspectorFrontendClient(): Call releaseFrontendPage()
+        like other ports do instead of just disconnectFrontendClient().
+        (WebKit::InspectorFrontendClient::destroyInspectorWindow): Use GRefPtr for the
+        inspector ref.
+        (WebKit::InspectorFrontendClient::bringToFront): Adjust for GRefPtr usage.
+        (WebKit::InspectorFrontendClient::attachWindow): Ditto.
+        (WebKit::InspectorFrontendClient::detachWindow): Ditto.
+        (WebKit::InspectorFrontendClient::inspectedURLChanged): Ditto.
+        * WebCoreSupport/InspectorClientGtk.h:
+        (InspectorFrontendClient): Use GRefPtr for inspector member.
+        * tests/testwebinspector.c: Added. Test that killing a WebView with the inspector
+        open does not crash, and that closing and reinspecting works.
+        (quitLoop):
+        (consoleMessageCallback):
+        (inspectElementCallback):
+        (closeInspector):
+        (showInspector):
+        (test_webkit_web_inspector_close_and_inspect):
+        (test_webkit_web_inspector_destroy_inspected_web_view):
+        (main):
+
+2012-02-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Add a null check for the gdkwindow, that will happen if the window
+        is not mapped.
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::setCursor):
+
 2012-02-06  Martin Robinson  <mrobinson@igalia.com>
 
         [GTK] WebKitWebView does a lot of work during size_allocate when not mapped

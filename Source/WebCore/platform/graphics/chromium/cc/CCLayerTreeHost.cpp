@@ -371,22 +371,23 @@ void CCLayerTreeHost::composite()
     static_cast<CCSingleThreadProxy*>(m_proxy.get())->compositeImmediately();
 }
 
-void CCLayerTreeHost::updateLayers()
+bool CCLayerTreeHost::updateLayers()
 {
     if (!m_layerRendererInitialized) {
         initializeLayerRenderer();
         // If we couldn't initialize, then bail since we're returning to software mode.
         if (!m_layerRendererInitialized)
-            return;
+            return false;
     }
 
     if (!rootLayer())
-        return;
+        return true;
 
     if (viewportSize().isEmpty())
-        return;
+        return true;
 
     updateLayers(rootLayer());
+    return true;
 }
 
 void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer)
@@ -495,10 +496,10 @@ static void enterTargetRenderSurface(Vector<RenderSurfaceRegion>& stack, RenderS
         stack.append(RenderSurfaceRegion());
         stack.last().surface = newTarget;
     } else if (stack.last().surface != newTarget) {
-        const RenderSurfaceRegion& previous = stack.last();
         stack.append(RenderSurfaceRegion());
         stack.last().surface = newTarget;
-        stack.last().occludedInScreen = previous.occludedInScreen;
+        int lastIndex = stack.size() - 1;
+        stack[lastIndex].occludedInScreen = stack[lastIndex - 1].occludedInScreen;
     }
 }
 

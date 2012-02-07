@@ -15,9 +15,11 @@ var SERVER = location.protocol.indexOf('http') == 0 ? location.protocol + '//' +
 // server for static dashboard images
 var IMAGE_SERVER = SERVER;
 
-var LIGHT_COLORS = $.map(COLORS, function(color) {
-    return $.color.parse(color).add('a', -.5).toString();
-});
+if ($.color) {
+    var LIGHT_COLORS = $.map(COLORS, function(color) {
+        return $.color.parse(color).add('a', -.5).toString();
+    });
+}
 
 var PLOT_OPTIONS = {
     xaxis: { mode: 'time' },
@@ -74,5 +76,13 @@ function fetchDashboardManifest(callback)
         cache: true,
     });
 
-    $.getJSON(SERVER + '/api/test/dashboard', callback);
+    $.getJSON(SERVER + '/api/test/dashboard', function (dashboardManifest) {
+        var testToId = dashboardManifest['testToId'];
+        var tests = Object.keys(testToId).sort();
+        var sortedTestToId = {};
+        for (var i = 0; i < tests.length; i++)
+            sortedTestToId[tests[i]] = testToId[tests[i]];
+        dashboardManifest['testToId'] = sortedTestToId;
+        callback(dashboardManifest);
+    });
 }

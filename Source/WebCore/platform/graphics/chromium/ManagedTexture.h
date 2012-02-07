@@ -46,13 +46,15 @@ public:
     }
     ~ManagedTexture();
 
+    void setTextureManager(TextureManager*);
+    void clearManager() { m_textureManager = 0; }
+
     bool isValid(const IntSize&, unsigned format);
     bool reserve(const IntSize&, unsigned format);
     void unreserve();
     bool isReserved()
     {
-        ASSERT(m_textureManager);
-        return m_textureManager->isProtected(m_token);
+        return m_textureManager && m_textureManager->isProtected(m_token);
     }
 
     void allocate(TextureAllocator*);
@@ -70,6 +72,8 @@ public:
 private:
     explicit ManagedTexture(TextureManager*);
     ManagedTexture(TextureManager*, TextureToken, IntSize, unsigned format, unsigned textureId);
+
+    void clear();
 
     TextureManager* m_textureManager;
     TextureToken m_token;

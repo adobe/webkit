@@ -1242,10 +1242,7 @@ svg/custom/acid3-test-77.html
 svg/custom/altglyph.svg
 svg/custom/font-face-simple.svg
 svg/custom/global-constructors.html
-svg/custom/glyph-selection-arabic-forms.svg
-svg/custom/glyph-selection-bidi-mirror.svg
 svg/custom/glyph-selection-lang-attribute.svg
-svg/custom/glyph-selection-non-bmp.svg
 svg/custom/glyph-setting-d-attribute.svg
 svg/custom/insertItemBefore-from-non-list-origin.svg
 svg/custom/svg-fonts-in-text-controls.html
@@ -1342,6 +1339,7 @@ svg/W3C-SVG-1.1/text-align-04-b.svg
 svg/zoom/page/zoom-mask-with-percentages.svg
 svg/zoom/page/zoom-img-preserveAspectRatio-support-1.html
 svg/dom/css-transforms.xhtml
+svg/carto.net/tabgroup.svg
 
 # [Qt] Couple of tests have different results on 64 bit and/or in debug mode compared to 32 bit and/or release mode
 # https://bugs.webkit.org/show_bug.cgi?id=52810
@@ -1377,6 +1375,11 @@ svg/custom/getBBox-path.svg
 # [Qt] REGRESSION(r96779): It made svg/as-image/svg-nested.html timeout
 # https://bugs.webkit.org/show_bug.cgi?id=69511
 svg/as-image/svg-nested.html
+
+#[Qt] New svg/hittest tests introduced in r106882 fail
+#https://bugs.webkit.org/show_bug.cgi?id=77964
+svg/hittest/zero-length-round-cap-path.xhtml
+svg/hittest/zero-length-square-cap-path.xhtml
 
 # ============================================================================= #
 # Failing CSS Tests

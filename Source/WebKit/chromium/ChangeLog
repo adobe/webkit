@@ -1,3 +1,188 @@
+2012-02-07  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        Process Scroll-gesture events from the compositor.
+        https://bugs.webkit.org/show_bug.cgi?id=77477
+
+        Reviewed by James Robinson.
+
+        * src/WebCompositorInputHandlerImpl.cpp:
+        (WebKit::WebCompositorInputHandlerImpl::WebCompositorInputHandlerImpl):
+        (WebKit::WebCompositorInputHandlerImpl::handleInputEvent):
+        * src/WebCompositorInputHandlerImpl.h:
+        (WebCompositorInputHandlerImpl):
+
+2012-02-07  Anders Carlsson  <andersca@apple.com>
+
+        ScrollableAreaSet should be moved from Page to FrameView
+        https://bugs.webkit.org/show_bug.cgi?id=62762
+
+        Reviewed by Beth Dakin.
+
+        Update for changes to WebCore now that the scrollable area set is kept per frame view.
+
+        * src/ScrollbarGroup.cpp:
+        (WebKit::ScrollbarGroup::ScrollbarGroup):
+        (WebKit::ScrollbarGroup::~ScrollbarGroup):
+        * src/ScrollbarGroup.h:
+        (WebCore):
+        (ScrollbarGroup):
+        * src/WebPluginContainerImpl.cpp:
+        (WebKit::WebPluginContainerImpl::scrollbarGroup):
+
+2012-02-07  Hans Wennborg  <hans@chromium.org>
+
+        Chromium: remove WebSpeechInputResult::set
+        https://bugs.webkit.org/show_bug.cgi?id=77977
+
+        Reviewed by Darin Fisher.
+
+        It was renamed to assign() in r106475.
+
+        * public/WebSpeechInputResult.h:
+
+2012-02-07  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r106935.
+        http://trac.webkit.org/changeset/106935
+        https://bugs.webkit.org/show_bug.cgi?id=77994
+
+        "Crashes runMultiThread webkit_unit_test" (Requested by tonyg-
+        cr on #webkit).
+
+        * public/WebWidget.h:
+        (WebWidget):
+        * src/WebViewImpl.cpp:
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-02-07  Jonathan Backer  <backer@chromium.org>
+
+        [chromium] Add setNeedsRedraw to WebWidget
+        https://bugs.webkit.org/show_bug.cgi?id=77555
+
+        Reviewed by James Robinson.
+
+        * public/WebWidget.h:
+        (WebWidget):
+        (WebKit::WebWidget::setNeedsRedraw):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::setNeedsRedraw):
+        (WebKit):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-02-07  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-02-06  James Robinson  <jamesr@chromium.org>
+
+        [chromium] canvas demo is slow due to unnecessary resource cleanups
+        https://bugs.webkit.org/show_bug.cgi?id=77135
+
+        Reviewed by Kenneth Russell.
+
+        * tests/Canvas2DLayerChromiumTest.cpp:
+        (WebCore::Canvas2DLayerChromiumTest::fullLifecycleTest):
+        * tests/TextureManagerTest.cpp:
+        * tests/TiledLayerChromiumTest.cpp:
+
+2012-02-06  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Unreviewed gardening.
+
+        * DEPS: Rolling the DEPS to get the apple_webkit update
+        and fix the Chromium build.
+
+2012-02-06  Emil A Eklund  <eae@chromium.org>
+
+        Convert PopupMenuClient::clientPadding over to new layout abstraction
+        https://bugs.webkit.org/show_bug.cgi?id=77798
+
+        Reviewed by Eric Seidel.
+
+        Change PopupMenuClient and all classes inheriting from it to use the new
+        layout types for padding.
+
+        * src/AutofillPopupMenuClient.cpp:
+        (WebKit::AutofillPopupMenuClient::clientPaddingLeft):
+        (WebKit::AutofillPopupMenuClient::clientPaddingRight):
+        * src/AutofillPopupMenuClient.h:
+        (AutofillPopupMenuClient):
+        * tests/PopupMenuTest.cpp:
+        (WebKit::TestPopupMenuClient::clientPaddingLeft):
+        (WebKit::TestPopupMenuClient::clientPaddingRight):
+
+2012-02-06  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Drop tiles completely outside of layer bounds when resizing to a smaller size
+        https://bugs.webkit.org/show_bug.cgi?id=77910
+
+        Reviewed by Kenneth Russell.
+
+        Adds test for resizing a layer to cover fewer tiles. Test hits ASSERT()s without any code changes.
+
+        * tests/TiledLayerChromiumTest.cpp:
+        (::TEST):
+
+2012-02-06  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Revert r106859. It was completely bogus.
+
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::doPixelReadbackToCanvas):
+
+2012-02-06  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Chromium build fix after r106836.
+
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::doPixelReadbackToCanvas):
+
+2012-02-06  Eric Uhrhane  <ericu@chromium.org>
+
+        [filesystem/Chromium] crackFileSystemURL needs to use innerURL
+        https://bugs.webkit.org/show_bug.cgi?id=77881
+
+        Reviewed by Adam Barth.
+
+        * src/AsyncFileSystemChromium.cpp:
+        (WebCore::AsyncFileSystem::crackFileSystemURL):
+        Add the new code path, taken only if innerURL is present.
+
+2012-02-03  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Support detaching TextureManager from ManagedTexture
+        https://bugs.webkit.org/show_bug.cgi?id=77655
+
+        Adds unit test for destroying a TextureManager while ManagedTextures are still alive referring to it.
+
+        Reviewed by Kenneth Russell.
+
+        * tests/TextureManagerTest.cpp:
+
+2012-02-06  Matthew Delaney  <mdelaney@apple.com>
+
+        toDataURL() uses stale data after putImageData()
+        https://bugs.webkit.org/show_bug.cgi?id=65767
+
+        Reviewed by Chris Marrin.
+
+        * src/WebViewImpl.cpp: Updated method name.
+        (WebKit::WebViewImpl::doPixelReadbackToCanvas):
+
+2012-02-06  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Provide more attribute methods in Element
+        https://bugs.webkit.org/show_bug.cgi?id=77800
+
+        Reviewed by Ryosuke Niwa.
+
+        * src/WebPageSerializerImpl.cpp:
+        (WebKit::WebPageSerializerImpl::openTagToString): access attributes via Element interface.
+
 2012-02-04  Shawn Singh  <shawnsingh@chromium.org>
 
         [chromium] Add support to force full damage in CCDamageTracker

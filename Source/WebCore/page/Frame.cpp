@@ -290,11 +290,11 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     // Update the cached 'document' property, which is now stale.
     m_script.updateDocument();
 
-    if (m_page) {
-        m_page->updateViewportArguments();
-        if (m_page->mainFrame() == this)
-            notifyChromeClientWheelEventHandlerCountChanged();
-    }
+    if (m_doc)
+        m_doc->updateViewportArguments();
+
+    if (m_page && m_page->mainFrame() == this)
+        notifyChromeClientWheelEventHandlerCountChanged();
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -1071,7 +1071,7 @@ DragImageRef Frame::nodeImage(Node* node)
     m_doc->updateLayout();
     m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
 
-    IntRect topLevelRect;
+    LayoutRect topLevelRect;
     IntRect paintingRect = renderer->paintingRootRect(topLevelRect);
 
     OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));

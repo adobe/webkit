@@ -1,3 +1,68 @@
+2012-02-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Dashboard on perf-o-matic should be sorted
+        https://bugs.webkit.org/show_bug.cgi?id=77924
+
+        Reviewed by Tony Chang.
+
+        Sort tests in the frontend using the fact ES5 keeps the property order in the insertion order.
+
+        * Websites/webkit-perf.appspot.com/js/config.js:
+        (fetchDashboardManifest):
+
+2012-02-07  Frederik Gladhorn  <frederik.gladhorn@nokia.com>
+
+        Update .gitignore for Qt Creator/KDevelop.
+        https://bugs.webkit.org/show_bug.cgi?id=77984
+
+        Reviewed by Simon Hausmann.
+
+        * .gitignore: Ignore temp files created by Qt Creator and KDevelop.
+
+2012-02-07  Priit Laes  <plaes@plaes.org>
+
+        [GTK] Broken "HTML5 <scoped style>" detection
+        https://bugs.webkit.org/show_bug.cgi?id=77979
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Fix wrong variable for HTML5 <style scoped> detection
+
+2012-02-06  Shinya Kawanaka  <shinyak@google.com>
+
+        Remove Element::ensureShadowRoot export.
+        https://bugs.webkit.org/show_bug.cgi?id=77932
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter:
+
+2012-02-06  Martin Robinson  <mrobinson@igalia.com> and Nayan Kumar K  <nayankk@motorola.com>
+
+        [GTK] Add TextureMapperGL implementation
+        https://bugs.webkit.org/show_bug.cgi?id=75308
+
+        Reviewed by Alejandro G. Castro.
+
+        * GNUmakefile.am: TextureMapperGL implies USE(TEXTURE_MAPPER)
+        * configure.ac: Only allow enabling the GL version of TextureMapper on X11.
+
+2012-02-06  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic should show min/max/stdev on graphs
+        https://bugs.webkit.org/show_bug.cgi?id=77702
+
+        Reviewed by Andreas Kling.
+
+        Include min/max/stdev in test runs when available to be shown on the perf-o-matic.
+
+        Also merge a change to config.js and increment the version number by 1 (unreviewed).
+
+        * Websites/webkit-perf.appspot.com/app.yaml:
+        * Websites/webkit-perf.appspot.com/js/config.js:
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.get):
+
 2012-02-06  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK] Update NEWS and configure.ac for 1.7.5 release

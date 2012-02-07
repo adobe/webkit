@@ -566,9 +566,9 @@ WebInspector.HeapSnapshotNode.prototype = {
         return this._type() === this._snapshot._nodeHiddenType;
     },
 
-    get isArtificial()
+    get isSynthetic()
     {
-        return this._type() === this._snapshot._nodeArtificialType;
+        return this._type() === this._snapshot._nodeSyntheticType;
     },
 
     get isDOMWindow()
@@ -711,7 +711,7 @@ WebInspector.HeapSnapshot.prototype = {
         this._firstEdgeOffset = meta.fields.indexOf("children");
         this._nodeTypes = meta.types[this._nodeTypeOffset];
         this._nodeHiddenType = this._nodeTypes.indexOf("hidden");
-        this._nodeArtificialType = this._nodeTypes.indexOf("artificial");
+        this._nodeSyntheticType = this._nodeTypes.indexOf("synthetic");
         var edgesMeta = meta.types[this._firstEdgeOffset];
         this._edgeFieldsCount = edgesMeta.fields.length;
         this._edgeTypeOffset = edgesMeta.fields.indexOf("type");
@@ -1129,14 +1129,14 @@ WebInspector.HeapSnapshot.prototype = {
             for (var iter = node.edges; iter.hasNext(); iter.next()) {
                 var edge = iter.edge;
                 var node = edge.node;
-                if (this._flags[node.nodeIndex])
+                if (this._flags[node.nodeIndex] & flag)
                     continue;
                 if (edge.isHidden || edge.isInvisible)
                     continue;
                 var name = edge.name;
                 if (!name)
                     continue;
-                if (edge.isInternal && name !== "native")
+                if (edge.isInternal)
                     continue;
                 list.push(node);
             }
