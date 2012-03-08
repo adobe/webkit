@@ -177,6 +177,7 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
 #if ENABLE(CSS_FILTERS)
     updateLayerFilters(renderer()->style());
 #endif
+    updateLayerBlendMode(renderer()->style());
 }
 
 void RenderLayerBacking::destroyGraphicsLayers()
@@ -214,6 +215,11 @@ void RenderLayerBacking::updateLayerFilters(const RenderStyle* style)
     m_canCompositeFilters = m_graphicsLayer->setFilters(style->filter());
 }
 #endif
+
+void RenderLayerBacking::updateLayerBlendMode(const RenderStyle* style)
+{
+    m_graphicsLayer->setBlendMode(style->blendMode());
+}
 
 static bool hasNonZeroTransformOrigin(const RenderObject* renderer)
 {
@@ -415,6 +421,8 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
 #if ENABLE(CSS_FILTERS)
     updateLayerFilters(renderer()->style());
 #endif
+    
+    updateLayerBlendMode(renderer()->style());
     
     m_owningLayer->updateVisibilityStatus();
 
@@ -1081,6 +1089,13 @@ bool RenderLayerBacking::paintingGoesToWindow() const
         return compositor()->rootLayerAttachment() != RenderLayerCompositor::RootLayerAttachedViaEnclosingFrame;
     
     return false;
+}
+
+void RenderLayerBacking::setBlendMode(EBlendMode blendMode)
+{
+    if (m_graphicsLayer)
+        m_graphicsLayer->setBlendMode(blendMode);
+    // setContentsNeedDisplay();
 }
 
 void RenderLayerBacking::setContentsNeedDisplay()

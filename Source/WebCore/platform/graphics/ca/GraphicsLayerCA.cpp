@@ -266,6 +266,7 @@ GraphicsLayerCA::GraphicsLayerCA(GraphicsLayerClient* client)
     , m_contentsLayerHasBackgroundColor(false)
     , m_allowTiledLayer(true)
     , m_uncommittedChanges(0)
+    , m_blendMode(BlendModeNormal)
 {
     PlatformCALayer::LayerType layerType = PlatformCALayer::LayerTypeWebLayer;
     if (client && client->shouldUseTileCache(this))
@@ -590,6 +591,13 @@ void GraphicsLayerCA::setOpacity(float opacity)
 
     GraphicsLayer::setOpacity(clampedOpacity);
     noteLayerPropertyChanged(OpacityChanged);
+}
+
+void GraphicsLayerCA::setBlendMode(EBlendMode blendMode)
+{
+    m_blendMode = blendMode;
+    GraphicsLayer::setBlendMode(blendMode);
+    noteLayerPropertyChanged(BlendModeChanged);
 }
 
 #if ENABLE(CSS_FILTERS)
@@ -1034,6 +1042,9 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     if (m_uncommittedChanges & OpacityChanged)
         updateOpacityOnLayer();
     
+    if (m_uncommittedChanges & BlendModeChanged)
+        updateBlendModeOnLayer();
+    
 #if ENABLE(CSS_FILTERS)
     if (m_uncommittedChanges & FiltersChanged)
         updateFilters();
@@ -1353,6 +1364,7 @@ void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, floa
 
             updateSublayerList();
             updateOpacityOnLayer();
+            updateBlendModeOnLayer();
         }
         return;
     }
@@ -1421,6 +1433,7 @@ void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, floa
     
     updateSublayerList();
     updateOpacityOnLayer();
+    updateBlendModeOnLayer();
 }
 
 GraphicsLayerCA::StructuralLayerPurpose GraphicsLayerCA::structuralLayerPurpose() const
@@ -2436,6 +2449,7 @@ void GraphicsLayerCA::swapFromOrToTiledLayer(bool useTiledLayer, float pageScale
     updateContentsScale(pageScaleFactor, positionRelativeToBase);
     updateAcceleratesDrawing();
     updateOpacityOnLayer();
+    updateBlendModeOnLayer();
     
 #ifndef NDEBUG
     String name = String::format("%sCALayer(%p) GraphicsLayer(%p) ", (m_layer->layerType() == PlatformCALayer::LayerTypeWebTiledLayer) ? "Tiled " : "", m_layer->platformLayer(), this) + m_name;
@@ -2709,6 +2723,20 @@ void GraphicsLayerCA::updateOpacityOnLayer()
             it->second->setOpacity(m_opacity);
         }
         
+    }
+}
+
+void GraphicsLayerCA::updateBlendModeOnLayer()
+{
+    primaryLayer()->setBlendMode(m_blendMode);
+    
+    if (LayerMap* layerCloneMap = primaryLayerClones()) {
+        LayerMap::const_iterator end = layerCloneMap->end();
+        for (LayerMap::const_iterator it = layerCloneMap->begin(); it != end; ++it) {
+            if (m_replicaLayer && isReplicatedRootClone(it->first))
+                continue;
+            it->second->setBlendMode(m_blendMode);
+        }        
     }
 }
 

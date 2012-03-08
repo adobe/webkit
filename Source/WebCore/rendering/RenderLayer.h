@@ -371,6 +371,7 @@ public:
     void updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerPositionsFlags = defaultFlags);
 
     void updateTransform();
+    void updateBlendMode();
 
     void relativePositionOffset(LayoutUnit& relX, LayoutUnit& relY) const { relX += m_relativeOffset.width(); relY += m_relativeOffset.height(); }
     const LayoutSize& relativePositionOffset() const { return m_relativeOffset; }
@@ -871,6 +872,8 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     OwnPtr<RenderLayerBacking> m_backing;
 #endif
+
+    EBlendMode m_blendMode;
 };
 
 inline void RenderLayer::updateZOrderLists()

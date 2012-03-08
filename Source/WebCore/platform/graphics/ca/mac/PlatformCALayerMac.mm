@@ -705,6 +705,72 @@ void PlatformCALayer::setOpacity(float value)
     END_BLOCK_OBJC_EXCEPTIONS
 }
 
+void PlatformCALayer::setBlendMode(EBlendMode blendMode)
+{
+    BEGIN_BLOCK_OBJC_EXCEPTIONS
+    CIFilter* filter = nil;
+        
+    switch (blendMode) {
+    case BlendModeNormal:
+        // Just pass nil.
+        break;
+    case BlendModeOverlay:
+        filter = [CIFilter filterWithName:@"CIOverlayBlendMode"];
+        break;
+    case BlendModeColor:
+        filter = [CIFilter filterWithName:@"CIColorBlendMode"];
+        break;
+    case BlendModeColorDodge:
+        filter = [CIFilter filterWithName:@"CIColorDodgeBlendMode"];
+        break;
+    case BlendModeColorBurn:
+        filter = [CIFilter filterWithName:@"CIColorBurnBlendMode"];
+        break;
+    case BlendModeDarken:
+        filter = [CIFilter filterWithName:@"CIDarkenBlendMode"];
+        break;
+    case BlendModeDifference:
+        filter = [CIFilter filterWithName:@"CIDifferenceBlendMode"];
+        break;
+    case BlendModeExclusion:
+        filter = [CIFilter filterWithName:@"CIExclusionBlendMode"];
+        break;
+    case BlendModeHardLight:
+        filter = [CIFilter filterWithName:@"CIHardLightBlendMode"];
+        break;
+    case BlendModeHue:
+        filter = [CIFilter filterWithName:@"CIHueBlendMode"];
+        break;
+    case BlendModeMultiply:
+        filter = [CIFilter filterWithName:@"CIMultiplyBlendMode"];
+        break;
+    case BlendModeLighten:
+        filter = [CIFilter filterWithName:@"CILightenBlendMode"];
+        break;
+    case BlendModeSoftLight:
+        filter = [CIFilter filterWithName:@"CISoftLightlendMode"];
+        break;
+    case BlendModeLuminosity:
+        filter = [CIFilter filterWithName:@"CILuminosityBlendMode"];
+        break;
+    case BlendModeSaturation:
+        filter = [CIFilter filterWithName:@"CISaturationBlendMode"];
+        break;
+    case BlendModeScreen:
+        filter = [CIFilter filterWithName:@"CIScreenBlendMode"];
+        break;
+    case BlendModePlus:
+        filter = [CIFilter filterWithName: @"CIAdditionCompositing"];
+        break;
+    }
+    
+    if (filter)
+        [filter setDefaults];
+    
+    [m_layer.get() setCompositingFilter:filter];
+    END_BLOCK_OBJC_EXCEPTIONS
+}
+
 #if ENABLE(CSS_FILTERS)
 void PlatformCALayer::setFilters(const FilterOperations& filters)
 {

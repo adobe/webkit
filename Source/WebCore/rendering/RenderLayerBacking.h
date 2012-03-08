@@ -149,6 +149,8 @@ public:
     bool canCompositeFilters() const { return m_canCompositeFilters; }
 #endif
     
+    void setBlendMode(EBlendMode);
+    
 private:
     void createPrimaryGraphicsLayer();
     void destroyGraphicsLayers();
@@ -180,6 +182,7 @@ private:
 #if ENABLE(CSS_FILTERS)
     void updateLayerFilters(const RenderStyle*);
 #endif
+    void updateLayerBlendMode(const RenderStyle* style);
 
     // Return the opacity value that this layer should use for compositing.
     float compositingOpacity(float rendererOpacity) const;

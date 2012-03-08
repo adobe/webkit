@@ -93,6 +93,8 @@ public:
 
     virtual void setContentsOpaque(bool);
     virtual void setBackfaceVisibility(bool);
+    
+    virtual void setBlendMode(EBlendMode);
 
     // return true if we started an animation
     virtual void setOpacity(float);
@@ -161,6 +163,7 @@ private:
     virtual float platformCALayerDeviceScaleFactor() OVERRIDE;
 
     void updateOpacityOnLayer();
+    void updateBlendModeOnLayer();
     
 #if ENABLE(CSS_FILTERS)
     void updateFilters();
@@ -367,6 +370,7 @@ private:
 #if ENABLE(CSS_FILTERS)
         FiltersChanged = 1 << 25,
 #endif
+        BlendModeChanged = 1 << 26
     };
     typedef unsigned LayerChangeFlags;
     void noteLayerPropertyChanged(LayerChangeFlags flags);
@@ -445,6 +449,8 @@ private:
     FloatSize m_pixelAlignmentOffset;
     
     LayerChangeFlags m_uncommittedChanges;
+    
+    EBlendMode m_blendMode;
 };
 
 } // namespace WebCore

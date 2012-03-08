@@ -640,6 +640,9 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             return StyleDifferenceRepaint;
 
 #if USE(ACCELERATED_COMPOSITING)
+    if (noninherited_flags._effectiveBlendMode != other->noninherited_flags._effectiveBlendMode)
+        return StyleDifferenceRecompositeLayer;
+
     if (rareNonInheritedData.get() != other->rareNonInheritedData.get()) {
         if (rareNonInheritedData->m_transformStyle3D != other->rareNonInheritedData->m_transformStyle3D
             || rareNonInheritedData->m_backfaceVisibility != other->rareNonInheritedData->m_backfaceVisibility

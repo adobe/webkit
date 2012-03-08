@@ -1386,6 +1386,7 @@ bool RenderLayerCompositor::requiresCompositingLayer(const RenderLayer* layer) c
              || clipsCompositingDescendants(layer)
              || requiresCompositingForAnimation(renderer)
              || requiresCompositingForFilters(renderer)
+             || requiresCompositingForBlending(renderer)
              || requiresCompositingForPosition(renderer, layer);
 }
 
@@ -1578,6 +1579,11 @@ bool RenderLayerCompositor::requiresCompositingForFilters(RenderObject* renderer
     UNUSED_PARAM(renderer);
     return false;
 #endif
+}
+
+bool RenderLayerCompositor::requiresCompositingForBlending(RenderObject* renderer) const
+{
+    return renderer->style()->blendMode() != BlendModeNormal;
 }
 
 bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* renderer, const RenderLayer* layer) const

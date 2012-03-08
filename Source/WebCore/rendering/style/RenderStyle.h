@@ -381,6 +381,7 @@ protected:
         noninherited_flags.setAffectedByActive(false);
         noninherited_flags.setAffectedByDrag(false);
         noninherited_flags.setIsLink(false);
+        noninherited_flags._effectiveBlendMode = initialBlendMode();
     }
 
 private:

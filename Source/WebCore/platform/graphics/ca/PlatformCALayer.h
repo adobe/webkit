@@ -183,6 +183,9 @@ public:
     float opacity() const;
     void setOpacity(float);
     
+    void setBlendMode(EBlendMode);
+    
+    
 #if ENABLE(CSS_FILTERS)
     void setFilters(const FilterOperations&);
     static bool filtersCanBeComposited(const FilterOperations&);
