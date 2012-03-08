@@ -1056,7 +1056,123 @@ template<> inline CSSPrimitiveValue::operator ECursor() const
         return CURSOR_NONE;
     return static_cast<ECursor>(m_value.ident - CSSValueAuto);
 }
+    
+    
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBlendMode e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch(e){
+    case BlendModeNormal:
+        m_value.ident = CSSValueNormal;
+        break;                
+    case BlendModePlus: 
+        m_value.ident = CSSValuePlus;
+        break;
+    case BlendModeMultiply:
+        m_value.ident = CSSValueMultiply;
+        break;
+    case BlendModeScreen:
+        m_value.ident = CSSValueScreen; 
+        break;
+    case BlendModeOverlay:
+        m_value.ident = CSSValueOverlay; 
+        break;
+    case BlendModeDarken:
+        m_value.ident = CSSValueDarken; 
+        break;
+    case BlendModeLighten:
+        m_value.ident = CSSValueLighten; 
+        break;
+    case BlendModeColorDodge:
+        m_value.ident = CSSValueColorDodge; 
+        break;
+    case BlendModeColorBurn:
+        m_value.ident = CSSValueColorBurn; 
+        break;
+    case BlendModeHardLight:
+        m_value.ident = CSSValueHardLight; 
+        break;
+    case BlendModeSoftLight:
+        m_value.ident = CSSValueSoftLight; 
+        break;
+    case BlendModeDifference:
+        m_value.ident = CSSValueDifference; 
+        break;
+    case BlendModeExclusion:
+        m_value.ident = CSSValueExclusion; 
+        break;
+    case BlendModeHue:
+        m_value.ident = CSSValueHue; 
+        break;
+    case BlendModeSaturation:
+        m_value.ident = CSSValueSaturation; 
+        break;
+    case BlendModeColor:
+        m_value.ident = CSSValueColor; 
+        break;
+    case BlendModeLuminosity :                
+        m_value.ident = CSSValueLuminosity; 
+            break;
+    }
+}
+    
+template<> inline CSSPrimitiveValue::operator EBlendMode() const
+    {
+        switch (m_value.ident) {
+            case CSSValueNormal:
+                return BlendModeNormal;
+            case CSSValuePlus: 
+                return BlendModePlus;
+            case CSSValueMultiply:
+                return BlendModeMultiply;
+            case CSSValueScreen:
+                return BlendModeScreen; 
+            case CSSValueOverlay:
+                return BlendModeOverlay; 
+                break;
+            case CSSValueDarken:
+                return BlendModeDarken; 
+                break;
+            case CSSValueLighten:
+                return BlendModeLighten; 
+                break;
+            case CSSValueColorDodge:
+                return BlendModeColorDodge; 
+                break;
+            case CSSValueColorBurn:
+                return BlendModeColorBurn; 
+                break;
+            case CSSValueHardLight:
+                return BlendModeHardLight; 
+                break;
+            case CSSValueSoftLight:
+                return BlendModeSoftLight; 
+                break;
+            case CSSValueDifference:
+                return BlendModeDifference; 
+                break;
+            case CSSValueExclusion:
+                return BlendModeExclusion; 
+                break;
+            case CSSValueHue:
+                return BlendModeHue; 
+                break;
+            case CSSValueSaturation:
+                return BlendModeSaturation; 
+                break;
+            case CSSValueColor:
+                return BlendModeColor; 
+                break;
+            case CSSValueLuminosity :                
+                return BlendModeLuminosity; 
+                break;
+            default:
+                return BlendModeNormal;
+        }
+    }
+    
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
     : CSSValue(PrimitiveClass)
 {

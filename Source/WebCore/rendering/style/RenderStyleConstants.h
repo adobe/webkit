@@ -462,6 +462,8 @@ enum LineAlign { LineAlignNone, LineAlignEdges };
 enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowLeft, WrapFlowRight, WrapFlowMaximum, WrapFlowClear };
 
 enum WrapThrough { WrapThroughWrap, WrapThroughNone };
+    
+enum EBlendMode { BlendModeNormal, BlendModePlus, BlendModeMultiply, BlendModeScreen, BlendModeOverlay, BlendModeDarken, BlendModeLighten, BlendModeColorDodge, BlendModeColorBurn, BlendModeHardLight, BlendModeSoftLight, BlendModeDifference, BlendModeExclusion, BlendModeHue, BlendModeSaturation, BlendModeColor, BlendModeLuminosity };
 
 } // namespace WebCore
 

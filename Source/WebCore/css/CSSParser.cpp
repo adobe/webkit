@@ -1998,6 +1998,9 @@ bool CSSParser::parseValue(int propId, bool important)
         }
         break;
 #endif
+    case CSSPropertyWebkitBlendMode:
+            validPrimitive = true;
+            break;
     case CSSPropertyWebkitFlexOrder:
         if (validUnit(value, FInteger, true)) {
             // We restrict the smallest value to int min + 2 because we use int min and int min + 1 as special values in a hash set.

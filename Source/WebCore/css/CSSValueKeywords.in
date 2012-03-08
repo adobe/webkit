@@ -914,3 +914,22 @@ filter-box
 detached
 #endif // CSS_SHADERS
 #endif // CSS_FILTERS
+
+// -webkit-blend-mode
+// normal
+plus
+multiply
+screen
+// overlay
+darken
+lighten
+color-dodge
+color-burn
+hard-light
+soft-light
+difference
+exclusion
+hue
+saturation
+color
+luminosity 

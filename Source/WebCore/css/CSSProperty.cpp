@@ -670,6 +670,7 @@ bool CSSProperty::isInheritedProperty(unsigned propertyID)
     case CSSPropertyVectorEffect:
     case CSSPropertyWebkitSvgShadow:
 #endif
+    case CSSPropertyWebkitBlendMode:
 #if ENABLE(DASHBOARD_SUPPORT)
     case CSSPropertyWebkitDashboardRegion:
 #endif

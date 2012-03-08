@@ -93,7 +93,7 @@
 template<typename T, typename U> inline bool compareEqual(const T& t, const U& u) { return t == static_cast<T>(u); }
 
 #define SET_VAR(group, variable, value) \
-    if (!compareEqual(group->variable, value)) \
+if (!compareEqual(group->variable, value)) \
         group.access()->variable = value;
 
 #define SET_BORDERVALUE_COLOR(group, variable, value) \
@@ -291,6 +291,7 @@ protected:
                 && _page_break_after == other._page_break_after
                 && _page_break_inside == other._page_break_inside
                 && _styleType == other._styleType
+                && _effectiveBlendMode == other._effectiveBlendMode
                 && _affectedByHover == other._affectedByHover
                 && _affectedByActive == other._affectedByActive
                 && _affectedByDrag == other._affectedByDrag
@@ -319,6 +320,7 @@ protected:
 
         unsigned _styleType : 6; // PseudoId
         unsigned _pseudoBits : 7;
+        unsigned _effectiveBlendMode: 4;
 
         bool affectedByHover() const { return _affectedByHover; }
         void setAffectedByHover(bool value) { _affectedByHover = value; }
@@ -977,6 +979,10 @@ public:
 #else
     bool hasFilter() const { return false; }
 #endif
+    
+    EBlendMode blendMode() const { return static_cast<EBlendMode>(noninherited_flags._effectiveBlendMode); }
+    void setBlendMode(EBlendMode v) { noninherited_flags._effectiveBlendMode = v; }
+    
 
 #if USE(RTL_SCROLLBAR)
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
@@ -1692,6 +1698,7 @@ public:
 #if ENABLE(CSS_FILTERS)
     static const FilterOperations& initialFilter() { DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
 #endif
+    static EBlendMode initialBlendMode() { return BlendModeNormal; }
 private:
     void setVisitedLinkColor(const Color& v) { SET_VAR(inherited, visitedLinkColor, v) }
     void setVisitedLinkBackgroundColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBackgroundColor, v) }

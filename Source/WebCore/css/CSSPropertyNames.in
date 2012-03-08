@@ -386,3 +386,4 @@ z-index
 #if defined(ENABLE_OVERFLOW_SCROLLING)
 -webkit-overflow-scrolling
 #endif
+-webkit-blend-mode

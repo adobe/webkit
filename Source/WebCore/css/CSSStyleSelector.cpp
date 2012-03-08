@@ -3782,6 +3782,12 @@ void CSSStyleSelector::applyProperty(int id, CSSValue *value)
         return;
     }
 #endif
+        case CSSPropertyWebkitBlendMode:
+            HANDLE_INHERIT_AND_INITIAL(blendMode, BlendMode);
+            if (!primitiveValue)
+                return;                
+           m_style->setBlendMode(*primitiveValue);
+        return;
 #if ENABLE(CSS_GRID_LAYOUT)
     case CSSPropertyWebkitGridColumns: {
         Vector<Length> lengths;
