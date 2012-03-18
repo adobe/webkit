@@ -54,6 +54,7 @@
 #include "RenderListItem.h"
 #include "RenderMultiColumnBlock.h"
 #include "RenderRegion.h"
+#include "RenderRegionMultiColumn.h"
 #include "RenderRuby.h"
 #include "RenderRubyText.h"
 #include "RenderTableCaption.h"
@@ -159,8 +160,12 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case RUN_IN:
     case COMPACT:
         // Only non-replaced block elements can become a region.
-        if (doc->cssRegionsEnabled() && !style->regionThread().isEmpty() && doc->renderView())
-            return new (arena) RenderRegion(node, doc->renderView()->ensureRenderFlowThreadWithName(style->regionThread()));
+        if (doc->cssRegionsEnabled() && !style->regionThread().isEmpty() && doc->renderView()) {
+            RenderFlowThread* flowThread = doc->renderView()->ensureRenderFlowThreadWithName(style->regionThread());
+            if (!style->hasAutoColumnCount() || !style->hasAutoColumnWidth())
+                return new (arena) RenderRegionMultiColumn(node, flowThread);
+            return new (arena) RenderRegion(node, flowThread);
+        }
         if ((!style->hasAutoColumnCount() || !style->hasAutoColumnWidth()) && doc->regionBasedColumnsEnabled())
             return new (arena) RenderMultiColumnBlock(node);
         return new (arena) RenderBlock(node);

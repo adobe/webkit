@@ -94,6 +94,9 @@ public:
     void setRegionState(RegionState regionState) { m_regionState = regionState; }
     void setDispatchRegionLayoutUpdateEvent(bool value) { m_dispatchRegionLayoutUpdateEvent = value; }
     bool shouldDispatchRegionLayoutUpdateEvent() { return m_dispatchRegionLayoutUpdateEvent; }
+    
+    bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
+    
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 

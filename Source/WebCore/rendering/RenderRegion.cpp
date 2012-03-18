@@ -317,4 +317,12 @@ void RenderRegion::clearBoxStyleInRegion(const RenderBox* box)
     m_renderBoxRegionStyle.remove(box);
 }
 
+bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
+{
+    if (newSize == intrinsicSize())
+        return false;
+    setIntrinsicSize(newSize);
+    return true;
+}
+
 } // namespace WebCore

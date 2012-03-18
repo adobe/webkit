@@ -159,11 +159,26 @@ static bool compareRenderRegions(const RenderRegion* firstRegion, const RenderRe
     ASSERT(firstRegion);
     ASSERT(secondRegion);
 
-    // If the regions have the same region-index, compare their position in dom.
-    ASSERT(firstRegion->node());
-    ASSERT(secondRegion->node());
-
-    unsigned short position = firstRegion->node()->compareDocumentPosition(secondRegion->node());
+    Node* firstNode = firstRegion->node();
+    if (!firstNode && firstRegion->parent())
+        firstNode = firstRegion->parent()->node();
+    Node* secondNode = secondRegion->node();
+    if (!secondNode && secondRegion->parent())
+        secondNode = secondRegion->parent()->node();
+    
+    ASSERT(firstNode);
+    ASSERT(secondNode);
+    
+    if (!firstRegion->node() && !secondRegion->node()) {
+        // same multi-column box
+        for (const RenderObject* regionIterator = firstRegion; regionIterator; regionIterator = regionIterator->nextSibling()) {
+            if (regionIterator == secondRegion)
+                return true;
+        }
+        return false;
+    }
+    
+    unsigned short position = firstNode->compareDocumentPosition(secondNode);
     return (position & Node::DOCUMENT_POSITION_FOLLOWING);
 }
 
