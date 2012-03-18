@@ -95,8 +95,6 @@ void RenderRegionMultiColumn::layoutBlock(bool relayoutChildren, int, BlockLayou
     }
     computeInitialRegionRangeForBlock();
 
-    IntSize previousSize = size();
-
     setLogicalHeight(0);
     // We need to call both of these because we grab both crossAxisExtent and mainAxisExtent in layoutFlexItems.
     computeLogicalWidth();
