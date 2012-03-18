@@ -4722,6 +4722,8 @@
             'rendering/RenderQuote.h',
             'rendering/RenderRegion.cpp',
             'rendering/RenderRegion.h',
+            'rendering/RenderRegionMultiColumn.cpp',
+            'rendering/RenderRegionMultiColumn.h',
             'rendering/RenderRegionSet.cpp',
             'rendering/RenderRegionSet.h',
             'rendering/RenderReplaced.cpp',
