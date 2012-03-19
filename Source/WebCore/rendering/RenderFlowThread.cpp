@@ -169,7 +169,7 @@ static bool compareRenderRegions(const RenderRegion* firstRegion, const RenderRe
     ASSERT(firstNode);
     ASSERT(secondNode);
     
-    if (!firstRegion->node() && !secondRegion->node()) {
+    if (!firstRegion->node() && !secondRegion->node() && firstNode == secondNode) {
         // same multi-column box
         for (const RenderObject* regionIterator = firstRegion; regionIterator; regionIterator = regionIterator->nextSibling()) {
             if (regionIterator == secondRegion)

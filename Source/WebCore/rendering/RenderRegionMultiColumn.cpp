@@ -60,7 +60,7 @@ void RenderRegionMultiColumn::updateColumnCount(unsigned newColumnCount)
     for (; columns < newColumnCount; ++columns) {
         // Add new columns.
         RenderRegion* region = new (renderArena()) RenderRegion(document(), m_flowThread);
-        
+    
         RefPtr<RenderStyle> newStyle(RenderStyle::createAnonymousStyle(style()));
         newStyle->setDisplay(BLOCK);
         newStyle->setRegionOverflow(BreakRegionOverflow);
@@ -68,13 +68,15 @@ void RenderRegionMultiColumn::updateColumnCount(unsigned newColumnCount)
         newStyle->setOverflowY(OHIDDEN);
         newStyle->font().update(0);
         region->setStyle(newStyle.release());
-        
+    
         addChild(region);
     }
     
     for (; columns > newColumnCount; --columns) {
         // Delete the last column.
-        removeChild(lastChild());
+        RenderObject* lastColumn = lastChild();
+        removeChild(lastColumn);
+        lastColumn->destroy();
     }
 }
 
@@ -127,6 +129,7 @@ void RenderRegionMultiColumn::layoutBlock(bool relayoutChildren, int, BlockLayou
     updateColumnCount(desiredColumnCount);
     colGap = desiredColumnCount > 1 ? (availWidth - desiredColumnCount * desiredColumnWidth) / (desiredColumnCount - 1) : 0;
     columnRect.setWidth(desiredColumnWidth);
+    int remainder = availWidth - desiredColumnCount * desiredColumnWidth - (colGap * (desiredColumnWidth - 1));
     
     for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
         if (!child->isRenderRegion())
@@ -137,6 +140,11 @@ void RenderRegionMultiColumn::layoutBlock(bool relayoutChildren, int, BlockLayou
         if (childRegion->updateIntrinsicSizeIfNeeded(columnRect.size()))
             childRegion->setChildNeedsLayout(true);
         childRegion->layoutIfNeeded();
+        if (remainder > 0) {
+            // Adjust the size, so that we don't end up having a large gap the end.
+            remainder--;
+            columnRect.move(1, 0);
+        }
         columnRect.move(columnRect.width() + colGap, 0);
     }
     
