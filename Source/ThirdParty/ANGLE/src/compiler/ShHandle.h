@@ -67,11 +67,15 @@ protected:
     bool InitBuiltInSymbolTable(const ShBuiltInResources& resources);
     // Clears the results from the previous compilation.
     void clearResults();
+    // Return true if any uniform is a texture.
+    bool detectTextureAccess(TIntermNode* root);
     // Return true if function recursion is detected.
     bool detectRecursion(TIntermNode* root);
     // Returns true if the given shader does not exceed the minimum
     // functionality mandated in GLSL 1.0 spec Appendix A.
     bool validateLimitations(TIntermNode* root);
+    // returns true if color is used in a potential malicious way
+    bool validateColorLimitations(TIntermNode* root);
     // Collect info for all attribs and uniforms.
     void collectAttribsUniforms(TIntermNode* root);
     // Map long variable names into shorter ones.

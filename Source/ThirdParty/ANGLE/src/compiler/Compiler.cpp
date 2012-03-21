@@ -5,11 +5,13 @@
 //
 
 #include "compiler/BuiltInFunctionEmulator.h"
+#include "compiler/DetectTextureAccess.h"
 #include "compiler/DetectRecursion.h"
 #include "compiler/ForLoopUnroll.h"
 #include "compiler/Initialize.h"
 #include "compiler/ParseHelper.h"
 #include "compiler/ShHandle.h"
+#include "compiler/ValidateColorLimitations.h"
 #include "compiler/ValidateLimitations.h"
 #include "compiler/MapLongVariableNames.h"
 
@@ -158,6 +160,9 @@ bool TCompiler::compile(const char* const shaderStrings[],
         if (success && (compileOptions & SH_VALIDATE_LOOP_INDEXING))
             success = validateLimitations(root);
 
+        if (success && (compileOptions & SH_VALIDATE_COLOR_ACCESS))
+            success = validateColorLimitations(root);
+
         // Unroll for-loop markup needs to happen after validateLimitations pass.
         if (success && (compileOptions & SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX))
             ForLoopUnroll::MarkForLoopsWithIntegerIndicesForUnrolling(root);
@@ -174,6 +179,9 @@ bool TCompiler::compile(const char* const shaderStrings[],
 
         if (success && (compileOptions & SH_ATTRIBUTES_UNIFORMS))
             collectAttribsUniforms(root);
+
+        if (success && (compileOptions & SH_NO_TEXTURE_ACCESS))
+            success = !detectTextureAccess(root);
 
         if (success && (compileOptions & SH_INTERMEDIATE_TREE))
             intermediate.outputTree(root);
@@ -213,6 +221,20 @@ void TCompiler::clearResults()
     builtInFunctionEmulator.Cleanup();
 }
 
+bool TCompiler::detectTextureAccess(TIntermNode* root)
+{
+    DetectTextureAccess detect;
+    root->traverse(&detect);
+    
+    printf(">>> attribs: %ld\n", attribs.size());
+    printf(">>> uniforms: %ld\n", uniforms.size());
+    for (size_t i = 0; i < uniforms.size(); ++i) {
+        printf(">>> uniform %s\n", uniforms[i].name.c_str());
+    }
+    
+    return detect.detectTextureAccess();
+}
+
 bool TCompiler::detectRecursion(TIntermNode* root)
 {
     DetectRecursion detect;
@@ -236,6 +258,29 @@ bool TCompiler::validateLimitations(TIntermNode* root) {
     ValidateLimitations validate(shaderType, infoSink.info);
     root->traverse(&validate);
     return validate.numErrors() == 0;
+}
+
+bool TCompiler::validateColorLimitations(TIntermNode* root) {
+    printf(">>> Entering validateColorLimitations");
+    ValidateColorLimitations validate(infoSink.info);
+    bool reparse = false;
+    int numReparse = 0;
+    do {
+        reparse = false;
+        root->traverse(&validate);
+        if (validate.foundNewUnsafeSymbols()) {
+            infoSink.info << "Found new unsafe symbols. Reparsing the tree\n\n";
+            validate.setNewUnsafeSymbols(false);
+            reparse = true;
+        }
+        numReparse ++;
+    } while (reparse);
+    infoSink.info << "Tree reparsing: " << numReparse << '\n';
+    if (validate.numErrors() > 0)
+        infoSink.info << "TotalErrors: " << validate.numErrors() << '\n';
+    printf(">>> validateColorLimitations numErrors: %d", validate.numErrors());
+    return validate.numErrors() == 0;
+    //return true;
 }
 
 void TCompiler::collectAttribsUniforms(TIntermNode* root)

@@ -103,7 +103,10 @@ typedef enum {
   SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX = 0x0080,
 
   // This is needed only as a workaround for certain OpenGL driver bugs.
-  SH_EMULATE_BUILT_IN_FUNCTIONS = 0x0100
+  SH_EMULATE_BUILT_IN_FUNCTIONS = 0x0100,
+  
+  SH_NO_TEXTURE_ACCESS          = 0x0200,
+  SH_VALIDATE_COLOR_ACCESS      = 0x0400
 } ShCompileOptions;
 
 //

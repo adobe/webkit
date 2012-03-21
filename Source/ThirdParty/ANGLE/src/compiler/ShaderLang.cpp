@@ -173,6 +173,8 @@ int ShCompile(
     const int numStrings,
     int compileOptions)
 {
+    printf(">>> Entering ShCompile...\n");
+    
     if (!InitThread())
         return 0;
 
