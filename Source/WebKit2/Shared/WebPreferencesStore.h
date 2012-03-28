@@ -75,6 +75,7 @@ namespace WebKit {
     macro(WebGLEnabled, webGLEnabled, Bool, bool, false) \
     macro(CSSRegionsEnabled, cssRegionsEnabled, Bool, bool, true) \
     macro(RegionBasedColumnsEnabled, regionBasedColumnsEnabled, Bool, bool, false) \
+    macro(CSSRegionsAutoHeightEnabled, cssRegionsAutoHeightEnabled, Bool, bool, true) \
     macro(ForceFTPDirectoryListings, forceFTPDirectoryListings, Bool, bool, false) \
     macro(TabsToLinks, tabsToLinks, Bool, bool, DEFAULT_WEBKIT_TABSTOLINKS_ENABLED) \
     macro(DNSPrefetchingEnabled, dnsPrefetchingEnabled, Bool, bool, false) \

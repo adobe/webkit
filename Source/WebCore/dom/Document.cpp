@@ -1025,6 +1025,11 @@ bool Document::cssRegionsEnabled() const
     return settings() && settings()->cssRegionsEnabled(); 
 }
 
+bool Document::cssRegionsAutoHeightEnabled() const
+{
+    return settings() && settings()->cssRegionsAutoHeightEnabled();
+}
+
 static bool validFlowName(const String& flowName)
 {
     if (equalIgnoringCase(flowName, "auto")

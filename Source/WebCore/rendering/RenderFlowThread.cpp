@@ -604,6 +604,13 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
         if (position <= 0)
             return region;
 
+        if (document()->cssRegionsAutoHeightEnabled() && region->hasAutoHeight()) {
+            if (!region->hasComputedAutoHeight())
+                return region;
+            else if (position < region->regionRect().y() + region->computedAutoHeight())
+                return region;
+        }
+
         LayoutRect regionRect = region->regionRect();
 
         if ((useHorizontalWritingMode && position < regionRect.maxY()) || (!useHorizontalWritingMode && position < regionRect.maxX()))
@@ -1030,6 +1037,79 @@ bool RenderFlowThread::objectInFlowRegion(const RenderObject* object, const Rend
     }
 
     return false;
+}
+
+bool RenderFlowThread::needsSecondPassLayoutForRegionsAutoHeight() const
+{
+    if (!document()->cssRegionsAutoHeightEnabled())
+        return false;
+
+    for (RenderRegionList::const_iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        if (region->style()->logicalHeight().isAuto())
+            return true;
+    }
+    return false;
+}
+
+void RenderFlowThread::resetRegionsAutoHeight()
+{
+     if (!document()->cssRegionsAutoHeightEnabled())
+        return;
+
+   for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        region->setComputedAutoHeight(0);
+    }
+}
+
+void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
+{
+   if (!document()->cssRegionsAutoHeightEnabled())
+       return;
+
+   if (!view()->inFirstRegionsAutoHeightLayoutPass())
+       return;
+
+    LayoutUnit accumulatedLogicalHeight = 0;
+
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        if (!region->hasAutoHeight()) {
+            accumulatedLogicalHeight += region->contentHeight();
+            continue;
+        }
+
+        if (region->hasComputedAutoHeight()) {
+            accumulatedLogicalHeight += region->computedAutoHeight();
+            continue;
+        }
+
+        region->setComputedAutoHeight(logicalOffset - accumulatedLogicalHeight);
+        return;
+    }
+}
+
+void RenderFlowThread::markRegionsForLayout()
+{
+    if (!document()->cssRegionsAutoHeightEnabled())
+        return;
+
+    if (!view()->inFirstRegionsAutoHeightLayoutPass())
+        return;
+
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        region->setNeedsLayout(true);
+    }
 }
 
 } // namespace WebCore

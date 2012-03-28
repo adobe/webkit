@@ -1479,6 +1479,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings->setCSSCustomFilterEnabled([preferences cssCustomFilterEnabled]);
 #endif
     settings->setCSSRegionsEnabled([preferences cssRegionsEnabled]);
+    settings->setCSSRegionsAutoHeightEnabled([preferences cssRegionsAutoHeightEnabled]);
 #if ENABLE(FULLSCREEN_API)
     settings->setFullScreenEnabled([preferences fullScreenEnabled]);
 #endif

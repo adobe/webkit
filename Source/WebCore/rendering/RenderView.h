@@ -187,6 +187,11 @@ public:
     RenderFlowThread* currentRenderFlowThread() const { return m_currentRenderFlowThread; }
     void setCurrentRenderFlowThread(RenderFlowThread* flowThread) { m_currentRenderFlowThread = flowThread; }
 
+    bool inFirstRegionsAutoHeightLayoutPass() const { return m_inFirstRegionsAutoHeightLayoutPass; }
+    bool needsSecondPassLayoutForRegionsAutoHeight() const;
+    void resetRegionsAutoHeight();
+    void markRegionsForLayout();
+
     void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
     IntervalArena* intervalArena();
@@ -278,6 +283,7 @@ private:
 #endif
     OwnPtr<RenderFlowThreadList> m_renderFlowThreadList;
     RenderFlowThread* m_currentRenderFlowThread;
+    bool m_inFirstRegionsAutoHeightLayoutPass;
     RefPtr<IntervalArena> m_intervalArena;
 };
 

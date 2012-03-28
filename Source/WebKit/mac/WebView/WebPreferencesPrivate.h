@@ -277,6 +277,9 @@ extern NSString *WebPreferencesChangedInternalNotification;
 - (void)setRegionBasedColumnsEnabled:(BOOL)flag;
 - (BOOL)regionBasedColumnsEnabled;
 
+- (void)setCSSRegionsAutoHeightEnabled:(BOOL)flag;
+- (BOOL)cssRegionsAutoHeightEnabled;
+
 // Deprecated. You should use [setS|s]uppressesIncrementalRendering in WebPreferences.h instead.
 - (void)setSuppressIncrementalRendering:(BOOL)flag;
 - (BOOL)suppressIncrementalRendering;

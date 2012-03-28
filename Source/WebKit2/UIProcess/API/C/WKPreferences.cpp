@@ -428,6 +428,16 @@ bool WKPreferencesGetRegionBasedColumnsEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->regionBasedColumnsEnabled();
 }
 
+bool WKPreferencesGetCSSRegionsAutoHeightEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->cssRegionsAutoHeightEnabled();
+}
+
+void WKPreferencesSetCSSRegionsAutoHeightEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCSSRegionsAutoHeightEnabled(flag);
+}
+
 void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setNeedsSiteSpecificQuirks(flag);

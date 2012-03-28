@@ -1579,6 +1579,9 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
                 }
             }
         }
+        // FIXME: check for a better place to insert the final break
+        if (isRenderFlowThread() && document()->cssRegionsAutoHeightEnabled())
+            toRenderFlowThread(this)->addRegionBreak(oldHeight);
     }
 
     if (previousHeight != newHeight)
@@ -6677,6 +6680,12 @@ bool RenderBlock::hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule pageBou
     RenderRegion* region = enclosingRenderFlowThread()->renderRegionForLine(pageOffset, this);
     if (!region)
         return false;
+    // FIXME:
+    // If the region has auto height and the computed auto height was not "computed yet"
+    // and the pageBoundaryRule == ExcludePageBoundary, then "pretend" that there is no next page
+    // otherwise the computation of margins for elements inside auto height regions would be wrong/
+    if (document()->cssRegionsAutoHeightEnabled() && pageBoundaryRule == ExcludePageBoundary && region->hasAutoHeight() && !region->hasComputedAutoHeight())
+        return false;
     if (region->isLastRegion())
         return region->style()->regionOverflow() == BreakRegionOverflow
             || (pageBoundaryRule == IncludePageBoundary && pageOffset == region->offsetFromLogicalTopOfFirstPage());
@@ -6726,6 +6735,8 @@ LayoutUnit RenderBlock::applyBeforeBreak(RenderBox* child, LayoutUnit logicalOff
     if (checkBeforeAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
+        if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
+            enclosingRenderFlowThread()->addRegionBreak(logicalOffset);
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary);
     }
     return logicalOffset;
@@ -6743,6 +6754,8 @@ LayoutUnit RenderBlock::applyAfterBreak(RenderBox* child, LayoutUnit logicalOffs
         marginInfo.setMarginAfterQuirk(true); // Cause margins to be discarded for any following content.
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
+        if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
+            enclosingRenderFlowThread()->addRegionBreak(logicalOffset + marginInfo.margin());
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary);
     }
     return logicalOffset;

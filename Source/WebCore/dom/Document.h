@@ -352,6 +352,7 @@ public:
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
     bool cssRegionsEnabled() const;
+    bool cssRegionsAutoHeightEnabled() const;
     PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
 
     bool regionBasedColumnsEnabled() const;

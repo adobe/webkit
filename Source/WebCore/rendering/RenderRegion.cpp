@@ -49,6 +49,7 @@ RenderRegion::RenderRegion(Node* node, RenderFlowThread* flowThread)
     , m_hasCustomRegionStyle(false)
     , m_regionState(RegionUndefined)
     , m_dispatchRegionLayoutUpdateEvent(false)
+    , m_computedAutoHeight(0)
 {
     ASSERT(node->document()->cssRegionsEnabled());
 }
@@ -323,6 +324,13 @@ bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
         return false;
     setIntrinsicSize(newSize);
     return true;
+}
+
+LayoutUnit RenderRegion::computeReplacedLogicalHeight() const
+{
+    if (!document()->cssRegionsAutoHeightEnabled() || !hasAutoHeight() || view()->inFirstRegionsAutoHeightLayoutPass())
+        return RenderReplaced::computeReplacedLogicalHeight();
+    return computedAutoHeight();
 }
 
 } // namespace WebCore

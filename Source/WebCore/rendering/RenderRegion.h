@@ -96,6 +96,29 @@ public:
     bool shouldDispatchRegionLayoutUpdateEvent() { return m_dispatchRegionLayoutUpdateEvent; }
     
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
+
+    bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
+    bool hasComputedAutoHeight() const { return m_computedAutoHeight; }
+    LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
+    void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
+        if (document()->cssRegionsAutoHeightEnabled())
+            m_computedAutoHeight = computedAutoHeight;
+    }
+
+    bool needsSecondLayout() const {
+        return document()->cssRegionsAutoHeightEnabled() && style()->logicalHeight().isAuto() && intrinsicSize().isEmpty();
+    }
+    void prepareSecondLayout(LayoutUnit intrinsicHeight) {
+        if (document()->cssRegionsAutoHeightEnabled()) {
+            setIntrinsicSize(IntSize(logicalWidth(), intrinsicHeight));
+            setNeedsLayout(true);
+        }
+    }
+    void resetIntrinsicSize() {
+        if (document()->cssRegionsAutoHeightEnabled())
+            setIntrinsicSize(IntSize());
+    }
+    virtual LayoutUnit computeReplacedLogicalHeight() const;
     
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
@@ -127,6 +150,9 @@ private:
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
     bool m_dispatchRegionLayoutUpdateEvent;
+
+    // Store the computed region autoheight
+    LayoutUnit m_computedAutoHeight;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)

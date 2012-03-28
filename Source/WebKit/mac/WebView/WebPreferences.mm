@@ -391,6 +391,7 @@ static WebCacheModel cacheModelForMainBundle(void)
         [NSNumber numberWithBool:NO],   WebKitWebAudioEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitSuppressesIncrementalRenderingKey,
         [NSNumber numberWithBool:NO],   WebKitRegionBasedColumnsEnabledKey,
+        [NSNumber numberWithBool:YES],   WebKitCSSRegionsAutoHeightEnabledKey,
         [NSNumber numberWithBool:YES],  WebKitBackspaceKeyNavigationEnabledKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplaySubtitlesPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplayCaptionsPreferenceKey,
@@ -1673,6 +1674,16 @@ static NSString *classIBCreatorID = nil;
 - (BOOL)regionBasedColumnsEnabled
 {
     return [self _boolValueForKey:WebKitRegionBasedColumnsEnabledKey];
+}
+
+- (void)setCSSRegionsAutoHeightEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitCSSRegionsAutoHeightEnabledKey];
+}
+
+- (BOOL)cssRegionsAutoHeightEnabled
+{
+    return [self _boolValueForKey:WebKitCSSRegionsAutoHeightEnabledKey];
 }
 
 @end

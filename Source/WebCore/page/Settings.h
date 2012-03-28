@@ -322,6 +322,9 @@ namespace WebCore {
         void setRegionBasedColumnsEnabled(bool enabled) { m_regionBasedColumnsEnabled = enabled; }
         bool regionBasedColumnsEnabled() const { return m_regionBasedColumnsEnabled; }
 
+        void setCSSRegionsAutoHeightEnabled(bool enabled) { m_cssRegionsAutoHeightEnabled = enabled; }
+        bool cssRegionsAutoHeightEnabled() const { return m_cssRegionsAutoHeightEnabled; }
+
         void setAcceleratedCompositingEnabled(bool);
         bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
 
@@ -629,6 +632,7 @@ namespace WebCore {
         bool m_isCSSCustomFilterEnabled : 1;
         bool m_cssRegionsEnabled : 1;
         bool m_regionBasedColumnsEnabled : 1;
+        bool m_cssRegionsAutoHeightEnabled : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;
