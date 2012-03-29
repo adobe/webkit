@@ -299,6 +299,11 @@ void WebSettingsImpl::setExperimentalCSSRegionsEnabled(bool enabled)
     m_settings->setCSSRegionsEnabled(enabled);
 }
 
+void WebSettingsImpl::setExperimentalCSSRegionsAutoHeightEnabled(bool enabled)
+{
+    m_settings->setCSSRegionsAutoHeightEnabled(enabled);
+}
+
 void WebSettingsImpl::setExperimentalCSSCustomFilterEnabled(bool enabled)
 {
     m_settings->setCSSCustomFilterEnabled(enabled);
