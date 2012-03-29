@@ -97,7 +97,7 @@ public:
     
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
-    bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
+    bool hasAutoHeight() const { return !usedForMultiColumn() && style()->logicalHeight().isAuto(); }
     bool hasComputedAutoHeight() const { return m_computedAutoHeight; }
     LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
     void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
@@ -106,7 +106,7 @@ public:
     }
 
     bool needsSecondLayout() const {
-        return document()->cssRegionsAutoHeightEnabled() && style()->logicalHeight().isAuto() && intrinsicSize().isEmpty();
+        return document()->cssRegionsAutoHeightEnabled() && !usedForMultiColumn() && style()->logicalHeight().isAuto() && intrinsicSize().isEmpty();
     }
     void prepareSecondLayout(LayoutUnit intrinsicHeight) {
         if (document()->cssRegionsAutoHeightEnabled()) {
@@ -119,6 +119,9 @@ public:
             setIntrinsicSize(IntSize());
     }
     virtual LayoutUnit computeReplacedLogicalHeight() const;
+    
+    void setUsedForMultiColumn(bool usedForMultiColumn) { m_usedForMultiColumn = usedForMultiColumn; }
+    bool usedForMultiColumn() const { return m_usedForMultiColumn; }
     
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
@@ -150,6 +153,7 @@ private:
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
     bool m_dispatchRegionLayoutUpdateEvent;
+    bool m_usedForMultiColumn;
 
     // Store the computed region autoheight
     LayoutUnit m_computedAutoHeight;

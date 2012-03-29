@@ -49,6 +49,7 @@ RenderRegion::RenderRegion(Node* node, RenderFlowThread* flowThread)
     , m_hasCustomRegionStyle(false)
     , m_regionState(RegionUndefined)
     , m_dispatchRegionLayoutUpdateEvent(false)
+    , m_usedForMultiColumn(false)
     , m_computedAutoHeight(0)
 {
     ASSERT(node->document()->cssRegionsEnabled());

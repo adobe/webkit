@@ -68,7 +68,8 @@ void RenderRegionMultiColumn::updateColumnCount(unsigned newColumnCount)
         newStyle->setOverflowY(OHIDDEN);
         newStyle->font().update(0);
         region->setStyle(newStyle.release());
-    
+        region->setUsedForMultiColumn(true);
+        
         addChild(region);
     }
     
