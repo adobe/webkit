@@ -979,8 +979,11 @@ void RenderView::resetRegionsAutoHeight()
     if (!document()->cssRegionsAutoHeightEnabled())
         return;
 
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter)
-        (*iter)->resetRegionsAutoHeight();
+    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
+        RenderFlowThread* flowRenderer = *iter;
+        if (flowRenderer->needsSecondPassLayoutForRegionsAutoHeight())
+            flowRenderer->resetRegionsAutoHeight();
+    }
 }
 
 void RenderView::markRegionsForLayout()

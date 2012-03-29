@@ -113,18 +113,11 @@ public:
         }
     }
 
-    bool needsSecondLayout() const {
-        return document()->cssRegionsAutoHeightEnabled() && !usedForMultiColumn() && style()->logicalHeight().isAuto() && intrinsicSize().isEmpty();
-    }
     void prepareSecondLayout(LayoutUnit intrinsicHeight) {
         if (document()->cssRegionsAutoHeightEnabled()) {
             setIntrinsicSize(IntSize(logicalWidth(), intrinsicHeight));
             setNeedsLayout(true);
         }
-    }
-    void resetIntrinsicSize() {
-        if (document()->cssRegionsAutoHeightEnabled())
-            setIntrinsicSize(IntSize());
     }
     virtual LayoutUnit computeReplacedLogicalHeight() const;
     

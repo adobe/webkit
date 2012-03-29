@@ -1048,7 +1048,7 @@ bool RenderFlowThread::needsSecondPassLayoutForRegionsAutoHeight() const
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
-        if (region->style()->logicalHeight().isAuto())
+        if (region->hasAutoHeight())
             return true;
     }
     return false;
