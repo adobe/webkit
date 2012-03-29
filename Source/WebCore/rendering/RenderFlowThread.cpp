@@ -1063,7 +1063,7 @@ void RenderFlowThread::resetRegionsAutoHeight()
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
-        region->setComputedAutoHeight(0);
+        region->resetComputedAutoHeight();
     }
 }
 

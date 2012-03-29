@@ -991,7 +991,6 @@ void RenderView::markRegionsForLayout()
     for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
         RenderFlowThread* flowRenderer = *iter;
         flowRenderer->markRegionsForLayout();
-        flowRenderer->setNeedsLayout(true);
     }
 }
 

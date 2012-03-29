@@ -98,11 +98,19 @@ public:
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
     bool hasAutoHeight() const { return !usedForMultiColumn() && style()->logicalHeight().isAuto(); }
-    bool hasComputedAutoHeight() const { return m_computedAutoHeight; }
+    bool hasComputedAutoHeight() const { return m_hasComputedAutoHeight; }
     LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
     void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
-        if (document()->cssRegionsAutoHeightEnabled())
+        if (document()->cssRegionsAutoHeightEnabled()) {
             m_computedAutoHeight = computedAutoHeight;
+            m_hasComputedAutoHeight = true;
+        }
+    }
+    void resetComputedAutoHeight() {
+        if (document()->cssRegionsAutoHeightEnabled()) {
+            m_computedAutoHeight = 0;
+            m_hasComputedAutoHeight = false;
+        }
     }
 
     bool needsSecondLayout() const {
@@ -157,6 +165,7 @@ private:
 
     // Store the computed region autoheight
     LayoutUnit m_computedAutoHeight;
+    bool m_hasComputedAutoHeight;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)
