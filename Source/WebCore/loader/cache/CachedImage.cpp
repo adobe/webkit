@@ -371,13 +371,24 @@ void CachedImage::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
         if (m_image)
             setEncodedSize(m_image->data() ? m_image->data()->size() : 0);
     }
-    
+
+    checkNotifyProgress();
     if (allDataReceived) {
         setLoading(false);
         checkNotify();
     }
 }
 
+void CachedImage::checkNotifyProgress() 
+{
+    if (!isLoading())
+        return;
+
+    CachedResourceClientWalker<CachedResourceClient> w(m_clients);
+    while (CachedResourceClient* c = w.next())
+        c->didReceiveData(this);    
+}
+    
 void CachedImage::error(CachedResource::Status status)
 {
     checkShouldPaintBrokenImage();
