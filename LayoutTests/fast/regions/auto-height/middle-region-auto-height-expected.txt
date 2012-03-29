@@ -1,0 +1,19 @@
+Test for regions auto-height prototype.
+
+On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE".
+
+
+PASS regionListP1.length is 1
+PASS regionListP1.item(0).id is "region"
+PASS regionListP2.length is 2
+PASS regionListP2.item(0).id is "region"
+PASS regionListP2.item(1).id is "region2"
+PASS regionListP3.length is 1
+PASS regionListP3.item(0).id is "region2"
+PASS successfullyParsed is true
+
+TEST COMPLETE
+
+
+
+
