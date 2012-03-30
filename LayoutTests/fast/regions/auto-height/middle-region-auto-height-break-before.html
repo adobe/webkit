@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+    <head>
+        <!--
+        Test for regions auto-height. A flow with 3 regions, the middle region has auto height.
+        The second paragraph has a break before, p1 should go into the first region,
+        p2 and p3 should go in the second region.
+        -->
+        <script src="../../../fast/js/resources/js-test-pre.js"></script>
+        <style>
+            body { font-family: monospace; }
+            #article { -webkit-flow-into: flow; }
+            #region, #region2, #region3 { -webkit-flow-from: flow; border: 1px solid red; }
+            #region { width: 150px; height: 150px; }
+            #region2 { width: 100px; }
+            #region3 { width: 200px; height: 150px; }
+            #p2 { -webkit-region-break-before: always; }
+        </style>
+    </head>
+    <body>
+        <div id="article">
+            <p id="p1">Text inside p1. Text inside p1. Text inside p1. Text inside p1. Text inside p1.</p>
+            <p id="p2">Text inside p2. Text inside p2. Text inside p2. Text inside p2. Text inside p2.</p>
+            <p id="p3">Text inside p3. Text inside p3. Text inside p3. Text inside p3. Text inside p3.</p>
+        </div>
+        <div id="region"></div>
+        <div id="region2"></div>
+        <div id="region3"></div>
+        <script>
+            if (window.layoutTestController)
+                window.layoutTestController.dumpAsText();
+            
+            description("Test for regions auto-height prototype.");
+
+            var namedFlow = document.webkitGetFlowByName("flow");
+            
+            // Check the regions for the first p1, it should be the first region
+            var regionListP1 = namedFlow.getRegionsByContentNode(document.getElementById("p1"));
+            shouldEvaluateTo("regionListP1.length", 1);
+            shouldBeEqualToString("regionListP1.item(0).id", "region");
+
+            // Check the regions for p2, it should be the second region
+            var regionListP2 = namedFlow.getRegionsByContentNode(document.getElementById("p2"));
+            shouldEvaluateTo("regionListP2.length", 1);
+            shouldBeEqualToString("regionListP2.item(0).id", "region2");
+
+            // Check the regions for p3, it should be in the second region.
+            var regionListP3 = namedFlow.getRegionsByContentNode(document.getElementById("p3"));
+            shouldEvaluateTo("regionListP3.length", 1);
+            shouldBeEqualToString("regionListP3.item(0).id", "region2");
+ 
+            // hide the regions and the flow
+            document.getElementById("article").style.visibility = "hidden";
+            document.getElementById("region").style.visibility = "hidden";
+            document.getElementById("region2").style.visibility = "hidden";
+            document.getElementById("region3").style.visibility = "hidden"; 
+        </script>
+    </body>
+    <script src="../../../fast/js/resources/js-test-post.js"></script>
+</html>

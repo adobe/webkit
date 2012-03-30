@@ -1081,10 +1081,16 @@ void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
+
         if (!region->hasAutoHeight()) {
             accumulatedLogicalHeight += region->contentHeight();
             continue;
         }
+
+        // The break position falls into a region that is not auto-height.
+        // In this case, we simply return from the processing.
+        if (logicalOffset <= accumulatedLogicalHeight)
+            return;
 
         if (region->hasComputedAutoHeight()) {
             accumulatedLogicalHeight += region->computedAutoHeight();
