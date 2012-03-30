@@ -1072,7 +1072,7 @@
 
 #if !defined(ENABLE_CSS_SHADERS)
 #if PLATFORM(MAC) || PLATFORM(IOS)
-#define ENABLE_CSS_SHADERS 0
+#define ENABLE_CSS_SHADERS 1
 #endif
 #endif
 
