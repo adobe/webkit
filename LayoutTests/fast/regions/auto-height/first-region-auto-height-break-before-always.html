@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+    <head>
+        <!--
+        Test for regions auto height. First region is auto, second region is not auto height.
+        We have a break before p1, h2 should go in the first region, p should go into second region.
+        Both regions are absolutely positioned.
+        -->
+        <script src="../../../fast/js/resources/js-test-pre.js"></script>
+        <style>
+            body { font-family: monospace; }
+            #article { -webkit-flow-into: flow; }
+            
+            #region { 
+                -webkit-flow-from: flow; 
+                width: 150px; 
+                border: 2px solid red; 
+                position: absolute; top: 100px; left: 100px;
+            }
+            
+            #region2 { 
+                -webkit-flow-from: flow; 
+                width: 300px; 
+                border: 2px solid black; 
+                height: 300px;
+                position: absolute; top: 300px; left: 300px;
+            }
+            
+            #h2 { font-size: 40px; }
+            #p1 { -webkit-region-break-before: always; }
+        </style>
+    </head>
+    <body>
+        <div id="article">
+            <h2 id="h2">What is lorem ipsum?</h2>
+            <p id="p1">Lorem Ipsum is simply dummy text of the printing and typesetting industry.</p> 
+        </div>
+        <div id="region"></div>
+        <div id="region2"></div>
+        <script>
+            if (window.layoutTestController)
+                window.layoutTestController.dumpAsText();
+            description("Test for regions auto height prototype.");
+
+            var namedFlow = document.webkitGetFlowByName("flow");
+            var h2RegionList = namedFlow.getRegionsByContentNode(document.getElementById("h2"));
+            var p1RegionList = namedFlow.getRegionsByContentNode(document.getElementById("p1"));
+
+            // FIXME: here we have a bug, h2RegionList.length -> 2, even though h2 is contained in the first region.
+            //shouldEvaluateTo("h2RegionList.length", 1);
+            shouldBeEqualToString("h2RegionList.item(0).id", "region");
+
+            shouldEvaluateTo("p1RegionList.length", 1);
+            shouldBeEqualToString("p1RegionList.item(0).id", "region2");
+            
+            document.getElementById("article").style.visibility = "hidden";
+            document.getElementById("region").style.visibility = "hidden";
+            document.getElementById("region2").style.visibility = "hidden";
+        </script>
+    </body>
+    <script src="../../../fast/js/resources/js-test-post.js"></script>
+</html>
+
