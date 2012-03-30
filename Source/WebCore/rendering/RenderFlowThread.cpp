@@ -604,10 +604,13 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
         if (position <= 0)
             return region;
 
-        if (document()->cssRegionsAutoHeightEnabled() && region->hasAutoHeight()) {
+        if (document()->cssRegionsAutoHeightEnabled()
+            && region->hasRegionAutoHeight()
+            ) {
             if (!region->hasComputedAutoHeight())
                 return region;
-            else if (position < region->regionRect().y() + region->computedAutoHeight())
+            else if ((useHorizontalWritingMode && (position < region->regionRect().y() + region->computedAutoHeight()))
+                    || (!useHorizontalWritingMode && (position < region->regionRect().x() + region->computedAutoHeight())))
                 return region;
         }
 
@@ -1048,7 +1051,7 @@ bool RenderFlowThread::needsSecondPassLayoutForRegionsAutoHeight() const
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
-        if (region->hasAutoHeight())
+        if (region->hasRegionAutoHeight())
             return true;
     }
     return false;
@@ -1076,14 +1079,15 @@ void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
        return;
 
     LayoutUnit accumulatedLogicalHeight = 0;
+    bool useHorizontalWritingMode = isHorizontalWritingMode();
 
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
 
-        if (!region->hasAutoHeight()) {
-            accumulatedLogicalHeight += region->contentHeight();
+        if (!region->hasRegionAutoHeight()) {
+            accumulatedLogicalHeight += useHorizontalWritingMode ? region->contentHeight() : region->contentWidth();
             continue;
         }
 

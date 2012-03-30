@@ -1,0 +1,14 @@
+Test auto height prototype with bottom-top writing mode
+
+On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE".
+
+
+PASS p1RegionList.item(0).id is "region"
+PASS p2RegionList.length is 1
+PASS p2RegionList.item(0).id is "region2"
+PASS successfullyParsed is true
+
+TEST COMPLETE
+
+
+

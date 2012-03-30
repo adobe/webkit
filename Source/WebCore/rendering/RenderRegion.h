@@ -98,6 +98,11 @@ public:
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
     bool hasAutoHeight() const { return !usedForMultiColumn() && style()->logicalHeight().isAuto(); }
+    bool hasAutoWidth() const { return !usedForMultiColumn() && style()->logicalWidth().isAuto(); }
+    bool hasRegionAutoHeight() const {
+        return (isHorizontalWritingMode() && hasAutoHeight()) || (!isHorizontalWritingMode() && hasAutoWidth());
+    }
+
     bool hasComputedAutoHeight() const { return m_hasComputedAutoHeight; }
     LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
     void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
@@ -119,7 +124,9 @@ public:
             setNeedsLayout(true);
         }
     }
+
     virtual LayoutUnit computeReplacedLogicalHeight() const;
+    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
     
     void setUsedForMultiColumn(bool usedForMultiColumn) { m_usedForMultiColumn = usedForMultiColumn; }
     bool usedForMultiColumn() const { return m_usedForMultiColumn; }

@@ -330,8 +330,21 @@ bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
 
 LayoutUnit RenderRegion::computeReplacedLogicalHeight() const
 {
-    if (!document()->cssRegionsAutoHeightEnabled() || !hasAutoHeight() || view()->inFirstRegionsAutoHeightLayoutPass())
+    if (!document()->cssRegionsAutoHeightEnabled()
+        || !hasAutoHeight()
+        || view()->inFirstRegionsAutoHeightLayoutPass()
+        || !isHorizontalWritingMode())
         return RenderReplaced::computeReplacedLogicalHeight();
+    return computedAutoHeight();
+}
+
+LayoutUnit RenderRegion::computeReplacedLogicalWidth(bool includeMaxWidth) const
+{
+    if (!document()->cssRegionsAutoHeightEnabled()
+        || !hasAutoWidth()
+        || view()->inFirstRegionsAutoHeightLayoutPass()
+        || isHorizontalWritingMode())
+        return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
     return computedAutoHeight();
 }
 

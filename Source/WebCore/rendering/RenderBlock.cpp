@@ -6684,7 +6684,10 @@ bool RenderBlock::hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule pageBou
     // If the region has auto height and the computed auto height was not "computed yet"
     // and the pageBoundaryRule == ExcludePageBoundary, then "pretend" that there is no next page
     // otherwise the computation of margins for elements inside auto height regions would be wrong/
-    if (document()->cssRegionsAutoHeightEnabled() && pageBoundaryRule == ExcludePageBoundary && region->hasAutoHeight() && !region->hasComputedAutoHeight())
+    if (document()->cssRegionsAutoHeightEnabled()
+        && pageBoundaryRule == ExcludePageBoundary
+        && region->hasRegionAutoHeight()
+        && !region->hasComputedAutoHeight())
         return false;
     if (region->isLastRegion())
         return region->style()->regionOverflow() == BreakRegionOverflow

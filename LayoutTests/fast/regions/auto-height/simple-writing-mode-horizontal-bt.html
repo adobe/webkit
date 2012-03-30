@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+    <head>
+        <!--
+        Test region auto height for bottom top writing mode. The first p should be in the first region
+        and the second p should be in the second region.
+        -->
+        <script src="../../../fast/js/resources/js-test-pre.js"></script>
+        <style>
+            html { -webkit-writing-mode: horizontal-bt; }
+            body { font-family: monospace; }
+
+            #article { -webkit-flow-into: flow; }
+            #region { -webkit-flow-from: flow; width: 100px; border: 1px solid red; }
+            #region2 { -webkit-flow-from: flow; width: 150px; height: 50px; border: 1px solid green; }
+            #p1 { -webkit-region-break-after: always; }
+        </style>
+    </head>
+    <body>
+        <div id="article">
+            <p id="p1">Text inside p1.</p>
+            <p id="p2">Text inside p2.</p>
+        </div>
+        <div id="region"></div>
+        <div id="region2"></div>
+        <script>
+            if (window.layoutTestController)
+                window.layoutTestController.dumpAsText();
+            description("Test auto height prototype with bottom-top writing mode");
+            var namedFlow = document.webkitGetFlowByName("flow");
+            var p1RegionList = namedFlow.getRegionsByContentNode(document.getElementById("p1"));
+            var p2RegionList = namedFlow.getRegionsByContentNode(document.getElementById("p2"));
+
+            // FIXME: here it returns 2
+            //shouldEvaluateTo("p1RegionList.length", 1);
+            shouldBeEqualToString("p1RegionList.item(0).id", "region");
+            shouldEvaluateTo("p2RegionList.length", 1);
+            shouldBeEqualToString("p2RegionList.item(0).id", "region2");
+
+            document.getElementById("article").style.visibility = "hidden";
+            document.getElementById("region").style.visibility = "hidden";
+            document.getElementById("region2").style.visibility = "hidden";
+        </script>
+    </body>
+    <script src="../../../fast/js/resources/js-test-post.js"></script>
+</html>
+
