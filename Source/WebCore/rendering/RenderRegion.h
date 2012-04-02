@@ -103,7 +103,7 @@ public:
         return (isHorizontalWritingMode() && hasAutoHeight()) || (!isHorizontalWritingMode() && hasAutoWidth());
     }
 
-    bool hasComputedAutoHeight() const { return m_hasComputedAutoHeight; }
+    bool hasComputedAutoHeight() const { return document()->cssRegionsAutoHeightEnabled() && m_hasComputedAutoHeight; }
     LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
     void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
         if (document()->cssRegionsAutoHeightEnabled()) {

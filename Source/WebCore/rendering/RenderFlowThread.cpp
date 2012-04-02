@@ -647,7 +647,7 @@ LayoutUnit RenderFlowThread::regionLogicalHeightForLine(LayoutUnit position) con
     RenderRegion* region = renderRegionForLine(position);
     if (!region)
         return 0;
-    return isHorizontalWritingMode() ? region->regionRect().height() : region->regionRect().width();
+    return isHorizontalWritingMode() ? (region->hasComputedAutoHeight() ? region->computedAutoHeight() : region->regionRect().height()) : region->regionRect().width();
 }
 
 LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule pageBoundaryRule) const
@@ -656,12 +656,12 @@ LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit posi
     if (!region)
         return 0;
 
-    LayoutUnit regionLogicalBottom = isHorizontalWritingMode() ? region->regionRect().maxY() : region->regionRect().maxX();
+    LayoutUnit regionLogicalBottom = isHorizontalWritingMode() ? (region->hasComputedAutoHeight() ? region->regionRect().y() + region->computedAutoHeight() : region->regionRect().maxY()) : region->regionRect().maxX();
     LayoutUnit remainingHeight = regionLogicalBottom - position;
     if (pageBoundaryRule == IncludePageBoundary) {
         // If IncludePageBoundary is set, the line exactly on the top edge of a
         // region will act as being part of the previous region.
-        LayoutUnit regionHeight = isHorizontalWritingMode() ? region->regionRect().height() : region->regionRect().width();
+        LayoutUnit regionHeight = isHorizontalWritingMode() ? (region->hasComputedAutoHeight() ? region->computedAutoHeight() : region->regionRect().height()) : region->regionRect().width();
         remainingHeight = layoutMod(remainingHeight, regionHeight);
     }
     return remainingHeight;
