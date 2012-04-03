@@ -121,6 +121,9 @@ public:
     void setUsedForMultiColumn(bool usedForMultiColumn) { m_usedForMultiColumn = usedForMultiColumn; }
     bool usedForMultiColumn() const { return m_usedForMultiColumn; }
     
+    virtual LayoutUnit minPreferredLogicalWidth() const;
+    virtual LayoutUnit maxPreferredLogicalWidth() const;
+    
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 

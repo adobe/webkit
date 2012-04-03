@@ -361,5 +361,15 @@ LayoutUnit RenderRegion::computeReplacedLogicalWidth(bool includeMaxWidth) const
         return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
     return computedAutoHeight();
 }
+    
+LayoutUnit RenderRegion::minPreferredLogicalWidth() const
+{
+    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();
+}
+
+LayoutUnit RenderRegion::maxPreferredLogicalWidth() const
+{
+    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() : RenderReplaced::maxPreferredLogicalWidth();
+}
 
 } // namespace WebCore
