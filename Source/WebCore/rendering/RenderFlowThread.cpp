@@ -593,6 +593,7 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
     // If no region matches the position and extendLastRegion is true, it will return
     // the last valid region. It is similar to auto extending the size of the last region. 
     RenderRegion* lastValidRegion = 0;
+    LayoutUnit accumulatedLogicalHeight = 0;
     
     // FIXME: The regions are always in order, optimize this search.
     bool useHorizontalWritingMode = isHorizontalWritingMode();
@@ -608,17 +609,24 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
             lastValidRegion = region;
 
         if (document()->cssRegionsAutoHeightEnabled() && region->usesAutoHeight()) {
-            if (!region->hasComputedAutoHeight())
-                return region;
-            if ((useHorizontalWritingMode && (position < region->regionRect().y() + region->computedAutoHeight()))
-                    || (!useHorizontalWritingMode && (position < region->regionRect().x() + region->computedAutoHeight())))
+            if (!region->hasComputedAutoHeight() && view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
+                // Check the size, so that we don't grow more then the maximum size.
+                LayoutUnit regionSize = position - accumulatedLogicalHeight;
+                LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
+                if (regionSize <= regionActualSize)
+                    return region;
+                region->setComputedAutoHeight(regionActualSize);
+                // Continue to the next region.
+            }
+            accumulatedLogicalHeight += region->computedAutoHeight();
+            if (position < accumulatedLogicalHeight)
                 return region;
             continue;
         }
 
         LayoutRect regionRect = region->regionRect();
-
-        if ((useHorizontalWritingMode && position < regionRect.maxY()) || (!useHorizontalWritingMode && position < regionRect.maxX()))
+        accumulatedLogicalHeight += useHorizontalWritingMode ? regionRect.height() : regionRect.width();
+        if (position < accumulatedLogicalHeight)
             return region;
     }
 
