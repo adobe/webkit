@@ -140,10 +140,10 @@ public:
     // Check if the object is in region and the region is part of this flow thread.
     bool objectInFlowRegion(const RenderObject*, const RenderRegion*) const;
 
-    bool needsSecondPassLayoutForRegionsAutoHeight() const;
-    void resetRegionsAutoHeight();
+    bool resetAutoHeightRegionsForFirstLayoutPhase();
+    void markAutoHeightRegionsForSecondLayoutPhase();
+    
     void addRegionBreak(LayoutUnit);
-    void markRegionsForLayout();
 
 private:
     virtual const char* renderName() const { return "RenderFlowThread"; }

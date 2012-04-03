@@ -58,7 +58,8 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
     , m_currentRenderFlowThread(0)
-    , m_inFirstRegionsAutoHeightLayoutPass(false)
+    , m_inFirstLayoutPhaseOfRegionsAutoHeight(false)
+    , m_autoHeightRegionsCount(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
     // any renderer with document as the node is anonymous.
@@ -139,25 +140,24 @@ void RenderView::layout()
     // If one of the render flow threads has a region with auto-height
     // then we need a second pass layout.
     if (needsLayout()) {
-
-        if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && needsSecondPassLayoutForRegionsAutoHeight()) {
-            m_inFirstRegionsAutoHeightLayoutPass = true;
-            resetRegionsAutoHeight();
-            markRegionsForLayout();    
-        }
-
+        m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
+        if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions() && resetAutoHeightRegionsForFirstLayoutPhase())
+            m_inFirstLayoutPhaseOfRegionsAutoHeight = true;
         RenderBlock::layout();
         if (hasRenderFlowThreads())
             layoutRenderFlowThreads();
     }
-
-    if (document()->cssRegionsAutoHeightEnabled() && inFirstRegionsAutoHeightLayoutPass()) {
-        markRegionsForLayout();
-        m_inFirstRegionsAutoHeightLayoutPass = false;
-
-        RenderBlock::layout();
-        if (hasRenderFlowThreads())
+    
+    if (m_inFirstLayoutPhaseOfRegionsAutoHeight) {
+        m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
+        // Regions should decide for themselves whether they need a second layout.
+        setNeedsLayout(false);
+        markAutoHeightRegionsForSecondLayoutPhase();
+        if (needsLayout()) {
+            RenderBlock::layout();
+            ASSERT(hasRenderFlowThreads());
             layoutRenderFlowThreads();
+        }
     }
 
     ASSERT(layoutDelta() == LayoutSize());
@@ -960,40 +960,29 @@ void RenderView::layoutRenderFlowThreads()
     }
 }
 
-bool RenderView::needsSecondPassLayoutForRegionsAutoHeight() const
+bool RenderView::resetAutoHeightRegionsForFirstLayoutPhase()
 {
     if (!document()->cssRegionsAutoHeightEnabled())
         return false;
 
+    bool hadFlowsWithAutoHeightRegions = false;
     for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
         RenderFlowThread* flowRenderer = *iter;
-        if (flowRenderer->needsSecondPassLayoutForRegionsAutoHeight())
-            return true;
+        if (flowRenderer->resetAutoHeightRegionsForFirstLayoutPhase())
+            hadFlowsWithAutoHeightRegions = true;
     }
-
-    return false;
+    
+    return hadFlowsWithAutoHeightRegions;
 }
 
-void RenderView::resetRegionsAutoHeight()
+void RenderView::markAutoHeightRegionsForSecondLayoutPhase()
 {
     if (!document()->cssRegionsAutoHeightEnabled())
         return;
 
     for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
         RenderFlowThread* flowRenderer = *iter;
-        if (flowRenderer->needsSecondPassLayoutForRegionsAutoHeight())
-            flowRenderer->resetRegionsAutoHeight();
-    }
-}
-
-void RenderView::markRegionsForLayout()
-{
-    if (!document()->cssRegionsAutoHeightEnabled())
-        return;
-
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-        RenderFlowThread* flowRenderer = *iter;
-        flowRenderer->markRegionsForLayout();
+        flowRenderer->markAutoHeightRegionsForSecondLayoutPhase();
     }
 }
 

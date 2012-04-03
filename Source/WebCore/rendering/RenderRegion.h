@@ -97,34 +97,24 @@ public:
     
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
-    bool hasAutoHeight() const { return !usedForMultiColumn() && style()->logicalHeight().isAuto(); }
-    bool hasAutoWidth() const { return !usedForMultiColumn() && style()->logicalWidth().isAuto(); }
-    bool hasRegionAutoHeight() const {
-        return (isHorizontalWritingMode() && hasAutoHeight()) || (!isHorizontalWritingMode() && hasAutoWidth());
-    }
+    bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
+    bool hasAutoWidth() const { return style()->logicalWidth().isAuto(); }
+    bool hasAutoHeightStyle() const  { return !usedForMultiColumn() && (isHorizontalWritingMode() ? hasAutoHeight() : hasAutoWidth()); }
+    bool usesAutoHeight() const { return m_usesAutoHeight; }
 
     bool hasComputedAutoHeight() const { return document()->cssRegionsAutoHeightEnabled() && m_hasComputedAutoHeight; }
     LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
     void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
-        if (document()->cssRegionsAutoHeightEnabled()) {
-            m_computedAutoHeight = computedAutoHeight;
-            m_hasComputedAutoHeight = true;
-        }
+        ASSERT(document()->cssRegionsAutoHeightEnabled());
+        m_computedAutoHeight = computedAutoHeight;
+        m_hasComputedAutoHeight = true;
     }
     void resetComputedAutoHeight() {
-        if (document()->cssRegionsAutoHeightEnabled()) {
-            m_computedAutoHeight = 0;
-            m_hasComputedAutoHeight = false;
-        }
+        ASSERT(document()->cssRegionsAutoHeightEnabled());
+        m_computedAutoHeight = 0;
+        m_hasComputedAutoHeight = false;
     }
-
-    void prepareSecondLayout(LayoutUnit intrinsicHeight) {
-        if (document()->cssRegionsAutoHeightEnabled()) {
-            setIntrinsicSize(IntSize(logicalWidth(), intrinsicHeight));
-            setNeedsLayout(true);
-        }
-    }
-
+    
     virtual LayoutUnit computeReplacedLogicalHeight() const;
     virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
     
@@ -166,6 +156,7 @@ private:
     // Store the computed region autoheight
     LayoutUnit m_computedAutoHeight;
     bool m_hasComputedAutoHeight;
+    bool m_usesAutoHeight;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)

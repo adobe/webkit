@@ -52,6 +52,7 @@ RenderRegion::RenderRegion(Node* node, RenderFlowThread* flowThread)
     , m_usedForMultiColumn(false)
     , m_computedAutoHeight(0)
     , m_hasComputedAutoHeight(false)
+    , m_usesAutoHeight(false)
 {
     ASSERT(node->document()->cssRegionsEnabled());
 }
@@ -180,7 +181,16 @@ void RenderRegion::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
         Element* regionElement = static_cast<Element*>(node());
         customRegionStyle = view()->document()->styleSelector()->checkRegionStyle(regionElement);
     }
-    setHasCustomRegionStyle(customRegionStyle);
+    
+    bool didUseAutoHeight = m_usesAutoHeight;
+    m_usesAutoHeight = hasAutoHeightStyle();
+    if (m_flowThread && didUseAutoHeight != m_usesAutoHeight) {
+        if (m_usesAutoHeight)
+            view()->view()->incrementAutoHeightRegions();
+        else
+            view()->view()->incrementAutoHeightRegions();
+        setNeedsLayout(true);
+    }
 }
 
 void RenderRegion::layout()
@@ -231,8 +241,12 @@ void RenderRegion::attachRegion()
 
 void RenderRegion::detachRegion()
 {
-    if (m_flowThread)
+    if (m_flowThread) {
         m_flowThread->removeRegionFromThread(this);
+        if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight())
+            view()->decrementAutoHeightRegions();
+        m_flowThread = 0;
+    }
 }
 
 RenderBoxRegionInfo* RenderRegion::renderBoxRegionInfo(const RenderBox* box) const
@@ -331,8 +345,8 @@ bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
 LayoutUnit RenderRegion::computeReplacedLogicalHeight() const
 {
     if (!document()->cssRegionsAutoHeightEnabled()
-        || !hasAutoHeight()
-        || view()->inFirstRegionsAutoHeightLayoutPass()
+        || !usesAutoHeight()
+        || view()->inFirstLayoutPhaseOfRegionsAutoHeight()
         || !isHorizontalWritingMode())
         return RenderReplaced::computeReplacedLogicalHeight();
     return computedAutoHeight();
@@ -341,8 +355,8 @@ LayoutUnit RenderRegion::computeReplacedLogicalHeight() const
 LayoutUnit RenderRegion::computeReplacedLogicalWidth(bool includeMaxWidth) const
 {
     if (!document()->cssRegionsAutoHeightEnabled()
-        || !hasAutoWidth()
-        || view()->inFirstRegionsAutoHeightLayoutPass()
+        || !usesAutoHeight()
+        || view()->inFirstLayoutPhaseOfRegionsAutoHeight()
         || isHorizontalWritingMode())
         return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
     return computedAutoHeight();

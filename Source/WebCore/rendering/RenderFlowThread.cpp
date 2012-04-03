@@ -224,7 +224,7 @@ void RenderFlowThread::addRegionToThread(RenderRegion* renderRegion)
     }
 
     renderRegion->setIsValid(true);
-
+    
     invalidateRegions();
 }
 
@@ -600,27 +600,26 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
-
+        
         if (position <= 0)
             return region;
+        
+        if (extendLastRegion)
+            lastValidRegion = region;
 
-        if (document()->cssRegionsAutoHeightEnabled()
-            && region->hasRegionAutoHeight()
-            ) {
+        if (document()->cssRegionsAutoHeightEnabled() && region->usesAutoHeight()) {
             if (!region->hasComputedAutoHeight())
                 return region;
-            else if ((useHorizontalWritingMode && (position < region->regionRect().y() + region->computedAutoHeight()))
+            if ((useHorizontalWritingMode && (position < region->regionRect().y() + region->computedAutoHeight()))
                     || (!useHorizontalWritingMode && (position < region->regionRect().x() + region->computedAutoHeight())))
                 return region;
+            continue;
         }
 
         LayoutRect regionRect = region->regionRect();
 
         if ((useHorizontalWritingMode && position < regionRect.maxY()) || (!useHorizontalWritingMode && position < regionRect.maxX()))
             return region;
-
-        if (extendLastRegion)
-            lastValidRegion = region;
     }
 
     return lastValidRegion;
@@ -912,6 +911,10 @@ WebKitNamedFlow* RenderFlowThread::ensureNamedFlow()
 void RenderFlowThread::computeOverflowStateForRegions(LayoutUnit oldClientAfterEdge)
 {
     LayoutUnit height = oldClientAfterEdge;
+    
+    if (document()->cssRegionsAutoHeightEnabled())
+        addRegionBreak(height);
+    
     // FIXME: the visual overflow of middle region (if it is the last one to contain any content in a render flow thread)
     // might not be taken into account because the render flow thread height is greater that that regions height + its visual overflow
     // because of how computeLogicalHeight is implemented for RenderFlowThread (as a sum of all regions height).
@@ -1042,59 +1045,23 @@ bool RenderFlowThread::objectInFlowRegion(const RenderObject* object, const Rend
     return false;
 }
 
-bool RenderFlowThread::needsSecondPassLayoutForRegionsAutoHeight() const
-{
-    if (!document()->cssRegionsAutoHeightEnabled())
-        return false;
-
-    for (RenderRegionList::const_iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-        RenderRegion* region = *iter;
-        if (!region->isValid())
-            continue;
-        if (region->hasRegionAutoHeight())
-            return true;
-    }
-    return false;
-}
-
-void RenderFlowThread::resetRegionsAutoHeight()
-{
-     if (!document()->cssRegionsAutoHeightEnabled())
-        return;
-
-   for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-        RenderRegion* region = *iter;
-        if (!region->isValid())
-            continue;
-        region->resetComputedAutoHeight();
-    }
-}
-
 void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
 {
-   if (!document()->cssRegionsAutoHeightEnabled())
-       return;
-
-   if (!view()->inFirstRegionsAutoHeightLayoutPass())
-       return;
-
+    if (!document()->cssRegionsAutoHeightEnabled() || !view()->inFirstLayoutPhaseOfRegionsAutoHeight())
+        return;
+    
     LayoutUnit accumulatedLogicalHeight = 0;
     bool useHorizontalWritingMode = isHorizontalWritingMode();
 
-    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end() && logicalOffset >= accumulatedLogicalHeight; ++iter) {
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
 
-        if (!region->hasRegionAutoHeight()) {
+        if (!region->usesAutoHeight()) {
             accumulatedLogicalHeight += useHorizontalWritingMode ? region->contentHeight() : region->contentWidth();
             continue;
         }
-
-        // The break position falls into a region that is not auto-height.
-        // In this case, we simply return from the processing.
-        if (logicalOffset <= accumulatedLogicalHeight)
-            return;
 
         if (region->hasComputedAutoHeight()) {
             accumulatedLogicalHeight += region->computedAutoHeight();
@@ -1106,17 +1073,32 @@ void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
     }
 }
 
-void RenderFlowThread::markRegionsForLayout()
+bool RenderFlowThread::resetAutoHeightRegionsForFirstLayoutPhase()
+{
+    if (!document()->cssRegionsAutoHeightEnabled())
+        return false;
+    
+    bool hadAutoHeightRegions = false;
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid() || !region->usesAutoHeight())
+            continue;
+        hadAutoHeightRegions = true;
+        region->resetComputedAutoHeight();
+        region->setNeedsLayout(true);
+    }
+    
+    return hadAutoHeightRegions;
+}
+
+void RenderFlowThread::markAutoHeightRegionsForSecondLayoutPhase()
 {
     if (!document()->cssRegionsAutoHeightEnabled())
         return;
 
-    if (!view()->inFirstRegionsAutoHeightLayoutPass())
-        return;
-
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
-        if (!region->isValid())
+        if (!region->isValid() || !region->usesAutoHeight())
             continue;
         region->setNeedsLayout(true);
     }
