@@ -452,6 +452,12 @@ void RenderFlowThread::computeLogicalHeight()
         if (!region->isValid())
             continue;
         ASSERT(!region->needsLayout());
+        if ((region->usesAutoHeight() && !region->hasComputedAutoHeight()) 
+            || (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight()
+                && !region->parentMultiColumnRegion()->hasComputedAutoHeight())) {
+            // If we have auto height regions we cannot know for sure the height of this flow.
+            return;
+        }
         logicalHeight += isHorizontalWritingMode() ? region->contentHeight() : region->contentWidth();
     }
 
