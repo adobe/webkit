@@ -355,6 +355,9 @@ private:
 
 void RenderFlowThread::layout()
 {
+    m_breakBeforeToRegionMap.clear();
+    m_breakAfterToRegionMap.clear();
+    
     bool regionsChanged = m_regionsInvalidated && everHadLayout();
     if (m_regionsInvalidated) {
         m_regionsInvalidated = false;
@@ -574,7 +577,7 @@ void RenderFlowThread::repaintRectangleInRegions(const LayoutRect& repaintRect, 
     }
 }
 
-RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool extendLastRegion, bool usedForLineAdjustment) const
+RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool extendLastRegion) const
 {
     ASSERT(!m_regionsInvalidated);
 
@@ -598,19 +601,8 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
 
         if (document()->cssRegionsAutoHeightEnabled() && view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
             if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight()) {
-                if (!region->parentMultiColumnRegion()->hasComputedAutoHeight()) {
-                    if (!usedForLineAdjustment)
-                        return region;
-                    LayoutUnit regionSize = position - accumulatedLogicalHeight;
-                    regionSize = regionSize / region->parentMultiColumnRegion()->columnCount() + regionSize % region->parentMultiColumnRegion()->columnCount();
-                    LayoutUnit regionActualSize = region->parentMultiColumnRegion()->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
-                    if (regionSize <= regionActualSize)
-                        return region;
-                    region->parentMultiColumnRegion()->setComputedAutoHeight(regionActualSize);
-                    // This will actually update all the following regions that are part of the same multi-column block.
-                    const_cast<RenderFlowThread*>(this)->updateRegionRects();
-                    // Just fell through to take the computed auto-height and fill the following regions.
-                }
+                if (!region->parentMultiColumnRegion()->hasComputedAutoHeight())
+                    return region;
                 accumulatedLogicalHeight += region->parentMultiColumnRegion()->computedAutoHeight();
                 if (position < accumulatedLogicalHeight)
                     return region;
@@ -618,18 +610,8 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
             }
             
             if (region->usesAutoHeight()) {
-                if (!region->hasComputedAutoHeight()) {
-                    if (!usedForLineAdjustment)
-                        return region;
-                    // Check the size, so that we don't grow more then the maximum size.
-                    LayoutUnit regionSize = position - accumulatedLogicalHeight;
-                    LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
-                    if (regionSize <= regionActualSize)
-                        return region;
-                    region->setComputedAutoHeight(regionActualSize);
-                    const_cast<RenderFlowThread*>(this)->updateRegionRects();
-                    // Continue to the next region.
-                }
+                if (!region->hasComputedAutoHeight())
+                    return region;
                 accumulatedLogicalHeight += region->computedAutoHeight();
                 if (position < accumulatedLogicalHeight)
                     return region;
@@ -711,7 +693,7 @@ LayoutUnit RenderFlowThread::regionLogicalHeightForLine(LayoutUnit position) con
 
 LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule pageBoundaryRule, bool jumpOverMultiColumnRegions) const
 {
-    RenderRegion* region = renderRegionForLine(position, false, true);
+    RenderRegion* region = renderRegionForLine(position, false);
     if (!region)
         return 0;
     
@@ -943,7 +925,7 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
 
     // FIXME: Not right for differing writing-modes.
     RenderRegion* startRegion = renderRegionForLine(offsetFromLogicalTopOfFirstPage, true);
-    RenderRegion* endRegion = renderRegionForLine(offsetFromLogicalTopOfFirstPage + box->logicalHeight(), true);
+    RenderRegion* endRegion = renderRegionForLine(max(offsetFromLogicalTopOfFirstPage, offsetFromLogicalTopOfFirstPage + box->logicalHeight()), true);
     RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
     if (it == m_regionRangeMap.end()) {
         m_regionRangeMap.set(box, RenderRegionRange(startRegion, endRegion));
@@ -959,7 +941,8 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
         if (region == startRegion) {
-            iter = m_regionList.find(endRegion);
+            if (startRegion != endRegion)
+                iter = m_regionList.find(endRegion);
             continue;
         }
 
@@ -1000,7 +983,7 @@ void RenderFlowThread::computeOverflowStateForRegions(LayoutUnit oldClientAfterE
     LayoutUnit height = oldClientAfterEdge;
     
     if (document()->cssRegionsAutoHeightEnabled())
-        addRegionBreak(height);
+        addRegionForcedBreak(height, this, false);
     
     // FIXME: the visual overflow of middle region (if it is the last one to contain any content in a render flow thread)
     // might not be taken into account because the render flow thread height is greater that that regions height + its visual overflow
@@ -1131,49 +1114,98 @@ bool RenderFlowThread::objectInFlowRegion(const RenderObject* object, const Rend
 
     return false;
 }
-
-void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
+    
+bool RenderFlowThread::addRegionForcedBreak(LayoutUnit offset, RenderObject* breakChild, bool isBefore, LayoutUnit* adjustment)
 {
     if (!document()->cssRegionsAutoHeightEnabled() || !view()->inFirstLayoutPhaseOfRegionsAutoHeight())
-        return;
+        return false;
+
+    // Breaks cand come before or after some objects. We need to track the objects, so that if we get
+    // multiple breaks for the same object (for example because of multiple layouts on the same object),
+    // we need to invalidate every other region after the old one and start computing from fresh.
     
-    LayoutUnit accumulatedLogicalHeight = 0;
-    bool useHorizontalWritingMode = isHorizontalWritingMode();
-
-    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end() && logicalOffset >= accumulatedLogicalHeight; ++iter) {
-        RenderRegion* region = *iter;
-        if (!region->isValid())
-            continue;
-
-        if (!region->usesAutoHeight() && !(region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight())) {
-            accumulatedLogicalHeight += useHorizontalWritingMode ? region->contentHeight() : region->contentWidth();
-            continue;
-        }
-
-        if (region->hasComputedAutoHeight()) {
-            accumulatedLogicalHeight += region->computedAutoHeight();
-            continue;
-        }
-        
-        if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->hasComputedAutoHeight()) {
-            accumulatedLogicalHeight += region->parentMultiColumnRegion()->computedAutoHeight();
-            continue;
-        }
-
-        if (region->hasParentMultiColumnRegion()) {
-            LayoutUnit regionSize = logicalOffset - accumulatedLogicalHeight;
-            regionSize = regionSize / region->parentMultiColumnRegion()->columnCount() + regionSize % region->parentMultiColumnRegion()->columnCount();
-            LayoutUnit regionActualSize = region->parentMultiColumnRegion()->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
-            region->parentMultiColumnRegion()->setComputedAutoHeight(regionActualSize);
-        } else {
-            // FIXME: Make sure we don't go below the min-height here.
-            LayoutUnit regionSize = logicalOffset - accumulatedLogicalHeight;
-            LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
-            region->setComputedAutoHeight(regionActualSize);
+    RenderObjectToRegionMap& mapToUse = isBefore ? m_breakBeforeToRegionMap : m_breakAfterToRegionMap;
+    RenderObjectToRegionMap::iterator iter = mapToUse.find(breakChild);
+    if (iter != mapToUse.end()) {
+        RenderRegionList::iterator regionIter = m_regionList.find(iter->second);
+        ASSERT(regionIter != m_regionList.end());
+        for (; regionIter != m_regionList.end(); ++regionIter) {
+            RenderRegion* region = *regionIter;
+            if (!region->isValid())
+                continue;
+            if (region->usesAutoHeight())
+                region->resetComputedAutoHeight();
+            
+            if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight())
+                region->parentMultiColumnRegion()->resetComputedAutoHeight();
         }
         updateRegionRects();
-        return;
     }
+    
+    RenderRegion* startRegion = renderRegionForLine(offset);
+    if (!startRegion)
+        return false;
+    
+    bool useHorizontalWritingMode = isHorizontalWritingMode(); 
+    LayoutUnit accumulatedOffset = useHorizontalWritingMode ? startRegion->regionRect().y() : startRegion->regionRect().x();
+    LayoutUnit offsetInRegion = offset - accumulatedOffset;
+    // Want to distribute the offsetInRegion to the next regions. The distribution might happen because the block was so large, that it 
+    // spans multiple regions (because of the max-height).
+    
+    bool computedAtLeastAHeight = false;
+    
+    RenderRegionList::iterator regionIter = m_regionList.find(startRegion);
+    ASSERT(regionIter != m_regionList.end());
+    for (; regionIter != m_regionList.end(); ++regionIter) {
+        RenderRegion* region = *regionIter;
+        if (!region->isValid())
+            continue;
+        
+        if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight() && !region->parentMultiColumnRegion()->hasComputedAutoHeight()) {
+            LayoutUnit regionSize = offsetInRegion / region->parentMultiColumnRegion()->columnCount() 
+                                    + offsetInRegion % region->parentMultiColumnRegion()->columnCount() // make sure the remainder is also taken into account
+                                    + 10; // we add one pixel to make sure the lines can be now split.
+            LayoutUnit regionActualSize = region->parentMultiColumnRegion()->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
+            mapToUse.set(breakChild, region);
+            region->parentMultiColumnRegion()->setComputedAutoHeight(regionActualSize);
+            computedAtLeastAHeight = true;
+            LayoutUnit totalHeight = regionActualSize * region->parentMultiColumnRegion()->columnCount();
+            accumulatedOffset += totalHeight;
+            offsetInRegion -= totalHeight;
+            if (accumulatedOffset < offset)
+                continue;
+            break;
+        }
+        
+        if (region->usesAutoHeight() && !region->hasComputedAutoHeight()) {
+            LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(offsetInRegion);
+            mapToUse.set(breakChild, region);
+            region->setComputedAutoHeight(regionActualSize);
+            computedAtLeastAHeight = true;
+            accumulatedOffset += regionActualSize;
+            offsetInRegion -= regionActualSize;
+            if (accumulatedOffset < offset)
+                continue;
+            break;
+        }
+        
+        accumulatedOffset += useHorizontalWritingMode ? region->regionRect().height() : region->regionRect().width();
+        if (accumulatedOffset >= offset)
+            break;
+    }
+    
+    if (computedAtLeastAHeight)
+        updateRegionRects();
+
+    if (adjustment)
+        *adjustment = max<LayoutUnit>(zeroLayoutUnit, accumulatedOffset - offset);
+    
+    return computedAtLeastAHeight;
+}
+
+void RenderFlowThread::addRegionPossibleBreak(LayoutUnit /*offset*/)
+{
+    // TODO: use this for better columns
 }
 
 bool RenderFlowThread::resetAutoHeightRegionsForFirstLayoutPhase()

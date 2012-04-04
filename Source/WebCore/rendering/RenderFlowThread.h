@@ -109,7 +109,7 @@ public:
     LayoutUnit regionLogicalWidthForLine(LayoutUnit position) const;
     LayoutUnit regionLogicalHeightForLine(LayoutUnit position) const;
     LayoutUnit regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule = IncludePageBoundary, bool jumpOverMultiColumnRegions = false) const;
-    RenderRegion* renderRegionForLine(LayoutUnit position, bool extendLastRegion = false, bool usedForLineAdjustment = false) const;
+    RenderRegion* renderRegionForLine(LayoutUnit position, bool extendLastRegion = false) const;
 
     bool regionsHaveUniformLogicalWidth() const { return m_regionsHaveUniformLogicalWidth; }
     bool regionsHaveUniformLogicalHeight() const { return m_regionsHaveUniformLogicalHeight; }
@@ -143,7 +143,8 @@ public:
     bool resetAutoHeightRegionsForFirstLayoutPhase();
     void markAutoHeightRegionsForSecondLayoutPhase();
     
-    void addRegionBreak(LayoutUnit);
+    bool addRegionForcedBreak(LayoutUnit, RenderObject* breakChild, bool isBefore, LayoutUnit* adjustment = 0);
+    void addRegionPossibleBreak(LayoutUnit);
     void updateRegionRects();
 
 private:
@@ -204,6 +205,10 @@ private:
     typedef HashMap<const RenderBox*, RenderRegionRange> RenderRegionRangeMap;
     RenderRegionRangeMap m_regionRangeMap;
 
+    typedef HashMap<RenderObject*, RenderRegion*> RenderObjectToRegionMap;
+    RenderObjectToRegionMap m_breakBeforeToRegionMap;
+    RenderObjectToRegionMap m_breakAfterToRegionMap;
+    
     bool m_hasValidRegions;
     bool m_regionsInvalidated;
     bool m_regionsHaveUniformLogicalWidth;

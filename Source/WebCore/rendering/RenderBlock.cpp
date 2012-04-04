@@ -6726,8 +6726,11 @@ LayoutUnit RenderBlock::applyBeforeBreak(RenderBox* child, LayoutUnit logicalOff
     if (checkBeforeAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
-        if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
-            enclosingRenderFlowThread()->addRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset);
+        if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled()) {
+            LayoutUnit adjustment;
+            if (enclosingRenderFlowThread()->addRegionForcedBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset, child, true, &adjustment))
+                return logicalOffset + adjustment;
+        }
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary, hadRegionBreak);
     }
     return logicalOffset;
@@ -6745,8 +6748,12 @@ LayoutUnit RenderBlock::applyAfterBreak(RenderBox* child, LayoutUnit logicalOffs
         marginInfo.setMarginAfterQuirk(true); // Cause margins to be discarded for any following content.
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
-        if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
-            enclosingRenderFlowThread()->addRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + marginInfo.margin());
+        if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled()) {
+            LayoutUnit marginOffset = marginInfo.canCollapseWithMarginBefore() ? zeroLayoutUnit : marginInfo.margin();
+            LayoutUnit adjustment;
+            if (enclosingRenderFlowThread()->addRegionForcedBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + marginOffset, child, false, &adjustment))
+                return logicalOffset + adjustment;
+        }
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary, hadRegionBreak);
     }
     return logicalOffset;
@@ -6809,6 +6816,8 @@ LayoutUnit RenderBlock::adjustForUnsplittableChild(RenderBox* child, LayoutUnit 
     LayoutState* layoutState = view()->layoutState();
     if (layoutState->m_columnInfo)
         layoutState->m_columnInfo->updateMinimumColumnHeight(childLogicalHeight);
+    if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
+        enclosingRenderFlowThread()->addRegionPossibleBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + childLogicalHeight);
     LayoutUnit pageLogicalHeight = pageLogicalHeightForOffset(logicalOffset);
     bool hasUniformPageLogicalHeight = !inRenderFlowThread() || enclosingRenderFlowThread()->regionsHaveUniformLogicalHeight();
     if (!pageLogicalHeight || (hasUniformPageLogicalHeight && childLogicalHeight > pageLogicalHeight)
@@ -6866,6 +6875,8 @@ void RenderBlock::adjustLinePositionForPagination(RootInlineBox* lineBox, Layout
     LayoutState* layoutState = renderView->layoutState();
     if (layoutState->m_columnInfo)
         layoutState->m_columnInfo->updateMinimumColumnHeight(lineHeight);
+    if (inRenderFlowThread() && document()->cssRegionsAutoHeightEnabled())
+        enclosingRenderFlowThread()->addRegionPossibleBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + lineHeight);
     logicalOffset += delta;
     lineBox->setPaginationStrut(0);
     LayoutUnit pageLogicalHeight = pageLogicalHeightForOffset(logicalOffset);
