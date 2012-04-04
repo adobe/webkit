@@ -1765,7 +1765,10 @@ void RenderBox::computeLogicalWidthInRegion(RenderRegion* region, LayoutUnit off
     // https://bugs.webkit.org/show_bug.cgi?id=46418
     bool inVerticalBox = parent()->isDeprecatedFlexibleBox() && (parent()->style()->boxOrient() == VERTICAL);
     bool stretching = (parent()->style()->boxAlign() == BSTRETCH);
-    bool treatAsReplaced = shouldComputeSizeAsReplaced() && (!inVerticalBox || !stretching) && !isRenderRegion();
+    bool isRegion = isRenderRegion() || isRenderRegionMultiColumn();
+    bool isMultiColumnRegion = isRenderRegion() && toRenderRegion(this)->hasParentMultiColumnRegion();
+    bool canRegionBeTreatedAsReplaced = isRegion && (isMultiColumnRegion || !style()->logicalWidth().isAuto());
+    bool treatAsReplaced = (isRegion ? canRegionBeTreatedAsReplaced : shouldComputeSizeAsReplaced()) && (!inVerticalBox || !stretching);
 
     RenderStyle* styleToUse = style();
     Length logicalWidthLength = (treatAsReplaced) ? Length(computeReplacedLogicalWidth(), Fixed) : styleToUse->logicalWidth();

@@ -38,6 +38,7 @@
 #include "RenderBoxRegionInfo.h"
 #include "RenderLayer.h"
 #include "RenderRegion.h"
+#include "RenderRegionMultiColumn.h"
 #include "RenderView.h"
 #include "TransformState.h"
 #include "WebKitNamedFlow.h"
@@ -392,22 +393,7 @@ void RenderFlowThread::layout()
             }
             
             computeLogicalWidth(); // Called to get the maximum logical width for the region.
-            
-            LayoutUnit logicalHeight = 0;
-            for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-                RenderRegion* region = *iter;
-                if (!region->isValid())
-                    continue;
-                LayoutRect regionRect;
-                if (isHorizontalWritingMode()) {
-                    regionRect = LayoutRect(style()->direction() == LTR ? zeroLayoutUnit : logicalWidth() - region->contentWidth(), logicalHeight, region->contentWidth(), region->contentHeight());
-                    logicalHeight += regionRect.height();
-                } else {
-                    regionRect = LayoutRect(logicalHeight, style()->direction() == LTR ? zeroLayoutUnit : logicalWidth() - region->contentHeight(), region->contentWidth(), region->contentHeight());
-                    logicalHeight += regionRect.width();
-                }
-                region->setRegionRect(regionRect);
-            }
+            updateRegionRects();
         }
     }
 
@@ -437,13 +423,11 @@ void RenderFlowThread::computeLogicalWidth()
         logicalWidth = max(isHorizontalWritingMode() ? region->contentWidth() : region->contentHeight(), logicalWidth);
     }
     setLogicalWidth(logicalWidth);
-
     // If the regions have non-uniform logical widths, then insert inset information for the RenderFlowThread.
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
         if (!region->isValid())
             continue;
-        
         LayoutUnit regionLogicalWidth = isHorizontalWritingMode() ? region->contentWidth() : region->contentHeight();
         if (regionLogicalWidth != logicalWidth) {
             LayoutUnit logicalLeft = style()->direction() == LTR ? zeroLayoutUnit : logicalWidth - regionLogicalWidth;
@@ -586,7 +570,7 @@ void RenderFlowThread::repaintRectangleInRegions(const LayoutRect& repaintRect, 
     }
 }
 
-RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool extendLastRegion) const
+RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool extendLastRegion, bool usedForLineAdjustment) const
 {
     ASSERT(!m_regionsInvalidated);
 
@@ -608,20 +592,45 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
         if (extendLastRegion)
             lastValidRegion = region;
 
-        if (document()->cssRegionsAutoHeightEnabled() && region->usesAutoHeight()) {
-            if (!region->hasComputedAutoHeight() && view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
-                // Check the size, so that we don't grow more then the maximum size.
-                LayoutUnit regionSize = position - accumulatedLogicalHeight;
-                LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
-                if (regionSize <= regionActualSize)
+        if (document()->cssRegionsAutoHeightEnabled()) {
+            if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight()) {
+                if (!region->parentMultiColumnRegion()->hasComputedAutoHeight() && view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
+                    if (!usedForLineAdjustment)
+                        return region;
+                    LayoutUnit regionSize = position - accumulatedLogicalHeight;
+                    regionSize = regionSize / region->parentMultiColumnRegion()->columnCount() + regionSize % region->parentMultiColumnRegion()->columnCount();
+                    LayoutUnit regionActualSize = region->parentMultiColumnRegion()->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
+                    if (regionSize < regionActualSize)
+                        return region;
+                    region->parentMultiColumnRegion()->setComputedAutoHeight(regionActualSize);
+                    // This will actually update all the following regions that are part of the same multi-column block.
+                    const_cast<RenderFlowThread*>(this)->updateRegionRects();
+                    // Just fell through to take the computed auto-height and fill the following regions.
+                }
+                accumulatedLogicalHeight += region->parentMultiColumnRegion()->computedAutoHeight();
+                if (position < accumulatedLogicalHeight)
                     return region;
-                region->setComputedAutoHeight(regionActualSize);
-                // Continue to the next region.
+                continue;
             }
-            accumulatedLogicalHeight += region->computedAutoHeight();
-            if (position < accumulatedLogicalHeight)
-                return region;
-            continue;
+            
+            if (region->usesAutoHeight()) {
+                if (!region->hasComputedAutoHeight() && view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
+                    if (!usedForLineAdjustment)
+                        return region;
+                    // Check the size, so that we don't grow more then the maximum size.
+                    LayoutUnit regionSize = position - accumulatedLogicalHeight;
+                    LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
+                    if (regionSize < regionActualSize)
+                        return region;
+                    region->setComputedAutoHeight(regionActualSize);
+                    const_cast<RenderFlowThread*>(this)->updateRegionRects();
+                    // Continue to the next region.
+                }
+                accumulatedLogicalHeight += region->computedAutoHeight();
+                if (position < accumulatedLogicalHeight)
+                    return region;
+                continue;
+            }
         }
 
         LayoutRect regionRect = region->regionRect();
@@ -631,6 +640,38 @@ RenderRegion* RenderFlowThread::renderRegionForLine(LayoutUnit position, bool ex
     }
 
     return lastValidRegion;
+}
+
+void RenderFlowThread::updateRegionRects()
+{
+    LayoutUnit logicalHeight = 0;
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        if (!region->isValid())
+            continue;
+        LayoutRect regionRect;
+        LayoutUnit size = 0;
+        if (isHorizontalWritingMode()) {
+            regionRect = LayoutRect(style()->direction() == LTR ? zeroLayoutUnit : logicalWidth() - region->contentWidth(), logicalHeight, region->contentWidth(), region->contentHeight());
+            size = regionRect.height();
+        } else {
+            regionRect = LayoutRect(logicalHeight, style()->direction() == LTR ? zeroLayoutUnit : logicalWidth() - region->contentHeight(), region->contentWidth(), region->contentHeight());
+            size = regionRect.width();
+        }
+        if (region->hasComputedAutoHeight()) {
+            size = region->computedAutoHeight();
+            if (isHorizontalWritingMode())
+                regionRect.setHeight(size);
+            else
+                regionRect.setWidth(size);
+        }
+        if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight() && region->parentMultiColumnRegion()->hasComputedAutoHeight()) {
+            size = region->parentMultiColumnRegion()->computedAutoHeight();
+            regionRect.setHeight(size);
+        }
+        logicalHeight += size;
+        region->setRegionRect(regionRect);
+    }
 }
 
 LayoutUnit RenderFlowThread::regionLogicalTopForLine(LayoutUnit position) const
@@ -657,18 +698,39 @@ LayoutUnit RenderFlowThread::regionLogicalHeightForLine(LayoutUnit position) con
     return isHorizontalWritingMode() ? (region->hasComputedAutoHeight() ? region->computedAutoHeight() : region->regionRect().height()) : region->regionRect().width();
 }
 
-LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule pageBoundaryRule) const
+LayoutUnit RenderFlowThread::regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule pageBoundaryRule, bool jumpOverMultiColumnRegions) const
 {
-    RenderRegion* region = renderRegionForLine(position);
+    RenderRegion* region = renderRegionForLine(position, false, true);
     if (!region)
         return 0;
-
-    LayoutUnit regionLogicalBottom = isHorizontalWritingMode() ? (region->hasComputedAutoHeight() ? region->regionRect().y() + region->computedAutoHeight() : region->regionRect().maxY()) : region->regionRect().maxX();
+    
+    bool didMoveInsideMultiColumnRegion = false;
+    // Make sure we move to the last region in a multi-column region.
+    if (jumpOverMultiColumnRegions && region->hasParentMultiColumnRegion() 
+        && (!region->parentMultiColumnRegion()->usesAutoHeight() || region->parentMultiColumnRegion()->hasComputedAutoHeight() || !view()->inFirstLayoutPhaseOfRegionsAutoHeight())) {
+        RenderRegionMultiColumn* parentRegion = region->parentMultiColumnRegion();
+        RenderRegionList::const_iterator iter = m_regionList.find(region);
+        for (; iter != m_regionList.end(); ++iter) {
+            RenderRegion* newRegion = *iter;
+            if (!newRegion->isValid())
+                continue;
+            if (!newRegion->hasParentMultiColumnRegion() || newRegion->parentMultiColumnRegion() != parentRegion)
+                break;
+            region = newRegion;
+            didMoveInsideMultiColumnRegion = true;
+        }
+    }
+    
+    LayoutUnit regionLogicalBottom = isHorizontalWritingMode() ? region->regionRect().maxY() : region->regionRect().maxX();
     LayoutUnit remainingHeight = regionLogicalBottom - position;
     if (pageBoundaryRule == IncludePageBoundary) {
         // If IncludePageBoundary is set, the line exactly on the top edge of a
         // region will act as being part of the previous region.
-        LayoutUnit regionHeight = isHorizontalWritingMode() ? (region->hasComputedAutoHeight() ? region->computedAutoHeight() : region->regionRect().height()) : region->regionRect().width();
+        LayoutUnit regionHeight = isHorizontalWritingMode() ? region->regionRect().height() : region->regionRect().width();
+        if (didMoveInsideMultiColumnRegion) {
+            ASSERT(region->hasParentMultiColumnRegion());
+            regionHeight *= region->parentMultiColumnRegion()->columnCount();
+        }
         remainingHeight = layoutMod(remainingHeight, regionHeight);
     }
     return remainingHeight;
@@ -1066,7 +1128,7 @@ void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
         if (!region->isValid())
             continue;
 
-        if (!region->usesAutoHeight()) {
+        if (!region->usesAutoHeight() && !(region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight())) {
             accumulatedLogicalHeight += useHorizontalWritingMode ? region->contentHeight() : region->contentWidth();
             continue;
         }
@@ -1075,8 +1137,24 @@ void RenderFlowThread::addRegionBreak(LayoutUnit logicalOffset)
             accumulatedLogicalHeight += region->computedAutoHeight();
             continue;
         }
+        
+        if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->hasComputedAutoHeight()) {
+            accumulatedLogicalHeight += region->parentMultiColumnRegion()->computedAutoHeight();
+            continue;
+        }
 
-        region->setComputedAutoHeight(logicalOffset - accumulatedLogicalHeight);
+        if (region->hasParentMultiColumnRegion()) {
+            LayoutUnit regionSize = logicalOffset - accumulatedLogicalHeight;
+            regionSize = regionSize / region->parentMultiColumnRegion()->columnCount() + regionSize % region->parentMultiColumnRegion()->columnCount();
+            LayoutUnit regionActualSize = region->parentMultiColumnRegion()->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
+            region->parentMultiColumnRegion()->setComputedAutoHeight(regionActualSize);
+        } else {
+            // FIXME: Make sure we don't go below the min-height here.
+            LayoutUnit regionSize = logicalOffset - accumulatedLogicalHeight;
+            LayoutUnit regionActualSize = region->computeReplacedLogicalHeightRespectingMinMaxHeight(regionSize);
+            region->setComputedAutoHeight(regionActualSize);
+        }
+        updateRegionRects();
         return;
     }
 }
@@ -1089,11 +1167,20 @@ bool RenderFlowThread::resetAutoHeightRegionsForFirstLayoutPhase()
     bool hadAutoHeightRegions = false;
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
-        if (!region->isValid() || !region->usesAutoHeight())
+        if (!region->isValid())
             continue;
+        if (!region->usesAutoHeight() && !(region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight()))
+            continue;
+            
         hadAutoHeightRegions = true;
-        region->resetComputedAutoHeight();
-        region->setNeedsLayout(true);
+        
+        if (region->usesAutoHeight()) {
+            region->resetComputedAutoHeight();
+            region->setNeedsLayout(true);
+        } else if (region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight()) {
+            region->parentMultiColumnRegion()->resetComputedAutoHeight();
+            region->parentMultiColumnRegion()->setNeedsLayout(true);
+        }
     }
     
     return hadAutoHeightRegions;
@@ -1106,10 +1193,17 @@ void RenderFlowThread::markAutoHeightRegionsForSecondLayoutPhase()
 
     for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
         RenderRegion* region = *iter;
-        if (!region->isValid() || !region->usesAutoHeight())
+        if (!region->isValid())
+            continue;
+        if (!region->usesAutoHeight() && !(region->hasParentMultiColumnRegion() && region->parentMultiColumnRegion()->usesAutoHeight()))
             continue;
         region->setNeedsLayout(true);
+        if (region->hasParentMultiColumnRegion())
+            region->parentMultiColumnRegion()->setNeedsLayout(true);
     }
+    // FIXME: Optimize this by only doing the second layout if any region has changed.
+    m_regionsInvalidated = true;
+    setNeedsLayout(true);
 }
 
 } // namespace WebCore

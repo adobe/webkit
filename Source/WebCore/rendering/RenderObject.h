@@ -316,6 +316,7 @@ public:
     virtual bool isRenderInline() const { return false; }
     virtual bool isRenderPart() const { return false; }
     virtual bool isRenderRegion() const { return false; }
+    virtual bool isRenderRegionMultiColumn() const { return false; }
     virtual bool isRenderView() const { return false; }
     virtual bool isReplica() const { return false; }
 

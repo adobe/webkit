@@ -956,7 +956,7 @@ protected:
     //
     // For a page height of 800px, the first rule will return 800 if the value passed in is 0. The second rule will simply return 0.
     enum PageBoundaryRule { ExcludePageBoundary, IncludePageBoundary };
-    LayoutUnit nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary) const;
+    LayoutUnit nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary, bool jumpOverMultiColumnRegions = false) const;
     bool hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary) const;
 
     virtual ColumnInfo::PaginationUnit paginationUnit() const;
@@ -967,7 +967,7 @@ protected:
 public:
     LayoutUnit pageLogicalTopForOffset(LayoutUnit offset) const;
     LayoutUnit pageLogicalHeightForOffset(LayoutUnit offset) const;
-    LayoutUnit pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule = IncludePageBoundary) const;
+    LayoutUnit pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule = IncludePageBoundary, bool jumpOverMultiColumnRegions = false) const;
     
 protected:
     bool pushToNextPageWithMinimumLogicalHeight(LayoutUnit& adjustment, LayoutUnit logicalOffset, LayoutUnit minimumLogicalHeight) const;

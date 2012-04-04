@@ -37,6 +37,7 @@ namespace WebCore {
 class RenderBox;
 class RenderBoxRegionInfo;
 class RenderFlowThread;
+class RenderRegionMultiColumn;
 
 class RenderRegion : public RenderReplaced {
 public:
@@ -99,7 +100,7 @@ public:
 
     bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
     bool hasAutoWidth() const { return style()->logicalWidth().isAuto(); }
-    bool hasAutoHeightStyle() const  { return !usedForMultiColumn() && (isHorizontalWritingMode() ? hasAutoHeight() : hasAutoWidth()); }
+    bool hasAutoHeightStyle() const;
     bool usesAutoHeight() const { return m_usesAutoHeight; }
 
     bool hasComputedAutoHeight() const { return document()->cssRegionsAutoHeightEnabled() && m_hasComputedAutoHeight; }
@@ -118,8 +119,9 @@ public:
     virtual LayoutUnit computeReplacedLogicalHeight() const;
     virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
     
-    void setUsedForMultiColumn(bool usedForMultiColumn) { m_usedForMultiColumn = usedForMultiColumn; }
-    bool usedForMultiColumn() const { return m_usedForMultiColumn; }
+    void setParentMultiColumnRegion(RenderRegionMultiColumn* parentRegion) { m_parentMultiColumnRegion = parentRegion; }
+    RenderRegionMultiColumn* parentMultiColumnRegion() const { return m_parentMultiColumnRegion; }
+    bool hasParentMultiColumnRegion() const { return m_parentMultiColumnRegion; }
     
     virtual LayoutUnit minPreferredLogicalWidth() const;
     virtual LayoutUnit maxPreferredLogicalWidth() const;
@@ -150,11 +152,12 @@ private:
     typedef HashMap<const RenderBox*, RefPtr<RenderStyle> > RenderBoxRegionStyleMap;
     RenderBoxRegionStyleMap m_renderBoxRegionStyle;
 
+    RenderRegionMultiColumn* m_parentMultiColumnRegion; 
+    
     bool m_isValid;
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
     bool m_dispatchRegionLayoutUpdateEvent;
-    bool m_usedForMultiColumn;
 
     // Store the computed region autoheight
     LayoutUnit m_computedAutoHeight;

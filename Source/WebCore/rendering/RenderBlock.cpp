@@ -6683,14 +6683,14 @@ bool RenderBlock::hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule pageBou
     return true;
 }
 
-LayoutUnit RenderBlock::nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule pageBoundaryRule) const
+LayoutUnit RenderBlock::nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule pageBoundaryRule, bool jumpOverMultiColumnRegions) const
 {
     LayoutUnit pageLogicalHeight = pageLogicalHeightForOffset(logicalOffset);
     if (!pageLogicalHeight)
         return logicalOffset;
     
     // The logicalOffset is in our coordinate space.  We can add in our pushed offset.
-    LayoutUnit remainingLogicalHeight = pageRemainingLogicalHeightForOffset(logicalOffset);
+    LayoutUnit remainingLogicalHeight = pageRemainingLogicalHeightForOffset(logicalOffset, IncludePageBoundary, jumpOverMultiColumnRegions);
     if (pageBoundaryRule == ExcludePageBoundary)
         return logicalOffset + (remainingLogicalHeight ? remainingLogicalHeight : pageLogicalHeight);
     return logicalOffset + remainingLogicalHeight;
@@ -6721,14 +6721,14 @@ LayoutUnit RenderBlock::applyBeforeBreak(RenderBox* child, LayoutUnit logicalOff
     bool checkColumnBreaks = view()->layoutState()->isPaginatingColumns();
     bool checkPageBreaks = !checkColumnBreaks && view()->layoutState()->m_pageLogicalHeight; // FIXME: Once columns can print we have to check this.
     bool checkRegionBreaks = inRenderFlowThread();
-    bool checkBeforeAlways = (checkColumnBreaks && child->style()->columnBreakBefore() == PBALWAYS) || (checkPageBreaks && child->style()->pageBreakBefore() == PBALWAYS)
-                             || (checkRegionBreaks && child->style()->regionBreakBefore() == PBALWAYS);
+    bool hadRegionBreak = checkRegionBreaks && child->style()->regionBreakBefore() == PBALWAYS;
+    bool checkBeforeAlways = (checkColumnBreaks && child->style()->columnBreakBefore() == PBALWAYS) || (checkPageBreaks && child->style()->pageBreakBefore() == PBALWAYS) || hadRegionBreak;
     if (checkBeforeAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
         if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
             enclosingRenderFlowThread()->addRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset);
-        return nextPageLogicalTop(logicalOffset, IncludePageBoundary);
+        return nextPageLogicalTop(logicalOffset, IncludePageBoundary, hadRegionBreak);
     }
     return logicalOffset;
 }
@@ -6739,15 +6739,15 @@ LayoutUnit RenderBlock::applyAfterBreak(RenderBox* child, LayoutUnit logicalOffs
     bool checkColumnBreaks = view()->layoutState()->isPaginatingColumns();
     bool checkPageBreaks = !checkColumnBreaks && view()->layoutState()->m_pageLogicalHeight; // FIXME: Once columns can print we have to check this.
     bool checkRegionBreaks = inRenderFlowThread();
-    bool checkAfterAlways = (checkColumnBreaks && child->style()->columnBreakAfter() == PBALWAYS) || (checkPageBreaks && child->style()->pageBreakAfter() == PBALWAYS)
-                            || (checkRegionBreaks && child->style()->regionBreakAfter() == PBALWAYS);
+    bool hadRegionBreak = checkRegionBreaks && child->style()->regionBreakAfter() == PBALWAYS;
+    bool checkAfterAlways = (checkColumnBreaks && child->style()->columnBreakAfter() == PBALWAYS) || (checkPageBreaks && child->style()->pageBreakAfter() == PBALWAYS) || hadRegionBreak;
     if (checkAfterAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         marginInfo.setMarginAfterQuirk(true); // Cause margins to be discarded for any following content.
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
         if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
             enclosingRenderFlowThread()->addRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset);
-        return nextPageLogicalTop(logicalOffset, IncludePageBoundary);
+        return nextPageLogicalTop(logicalOffset, IncludePageBoundary, hadRegionBreak);
     }
     return logicalOffset;
 }
@@ -6776,7 +6776,7 @@ LayoutUnit RenderBlock::pageLogicalHeightForOffset(LayoutUnit offset) const
     return enclosingRenderFlowThread()->regionLogicalHeightForLine(offset + offsetFromLogicalTopOfFirstPage());
 }
 
-LayoutUnit RenderBlock::pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule pageBoundaryRule) const
+LayoutUnit RenderBlock::pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule pageBoundaryRule, bool jumpOverMultiColumnRegions) const
 {
     RenderView* renderView = view();
     offset += offsetFromLogicalTopOfFirstPage();
@@ -6792,7 +6792,7 @@ LayoutUnit RenderBlock::pageRemainingLogicalHeightForOffset(LayoutUnit offset, P
         return remainingHeight;
     }
     
-    return enclosingRenderFlowThread()->regionRemainingLogicalHeightForLine(offset, pageBoundaryRule);
+    return enclosingRenderFlowThread()->regionRemainingLogicalHeightForLine(offset, pageBoundaryRule, jumpOverMultiColumnRegions);
 }
 
 LayoutUnit RenderBlock::adjustForUnsplittableChild(RenderBox* child, LayoutUnit logicalOffset, bool includeMargins)
@@ -7017,6 +7017,11 @@ bool RenderBlock::logicalWidthChangedInRegions() const
 RenderRegion* RenderBlock::clampToStartAndEndRegions(RenderRegion* region) const
 {
     ASSERT(region && inRenderFlowThread());
+    
+    // If we are overflowing into a auto height region, do not clamp anything.
+    // We will need to see how much we need to extend the region.
+    if (view()->inFirstLayoutPhaseOfRegionsAutoHeight())
+        return region;
     
     // We need to clamp to the block, since we want any lines or blocks that overflow out of the
     // logical top or logical bottom of the block to size as though the border box in the first and

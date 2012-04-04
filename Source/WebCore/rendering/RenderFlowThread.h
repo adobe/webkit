@@ -108,8 +108,8 @@ public:
     LayoutUnit regionLogicalTopForLine(LayoutUnit position) const;
     LayoutUnit regionLogicalWidthForLine(LayoutUnit position) const;
     LayoutUnit regionLogicalHeightForLine(LayoutUnit position) const;
-    LayoutUnit regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule = IncludePageBoundary) const;
-    RenderRegion* renderRegionForLine(LayoutUnit position, bool extendLastRegion = false) const;
+    LayoutUnit regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule = IncludePageBoundary, bool jumpOverMultiColumnRegions = false) const;
+    RenderRegion* renderRegionForLine(LayoutUnit position, bool extendLastRegion = false, bool usedForLineAdjustment = false) const;
 
     bool regionsHaveUniformLogicalWidth() const { return m_regionsHaveUniformLogicalWidth; }
     bool regionsHaveUniformLogicalHeight() const { return m_regionsHaveUniformLogicalHeight; }
@@ -144,6 +144,7 @@ public:
     void markAutoHeightRegionsForSecondLayoutPhase();
     
     void addRegionBreak(LayoutUnit);
+    void updateRegionRects();
 
 private:
     virtual const char* renderName() const { return "RenderFlowThread"; }

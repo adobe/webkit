@@ -32,6 +32,7 @@
 
 #include "LayoutRepainter.h"
 #include "LayoutTypes.h"
+#include "RenderFlowThread.h"
 #include "RenderRegion.h"
 #include "RenderStyle.h"
 #include "RenderView.h"
@@ -46,6 +47,9 @@ RenderRegionMultiColumn::RenderRegionMultiColumn(Node* node, RenderFlowThread* f
     : RenderBlock(node)
     , m_flowThread(flowThread)
     , m_columnCount(0)
+    , m_computedAutoHeight(0)
+    , m_hasComputedAutoHeight(false)
+    , m_usesAutoHeight(false)
 {
 }
 
@@ -66,8 +70,10 @@ void RenderRegionMultiColumn::updateColumnCount(unsigned newColumnCount)
         newStyle->setRegionOverflow(BreakRegionOverflow);
         newStyle->setOverflowX(OHIDDEN);
         newStyle->setOverflowY(OHIDDEN);
+        newStyle->setWidth(Length(0, Intrinsic));
+        newStyle->setHeight(Length(0, Intrinsic));
         newStyle->font().update(0);
-        region->setUsedForMultiColumn(true);
+        region->setParentMultiColumnRegion(this);
         region->setStyle(newStyle.release());
         
         addChild(region);
@@ -162,6 +168,51 @@ void RenderRegionMultiColumn::layoutBlock(bool relayoutChildren, int, BlockLayou
     repainter.repaintAfterLayout();
 
     setNeedsLayout(false);
+}
+
+void RenderRegionMultiColumn::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
+{
+    RenderBlock::styleDidChange(diff, oldStyle);
+    
+    bool didUseAutoHeight = m_usesAutoHeight;
+    m_usesAutoHeight = hasAutoHeightStyle();
+    if (m_flowThread && didUseAutoHeight != m_usesAutoHeight)
+        setNeedsLayout(true);
+}
+
+void RenderRegionMultiColumn::computeLogicalWidth()
+{
+    if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && !isHorizontalWritingMode()) {
+        setLogicalWidth(computedAutoHeight());
+        return;
+    }
+    RenderBlock::computeLogicalWidth();
+}
+
+void RenderRegionMultiColumn::computeLogicalHeight()
+{
+    if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && isHorizontalWritingMode()) {
+        setLogicalHeight(computedAutoHeight()); 
+        return;
+    }
+    RenderBlock::computeLogicalHeight();
+}
+
+LayoutUnit RenderRegionMultiColumn::minPreferredLogicalWidth() const
+{
+    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() : RenderBlock::minPreferredLogicalWidth();
+}
+
+LayoutUnit RenderRegionMultiColumn::maxPreferredLogicalWidth() const
+{
+    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() : RenderBlock::maxPreferredLogicalWidth();
+}
+
+void RenderRegionMultiColumn::setComputedAutoHeight(LayoutUnit computedAutoHeight)
+{
+    ASSERT(document()->cssRegionsAutoHeightEnabled());
+    m_computedAutoHeight = computedAutoHeight;
+    m_hasComputedAutoHeight = true;
 }
 
 const char* RenderRegionMultiColumn::renderName() const
