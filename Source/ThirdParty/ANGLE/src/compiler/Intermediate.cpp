@@ -656,6 +656,7 @@ TIntermTyped* TIntermediate::addSelection(TIntermTyped* cond, TIntermTyped* true
     // Make a selection node.
     //
     TIntermSelection* node = new TIntermSelection(cond, trueBlock, falseBlock, trueBlock->getType());
+    node->getTypePointer()->setQualifier(EvqTemporary);
     node->setLine(line);
 
     return node;
@@ -1371,8 +1372,6 @@ TIntermTyped* TIntermConstantUnion::fold(TOperator op, TIntermTyped* constantNod
         newNode->setLine(getLine());
         return newNode;
     }
-
-    return this;
 }
 
 TIntermTyped* TIntermediate::promoteConstantUnion(TBasicType promoteTo, TIntermConstantUnion* node)

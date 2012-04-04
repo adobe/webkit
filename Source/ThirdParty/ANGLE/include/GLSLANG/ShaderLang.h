@@ -77,7 +77,8 @@ typedef enum {
   SH_FLOAT_MAT4     = 0x8B5C,
   SH_SAMPLER_2D     = 0x8B5E,
   SH_SAMPLER_CUBE   = 0x8B60,
-  SH_SAMPLER_2D_RECT_ARB = 0x8B63
+  SH_SAMPLER_2D_RECT_ARB = 0x8B63,
+  SH_SAMPLER_EXTERNAL_OES = 0x8D66
 } ShDataType;
 
 typedef enum {
@@ -101,12 +102,10 @@ typedef enum {
   SH_SOURCE_PATH             = 0x0020,
   SH_MAP_LONG_VARIABLE_NAMES = 0x0040,
   SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX = 0x0080,
-
   // This is needed only as a workaround for certain OpenGL driver bugs.
   SH_EMULATE_BUILT_IN_FUNCTIONS = 0x0100,
-  
-  SH_NO_TEXTURE_ACCESS          = 0x0200,
-  SH_VALIDATE_COLOR_ACCESS      = 0x0400
+  SH_WEB_SAFE                   = 0x0200,
+  SH_DEPENDENCY_GRAPH           = 0x0400
 } ShCompileOptions;
 
 //

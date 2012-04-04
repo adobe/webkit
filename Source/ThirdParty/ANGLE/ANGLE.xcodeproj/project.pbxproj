@@ -38,10 +38,17 @@
 		A0AABE4513AFE94500F2EBD1 /* OutputESSL.h in Headers */ = {isa = PBXBuildFile; fileRef = A0AABE4313AFE94500F2EBD1 /* OutputESSL.h */; };
 		A0AABE4813AFE96100F2EBD1 /* TranslatorESSL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A0AABE4613AFE96100F2EBD1 /* TranslatorESSL.cpp */; };
 		A0AABE4913AFE96100F2EBD1 /* TranslatorESSL.h in Headers */ = {isa = PBXBuildFile; fileRef = A0AABE4713AFE96100F2EBD1 /* TranslatorESSL.h */; };
-		A2F34CDA151A53A80080EF49 /* ValidateColorLimitations.h in Headers */ = {isa = PBXBuildFile; fileRef = A2F34CD8151A53A80080EF49 /* ValidateColorLimitations.h */; };
-		A2F34CDB151A53A80080EF49 /* ValidateColorLimitations.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2F34CD9151A53A80080EF49 /* ValidateColorLimitations.cpp */; };
-		A2F34CDF151A56030080EF49 /* DetectTextureAccess.h in Headers */ = {isa = PBXBuildFile; fileRef = A2F34CDD151A56030080EF49 /* DetectTextureAccess.h */; };
-		A2F34CE0151A56030080EF49 /* DetectTextureAccess.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2F34CDE151A56030080EF49 /* DetectTextureAccess.cpp */; };
+		A248367D152CED8500D4FB5E /* DependencyGraph.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2483676152CED8500D4FB5E /* DependencyGraph.cpp */; };
+		A248367E152CED8500D4FB5E /* DependencyGraph.h in Headers */ = {isa = PBXBuildFile; fileRef = A2483677152CED8500D4FB5E /* DependencyGraph.h */; };
+		A248367F152CED8500D4FB5E /* DependencyGraphFactory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2483678152CED8500D4FB5E /* DependencyGraphFactory.cpp */; };
+		A2483680152CED8500D4FB5E /* DependencyGraphFactory.h in Headers */ = {isa = PBXBuildFile; fileRef = A2483679152CED8500D4FB5E /* DependencyGraphFactory.h */; };
+		A2483681152CED8500D4FB5E /* DependencyGraphOutput.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A248367A152CED8500D4FB5E /* DependencyGraphOutput.cpp */; };
+		A2483682152CED8500D4FB5E /* DependencyGraphOutput.h in Headers */ = {isa = PBXBuildFile; fileRef = A248367B152CED8500D4FB5E /* DependencyGraphOutput.h */; };
+		A2483683152CED8500D4FB5E /* DependencyGraphTraverse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A248367C152CED8500D4FB5E /* DependencyGraphTraverse.cpp */; };
+		A2483689152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2483685152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.cpp */; };
+		A248368A152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.h in Headers */ = {isa = PBXBuildFile; fileRef = A2483686152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.h */; };
+		A248368B152CED8F00D4FB5E /* ValidateWebSafeVertexShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A2483687152CED8F00D4FB5E /* ValidateWebSafeVertexShader.cpp */; };
+		A248368C152CED8F00D4FB5E /* ValidateWebSafeVertexShader.h in Headers */ = {isa = PBXBuildFile; fileRef = A2483688152CED8F00D4FB5E /* ValidateWebSafeVertexShader.h */; };
 		FB39D2711200F35A00088E69 /* CodeGenGLSL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB39D2221200F35A00088E69 /* CodeGenGLSL.cpp */; };
 		FB39D2751200F35A00088E69 /* debug.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB39D2261200F35A00088E69 /* debug.cpp */; };
 		FB39D2791200F35A00088E69 /* InfoSink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB39D22A1200F35A00088E69 /* InfoSink.cpp */; };
@@ -107,10 +114,17 @@
 		A0AABE4313AFE94500F2EBD1 /* OutputESSL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OutputESSL.h; sourceTree = "<group>"; };
 		A0AABE4613AFE96100F2EBD1 /* TranslatorESSL.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TranslatorESSL.cpp; sourceTree = "<group>"; };
 		A0AABE4713AFE96100F2EBD1 /* TranslatorESSL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TranslatorESSL.h; sourceTree = "<group>"; };
-		A2F34CD8151A53A80080EF49 /* ValidateColorLimitations.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ValidateColorLimitations.h; sourceTree = "<group>"; };
-		A2F34CD9151A53A80080EF49 /* ValidateColorLimitations.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ValidateColorLimitations.cpp; sourceTree = "<group>"; };
-		A2F34CDD151A56030080EF49 /* DetectTextureAccess.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetectTextureAccess.h; sourceTree = "<group>"; };
-		A2F34CDE151A56030080EF49 /* DetectTextureAccess.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DetectTextureAccess.cpp; sourceTree = "<group>"; };
+		A2483676152CED8500D4FB5E /* DependencyGraph.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencyGraph.cpp; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraph.cpp; sourceTree = "<group>"; };
+		A2483677152CED8500D4FB5E /* DependencyGraph.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DependencyGraph.h; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraph.h; sourceTree = "<group>"; };
+		A2483678152CED8500D4FB5E /* DependencyGraphFactory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencyGraphFactory.cpp; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraphFactory.cpp; sourceTree = "<group>"; };
+		A2483679152CED8500D4FB5E /* DependencyGraphFactory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DependencyGraphFactory.h; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraphFactory.h; sourceTree = "<group>"; };
+		A248367A152CED8500D4FB5E /* DependencyGraphOutput.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencyGraphOutput.cpp; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraphOutput.cpp; sourceTree = "<group>"; };
+		A248367B152CED8500D4FB5E /* DependencyGraphOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DependencyGraphOutput.h; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraphOutput.h; sourceTree = "<group>"; };
+		A248367C152CED8500D4FB5E /* DependencyGraphTraverse.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DependencyGraphTraverse.cpp; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/DependencyGraphTraverse.cpp; sourceTree = "<group>"; };
+		A2483685152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ValidateWebSafeFragmentShader.cpp; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/ValidateWebSafeFragmentShader.cpp; sourceTree = "<group>"; };
+		A2483686152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ValidateWebSafeFragmentShader.h; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/ValidateWebSafeFragmentShader.h; sourceTree = "<group>"; };
+		A2483687152CED8F00D4FB5E /* ValidateWebSafeVertexShader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ValidateWebSafeVertexShader.cpp; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/ValidateWebSafeVertexShader.cpp; sourceTree = "<group>"; };
+		A2483688152CED8F00D4FB5E /* ValidateWebSafeVertexShader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ValidateWebSafeVertexShader.h; path = ../../../../../../../ANGLESources/ANGLE/src/compiler/ValidateWebSafeVertexShader.h; sourceTree = "<group>"; };
 		FB39D0D11200F0E300088E69 /* libANGLE.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libANGLE.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB39D1861200F26200088E69 /* BaseTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BaseTypes.h; sourceTree = "<group>"; };
 		FB39D1871200F26200088E69 /* CodeGenGLSL.cpp */ = {isa = PBXFileReference; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.cpp; path = CodeGenGLSL.cpp; sourceTree = "<group>"; };
@@ -378,10 +392,17 @@
 		FB39D2201200F35A00088E69 /* compiler */ = {
 			isa = PBXGroup;
 			children = (
-				A2F34CDD151A56030080EF49 /* DetectTextureAccess.h */,
-				A2F34CDE151A56030080EF49 /* DetectTextureAccess.cpp */,
-				A2F34CD8151A53A80080EF49 /* ValidateColorLimitations.h */,
-				A2F34CD9151A53A80080EF49 /* ValidateColorLimitations.cpp */,
+				A2483685152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.cpp */,
+				A2483686152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.h */,
+				A2483687152CED8F00D4FB5E /* ValidateWebSafeVertexShader.cpp */,
+				A2483688152CED8F00D4FB5E /* ValidateWebSafeVertexShader.h */,
+				A2483676152CED8500D4FB5E /* DependencyGraph.cpp */,
+				A2483677152CED8500D4FB5E /* DependencyGraph.h */,
+				A2483678152CED8500D4FB5E /* DependencyGraphFactory.cpp */,
+				A2483679152CED8500D4FB5E /* DependencyGraphFactory.h */,
+				A248367A152CED8500D4FB5E /* DependencyGraphOutput.cpp */,
+				A248367B152CED8500D4FB5E /* DependencyGraphOutput.h */,
+				A248367C152CED8500D4FB5E /* DependencyGraphTraverse.cpp */,
 				A0AABE3213AFE84700F2EBD1 /* OutputGLSLBase.cpp */,
 				A0AABE3313AFE84700F2EBD1 /* OutputGLSLBase.h */,
 				A0AABE4613AFE96100F2EBD1 /* TranslatorESSL.cpp */,
@@ -520,8 +541,11 @@
 				49951C0314B7AAB30060E96E /* length_limits.h in Headers */,
 				49951C0A14B7AAD80060E96E /* BuiltInFunctionEmulator.h in Headers */,
 				49951C0C14B7AAD80060E96E /* DetectRecursion.h in Headers */,
-				A2F34CDA151A53A80080EF49 /* ValidateColorLimitations.h in Headers */,
-				A2F34CDF151A56030080EF49 /* DetectTextureAccess.h in Headers */,
+				A248367E152CED8500D4FB5E /* DependencyGraph.h in Headers */,
+				A2483680152CED8500D4FB5E /* DependencyGraphFactory.h in Headers */,
+				A2483682152CED8500D4FB5E /* DependencyGraphOutput.h in Headers */,
+				A248368A152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.h in Headers */,
+				A248368C152CED8F00D4FB5E /* ValidateWebSafeVertexShader.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -618,8 +642,12 @@
 				A0AABE4813AFE96100F2EBD1 /* TranslatorESSL.cpp in Sources */,
 				49951C0914B7AAD80060E96E /* BuiltInFunctionEmulator.cpp in Sources */,
 				49951C0B14B7AAD80060E96E /* DetectRecursion.cpp in Sources */,
-				A2F34CDB151A53A80080EF49 /* ValidateColorLimitations.cpp in Sources */,
-				A2F34CE0151A56030080EF49 /* DetectTextureAccess.cpp in Sources */,
+				A248367D152CED8500D4FB5E /* DependencyGraph.cpp in Sources */,
+				A248367F152CED8500D4FB5E /* DependencyGraphFactory.cpp in Sources */,
+				A2483681152CED8500D4FB5E /* DependencyGraphOutput.cpp in Sources */,
+				A2483683152CED8500D4FB5E /* DependencyGraphTraverse.cpp in Sources */,
+				A2483689152CED8F00D4FB5E /* ValidateWebSafeFragmentShader.cpp in Sources */,
+				A248368B152CED8F00D4FB5E /* ValidateWebSafeVertexShader.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

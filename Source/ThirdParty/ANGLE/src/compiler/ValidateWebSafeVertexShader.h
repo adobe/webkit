@@ -11,17 +11,10 @@
 
 #include "compiler/intermediate.h"
 
-// Traverses intermediate tree to detect if unifrom textures are used.
-class DetectTextureAccess : public TIntermTraverser {
+class ValidateWebSafeVertexShader : public TIntermTraverser {
 public:
-    DetectTextureAccess();
-    
-    virtual bool visitAggregate(Visit, TIntermAggregate*);
-    
-    bool detectTextureAccess() { return hasTextureAccess; }
-
-private:
-    bool hasTextureAccess;
+    void validate(TIntermNode* root);
+    int numErrors() { return 0; }   // TODO: Implement.
 };
 
 #endif  // COMPILER_DETECT_RECURSION_H_

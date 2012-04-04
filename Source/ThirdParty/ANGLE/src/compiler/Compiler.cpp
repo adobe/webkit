@@ -1,19 +1,21 @@
 //
-// Copyright (c) 2002-2011 The ANGLE Project Authors. All rights reserved.
+// Copyright (c) 2002-2012 The ANGLE Project Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
 
 #include "compiler/BuiltInFunctionEmulator.h"
-#include "compiler/DetectTextureAccess.h"
+#include "compiler/DependencyGraphFactory.h"
+#include "compiler/DependencyGraphOutput.h"
 #include "compiler/DetectRecursion.h"
+#include "compiler/ValidateWebSafeVertexShader.h"
 #include "compiler/ForLoopUnroll.h"
 #include "compiler/Initialize.h"
+#include "compiler/MapLongVariableNames.h"
 #include "compiler/ParseHelper.h"
 #include "compiler/ShHandle.h"
-#include "compiler/ValidateColorLimitations.h"
 #include "compiler/ValidateLimitations.h"
-#include "compiler/MapLongVariableNames.h"
+#include "compiler/ValidateWebSafeFragmentShader.h"
 
 namespace {
 bool InitializeSymbolTable(
@@ -93,10 +95,13 @@ TCompiler::TCompiler(ShShaderType type, ShShaderSpec spec)
       shaderSpec(spec),
       builtInFunctionEmulator(type)
 {
+    longNameMap = LongNameMap::GetInstance();
 }
 
 TCompiler::~TCompiler()
 {
+    ASSERT(longNameMap);
+    longNameMap->Release();
 }
 
 bool TCompiler::Init(const ShBuiltInResources& resources)
@@ -139,6 +144,8 @@ bool TCompiler::compile(const char* const shaderStrings[],
                                shaderType, shaderSpec, compileOptions, true,
                                sourcePath, infoSink);
     GlobalParseContext = &parseContext;
+    
+    TDepGraph* depGraph = NULL;
 
     // We preserve symbols at the built-in level from compile-to-compile.
     // Start pushing the user-defined symbols at global level.
@@ -153,16 +160,13 @@ bool TCompiler::compile(const char* const shaderStrings[],
     if (success) {
         TIntermNode* root = parseContext.treeRoot;
         success = intermediate.postProcess(root);
-
+        
         if (success)
             success = detectRecursion(root);
 
         if (success && (compileOptions & SH_VALIDATE_LOOP_INDEXING))
             success = validateLimitations(root);
-
-        if (success && (compileOptions & SH_VALIDATE_COLOR_ACCESS))
-            success = validateColorLimitations(root);
-
+                
         // Unroll for-loop markup needs to happen after validateLimitations pass.
         if (success && (compileOptions & SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX))
             ForLoopUnroll::MarkForLoopsWithIntegerIndicesForUnrolling(root);
@@ -179,13 +183,16 @@ bool TCompiler::compile(const char* const shaderStrings[],
 
         if (success && (compileOptions & SH_ATTRIBUTES_UNIFORMS))
             collectAttribsUniforms(root);
-
-        if (success && (compileOptions & SH_NO_TEXTURE_ACCESS))
-            success = !detectTextureAccess(root);
-
+        
+        bool isWebSafe = false;
+        if (success && (compileOptions & SH_WEB_SAFE))
+            isWebSafe = validateWebSafeShader(root, compileOptions & SH_DEPENDENCY_GRAPH);
+        
         if (success && (compileOptions & SH_INTERMEDIATE_TREE))
             intermediate.outputTree(root);
-
+        
+        success = isWebSafe;
+        
         if (success && (compileOptions & SH_OBJECT_CODE))
             translate(root);
     }
@@ -221,20 +228,6 @@ void TCompiler::clearResults()
     builtInFunctionEmulator.Cleanup();
 }
 
-bool TCompiler::detectTextureAccess(TIntermNode* root)
-{
-    DetectTextureAccess detect;
-    root->traverse(&detect);
-    
-    printf(">>> attribs: %ld\n", attribs.size());
-    printf(">>> uniforms: %ld\n", uniforms.size());
-    for (size_t i = 0; i < uniforms.size(); ++i) {
-        printf(">>> uniform %s\n", uniforms[i].name.c_str());
-    }
-    
-    return detect.detectTextureAccess();
-}
-
 bool TCompiler::detectRecursion(TIntermNode* root)
 {
     DetectRecursion detect;
@@ -254,33 +247,48 @@ bool TCompiler::detectRecursion(TIntermNode* root)
     }
 }
 
-bool TCompiler::validateLimitations(TIntermNode* root) {
+bool TCompiler::validateLimitations(TIntermNode* root) 
+{
     ValidateLimitations validate(shaderType, infoSink.info);
     root->traverse(&validate);
     return validate.numErrors() == 0;
 }
 
-bool TCompiler::validateColorLimitations(TIntermNode* root) {
-    printf(">>> Entering validateColorLimitations");
-    ValidateColorLimitations validate(infoSink.info);
-    bool reparse = false;
-    int numReparse = 0;
-    do {
-        reparse = false;
-        root->traverse(&validate);
-        if (validate.foundNewUnsafeSymbols()) {
-            infoSink.info << "Found new unsafe symbols. Reparsing the tree\n\n";
-            validate.setNewUnsafeSymbols(false);
-            reparse = true;
+bool TCompiler::validateWebSafeShader(TIntermNode* root, bool outputDepGraph)
+{
+    bool success = false;
+    
+    if (shaderType == SH_FRAGMENT_SHADER) {
+        TDepGraphFactory depGraphFactory;
+        TDepGraph* depGraph = depGraphFactory.createDepGraph(root);
+        success = validateWebSafeFragmentShader(depGraph);
+        
+        if (outputDepGraph) {
+            TDepGraphOutput output(infoSink.info);
+            output.outputAllSpanningTrees(depGraph);
         }
-        numReparse ++;
-    } while (reparse);
-    infoSink.info << "Tree reparsing: " << numReparse << '\n';
-    if (validate.numErrors() > 0)
-        infoSink.info << "TotalErrors: " << validate.numErrors() << '\n';
-    printf(">>> validateColorLimitations numErrors: %d", validate.numErrors());
-    return validate.numErrors() == 0;
-    //return true;
+        
+        delete depGraph;
+    }
+    else {
+        success = validateWebSafeVertexShader(root);
+    }
+    
+    return success;
+}
+
+bool TCompiler::validateWebSafeFragmentShader(TDepGraph* depGraph)
+{
+    ValidateWebSafeFragmentShader validator(infoSink.info);
+    validator.validate(depGraph);
+    return validator.numErrors() == 0;
+}
+
+bool TCompiler::validateWebSafeVertexShader(TIntermNode* root)
+{
+    ValidateWebSafeVertexShader validator;
+    validator.validate(root);
+    return validator.numErrors() == 0;
 }
 
 void TCompiler::collectAttribsUniforms(TIntermNode* root)
@@ -291,7 +299,8 @@ void TCompiler::collectAttribsUniforms(TIntermNode* root)
 
 void TCompiler::mapLongVariableNames(TIntermNode* root)
 {
-    MapLongVariableNames map(varyingLongNameMap);
+    ASSERT(longNameMap);
+    MapLongVariableNames map(longNameMap);
     root->traverse(&map);
 }
 
