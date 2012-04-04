@@ -80,18 +80,15 @@ bool ANGLEWebKitBridge::validateShaderSource(const char* shaderSource, ANGLEShad
     }
     
     ShHandle compiler;
-    bool validateSuccess;
+
+    if (shaderType == SHADER_TYPE_VERTEX)
+        compiler = m_vertexCompiler;
+    else
+        compiler = m_fragmentCompiler;
+    
     const char* const shaderSourceStrings[] = { shaderSource };
     
-    if (shaderType == SHADER_TYPE_VERTEX) {
-        compiler = m_vertexCompiler;
-        validateSuccess = ShCompile(compiler, shaderSourceStrings, 1, SH_OBJECT_CODE | SH_NO_TEXTURE_ACCESS);
-    }
-    else {
-        compiler = m_fragmentCompiler;
-        validateSuccess = ShCompile(compiler, shaderSourceStrings, 1, SH_OBJECT_CODE | SH_VALIDATE_COLOR_ACCESS);
-    }
-
+    bool validateSuccess = ShCompile(compiler, shaderSourceStrings, 1, SH_OBJECT_CODE | SH_WEB_SAFE);
     if (!validateSuccess) {
         int logSize = 0;
         ShGetInfo(compiler, SH_INFO_LOG_LENGTH, &logSize);
