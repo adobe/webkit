@@ -194,9 +194,9 @@ void RenderRegion::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
     m_usesAutoHeight = hasAutoHeightStyle();
     if (m_flowThread && didUseAutoHeight != m_usesAutoHeight) {
         if (m_usesAutoHeight)
-            view()->view()->incrementAutoHeightRegions();
+            view()->incrementAutoHeightRegions();
         else
-            view()->view()->incrementAutoHeightRegions();
+            view()->decrementAutoHeightRegions();
         setNeedsLayout(true);
     }
 }

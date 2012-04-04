@@ -174,10 +174,21 @@ void RenderRegionMultiColumn::styleDidChange(StyleDifference diff, const RenderS
 {
     RenderBlock::styleDidChange(diff, oldStyle);
     
+    if (!oldStyle) {
+        // make sure we have at least a column
+        updateColumnCount(1);
+    }
+    
     bool didUseAutoHeight = m_usesAutoHeight;
     m_usesAutoHeight = hasAutoHeightStyle();
-    if (m_flowThread && didUseAutoHeight != m_usesAutoHeight)
+    if (m_flowThread && didUseAutoHeight != m_usesAutoHeight) {
+        if (m_usesAutoHeight)
+            view()->incrementAutoHeightRegions();
+        else
+            view()->decrementAutoHeightRegions();
         setNeedsLayout(true);
+        m_flowThread->setNeedsLayout(true);
+    }
 }
 
 void RenderRegionMultiColumn::computeLogicalWidth()
