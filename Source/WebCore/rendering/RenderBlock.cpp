@@ -6746,7 +6746,7 @@ LayoutUnit RenderBlock::applyAfterBreak(RenderBox* child, LayoutUnit logicalOffs
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(logicalOffset);
         if (checkRegionBreaks && document()->cssRegionsAutoHeightEnabled())
-            enclosingRenderFlowThread()->addRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset);
+            enclosingRenderFlowThread()->addRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + marginInfo.margin());
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary, hadRegionBreak);
     }
     return logicalOffset;

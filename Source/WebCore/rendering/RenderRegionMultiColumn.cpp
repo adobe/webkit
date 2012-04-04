@@ -194,7 +194,7 @@ void RenderRegionMultiColumn::styleDidChange(StyleDifference diff, const RenderS
 void RenderRegionMultiColumn::computeLogicalWidth()
 {
     if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && !isHorizontalWritingMode()) {
-        setLogicalWidth(computedAutoHeight());
+        setLogicalWidth(computedAutoHeight() + borderAndPaddingLogicalWidth());
         return;
     }
     RenderBlock::computeLogicalWidth();
@@ -203,7 +203,7 @@ void RenderRegionMultiColumn::computeLogicalWidth()
 void RenderRegionMultiColumn::computeLogicalHeight()
 {
     if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && isHorizontalWritingMode()) {
-        setLogicalHeight(computedAutoHeight()); 
+        setLogicalHeight(computedAutoHeight() + borderAndPaddingLogicalHeight()); 
         return;
     }
     RenderBlock::computeLogicalHeight();
