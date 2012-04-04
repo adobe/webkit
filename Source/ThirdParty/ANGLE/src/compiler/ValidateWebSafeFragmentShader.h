@@ -26,7 +26,7 @@
 // TODO: Clean up the vertex shader texture access checker.
 // TODO: Create a flag for printing the dep graph.
 // TODO: What to call the compiler flags?
-// TODO: Validate texture access checks for all texture access. Maybe it should check for u_texture defintion instead.
+// TODO: Validate texture access checks for all texture access. Maybe it should check for s_texture defintion instead.
 // TODO: Look @ convention for private vs protected in the project. Audit the class defs.
 // TODO: Switch case statements on one line or on mulitple lines? Double check this.
 

@@ -42,7 +42,7 @@ TDepSymbol* TDepGraphFactory::getOrCreateDepSymbolByIntermSymbol(TIntermSymbol* 
         mDepGraph->getSymbolIdDepSymbolMap().insert(pair);
 
         if (mIsGlobalScope) {
-            // We map all symbols in the global scope by name, so traversers of the graph can quickly start searches at symbols like u_texture.
+            // We map all symbols in the global scope by name, so traversers of the graph can quickly start searches at symbols like s_texture.
             TSymbolNameDepSymbolPair pair(node->getSymbol(), depSymbol);
             mDepGraph->getGlobalScopeSymbolNameDepSymbolMap().insert(pair);
         }

@@ -21,8 +21,8 @@ void ValidateWebSafeFragmentShader::validate(TDepGraph* depGraph)
     
     validateUserDefinedFunctionCallUsage(depGraph);
     
-    // Traverse the dependency graph starting at u_texture and generate an error each time we hit a condition nodes.
-    TSymbolNameDepSymbolMap::iterator i = depGraph->getGlobalScopeSymbolNameDepSymbolMap().find((TString)"u_texture");
+    // Traverse the dependency graph starting at s_texture and generate an error each time we hit a condition nodes.
+    TSymbolNameDepSymbolMap::iterator i = depGraph->getGlobalScopeSymbolNameDepSymbolMap().find((TString)"s_texture");
     if (i != depGraph->getGlobalScopeSymbolNameDepSymbolMap().end()) {
         TSymbolNameDepSymbolPair pair = *i;
         TDepSymbol* uTextureDepSymbol = pair.second;
@@ -55,7 +55,7 @@ void ValidateWebSafeFragmentShader::visitDepArgument(TDepArgument* depParameter)
         return;
     
     beginError(depParameter->getIntermFunctionCall());    
-    mSink << "Values derived from symbol 'u_texture' are not permitted to be the second argument of a texture2D call.\n";  
+    mSink << "Values derived from symbol 's_texture' are not permitted to be the second argument of a texture2D call.\n";  
 }
 
 void ValidateWebSafeFragmentShader::visitFunctionCall(TDepFunctionCall* depFunctionCall)
@@ -69,17 +69,17 @@ void ValidateWebSafeFragmentShader::visitDepSymbol(TDepSymbol* depSymbol)
 void ValidateWebSafeFragmentShader::visitDepSelection(TDepSelection* depSelection)
 {
     beginError(depSelection->getIntermSelection());
-    mSink << "Values derived from symbol 'u_texture' are not permitted in conditional statements.\n";
+    mSink << "Values derived from symbol 's_texture' are not permitted in conditional statements.\n";
 }
 
 void ValidateWebSafeFragmentShader::visitDepLoop(TDepLoop* depLoop)
 {
     beginError(depLoop->getIntermLoop());
-    mSink << "Values derived from symbol 'u_texture' are not permitted in loop conditions.\n";
+    mSink << "Values derived from symbol 's_texture' are not permitted in loop conditions.\n";
 }
 
 void ValidateWebSafeFragmentShader::visitDepLogicalOp(TDepLogicalOp* depLogicalOp)
 {
     beginError(depLogicalOp->getIntermLogicalOp());
-    mSink << "Values derived from symbol 'u_texture' are not permitted on the left hand side of a logical " << depLogicalOp->getOpString() << " operator.\n";
+    mSink << "Values derived from symbol 's_texture' are not permitted on the left hand side of a logical " << depLogicalOp->getOpString() << " operator.\n";
 }
