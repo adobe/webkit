@@ -71,6 +71,7 @@
 #include "Pair.h"
 #include "Rect.h"
 #include "RenderTheme.h"
+#include "SVGParserUtilities.h"
 #include "Settings.h"
 #include "ShadowValue.h"
 #include "StylePropertySet.h"
@@ -8607,7 +8608,25 @@ restartAfterComment:
             break;
         }
 
-        yylval->number = charactersToDouble(m_tokenStart, m_currentCharacter - m_tokenStart);
+#if ENABLE(SVG)
+        // Use SVG parser for numbers on SVG presentation attributes.
+        if (m_cssParserMode == SVGAttributeMode) {
+            unsigned offset = 0;
+            if (isASCIIAlphaCaselessEqual(*m_currentCharacter, 'e')) {
+                if (m_currentCharacter[1] == '-' || m_currentCharacter[1] == '+' || isASCIIDigit(m_currentCharacter[1])) {
+                    offset += 2;
+                    while (isASCIIDigit(m_currentCharacter[offset]))
+                        ++offset;
+                    // Use FLOATTOKEN if we have exponents.
+                    dotSeen = true;
+                }
+            }
+            if (!parseSVGNumber(m_tokenStart, m_currentCharacter + offset - m_tokenStart, yylval->number))
+                break;
+            m_currentCharacter += offset;
+        } else
+#endif
+            yylval->number = charactersToDouble(m_tokenStart, m_currentCharacter - m_tokenStart);
 
         // Type of the function.
         if (isIdentifierStart()) {
