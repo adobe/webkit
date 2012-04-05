@@ -98,8 +98,6 @@ public:
     
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
-    bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
-    bool hasAutoWidth() const { return style()->logicalWidth().isAuto(); }
     bool hasAutoHeightStyle() const;
     bool usesAutoHeight() const { return m_usesAutoHeight; }
 

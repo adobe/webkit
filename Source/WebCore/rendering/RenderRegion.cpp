@@ -178,7 +178,9 @@ bool RenderRegion::hasAutoHeightStyle() const
 {
     if (hasParentMultiColumnRegion())
         return false;
-    return isHorizontalWritingMode() ? hasAutoHeight() : hasAutoWidth();
+    RenderStyle* styleToUse = style();
+    bool hasAnchoredTopAndBottom = (isPositioned() || isRelPositioned()) && styleToUse->logicalTop().isSpecified() && styleToUse->logicalBottom().isSpecified();
+    return !hasAnchoredTopAndBottom && styleToUse->logicalHeight().isAuto();
 }
 
 void RenderRegion::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)

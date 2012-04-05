@@ -2573,7 +2573,7 @@ static void computeInlineStaticDistance(Length& logicalLeft, Length& logicalRigh
 
 void RenderBox::computePositionedLogicalWidth(RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage)
 {
-    if (isReplaced()) {
+    if (isReplaced() && !(isRenderRegion() || isRenderRegionMultiColumn())) {
         computePositionedLogicalWidthReplaced(); // FIXME: Patch for regions when we add replaced element support.
         return;
     }
@@ -2922,7 +2922,7 @@ static void computeBlockStaticDistance(Length& logicalTop, Length& logicalBottom
 
 void RenderBox::computePositionedLogicalHeight()
 {
-    if (isReplaced()) {
+    if (isReplaced() && !(isRenderRegion() || isRenderRegionMultiColumn())) {
         computePositionedLogicalHeightReplaced();
         return;
     }

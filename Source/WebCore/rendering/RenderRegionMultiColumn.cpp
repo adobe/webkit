@@ -218,6 +218,14 @@ void RenderRegionMultiColumn::setComputedAutoHeight(LayoutUnit computedAutoHeigh
     m_computedAutoHeight = computedAutoHeight;
     m_hasComputedAutoHeight = true;
 }
+    
+bool RenderRegionMultiColumn::hasAutoHeightStyle() const
+{
+    RenderStyle* styleToUse = style();
+    bool hasAnchoredTopAndBottom = (isPositioned() || isRelPositioned()) && styleToUse->logicalTop().isSpecified() && styleToUse->logicalBottom().isSpecified();
+    return !hasAnchoredTopAndBottom && styleToUse->logicalHeight().isAuto();
+}
+
 
 const char* RenderRegionMultiColumn::renderName() const
 {

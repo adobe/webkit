@@ -47,9 +47,7 @@ public:
     
     unsigned columnCount() const { return m_columnCount; }
     
-    bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
-    bool hasAutoWidth() const { return style()->logicalWidth().isAuto(); }
-    bool hasAutoHeightStyle() const  { return isHorizontalWritingMode() ? hasAutoHeight() : hasAutoWidth(); }
+    bool hasAutoHeightStyle() const;
     
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
     
