@@ -191,22 +191,15 @@ void RenderRegionMultiColumn::styleDidChange(StyleDifference diff, const RenderS
     }
 }
 
-void RenderRegionMultiColumn::computeLogicalWidth()
-{
-    if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && !isHorizontalWritingMode()) {
-        setLogicalWidth(computedAutoHeight() + borderAndPaddingLogicalWidth());
-        return;
-    }
-    RenderBlock::computeLogicalWidth();
-}
-
 void RenderRegionMultiColumn::computeLogicalHeight()
 {
-    if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && isHorizontalWritingMode()) {
-        setLogicalHeight(computedAutoHeight() + borderAndPaddingLogicalHeight()); 
-        return;
-    }
     RenderBlock::computeLogicalHeight();
+    if (document()->cssRegionsAutoHeightEnabled() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight()
+        && usesAutoHeight() && hasComputedAutoHeight()) {
+        LayoutUnit newLogicalHeight = computedAutoHeight() + borderAndPaddingLogicalHeight();
+        if (newLogicalHeight > logicalHeight())
+            setLogicalHeight(newLogicalHeight);
+    }
 }
 
 LayoutUnit RenderRegionMultiColumn::minPreferredLogicalWidth() const

@@ -350,22 +350,23 @@ bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
     return true;
 }
 
-LayoutUnit RenderRegion::computeReplacedLogicalWidth(bool includeMaxWidth) const
+void RenderRegion::computeLogicalHeight()
 {
-    if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !hasParentMultiColumnRegion()
-        && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && !isHorizontalWritingMode())
-        return computedAutoHeight();
-    return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
-}
+    RenderReplaced::computeLogicalHeight();
     
-LayoutUnit RenderRegion::computeReplacedLogicalHeight() const
-{
-    if (document()->cssRegionsAutoHeightEnabled() && usesAutoHeight() && !hasParentMultiColumnRegion()
-        && !view()->inFirstLayoutPhaseOfRegionsAutoHeight() && isHorizontalWritingMode())
-        return computedAutoHeight();
-    return RenderReplaced::computeReplacedLogicalHeight();
+    if (document()->cssRegionsAutoHeightEnabled() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
+        if (usesAutoHeight() && hasComputedAutoHeight()) {
+            LayoutUnit newLogicalHeight = computedAutoHeight() + borderAndPaddingLogicalHeight();
+            if (newLogicalHeight > logicalHeight())
+                setLogicalHeight(newLogicalHeight);
+        }
+        if (hasParentMultiColumnRegion() && parentMultiColumnRegion()->usesAutoHeight() 
+            && parentMultiColumnRegion()->hasComputedAutoHeight() 
+            && (parentMultiColumnRegion()->computedAutoHeight() > logicalHeight()))
+            setLogicalHeight(computedAutoHeight());
+    }
 }
-    
+
 LayoutUnit RenderRegion::minPreferredLogicalWidth() const
 {
     return m_flowThread ? m_flowThread->minPreferredLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();

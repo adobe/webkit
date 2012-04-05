@@ -116,8 +116,7 @@ public:
         m_hasComputedAutoHeight = false;
     }
     
-    virtual LayoutUnit computeReplacedLogicalHeight() const;
-    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual void computeLogicalHeight();
     
     void setParentMultiColumnRegion(RenderRegionMultiColumn* parentRegion) { m_parentMultiColumnRegion = parentRegion; }
     RenderRegionMultiColumn* parentMultiColumnRegion() const { return m_parentMultiColumnRegion; }

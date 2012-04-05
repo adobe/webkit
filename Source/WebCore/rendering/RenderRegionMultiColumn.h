@@ -65,7 +65,6 @@ public:
         m_hasComputedAutoHeight = false;
     }
     
-    virtual void computeLogicalWidth();
     virtual void computeLogicalHeight();
     
     virtual LayoutUnit minPreferredLogicalWidth() const;
