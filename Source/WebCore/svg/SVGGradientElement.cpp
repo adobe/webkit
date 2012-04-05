@@ -69,10 +69,41 @@ bool SVGGradientElement::isSupportedAttribute(const QualifiedName& attrName)
         SVGURIReference::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         supportedAttributes.add(SVGNames::gradientUnitsAttr);
-        supportedAttributes.add(SVGNames::gradientTransformAttr);
+        //supportedAttributes.add(SVGNames::gradientTransformAttr);
         supportedAttributes.add(SVGNames::spreadMethodAttr);
     }
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+}
+
+CSSPropertyID SVGGradientElement::cssPropertyIdForSVGAttributeName(const QualifiedName& name)
+{
+    //DEFINE_STATIC_LOCAL(HashMap<AtomicStringImpl*, int>, supportedAttributes, ());
+    static HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap = 0;
+    if (!propertyNameToIdMap) {
+        propertyNameToIdMap = new HashMap<AtomicStringImpl*, CSSPropertyID>;
+        propertyNameToIdMap->set(SVGNames::gradientTransformAttr.localName().impl(), CSSPropertyWebkitTransform);
+    }
+    
+    return propertyNameToIdMap->get(name.localName().impl());
+}
+
+void SVGGradientElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    CSSPropertyID propertyID = SVGGradientElement::cssPropertyIdForSVGAttributeName(attr->name());
+    if (propertyID > 0) {
+        addPropertyToAttributeStyle(style, propertyID, attr->value());
+        return;
+    }
+
+    SVGStyledElement::collectStyleForAttribute(attr, style);
+}
+
+bool SVGGradientElement::isPresentationAttribute(const QualifiedName& name) const
+{
+    CSSPropertyID propertyID = SVGGradientElement::cssPropertyIdForSVGAttributeName(name);
+    if (propertyID > 0)
+        return true;
+    return SVGStyledElement::isPresentationAttribute(name);
 }
 
 void SVGGradientElement::parseAttribute(Attribute* attr)
@@ -89,13 +120,13 @@ void SVGGradientElement::parseAttribute(Attribute* attr)
         return;
     }
 
-    if (attr->name() == SVGNames::gradientTransformAttr) {
+    /*if (attr->name() == SVGNames::gradientTransformAttr) {
         SVGTransformList newList;
         newList.parse(attr->value());
         detachAnimatedGradientTransformListWrappers(newList.size());
         setGradientTransformBaseValue(newList);
         return;
-    }
+    }*/
 
     if (attr->name() == SVGNames::spreadMethodAttr) {
         SVGSpreadMethodType propertyValue = SVGPropertyTraits<SVGSpreadMethodType>::fromString(attr->value());

@@ -6786,81 +6786,114 @@ PassRefPtr<CSSValue> CSSParser::parseImageSet(CSSParserValueList* valueList)
 }
 #endif
 
+static bool equaleFunctionalNotation(const CSSParserString& a, const char* b, CSSParserMode cssParserMode)
+{
+    int i;
+    for (i = 0; i < a.length; i++) {
+        if (!b[i])
+            return false;
+        ASSERT(!isASCIIUpper(b[i]));
+        if (toASCIILower(a.characters[i]) != b[i])
+            break;
+    }
+    int j = i;
+    if (cssParserMode == SVGAttributeMode) {
+        while (i < a.length && isHTMLSpace(a.characters[i]))
+            i++;
+        if (i < a.length && a.characters[i] == b[j]) {
+            i++; j++;
+        }
+    }
+    return i == a.length && !b[j];
+}
+
 class TransformOperationInfo {
 public:
-    TransformOperationInfo(const CSSParserString& name)
+    TransformOperationInfo(const CSSParserString& name, CSSParserMode cssParserMode)
     : m_type(WebKitCSSTransformValue::UnknownTransformOperation)
     , m_argCount(1)
     , m_allowSingleArgument(false)
     , m_unit(CSSParser::FUnknown)
     {
-        if (equalIgnoringCase(name, "scale(") || equalIgnoringCase(name, "scalex(") || equalIgnoringCase(name, "scaley(") || equalIgnoringCase(name, "scalez(")) {
+        if (equaleFunctionalNotation(name, "scale(", cssParserMode)
+            || equaleFunctionalNotation(name, "scalex(", cssParserMode)
+            || equaleFunctionalNotation(name, "scaley(", cssParserMode)
+            || equaleFunctionalNotation(name, "scalez(", cssParserMode)) {
             m_unit = CSSParser::FNumber;
-            if (equalIgnoringCase(name, "scale("))
+            if (equaleFunctionalNotation(name, "scale(", cssParserMode))
                 m_type = WebKitCSSTransformValue::ScaleTransformOperation;
-            else if (equalIgnoringCase(name, "scalex("))
+            else if (equaleFunctionalNotation(name, "scalex(", cssParserMode))
                 m_type = WebKitCSSTransformValue::ScaleXTransformOperation;
-            else if (equalIgnoringCase(name, "scaley("))
+            else if (equaleFunctionalNotation(name, "scaley(", cssParserMode))
                 m_type = WebKitCSSTransformValue::ScaleYTransformOperation;
             else
                 m_type = WebKitCSSTransformValue::ScaleZTransformOperation;
-        } else if (equalIgnoringCase(name, "scale3d(")) {
+        } else if (equaleFunctionalNotation(name, "scale3d(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::Scale3DTransformOperation;
             m_argCount = 5;
             m_unit = CSSParser::FNumber;
-        } else if (equalIgnoringCase(name, "rotate(")) {
+        } else if (equaleFunctionalNotation(name, "rotate(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::RotateTransformOperation;
+            m_argCount = 5;
             m_unit = CSSParser::FAngle;
-        } else if (equalIgnoringCase(name, "rotatex(") ||
-                   equalIgnoringCase(name, "rotatey(") ||
-                   equalIgnoringCase(name, "rotatez(")) {
+            m_allowSingleArgument = true;
+        } else if (equaleFunctionalNotation(name, "rotatex(", cssParserMode) ||
+                   equaleFunctionalNotation(name, "rotatey(", cssParserMode) ||
+                   equaleFunctionalNotation(name, "rotatez(", cssParserMode)) {
             m_unit = CSSParser::FAngle;
-            if (equalIgnoringCase(name, "rotatex("))
+            if (equaleFunctionalNotation(name, "rotatex(", cssParserMode))
                 m_type = WebKitCSSTransformValue::RotateXTransformOperation;
-            else if (equalIgnoringCase(name, "rotatey("))
+            else if (equaleFunctionalNotation(name, "rotatey(", cssParserMode))
                 m_type = WebKitCSSTransformValue::RotateYTransformOperation;
             else
                 m_type = WebKitCSSTransformValue::RotateZTransformOperation;
-        } else if (equalIgnoringCase(name, "rotate3d(")) {
+        } else if (equaleFunctionalNotation(name, "rotate3d(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::Rotate3DTransformOperation;
             m_argCount = 7;
             m_unit = CSSParser::FNumber;
-        } else if (equalIgnoringCase(name, "skew(") || equalIgnoringCase(name, "skewx(") || equalIgnoringCase(name, "skewy(")) {
+        } else if (equaleFunctionalNotation(name, "skew(", cssParserMode)
+            || equaleFunctionalNotation(name, "skewx(", cssParserMode)
+            || equaleFunctionalNotation(name, "skewy(", cssParserMode)) {
             m_unit = CSSParser::FAngle;
-            if (equalIgnoringCase(name, "skew("))
+            if (equaleFunctionalNotation(name, "skew(", cssParserMode))
                 m_type = WebKitCSSTransformValue::SkewTransformOperation;
-            else if (equalIgnoringCase(name, "skewx("))
+            else if (equaleFunctionalNotation(name, "skewx(", cssParserMode))
                 m_type = WebKitCSSTransformValue::SkewXTransformOperation;
             else
                 m_type = WebKitCSSTransformValue::SkewYTransformOperation;
-        } else if (equalIgnoringCase(name, "translate(") || equalIgnoringCase(name, "translatex(") || equalIgnoringCase(name, "translatey(") || equalIgnoringCase(name, "translatez(")) {
+        } else if (equaleFunctionalNotation(name, "translate(", cssParserMode)
+            || equaleFunctionalNotation(name, "translatex(", cssParserMode)
+            || equaleFunctionalNotation(name, "translatey(", cssParserMode)
+            || equaleFunctionalNotation(name, "translatez(", cssParserMode)) {
             m_unit = CSSParser::FLength | CSSParser::FPercent;
-            if (equalIgnoringCase(name, "translate("))
+            if (equaleFunctionalNotation(name, "translate(", cssParserMode))
                 m_type = WebKitCSSTransformValue::TranslateTransformOperation;
-            else if (equalIgnoringCase(name, "translatex("))
+            else if (equaleFunctionalNotation(name, "translatex(", cssParserMode))
                 m_type = WebKitCSSTransformValue::TranslateXTransformOperation;
-            else if (equalIgnoringCase(name, "translatey("))
+            else if (equaleFunctionalNotation(name, "translatey(", cssParserMode))
                 m_type = WebKitCSSTransformValue::TranslateYTransformOperation;
             else
                 m_type = WebKitCSSTransformValue::TranslateZTransformOperation;
-        } else if (equalIgnoringCase(name, "translate3d(")) {
+        } else if (equaleFunctionalNotation(name, "translate3d(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::Translate3DTransformOperation;
             m_argCount = 5;
             m_unit = CSSParser::FLength | CSSParser::FPercent;
-        } else if (equalIgnoringCase(name, "matrix(")) {
+        } else if (equaleFunctionalNotation(name, "matrix(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::MatrixTransformOperation;
             m_argCount = 11;
             m_unit = CSSParser::FNumber;
-        } else if (equalIgnoringCase(name, "matrix3d(")) {
+        } else if (equaleFunctionalNotation(name, "matrix3d(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::Matrix3DTransformOperation;
             m_argCount = 31;
             m_unit = CSSParser::FNumber;
-        } else if (equalIgnoringCase(name, "perspective(")) {
+        } else if (equaleFunctionalNotation(name, "perspective(", cssParserMode)) {
             m_type = WebKitCSSTransformValue::PerspectiveTransformOperation;
             m_unit = CSSParser::FNumber;
         }
 
-        if (equalIgnoringCase(name, "scale(") || equalIgnoringCase(name, "skew(") || equalIgnoringCase(name, "translate(")) {
+        if (equaleFunctionalNotation(name, "scale(", cssParserMode)
+            || equaleFunctionalNotation(name, "skew(", cssParserMode)
+            || equaleFunctionalNotation(name, "translate(", cssParserMode)) {
             m_allowSingleArgument = true;
             m_argCount = 3;
         }
@@ -6889,6 +6922,10 @@ PassRefPtr<CSSValueList> CSSParser::parseTransform()
     // We collect a list of WebKitCSSTransformValues, where each value specifies a single operation.
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
     for (CSSParserValue* value = m_valueList->current(); value; value = m_valueList->next()) {
+        // Transform functions can be comma separated on SVG presentation attributes.
+        if (m_cssParserMode == SVGAttributeMode && value->unit == CSSParserValue::Operator && value->iValue == ',')
+            continue;
+
         if (value->unit != CSSParserValue::Function || !value->function)
             return 0;
 
@@ -6898,11 +6935,11 @@ PassRefPtr<CSSValueList> CSSParser::parseTransform()
             return 0;
 
         // See if the specified primitive is one we understand.
-        TransformOperationInfo info(value->function->name);
+        TransformOperationInfo info(value->function->name, m_cssParserMode);
         if (info.unknown())
             return 0;
 
-        if (!info.hasCorrectArgCount(args->size()))
+        if (!info.hasCorrectArgCount(args->size()) && m_cssParserMode != SVGAttributeMode)
             return 0;
 
         // Create the new WebKitCSSTransformValue for this operation and add it to our list.
@@ -6915,23 +6952,28 @@ PassRefPtr<CSSValueList> CSSParser::parseTransform()
         while (a) {
             CSSParser::Units unit = info.unit();
 
-            if (info.type() == WebKitCSSTransformValue::Rotate3DTransformOperation && argNumber == 3) {
+            if (info.type() == WebKitCSSTransformValue::RotateTransformOperation && argNumber > 0) {
+                // 2nd and 3rd param of rotate() is either a length or percentage, validate it as such.
+                unit = FLength | FPercent;
+                if (!validUnit(a, unit, m_cssParserMode))
+                    return 0;
+            } else if (info.type() == WebKitCSSTransformValue::Rotate3DTransformOperation && argNumber == 3) {
                 // 4th param of rotate3d() is an angle rather than a bare number, validate it as such
-                if (!validUnit(a, FAngle, CSSStrictMode))
+                if (!validUnit(a, FAngle, m_cssParserMode))
                     return 0;
             } else if (info.type() == WebKitCSSTransformValue::Translate3DTransformOperation && argNumber == 2) {
                 // 3rd param of translate3d() cannot be a percentage
-                if (!validUnit(a, FLength, CSSStrictMode))
+                if (!validUnit(a, FLength, m_cssParserMode))
                     return 0;
             } else if (info.type() == WebKitCSSTransformValue::TranslateZTransformOperation && argNumber == 0) {
                 // 1st param of translateZ() cannot be a percentage
-                if (!validUnit(a, FLength, CSSStrictMode))
+                if (!validUnit(a, FLength, m_cssParserMode))
                     return 0;
             } else if (info.type() == WebKitCSSTransformValue::PerspectiveTransformOperation && argNumber == 0) {
                 // 1st param of perspective() must be a non-negative number (deprecated) or length.
-                if (!validUnit(a, FNumber | FLength | FNonNeg, CSSStrictMode))
+                if (!validUnit(a, FNumber | FLength | FNonNeg, m_cssParserMode))
                     return 0;
-            } else if (!validUnit(a, unit, CSSStrictMode))
+            } else if (!validUnit(a, unit, m_cssParserMode))
                 return 0;
 
             // Add the value to the current transform operation.
@@ -6940,8 +6982,13 @@ PassRefPtr<CSSValueList> CSSParser::parseTransform()
             a = args->next();
             if (!a)
                 break;
-            if (a->unit != CSSParserValue::Operator || a->iValue != ',')
-                return 0;
+            if (a->unit != CSSParserValue::Operator || a->iValue != ',') {
+                if (m_cssParserMode == SVGAttributeMode) {
+                    argNumber++;
+                    continue;
+                } else
+                    return 0;
+            }
             a = args->next();
 
             argNumber++;
@@ -7998,6 +8045,18 @@ inline void CSSParser::parseIdentifier(UChar*& result, bool& hasEscape)
             parseEscape(result);
         }
     } while (isCSSLetter(m_currentCharacter[0]) || (m_currentCharacter[0] == '\\' && isCSSEscape(m_currentCharacter[1])));
+
+    if (m_cssParserMode == SVGAttributeMode) {
+        int offset = 0;
+        UChar temp = m_currentCharacter[offset];
+        while (temp <= 127 && typesOfASCIICharacters[temp] == CharacterWhiteSpace)
+            temp = m_currentCharacter[++offset];
+        if (offset > 0 && temp == '(') {
+            // include whitespace
+            m_currentCharacter += offset;
+            result += offset;        
+        }
+    }
 }
 
 inline void CSSParser::parseString(UChar*& result, UChar quote)
