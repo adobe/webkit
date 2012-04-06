@@ -33,6 +33,7 @@
 
 #include "LayoutRepainter.h"
 #include "RenderLayer.h"
+#include "RenderRegion.h"
 #include "RenderView.h"
 #include <limits>
 
@@ -1044,6 +1045,17 @@ void RenderFlexibleBox::applyStretchAlignmentToChild(RenderBox* child, LayoutUni
             return;
 
         child->setLogicalHeight(stretchedLogicalHeight);
+
+        // If the element to be streched is an auto-height region, check if the computedAutoHeight is less
+        // than the streched height. In this case, set the new computed autoheight to the streched value.
+        if (document()->cssRegionsAutoHeightEnabled() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
+            if (child->isRenderRegion()) {
+                RenderRegion* region = toRenderRegion(child);
+                if (region->usesAutoHeight() && region->hasComputedAutoHeight() && (stretchedLogicalHeight > region->computedAutoHeight() + region->borderAndPaddingLogicalHeight()))
+                    region->setComputedAutoHeight(stretchedLogicalHeight - region->borderAndPaddingLogicalHeight());
+            }
+        }
+
         child->computeLogicalHeight();
 
         if (child->logicalHeight() != logicalHeightBefore) {
