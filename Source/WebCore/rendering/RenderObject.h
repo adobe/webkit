@@ -512,6 +512,8 @@ public:
     bool hasFilter() const { return false; }
 #endif
 
+    bool needsWrappingContext() const { return style() && ((style()->wrapThrough() != WrapThroughNone) || (style()->wrapFlow() != WrapFlowAuto)); }
+
     inline bool preservesNewline() const;
 
 #if !HAVE(PATH_BASED_BORDER_RADIUS_DRAWING)

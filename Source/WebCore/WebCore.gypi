@@ -4801,6 +4801,8 @@
             'rendering/TableLayout.h',
             'rendering/TrailingFloatsRootInlineBox.h',
             'rendering/VerticalPositionCache.h',
+            'rendering/WrappingContext.cpp',
+            'rendering/WrappingContext.h',
             'rendering/break_lines.cpp',
             'rendering/break_lines.h',
             'rendering/mathml/RenderMathMLBlock.cpp',

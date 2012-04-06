@@ -95,6 +95,7 @@
 #include "TextStream.h"
 #include "TransformationMatrix.h"
 #include "TranslateTransformOperation.h"
+#include "WrappingContext.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
@@ -226,6 +227,8 @@ RenderLayer::~RenderLayer()
 #if USE(ACCELERATED_COMPOSITING)
     clearBacking();
 #endif
+    
+    clearWrappingContext();
     
     // Make sure we have no lingering clip rects.
     ASSERT(!m_clipRects);
@@ -1147,6 +1150,9 @@ void RenderLayer::addChild(RenderLayer* child, RenderLayer* beforeChild)
 #if USE(ACCELERATED_COMPOSITING)
     compositor()->layerWasAdded(this, child);
 #endif
+
+    if (child->hasWrappingContext())
+        child->wrappingContext()->didAddLayer();
 }
 
 RenderLayer* RenderLayer::removeChild(RenderLayer* oldChild)
@@ -1155,7 +1161,10 @@ RenderLayer* RenderLayer::removeChild(RenderLayer* oldChild)
     if (!renderer()->documentBeingDestroyed())
         compositor()->layerWillBeRemoved(this, oldChild);
 #endif
-
+    
+    if (oldChild->hasWrappingContext())
+        oldChild->wrappingContext()->willRemoveLayer();
+    
     // remove the child
     if (oldChild->previousSibling())
         oldChild->previousSibling()->setNextSibling(oldChild->nextSibling());
@@ -1199,6 +1208,9 @@ void RenderLayer::removeOnlyThisLayer()
 #if USE(ACCELERATED_COMPOSITING)
     compositor()->layerWillBeRemoved(m_parent, this);
 #endif
+
+    if (hasWrappingContext())
+        wrappingContext()->willRemoveLayer();
 
     // Dirty the clip rects.
     clearClipRectsIncludingDescendants();
@@ -4412,6 +4424,8 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
     updateOrRemoveFilterEffect();
 #endif
 
+    updateOrRemoveWrappingContext();
+
     if (Frame* frame = renderer()->frame()) {
         if (FrameView* frameView = frame->view()) {
             if (scrollsOverflow())
@@ -4558,6 +4572,41 @@ void RenderLayer::filterNeedsRepaint()
     renderer()->repaint();
 }
 #endif
+
+
+void RenderLayer::updateOrRemoveWrappingContext()
+{
+    bool needsWrappingContext = renderer()->needsWrappingContext() || renderer()->isRenderView();
+    if (needsWrappingContext)
+        ensureWrappingContext();
+    else
+        clearWrappingContext();
+}
+
+void RenderLayer::ensureWrappingContext()
+{
+    if (m_wrappingContext.get())
+        return;
+    m_wrappingContext = WrappingContext::create(this);
+    m_wrappingContext->didAddOnlyThisContext();
+}
+
+void RenderLayer::clearWrappingContext()
+{
+    if (!m_wrappingContext.get())
+        return;
+    m_wrappingContext->willRemoveOnlyThisContext();
+    m_wrappingContext = 0;
+}
+
+WrappingContext* RenderLayer::enclosingWrappingContext(bool includeSelf) const
+{
+    const RenderLayer* layer = includeSelf ? this : parent();
+    for (; layer; layer = layer->parent())
+        if (layer->hasWrappingContext())
+            return layer->wrappingContext();
+    return 0;
+}
 
 } // namespace WebCore
 
