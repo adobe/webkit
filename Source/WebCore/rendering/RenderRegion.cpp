@@ -371,12 +371,12 @@ void RenderRegion::computeLogicalHeight()
 
 LayoutUnit RenderRegion::minPreferredLogicalWidth() const
 {
-    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();
+    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() + borderAndPaddingLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();
 }
 
 LayoutUnit RenderRegion::maxPreferredLogicalWidth() const
 {
-    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() : RenderReplaced::maxPreferredLogicalWidth();
+    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() + borderAndPaddingLogicalWidth() : RenderReplaced::maxPreferredLogicalWidth();
 }
 
 } // namespace WebCore
