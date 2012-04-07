@@ -31,6 +31,8 @@
 #include "WrappingContext.h"
 
 #include "RenderLayer.h"
+#include "RenderObject.h"
+#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
@@ -42,6 +44,7 @@ PassOwnPtr<WrappingContext> WrappingContext::create(RenderLayer* layer)
 WrappingContext::WrappingContext(RenderLayer* layer)
     : m_layer(layer)
     , m_parent(0)
+    , m_hasDirtyChildContextOrder(false)
 {
 }
 
@@ -104,6 +107,7 @@ void WrappingContext::willRemoveLayer()
 void WrappingContext::addChildContext(WrappingContext* child)
 {
     m_children.append(child);
+    setHasDirtyChildContextsOrder();
 }
 
 void WrappingContext::removeChildContext(WrappingContext* child)
@@ -114,6 +118,98 @@ void WrappingContext::removeChildContext(WrappingContext* child)
         return;
     }
     m_children.remove(index);
+    setHasDirtyChildContextsOrder();
+}
+
+static bool findLayerInList(Vector<RenderLayer*>* list, RenderLayer* layer, size_t& position)
+{
+    if (!list)
+        return false;
+    size_t positionInList = list->find(layer);
+    if (positionInList != notFound) {
+        position += positionInList;
+        return true;
+    }
+    position += list->size();
+    return false;
+}
+
+static size_t layerPositionInStackingContext(RenderLayer* stackingContext, RenderLayer* layer)
+{
+    size_t position = 0;
+    
+    if (!findLayerInList(stackingContext->negZOrderList(), layer, position)) {
+        if (!findLayerInList(stackingContext->normalFlowList(), layer, position)) {
+            if (!findLayerInList(stackingContext->posZOrderList(), layer, position)) {
+                ASSERT_NOT_REACHED();
+                return notFound;
+            }
+        }
+    }
+
+    return position;
+}
+
+static bool compareLayerInSameStackingContext(RenderLayer* layerA, RenderLayer* layerB)
+{
+    RenderLayer* stackingContext = layerA->stackingContext();
+    ASSERT(stackingContext == layerB->stackingContext());
+    stackingContext->updateLayerListsIfNeeded();
+    // We just need to iterate on the lists and see which one is first.
+    size_t positionA = layerPositionInStackingContext(stackingContext, layerA);
+    size_t positionB = layerPositionInStackingContext(stackingContext, layerB);
+    return positionA < positionB;
+}
+
+static void fillWithLayerStackContextChain(RenderLayer* layer, Vector<RenderLayer*>& chain)
+{
+    for (; layer; layer = layer->stackingContext()) {
+        chain.append(layer);
+        if (layer->renderer()->isRenderView() || !layer->renderer()->isRoot())
+            return;
+    }
+}
+
+static bool compareWrappingContexts(const WrappingContext* contextA, const WrappingContext* contextB)
+{
+    RenderLayer* layerA = contextA->layer();
+    RenderLayer* layerB = contextB->layer();
+    ASSERT(layerA != layerB);
+    
+    if (layerA->stackingContext() == layerB->stackingContext())
+        return compareLayerInSameStackingContext(contextA->layer(), contextB->layer());
+    
+    Vector<RenderLayer*> stackContextChainA;
+    fillWithLayerStackContextChain(layerA, stackContextChainA);
+    
+    Vector<RenderLayer*> stackContextChainB;
+    fillWithLayerStackContextChain(layerB, stackContextChainB);
+    
+    size_t i = 0;
+    for (; i < stackContextChainA.size() && i < stackContextChainB.size(); ++i) {
+        if (stackContextChainA.at(i) != stackContextChainB.at(i))
+            break;
+    }
+    if (!i)
+        return true;
+    ASSERT(i < stackContextChainA.size() && i < stackContextChainB.size());
+    return compareLayerInSameStackingContext(stackContextChainA.at(i), stackContextChainB.at(i));
+}
+
+void WrappingContext::sortChildContextsIfNeeded()
+{
+    if (!m_hasDirtyChildContextOrder)
+        return;
+    // 1. If the wrap-contexts are in the same stacking-context use z-index or fail to document order if not specified.
+    // 2. If the wrap-contexts are not in the same stacking contexts, find the common ancestor stacking context and follow the 
+    // z-index on that or fail to document order if z-index is not specified
+    std::sort(m_children.begin(), m_children.end(), compareWrappingContexts);
+    m_hasDirtyChildContextOrder = false;
+}
+
+void WrappingContext::setHasDirtyChildContextsOrder()
+{
+    m_hasDirtyChildContextOrder = true;
 }
 
 } // namespace WebCore

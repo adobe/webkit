@@ -4204,8 +4204,10 @@ void RenderLayer::dirtyZOrderLists()
 void RenderLayer::dirtyStackingContextZOrderLists()
 {
     RenderLayer* sc = stackingContext();
-    if (sc)
+    if (sc) {
         sc->dirtyZOrderLists();
+        enclosingWrappingContext(false)->setHasDirtyChildContextsOrder();
+    }
 }
 
 void RenderLayer::dirtyNormalFlowList()

@@ -48,6 +48,7 @@
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "StylePropertySet.h"
+#include "WrappingContext.h"
 #include <wtf/HexNumber.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
@@ -589,6 +590,26 @@ enum LayerPaintPhase {
     LayerPaintPhaseForeground = 1
 };
 
+static void writeNodeIdAndClasses(TextStream& ts, Node* node)
+{
+    if (!node)
+        return;
+    
+    if (node->hasID())
+        ts << " id=\"" + static_cast<Element*>(node)->getIdAttribute() + "\"";
+
+    if (node->hasClass()) {
+        StyledElement* styledElement = static_cast<StyledElement*>(node);
+        String classes;
+        for (size_t i = 0; i < styledElement->classNames().size(); ++i) {
+            if (i > 0)
+                classes += " ";
+            classes += styledElement->classNames()[i];
+        }
+        ts << " class=\"" + classes + "\"";
+    }
+}
+
 static void write(TextStream& ts, RenderLayer& l,
                   const IntRect& layerBounds, const IntRect& backgroundClipRect, const IntRect& clipRect, const IntRect& outlineClipRect,
                   LayerPaintPhase paintPhase = LayerPaintPhaseAll, int indent = 0, RenderAsTextBehavior behavior = RenderAsTextBehaviorNormal)
@@ -635,6 +656,22 @@ static void write(TextStream& ts, RenderLayer& l,
 #else
     UNUSED_PARAM(behavior);
 #endif
+    
+    if (l.hasWrappingContext()) {
+        WrappingContext* wrappingContext = l.wrappingContext();
+        ts << " (wrapping context " << static_cast<const void*>(wrappingContext);
+        writeNodeIdAndClasses(ts, l.renderer()->node());
+        ts << ": ";
+        wrappingContext->sortChildContextsIfNeeded();
+        for (size_t i = 0; i < wrappingContext->childCount(); ++i) {
+            WrappingContext* child = wrappingContext->childAt(i);
+            if (i)
+                ts << ", ";
+            ts << static_cast<const void*>(child);
+            writeNodeIdAndClasses(ts, child->layer()->renderer()->node());
+        }
+        ts << ")";
+    }
     
     ts << "\n";
 

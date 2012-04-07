@@ -53,6 +53,8 @@ public:
     void didAddLayer();
     void willRemoveLayer();
     
+    void setHasDirtyChildContextsOrder();
+    void sortChildContextsIfNeeded();
     WrappingContext* childAt(size_t i) const { return m_children.at(i); }
     size_t childCount() const { return m_children.size(); }
     
@@ -69,6 +71,8 @@ private:
     
     WrappingContext* m_parent;
     WrappingContextList m_children;
+    
+    bool m_hasDirtyChildContextOrder;
 };
 
 } // Namespace WebCore

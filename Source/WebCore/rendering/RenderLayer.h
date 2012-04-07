@@ -570,6 +570,8 @@ public:
     WrappingContext* wrappingContext() const { return m_wrappingContext.get(); }
     WrappingContext* enclosingWrappingContext(bool includeSelf = true) const;
 
+    void updateLayerListsIfNeeded();
+
 private:
     void updateZOrderListsSlowCase();
 
@@ -600,7 +602,6 @@ private:
 
     void collectLayers(bool includeHiddenLayers, Vector<RenderLayer*>*&, Vector<RenderLayer*>*&);
 
-    void updateLayerListsIfNeeded();
     void updateCompositingAndLayerListsIfNeeded();
 
     void paintLayer(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,

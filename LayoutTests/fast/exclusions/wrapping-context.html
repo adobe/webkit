@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Exclusions</title>
+        <style>
+        
+        #exclusion1 {
+            -webkit-flow-wrap: clear; 
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            width: 100px; 
+            height: 100px; 
+            border: 1px solid red;
+        }
+        
+        #exclusion1:hover {
+            -webkit-flow-wrap: auto;
+            border: 20px solid green;
+        }
+        
+        .exclusion {
+            -webkit-flow-wrap: clear;
+        }
+        </style>
+    </head>
+<body>
+    
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+    
+    <div id="exclusion1">
+        <div id="exclusion2" class="exclusion">
+            <div id="exclusion3" class="exclusion">
+            </div>
+        </div>
+    </div>
+    
+    <div id="exclusion4" class="exclusion">
+    </div>
+    
+    <div id="exclusion5" class="exclusion">
+    </div>
+</body>
+</html>
