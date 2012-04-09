@@ -5,7 +5,6 @@ import xml.etree.ElementTree as ET
 
 webkitPath = ''
 w3cTestPath = ''
-w3cTestDir = ''
 platform = ''
 
 def usage():
@@ -48,17 +47,27 @@ def convertToWebkitTest(w3cTest):
     ### Copy the .html file to the WebKit/LayoutTests temp dir     
     shutil.copy2(w3cTest, webkitTest)
     
-    ### Strip the enumeration and extension from the basename
-    testRootname = re.split('\d+.xht', testBasename)[0]    
-    
     ### Find the reference file for this test
     refFile =  findRefFile(w3cTest)
     if refFile != "":
-		w3cRef = w3cTestDir + refFile
-       	### Copy it to the WebKit/LayoutTests temp dir with the '-expected.html' convention
+		w3cRef = os.path.abspath(os.path.join(w3cTest, os.path.pardir)) +'/'+ refFile
+	   	### Copy it to the WebKit/LayoutTests temp dir with the '-expected.html' convention
 		w3cRefConverted = re.split('.html', w3cTestConverted)[0] + '-expected.html'
 		webkitRef = webkitTempDir + w3cRefConverted
 		shutil.copy(w3cRef, webkitRef)
+
+def scanW3CDirectory(directory):
+	directory += "/"
+	directory = directory.replace("//", "/")
+	
+	### Scan the test directory
+	for w3cTest in os.listdir(directory):
+		fullpath = os.path.join(directory, w3cTest)
+		if os.path.isfile(fullpath) and not(w3cTest.startswith(".")):
+			print "converting " + w3cTest
+			convertToWebkitTest(fullpath)
+		elif os.path.isdir(fullpath) and not(w3cTest.startswith("reftest")):
+			scanW3CDirectory(fullpath)
 
 
 
@@ -78,18 +87,8 @@ os.makedirs(webkitTempDir)
 shutil.rmtree(webkitPath +'LayoutTests/platform/'+ platform +'/w3ctmp', ignore_errors=True )
 
 if os.path.isdir(w3cTestPath):
-	w3cTestPath += "/"
-	w3cTestPath = w3cTestPath.replace("//", "/")
-	w3cTestDir = w3cTestPath
-	
-	### Scan the test directory
-	for w3cTest in os.listdir(w3cTestPath):
-		fullpath = os.path.join(w3cTestPath, w3cTest)
-		if os.path.isfile(fullpath) and not(w3cTest.startswith(".")):
-			print "converting " + w3cTest
-			convertToWebkitTest(fullpath)
+	scanW3CDirectory(w3cTestPath)
 else:
-	w3cTestDir = os.path.abspath(os.path.join(w3cTestPath, os.path.pardir)) +'/'
 	convertToWebkitTest(w3cTestPath)
 
 ### Run the tests
