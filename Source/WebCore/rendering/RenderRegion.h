@@ -37,6 +37,7 @@ namespace WebCore {
 class RenderBox;
 class RenderBoxRegionInfo;
 class RenderFlowThread;
+class RenderRegionMultiColumn;
 
 class RenderRegion : public RenderReplaced {
 public:
@@ -97,37 +98,30 @@ public:
     
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
-    bool hasAutoHeight() const {
-        return !usedForMultiColumn() 
-                && (isHorizontalWritingMode() ? style()->logicalHeight().isAuto() : style()->logicalWidth().isAuto()); 
-    }
+    bool hasAutoHeightStyle() const;
+    bool usesAutoHeight() const { return m_usesAutoHeight; }
 
-    bool hasComputedAutoHeight() const { return m_hasComputedAutoHeight; }
+    bool hasComputedAutoHeight() const { return document()->cssRegionsAutoHeightEnabled() && m_hasComputedAutoHeight; }
     LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
     void setComputedAutoHeight(LayoutUnit computedAutoHeight) { 
-        if (document()->cssRegionsAutoHeightEnabled()) {
-            m_computedAutoHeight = computedAutoHeight;
-            m_hasComputedAutoHeight = true;
-        }
+        ASSERT(document()->cssRegionsAutoHeightEnabled());
+        m_computedAutoHeight = computedAutoHeight;
+        m_hasComputedAutoHeight = true;
     }
     void resetComputedAutoHeight() {
-        if (document()->cssRegionsAutoHeightEnabled()) {
-            m_computedAutoHeight = 0;
-            m_hasComputedAutoHeight = false;
-        }
+        ASSERT(document()->cssRegionsAutoHeightEnabled());
+        m_computedAutoHeight = 0;
+        m_hasComputedAutoHeight = false;
     }
-
-    void prepareSecondLayout(LayoutUnit intrinsicHeight) {
-        if (document()->cssRegionsAutoHeightEnabled()) {
-            setIntrinsicSize(IntSize(logicalWidth(), intrinsicHeight));
-            setNeedsLayout(true);
-        }
-    }
-    virtual LayoutUnit computeReplacedLogicalHeight() const;
-    virtual bool isInlineBlockOrInlineTable() const { return isInline() && isReplaced(); }
-   
-    void setUsedForMultiColumn(bool usedForMultiColumn) { m_usedForMultiColumn = usedForMultiColumn; }
-    bool usedForMultiColumn() const { return m_usedForMultiColumn; }
+    
+    virtual void computeLogicalHeight();
+    
+    void setParentMultiColumnRegion(RenderRegionMultiColumn* parentRegion) { m_parentMultiColumnRegion = parentRegion; }
+    RenderRegionMultiColumn* parentMultiColumnRegion() const { return m_parentMultiColumnRegion; }
+    bool hasParentMultiColumnRegion() const { return m_parentMultiColumnRegion; }
+    
+    virtual LayoutUnit minPreferredLogicalWidth() const;
+    virtual LayoutUnit maxPreferredLogicalWidth() const;
     
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
@@ -155,15 +149,17 @@ private:
     typedef HashMap<const RenderBox*, RefPtr<RenderStyle> > RenderBoxRegionStyleMap;
     RenderBoxRegionStyleMap m_renderBoxRegionStyle;
 
+    RenderRegionMultiColumn* m_parentMultiColumnRegion; 
+    
     bool m_isValid;
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
     bool m_dispatchRegionLayoutUpdateEvent;
-    bool m_usedForMultiColumn;
 
     // Store the computed region autoheight
     LayoutUnit m_computedAutoHeight;
     bool m_hasComputedAutoHeight;
+    bool m_usesAutoHeight;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)
