@@ -4598,7 +4598,7 @@ void RenderLayer::clearWrappingContext()
     if (!m_wrappingContext.get())
         return;
     m_wrappingContext->willRemoveOnlyThisContext();
-    m_wrappingContext = 0;
+    m_wrappingContext.clear();
 }
 
 WrappingContext* RenderLayer::enclosingWrappingContext(bool includeSelf) const
