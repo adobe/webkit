@@ -122,7 +122,10 @@ public:
     
     virtual LayoutUnit minPreferredLogicalWidth() const;
     virtual LayoutUnit maxPreferredLogicalWidth() const;
-    
+    // Fix for inline-block regions with width:auto
+    // (to avoid the computation path for inline replaced elements in RenderBox::computeLogicalWidthInRegion).
+    virtual bool isInlineBlockOrInlineTable() const { return isInline() && isReplaced(); }
+   
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 

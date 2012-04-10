@@ -369,6 +369,8 @@ void RenderRegion::computeLogicalHeight()
     }
 }
 
+// FIXME: adding borderAndPaddingLogicalWidth() is done for all classes at the end of computePrefferedLogicalWidths methods.
+// Probably we should implement computePrefferedLogicalWidths in RenderRegion too.
 LayoutUnit RenderRegion::minPreferredLogicalWidth() const
 {
     return m_flowThread ? m_flowThread->minPreferredLogicalWidth() + borderAndPaddingLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();
