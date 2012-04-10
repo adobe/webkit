@@ -14,7 +14,7 @@ def usage():
 def parseArgs():
 	### TODO convert args to the webkit style python script args
 	### TODO add option to removed the tmp dir after the harness is run
-	if (len(sys.argv) < 2):
+	if (len(sys.argv) < 3):
 	    usage()
 	else:
 		global webkitPath
