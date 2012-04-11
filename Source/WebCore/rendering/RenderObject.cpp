@@ -2009,6 +2009,13 @@ LayoutRect RenderObject::viewRect() const
     return view()->viewRect();
 }
 
+TransformationMatrix RenderObject::absoluteTransformationMatrix() const
+{
+    TransformState transformState;
+    mapAbsoluteToLocalPoint(false, true, transformState);
+    return transformState.globalTransformationMatrix();
+}
+
 FloatPoint RenderObject::localToAbsolute(const FloatPoint& localPoint, bool fixed, bool useTransforms) const
 {
     TransformState transformState(TransformState::ApplyTransformDirection, localPoint);

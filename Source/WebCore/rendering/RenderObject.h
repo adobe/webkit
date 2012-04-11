@@ -512,7 +512,7 @@ public:
     bool hasFilter() const { return false; }
 #endif
 
-    bool needsWrappingContext() const { return style() && ((style()->wrapThrough() != WrapThroughNone) || (style()->wrapFlow() != WrapFlowAuto)); }
+    bool needsWrappingContext() const { return style() && ((style()->wrapThrough() == WrapThroughNone) || (style()->wrapFlow() != WrapFlowAuto)); }
 
     inline bool preservesNewline() const;
 
@@ -634,6 +634,8 @@ public:
 
     // returns the containing block level element for this element.
     RenderBlock* containingBlock() const;
+
+    TransformationMatrix absoluteTransformationMatrix() const;
 
     // Convert the given local point to absolute coordinates
     // FIXME: Temporary. If useTransforms is true, take transforms into account. Eventually localToAbsolute() will always be transform-aware.

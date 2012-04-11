@@ -37,6 +37,7 @@
 #include "RenderWidget.h"
 #include "RenderWidgetProtector.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -60,6 +61,8 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_currentRenderFlowThread(0)
     , m_inFirstLayoutPhaseOfRegionsAutoHeight(false)
     , m_autoHeightRegionsCount(0)
+    , m_inFirstLayoutPhaseOfExclusionsPositioning(false)
+    , m_cssExclusionsCount(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
     // any renderer with document as the node is anonymous.
@@ -140,23 +143,33 @@ void RenderView::layout()
     // If one of the render flow threads has a region with auto-height
     // then we need a second pass layout.
     if (needsLayout()) {
+        m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
         if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions() && resetAutoHeightRegionsForFirstLayoutPhase())
             m_inFirstLayoutPhaseOfRegionsAutoHeight = true;
+        if (hasCSSExclusions())
+            m_inFirstLayoutPhaseOfExclusionsPositioning = true;
         RenderBlock::layout();
         if (hasRenderFlowThreads())
             layoutRenderFlowThreads();
     }
     
-    if (m_inFirstLayoutPhaseOfRegionsAutoHeight) {
+    if (m_inFirstLayoutPhaseOfRegionsAutoHeight || m_inFirstLayoutPhaseOfExclusionsPositioning) {
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
-        // Regions should decide for themselves whether they need a second layout.
+        m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         setNeedsLayout(false);
-        markAutoHeightRegionsForSecondLayoutPhase();
+        if (hasCSSExclusions()) {
+            // Exclusions are first, because we must not have any "needsLayout == true" in the tree.
+            m_layoutState = 0;
+            markCSSExclusionDependentBlocksForLayout();
+            m_layoutState = &state;
+        }
+        if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions())
+            markAutoHeightRegionsForSecondLayoutPhase();
         if (needsLayout()) {
             RenderBlock::layout();
-            ASSERT(hasRenderFlowThreads());
-            layoutRenderFlowThreads();
+            if (hasRenderFlowThreads())
+                layoutRenderFlowThreads();
         }
     }
 
@@ -984,6 +997,13 @@ void RenderView::markAutoHeightRegionsForSecondLayoutPhase()
         RenderFlowThread* flowRenderer = *iter;
         flowRenderer->markAutoHeightRegionsForSecondLayoutPhase();
     }
+}
+
+void RenderView::markCSSExclusionDependentBlocksForLayout()
+{
+    ASSERT(layer());
+    if (layer()->hasWrappingContext())
+        layer()->wrappingContext()->markDescendantsForSecondLayoutPass();
 }
 
 RenderBlock::IntervalArena* RenderView::intervalArena()

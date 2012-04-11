@@ -30,8 +30,10 @@
 #include "config.h"
 #include "WrappingContext.h"
 
+#include "RenderBlock.h"
 #include "RenderLayer.h"
 #include "RenderObject.h"
+#include "RootInlineBox.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
@@ -164,20 +166,18 @@ static bool compareLayerInSameStackingContext(RenderLayer* layerA, RenderLayer* 
 static void fillWithLayerStackContextChain(RenderLayer* layer, Vector<RenderLayer*>& chain)
 {
     for (; layer; layer = layer->stackingContext()) {
-        chain.append(layer);
-        if (layer->renderer()->isRenderView() || !layer->renderer()->isRoot())
+        chain.prepend(layer);
+        if (layer->renderer()->isRenderView() || layer->renderer()->isRoot())
             return;
     }
 }
 
-static bool compareWrappingContexts(const WrappingContext* contextA, const WrappingContext* contextB)
+static bool compareLayerOrder(RenderLayer* layerA, RenderLayer* layerB)
 {
-    RenderLayer* layerA = contextA->layer();
-    RenderLayer* layerB = contextB->layer();
     ASSERT(layerA != layerB);
     
     if (layerA->stackingContext() == layerB->stackingContext())
-        return compareLayerInSameStackingContext(contextA->layer(), contextB->layer());
+        return compareLayerInSameStackingContext(layerA, layerB);
     
     Vector<RenderLayer*> stackContextChainA;
     fillWithLayerStackContextChain(layerA, stackContextChainA);
@@ -192,8 +192,19 @@ static bool compareWrappingContexts(const WrappingContext* contextA, const Wrapp
     }
     if (!i)
         return true;
+    if (i == stackContextChainA.size())
+        return true;
+    if (i == stackContextChainB.size())
+        return false;
     ASSERT(i < stackContextChainA.size() && i < stackContextChainB.size());
     return compareLayerInSameStackingContext(stackContextChainA.at(i), stackContextChainB.at(i));
+}
+
+static bool compareWrappingContexts(WrappingContext* contextA, WrappingContext* contextB)
+{
+    RenderLayer* layerA = contextA->layer();
+    RenderLayer* layerB = contextB->layer();
+    return compareLayerOrder(layerA, layerB);
 }
 
 void WrappingContext::sortChildContextsIfNeeded()
@@ -210,6 +221,96 @@ void WrappingContext::sortChildContextsIfNeeded()
 void WrappingContext::setHasDirtyChildContextsOrder()
 {
     m_hasDirtyChildContextOrder = true;
+}
+
+void WrappingContext::markDescendantsForSecondLayoutPass()
+{
+    m_savedTransformationMatrix = layer()->renderer()->absoluteTransformationMatrix();
+    m_savedExclusionBoundingBox = layer()->renderer()->absoluteBoundingBoxRect();
+    
+    sortChildContextsIfNeeded();
+    for (size_t i = 0; i < m_children.size(); ++i)
+        m_children.at(i)->markDescendantsForSecondLayoutPass();
+    if (layer()->renderer()->isRenderBlock())
+        toRenderBlock(layer()->renderer())->setNeedsLayoutForWrappingContextChange();
+}
+    
+void WrappingContext::addSiblingExclusions(WrappingContext* child, Vector<WrappingContext*>& list)
+{
+    size_t childIndex = m_children.find(child);
+    if (childIndex == notFound)
+        return;
+    
+    ++childIndex;
+    for (; childIndex < m_children.size(); ++childIndex) {
+        WrappingContext* child = m_children.at(childIndex);
+        if (child->layer()->renderer()->style()->isCSSExclusion())
+            list.append(child);
+    }
+    
+    if (parent() && layer()->renderer()->style()->wrapThrough() == WrapThroughWrap)
+        parent()->addSiblingExclusions(this, list);
+}
+
+void WrappingContext::computeExclusionListForBlock(RenderBlock* block, Vector<WrappingContext*>& list)
+{
+    if (parent() && layer()->renderer()->style()->wrapThrough() == WrapThroughWrap)
+        parent()->addSiblingExclusions(this, list);
+    if (!m_children.size())
+        return;
+    size_t firstWrappingContext = 0;
+    if (block->layer() && block->layer()->hasWrappingContext()) {
+        // Just find the wrapping context and return all the following ones.
+        firstWrappingContext = m_children.find(block->layer()->wrappingContext());
+        if (firstWrappingContext == notFound)
+            return;
+    } else {
+        RenderLayer* enclosingLayer = block->enclosingLayer();
+        if (enclosingLayer != layer()) {
+            // Find the first wrapping context layer that is after the enclosing layer.
+            for (size_t i = 0; i < m_children.size(); ++i) {
+                if (compareLayerOrder(enclosingLayer, m_children.at(i)->layer())) {
+                    firstWrappingContext = i;
+                    break;
+                }
+            }
+        }
+        // FIXME: we should only return the wrapping context with positive z-index relative to
+        // the "layer()" stacking context.
+    }
+    for (size_t i = firstWrappingContext; i < m_children.size(); ++i) {
+        WrappingContext* child = m_children.at(i);
+        if (child->layer()->renderer()->style()->isCSSExclusion())
+            list.append(child);
+    }
+}
+
+static bool overlapping(int t0, int t1, int y0, int y1)
+{
+    return t0 <= y1 && t1 >= y0;
+}
+
+void WrappingContext::adjustLinePositionForExclusions(RenderBlock* block, RootInlineBox* lineBox, LayoutUnit& deltaOffset, const Vector<WrappingContext*>& exclusionsList)
+{
+    LayoutRect logicalVisualOverflow = lineBox->logicalVisualOverflowRect(lineBox->lineTop(), lineBox->lineBottom());
+    LayoutUnit logicalOffset = std::min(lineBox->lineTopWithLeading(), logicalVisualOverflow.y());
+    LayoutUnit lineHeight = std::max(lineBox->lineBottomWithLeading(), logicalVisualOverflow.maxY()) - logicalOffset;
+    
+    FloatPoint upperLeftCorner = block->localToAbsolute(FloatPoint(0, logicalOffset - block->logicalTop()), false, true);
+    FloatPoint lowerRightCorner = block->localToAbsolute(FloatPoint(10, logicalOffset + lineHeight - block->logicalTop()), false, true);
+    
+    int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
+    int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
+    int maxY = t0 - 1;
+    
+    for (size_t i = 0; i < exclusionsList.size(); ++i) {
+        WrappingContext* exclusion = exclusionsList.at(i);
+        const IntRect& exclusionBoundingBox = exclusion->savedExclusionBoundingBox();
+        if (overlapping(t0, t1, exclusionBoundingBox.y(), exclusionBoundingBox.maxY()))
+            maxY = std::max(maxY, exclusionBoundingBox.maxY());
+    }
+    if (maxY >= t0)
+        deltaOffset = maxY - t0;
 }
 
 } // namespace WebCore

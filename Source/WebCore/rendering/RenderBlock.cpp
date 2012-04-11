@@ -59,6 +59,7 @@
 #include "Settings.h"
 #include "SVGTextRunRenderingContext.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 #include <wtf/StdLibExtras.h>
 
 using namespace std;
@@ -2219,6 +2220,18 @@ void RenderBlock::setLogicalTopForChild(RenderBox* child, LayoutUnit logicalTop,
     }
 }
 
+void RenderBlock::setNeedsLayoutForWrappingContextChange()
+{
+    setNeedsLayout(true);
+    if (childrenInline())
+        return;
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
+        if (!child->isRenderBlock() || child->style()->wrapThrough() == WrapThroughNone)
+            continue;
+        toRenderBlock(child)->setNeedsLayoutForWrappingContextChange();
+    }
+}
+
 void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloatLogicalBottom)
 {
     if (gPercentHeightDescendantsMap) {
@@ -2378,6 +2391,14 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
         }
         
         if (childRenderBlock) {
+            // FIXME: This is horrible. Optimize this!
+            if (!view()->inFirstLayoutPhaseOfExclusionsPositioning()) {
+                WrappingContext* wrappingContext = enclosingLayer()->enclosingWrappingContext();
+                Vector<WrappingContext*> exclusionList;
+                wrappingContext->computeExclusionListForBlock(this, exclusionList);
+                if (exclusionList.size())
+                    childRenderBlock->setNeedsLayoutForWrappingContextChange();
+            }
             if (!child->avoidsFloats() && childRenderBlock->containsFloats())
                 childRenderBlock->markAllDescendantsWithFloatsForLayout();
             if (!child->needsLayout())

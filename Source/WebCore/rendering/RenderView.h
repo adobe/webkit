@@ -195,6 +195,12 @@ public:
     bool hasAutoHeightRegions() const { return m_autoHeightRegionsCount; }
     void incrementAutoHeightRegions() { ++m_autoHeightRegionsCount; }
     void decrementAutoHeightRegions() { ASSERT(m_autoHeightRegionsCount > 0); --m_autoHeightRegionsCount; }
+    
+    bool inFirstLayoutPhaseOfExclusionsPositioning() const { return m_inFirstLayoutPhaseOfExclusionsPositioning; }
+    bool hasCSSExclusions() const { return m_cssExclusionsCount; }
+    void incrementCSSExclusionsCount() { ++m_cssExclusionsCount; }
+    void decrementCSSExclusionsCount() { ASSERT(m_cssExclusionsCount > 0); --m_cssExclusionsCount; }
+    void markCSSExclusionDependentBlocksForLayout();
 
     void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -289,6 +295,8 @@ private:
     RenderFlowThread* m_currentRenderFlowThread;
     bool m_inFirstLayoutPhaseOfRegionsAutoHeight;
     unsigned m_autoHeightRegionsCount;
+    bool m_inFirstLayoutPhaseOfExclusionsPositioning;
+    unsigned m_cssExclusionsCount;
     RefPtr<IntervalArena> m_intervalArena;
 };
 

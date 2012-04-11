@@ -4426,7 +4426,7 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
     updateOrRemoveFilterEffect();
 #endif
 
-    updateOrRemoveWrappingContext();
+    updateOrRemoveWrappingContext(oldStyle);
 
     if (Frame* frame = renderer()->frame()) {
         if (FrameView* frameView = frame->view()) {
@@ -4576,8 +4576,17 @@ void RenderLayer::filterNeedsRepaint()
 #endif
 
 
-void RenderLayer::updateOrRemoveWrappingContext()
+void RenderLayer::updateOrRemoveWrappingContext(const RenderStyle* oldStyle)
 {
+    bool wasExclusion = oldStyle && oldStyle->isCSSExclusion();
+    if (renderer()->style()->isCSSExclusion()) {
+        if (!wasExclusion)
+            renderer()->view()->incrementCSSExclusionsCount();
+    } else {
+        if (wasExclusion)
+            renderer()->view()->decrementCSSExclusionsCount();
+    }
+    
     bool needsWrappingContext = renderer()->needsWrappingContext() || renderer()->isRenderView();
     if (needsWrappingContext)
         ensureWrappingContext();

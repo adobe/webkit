@@ -763,7 +763,7 @@ private:
     LayoutUnit verticalScrollbarStart(int minX, int maxX) const;
     LayoutUnit horizontalScrollbarStart(int minX) const;
 
-    void updateOrRemoveWrappingContext();
+    void updateOrRemoveWrappingContext(const RenderStyle* oldStyle);
     void ensureWrappingContext();
     void clearWrappingContext();
 

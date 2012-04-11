@@ -30,12 +30,15 @@
 #ifndef WrappingContext_h
 #define WrappingContext_h
 
+#include "TransformationMatrix.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
+class RenderBlock;
+class RootInlineBox;
 class RenderLayer;
 class WrappingContext;
 
@@ -60,6 +63,14 @@ public:
     
     WrappingContext* parent() const { return m_parent; }
     RenderLayer* layer() const { return m_layer; }
+    
+    void markDescendantsForSecondLayoutPass();
+    void addSiblingExclusions(WrappingContext*, Vector<WrappingContext*>&);
+    void computeExclusionListForBlock(RenderBlock*, Vector<WrappingContext*>&);
+    void adjustLinePositionForExclusions(RenderBlock*, RootInlineBox*, LayoutUnit& deltaOffset, const Vector<WrappingContext*>& exclusionsList);
+    
+    const TransformationMatrix& savedTransformationMatrix() const { return m_savedTransformationMatrix; }
+    const IntRect& savedExclusionBoundingBox() const { return m_savedExclusionBoundingBox; }
 private:
     WrappingContext(RenderLayer*);
     
@@ -71,6 +82,9 @@ private:
     
     WrappingContext* m_parent;
     WrappingContextList m_children;
+    
+    TransformationMatrix m_savedTransformationMatrix;
+    IntRect m_savedExclusionBoundingBox;
     
     bool m_hasDirtyChildContextOrder;
 };

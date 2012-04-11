@@ -39,6 +39,7 @@
 #include "TextBreakIterator.h"
 #include "TrailingFloatsRootInlineBox.h"
 #include "VerticalPositionCache.h"
+#include "WrappingContext.h"
 #include "break_lines.h"
 #include <wtf/AlwaysInline.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -1231,6 +1232,13 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
     VerticalPositionCache verticalPositionCache;
 
     LineBreaker lineBreaker(this);
+    
+    WrappingContext* wrappingContext = 0;
+    Vector<WrappingContext*> exclusionList;
+    if (!view()->inFirstLayoutPhaseOfExclusionsPositioning()) {
+        wrappingContext = enclosingLayer()->enclosingWrappingContext();
+        wrappingContext->computeExclusionListForBlock(this, exclusionList);
+    }
 
     while (!end.atEnd()) {
         // FIXME: Is this check necessary before the first iteration or can it be moved to the end?
@@ -1302,6 +1310,29 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                 if (layoutState.usesRepaintBounds())
                     layoutState.updateRepaintRangeFromBox(lineBox);
 
+                if (wrappingContext && exclusionList.size()) {
+                    LayoutUnit adjustment = 0;
+                    wrappingContext->adjustLinePositionForExclusions(this, lineBox, adjustment, exclusionList);
+                    if (adjustment) {
+                        LayoutUnit oldLineWidth = availableLogicalWidthForLine(oldLogicalHeight, layoutState.lineInfo().isFirstLine());
+                        lineBox->adjustBlockDirectionPosition(adjustment);
+                        if (layoutState.usesRepaintBounds())
+                            layoutState.updateRepaintRangeFromBox(lineBox);
+
+                        if (availableLogicalWidthForLine(oldLogicalHeight + adjustment, layoutState.lineInfo().isFirstLine()) != oldLineWidth) {
+                            // We have to delete this line, remove all floats that got added, and let line layout re-run.
+                            lineBox->deleteLine(renderArena());
+                            removeFloatingObjectsBelow(lastFloatFromPreviousLine, oldLogicalHeight);
+                            setLogicalHeight(oldLogicalHeight + adjustment);
+                            resolver.setPositionIgnoringNestedIsolates(oldEnd);
+                            end = oldEnd;
+                            continue;
+                        }
+
+                        setLogicalHeight(lineBox->lineBottomWithLeading());
+                    }
+                }
+                
                 if (paginated) {
                     LayoutUnit adjustment = 0;
                     adjustLinePositionForPagination(lineBox, adjustment);
