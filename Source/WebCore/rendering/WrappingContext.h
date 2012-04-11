@@ -64,6 +64,7 @@ public:
     WrappingContext* parent() const { return m_parent; }
     RenderLayer* layer() const { return m_layer; }
     
+    void resetExclusionsForFirstLayoutPass();
     void markDescendantsForSecondLayoutPass();
     void addSiblingExclusions(WrappingContext*, Vector<WrappingContext*>&);
     void computeExclusionListForBlock(RenderBlock*, Vector<WrappingContext*>&);

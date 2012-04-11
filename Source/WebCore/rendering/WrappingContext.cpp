@@ -223,6 +223,16 @@ void WrappingContext::setHasDirtyChildContextsOrder()
     m_hasDirtyChildContextOrder = true;
 }
 
+void WrappingContext::resetExclusionsForFirstLayoutPass()
+{
+    for (size_t i = 0; i < m_children.size(); ++i)
+        m_children.at(i)->resetExclusionsForFirstLayoutPass();
+    if (layer()->renderer()->isRenderBlock())
+        toRenderBlock(layer()->renderer())->setNeedsLayoutForWrappingContextChange();
+    if (layer()->renderer()->style()->isCSSExclusion())
+        layer()->renderer()->setNeedsLayout(true);
+}
+    
 void WrappingContext::markDescendantsForSecondLayoutPass()
 {
     m_savedTransformationMatrix = layer()->renderer()->absoluteTransformationMatrix();
@@ -292,6 +302,8 @@ static bool overlapping(int t0, int t1, int y0, int y1)
 
 void WrappingContext::adjustLinePositionForExclusions(RenderBlock* block, RootInlineBox* lineBox, LayoutUnit& deltaOffset, const Vector<WrappingContext*>& exclusionsList)
 {
+    deltaOffset = 0;
+    
     LayoutRect logicalVisualOverflow = lineBox->logicalVisualOverflowRect(lineBox->lineTop(), lineBox->lineBottom());
     LayoutUnit logicalOffset = std::min(lineBox->lineTopWithLeading(), logicalVisualOverflow.y());
     LayoutUnit lineHeight = std::max(lineBox->lineBottomWithLeading(), logicalVisualOverflow.maxY()) - logicalOffset;
@@ -301,16 +313,26 @@ void WrappingContext::adjustLinePositionForExclusions(RenderBlock* block, RootIn
     
     int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
     int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
-    int maxY = t0 - 1;
+    bool hadNoChange = false;
     
-    for (size_t i = 0; i < exclusionsList.size(); ++i) {
-        WrappingContext* exclusion = exclusionsList.at(i);
-        const IntRect& exclusionBoundingBox = exclusion->savedExclusionBoundingBox();
-        if (overlapping(t0, t1, exclusionBoundingBox.y(), exclusionBoundingBox.maxY()))
-            maxY = std::max(maxY, exclusionBoundingBox.maxY());
+    // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
+    // It will be fixed when we will have the shapes in place.
+    while (!hadNoChange) {
+        hadNoChange = true;
+        for (size_t i = 0; i < exclusionsList.size(); ++i) {
+            WrappingContext* exclusion = exclusionsList.at(i);
+            const IntRect& exclusionBoundingBox = exclusion->savedExclusionBoundingBox();
+            if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
+                int newDelta = std::max(deltaOffset + t0, exclusionBoundingBox.maxY()) - t0;
+                if (newDelta == deltaOffset)
+                    continue;
+                deltaOffset = newDelta;
+                // We need to start checking again.
+                hadNoChange = false;
+                break;
+            }
+        }
     }
-    if (maxY >= t0)
-        deltaOffset = maxY - t0;
 }
 
 } // namespace WebCore

@@ -147,8 +147,10 @@ void RenderView::layout()
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
         if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions() && resetAutoHeightRegionsForFirstLayoutPhase())
             m_inFirstLayoutPhaseOfRegionsAutoHeight = true;
-        if (hasCSSExclusions())
+        if (hasCSSExclusions()) {
             m_inFirstLayoutPhaseOfExclusionsPositioning = true;
+            resetCSSExclusionsForFirstLayoutPass();
+        }
         RenderBlock::layout();
         if (hasRenderFlowThreads())
             layoutRenderFlowThreads();
@@ -999,6 +1001,13 @@ void RenderView::markAutoHeightRegionsForSecondLayoutPhase()
     }
 }
 
+void RenderView::resetCSSExclusionsForFirstLayoutPass()
+{
+    ASSERT(layer());
+    if (layer()->hasWrappingContext())
+        layer()->wrappingContext()->resetExclusionsForFirstLayoutPass();
+}
+    
 void RenderView::markCSSExclusionDependentBlocksForLayout()
 {
     ASSERT(layer());

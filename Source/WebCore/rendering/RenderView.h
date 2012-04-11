@@ -200,6 +200,7 @@ public:
     bool hasCSSExclusions() const { return m_cssExclusionsCount; }
     void incrementCSSExclusionsCount() { ++m_cssExclusionsCount; }
     void decrementCSSExclusionsCount() { ASSERT(m_cssExclusionsCount > 0); --m_cssExclusionsCount; }
+    void resetCSSExclusionsForFirstLayoutPass();
     void markCSSExclusionDependentBlocksForLayout();
 
     void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
