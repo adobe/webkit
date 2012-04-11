@@ -7,6 +7,9 @@
         
         <title>Exclusions</title>
         <style>
+        #before {
+            height: 100px;
+        }
         .exclusion {
             -webkit-wrap-flow: clear; 
             position: absolute;
@@ -17,28 +20,43 @@
             border: 5px solid red;
             background: white;
         }
+        p {
+            -webkit-flow-into: article;
+            margin: 0px;
+        }
+        
+        .region {
+            -webkit-flow-from: article;
+            width: 300px;
+            height: 200px;
+            border: 1px solid red;
+            xmargin: 10px;
+        }
         </style>
     </head>
 <body>
-    <div class="exclusion" style="top: 270px; left: 488px">
+    <div class="exclusion">
         Drag me around 1 
     </div>
-    <div class="exclusion" style="top: 299px; left: 373px">
+    <div class="exclusion">
         Drag me around 2
     </div>
-    <div class="exclusion" style="top: 324px; left: 256px">
+    <div class="exclusion">
         Drag me around 3
     </div>
-    <div class="exclusion" style="top: 358px; left: 139px">
+    <div class="exclusion">
         Drag me around 4
     </div>
-
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
     
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+
+    <div class="region"></div>
+    <div class="region"></div>
+    <div class="region"></div>
 
     <script>
         $(function() {
