@@ -49,6 +49,8 @@ struct PaintInfo;
 class LineInfo;
 class RenderRubyRun;
 
+class WrappingContext;
+
 template <class Iterator, class Run> class BidiResolver;
 template <class Run> class BidiRunList;
 template <class Iterator> struct MidpointState;
@@ -945,7 +947,8 @@ private:
     // Helper function for layoutInlineChildren()
     RootInlineBox* createLineBoxesFromBidiRuns(BidiRunList<BidiRun>&, const InlineIterator& end, LineInfo&, VerticalPositionCache&, BidiRun* trailingSpaceRun);
     void layoutRunsAndFloats(LineLayoutState&, bool hasInlineChild);
-    void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines);
+    void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines,
+                                    WrappingContext* wrappingContext, Vector<WrappingContext*>& exclusionList);
     void linkToEndLineIfNeeded(LineLayoutState&);
     static void repaintDirtyFloats(Vector<FloatWithRect>& floats);
 

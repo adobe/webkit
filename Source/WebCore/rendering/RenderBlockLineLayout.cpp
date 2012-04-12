@@ -1158,6 +1158,15 @@ static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, Ro
 
 void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInlineChild)
 {
+    WrappingContext* wrappingContext = 0;
+    Vector<WrappingContext*> exclusionList;
+    if (!view()->inFirstLayoutPhaseOfExclusionsPositioning()) {
+        wrappingContext = enclosingLayer()->enclosingWrappingContext();
+        wrappingContext->computeExclusionListForBlock(this, exclusionList);
+        if (exclusionList.size())
+            layoutState.markForFullLayout();
+    }
+
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;
     RootInlineBox* startLine = determineStartPosition(layoutState, resolver);
@@ -1216,12 +1225,13 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
         }
     }
 
-    layoutRunsAndFloatsInRange(layoutState, resolver, cleanLineStart, cleanLineBidiStatus, consecutiveHyphenatedLines);
+    layoutRunsAndFloatsInRange(layoutState, resolver, cleanLineStart, cleanLineBidiStatus, consecutiveHyphenatedLines, wrappingContext, exclusionList);
     linkToEndLineIfNeeded(layoutState);
     repaintDirtyFloats(layoutState.floats());
 }
 
-void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
+void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines,
+                                             WrappingContext* wrappingContext, Vector<WrappingContext*>& exclusionList)
 {
     RenderStyle* styleToUse = style();
     bool paginated = view()->layoutState() && view()->layoutState()->isPaginated();
@@ -1232,13 +1242,6 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
     VerticalPositionCache verticalPositionCache;
 
     LineBreaker lineBreaker(this);
-    
-    WrappingContext* wrappingContext = 0;
-    Vector<WrappingContext*> exclusionList;
-    if (!view()->inFirstLayoutPhaseOfExclusionsPositioning()) {
-        wrappingContext = enclosingLayer()->enclosingWrappingContext();
-        wrappingContext->computeExclusionListForBlock(this, exclusionList);
-    }
 
     while (!end.atEnd()) {
         // FIXME: Is this check necessary before the first iteration or can it be moved to the end?

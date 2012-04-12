@@ -33,6 +33,7 @@
 #include "RenderBlock.h"
 #include "RenderLayer.h"
 #include "RenderObject.h"
+#include "RenderView.h"
 #include "RootInlineBox.h"
 #include <wtf/StdLibExtras.h>
 
@@ -302,17 +303,22 @@ static bool overlapping(int t0, int t1, int y0, int y1)
 
 void WrappingContext::adjustLinePositionForExclusions(RenderBlock* block, RootInlineBox* lineBox, LayoutUnit& deltaOffset, const Vector<WrappingContext*>& exclusionsList)
 {
+    // FIXME: Figure out why the layout state is sometimes including the "logicalTop" and
+    // sometimes it doesn't.
+    LayoutStateDisabler disableLayoutState(layer()->renderer()->view());
+    
     deltaOffset = 0;
     
     LayoutRect logicalVisualOverflow = lineBox->logicalVisualOverflowRect(lineBox->lineTop(), lineBox->lineBottom());
     LayoutUnit logicalOffset = std::min(lineBox->lineTopWithLeading(), logicalVisualOverflow.y());
     LayoutUnit lineHeight = std::max(lineBox->lineBottomWithLeading(), logicalVisualOverflow.maxY()) - logicalOffset;
     
-    FloatPoint upperLeftCorner = block->localToAbsolute(FloatPoint(0, logicalOffset - block->logicalTop()), false, true);
-    FloatPoint lowerRightCorner = block->localToAbsolute(FloatPoint(10, logicalOffset + lineHeight - block->logicalTop()), false, true);
+    FloatPoint upperLeftCorner = block->localToAbsolute(FloatPoint(0, logicalOffset), false, true);
+    FloatPoint lowerRightCorner = block->localToAbsolute(FloatPoint(10, logicalOffset + lineHeight), false, true);
     
     int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
     int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
+    
     bool hadNoChange = false;
     
     // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
