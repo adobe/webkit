@@ -184,6 +184,10 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case TABLE_COLUMN:
         return new (arena) RenderTableCol(node);
     case TABLE_CELL:
+        if (doc->cssRegionsEnabled() && !style->regionThread().isEmpty() && doc->renderView()) {
+            RenderFlowThread* flowThread = doc->renderView()->ensureRenderFlowThreadWithName(style->regionThread());
+            return new (arena) RenderRegion(node, flowThread);
+        }
         return new (arena) RenderTableCell(node);
     case TABLE_CAPTION:
         return new (arena) RenderTableCaption(node);
