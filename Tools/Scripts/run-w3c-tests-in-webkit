@@ -6,15 +6,17 @@ import xml.etree.ElementTree as ET
 webkitPath = ''
 w3cTestPath = ''
 platform = ''
+optionalArgs = ''
 
 def usage():
-    print"USAGE: run-w3c-tests-in-webkit [webkit_dir] [w3c_test_dir]"
+    print"USAGE: run-w3c-tests-in-webkit [webkit_dir] [w3c_test_dir] [optional_args]"
     sys.exit()
 
 def parseArgs():
 	### TODO convert args to the webkit style python script args
 	### TODO add option to removed the tmp dir after the harness is run
-	if (len(sys.argv) < 3):
+	numArgs = len(sys.argv)
+	if (numArgs < 3):
 	    usage()
 	else:
 		global webkitPath
@@ -23,6 +25,14 @@ def parseArgs():
 		webkitPath += "/"
 		webkitPath.replace("//","/")
 		w3cTestPath = sys.argv[2]
+		if(numArgs > 3):
+			global optionalArgs
+			counter = 0
+			for arg in sys.argv:
+				if counter > 2:
+					optionalArgs += arg
+					optionalArgs += " "
+				counter += 1
 
 def findRefFile(testFile):    
 	f = open(testFile)
@@ -93,7 +103,7 @@ else:
 
 ### Run the tests
 webkitHarness = webkitPath + 'Tools/Scripts/new-run-webkit-tests'
-webkitHarnessCmd = webkitHarness +" "+ webkitTempDir
-print "Calling new-run-webkit-tests " + webkitTempDir
+webkitHarnessCmd = webkitHarness +" "+ webkitTempDir +" "+ optionalArgs
+print "Calling new-run-webkit-tests " + webkitTempDir +" "+ optionalArgs
 os.system(webkitHarnessCmd)
     
