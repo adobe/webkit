@@ -1,7 +1,43 @@
 #!/usr/bin/env python
 
 import glob, os, sys, shutil, re
-import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup as Parser
+
+
+class TestParser():
+	refFilePath = ""
+	validationErrors = list()
+	
+	def TestParser():
+		print "In constructor"
+		for item in validationErrors:
+			validationErrors.remove(item)
+	
+	def handle_starttag(self, tag, attrs):
+		if str(tag) == 'link':
+			d = dict(attrs)
+			if str(d['rel']) == 'match':
+				self.refFilePath = str(d['href'])
+	def handle_startendtag(self, tag, attrs):
+		tagname = str(tag)
+		if (tagname != 'rect' and tagname != 'circle' and
+		    tagname != 'ellipse' and tagname != 'polygon' and
+		    tagname != 'line' and tagname != 'path' and
+		    tagname != 'polyline' and tagname != 'text' and 
+		    tagname != 'stop'):
+			
+			tagStr = "<" + tagname
+			
+			for attr in attrs:
+				tagStr += " "
+				tagStr += str(attr[0])
+				tagStr += "=\""
+				tagStr += str(attr[1])
+				tagStr += "\""
+				
+			tagStr += "/>"
+			self.validationErrors.append(tagStr)
+
 
 webkitPath = ''
 w3cTestPath = ''
@@ -33,35 +69,89 @@ def parseArgs():
 					optionalArgs += arg
 					optionalArgs += " "
 				counter += 1
+				
 
-def findRefFile(testFile):    
-	f = open(testFile)
-	doc = ET.parse(f).getroot()
-	f.close()
-    
-	for elem in doc.findall('head/link'):
-		if elem.get('rel') == 'match':
-			return elem.get('href')
-			print elem.get('rel')
+def validateHTML(html, filename):
 	
-	print "WARNING: No reference file specified in " + testFile
+	validationErrors = list()
+	lineNum = 0
+	for line in html:
+		error = validateLine(line)
+		if len(error) > 0:
+			validationErrors.append(str(lineNum) +": "+ error +": "+ line)
+			
+		lineNum += 1
+		
+	if len(validationErrors) > 0:
+		print "**** Found validation errors in " + filename
+		for error in validationErrors:
+			print error.replace("\n", "")
+			
+
+def validateLine(line):
+	# Check for space between quote and closing tag
+	if line.find("\" >") != -1 or line.find("\" />") != -1:
+		return "TRAILING SPACE"
+	
+	# Check for valid inline tags
+	if line.find("<") != -1 and line.find("\"/>") != -1:
+		tagname = line.split("<")[1]
+		tagname = tagname.split(" ")[0]
+		if (tagname != 'rect' and tagname != 'circle' and
+		    tagname != 'ellipse' and tagname != 'polygon' and
+		    tagname != 'line' and tagname != 'path' and
+		    tagname != 'polyline' and tagname != 'text' and 
+		    tagname != 'stop'):
+			return "INVALID INLINE TAG"
+		
+	# Check for certain svg tags not being closed
+	if line.find("<") != -1 and line.find("\">") != -1:
+		tagname = line.split("<")[1]
+		tagname = tagname.split(" ")[0]
+		if (tagname == 'rect' or tagname == 'circle' or
+		    tagname == 'ellipse' or tagname == 'polygon' or
+		    tagname == 'line' or tagname == 'path' or
+		    tagname == 'polyline' or tagname == 'text' or 
+		    tagname == 'stop'):
+			return "UNCLOSED SVG ELEMENT"
+	
 	return ""
-	
+		
+
+def findRefFile(html):
+	parser = Parser(html)
+	matchTag = parser.find(rel="match")
+	return matchTag["href"]
+
 def convertToWebkitTest(w3cTest):
 	### Convert the .xht file to .html
-    testBasename = os.path.basename(w3cTest) 
-    
-    w3cTestConverted = testBasename.replace("xht", "html")
-    webkitTest = webkitTempDir + w3cTestConverted
-    
-    ### Copy the .html file to the WebKit/LayoutTests temp dir     
-    shutil.copy2(w3cTest, webkitTest)
-    
-    ### Find the reference file for this test
-    refFile =  findRefFile(w3cTest)
-    if refFile != "":
+	testBasename = os.path.basename(w3cTest) 
+
+	w3cTestConverted = testBasename.replace("xht", "html")
+	webkitTest = webkitTempDir + w3cTestConverted
+
+	### Copy the .html file to the WebKit/LayoutTests temp dir     
+	shutil.copy2(w3cTest, webkitTest)
+
+	### Parse and validate the test file
+	f = open(w3cTest)
+	validateHTML(f.readlines(), w3cTest)
+	
+	f.seek(0,0)
+	refFile = findRefFile(f.read())
+	f.close()
+	
+	if len(refFile) == 0:
+		print "WARNING: No reference file specified in " + w3cTest
+	else:
 		w3cRef = os.path.abspath(os.path.join(w3cTest, os.path.pardir)) +'/'+ refFile
-	   	### Copy it to the WebKit/LayoutTests temp dir with the '-expected.html' convention
+		
+		### Validate the ref file
+		f = open(w3cRef)
+		validateHTML(f.readlines(), w3cRef)
+		f.close()
+		
+		### Copy it to the WebKit/LayoutTests temp dir with the '-expected.html' convention
 		w3cRefConverted = re.split('.html', w3cTestConverted)[0] + '-expected.html'
 		webkitRef = webkitTempDir + w3cRefConverted
 		shutil.copy(w3cRef, webkitRef)
