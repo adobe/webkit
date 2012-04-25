@@ -292,6 +292,20 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CompositeOperator e)
         case CompositePlusLighter:
             m_value.ident = CSSValuePlusLighter;
             break;
+        case CompositeMultiply:
+        case CompositeScreen:
+        case CompositeOverlay:
+        case CompositeDarken:
+        case CompositeLighten:
+        case CompositeColorDodge:
+        case CompositeColorBurn:
+        case CompositeHardLight:
+        case CompositeSoftLight:
+        case CompositeExclusion:
+        case CompositeHue:
+        case CompositeSaturation:
+        case CompositeColor:
+        case CompositeLuminosity:
         case CompositeDifference:
             ASSERT_NOT_REACHED();
             break;

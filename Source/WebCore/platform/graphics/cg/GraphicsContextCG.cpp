@@ -1624,6 +1624,48 @@ void GraphicsContext::setPlatformCompositeOperation(CompositeOperator mode)
     case CompositeDifference:
         target = kCGBlendModeDifference;
         break;
+    case CompositeMultiply:
+            target = kCGBlendModeMultiply;
+        break;            
+    case CompositeScreen:
+            target = kCGBlendModeScreen;
+            break; 
+    case CompositeOverlay:
+            target = kCGBlendModeOverlay;
+            break; 
+        case CompositeDarken:
+            target = kCGBlendModeDarken;
+            break; 
+        case CompositeLighten:
+            target = kCGBlendModeLighten;
+            break; 
+        case CompositeColorDodge:
+            target = kCGBlendModeColorDodge;
+            break; 
+        case CompositeColorBurn:
+            target = kCGBlendModeColorBurn;
+            break; 
+        case CompositeHardLight:
+            target = kCGBlendModeHardLight;
+            break; 
+        case CompositeSoftLight:
+            target = kCGBlendModeSoftLight;
+            break; 
+        case CompositeExclusion:
+            target = kCGBlendModeExclusion;
+            break; 
+        case CompositeHue:
+            target = kCGBlendModeHue;
+            break; 
+        case CompositeSaturation:
+            target = kCGBlendModeSaturation;
+            break; 
+        case CompositeColor:
+            target = kCGBlendModeColor;
+            break;   
+        case CompositeLuminosity:
+            target = kCGBlendModeLuminosity;
+            break;   
     }
     CGContextSetBlendMode(platformContext(), target);
 }

@@ -44,7 +44,21 @@ namespace WebCore {
         CompositeXOR,
         CompositePlusDarker,
         CompositePlusLighter,
-        CompositeDifference
+        CompositeMultiply,
+        CompositeScreen,
+        CompositeOverlay,
+        CompositeDarken,
+        CompositeLighten,
+        CompositeColorDodge,
+        CompositeColorBurn,
+        CompositeHardLight,
+        CompositeSoftLight,
+        CompositeDifference,
+        CompositeExclusion,
+        CompositeHue,
+        CompositeSaturation,
+        CompositeColor,
+        CompositeLuminosity
     };
 
     enum GradientSpreadMethod {
