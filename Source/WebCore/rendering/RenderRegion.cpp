@@ -191,7 +191,8 @@ void RenderRegion::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
         Element* regionElement = static_cast<Element*>(node());
         customRegionStyle = view()->document()->styleSelector()->checkRegionStyle(regionElement);
     }
-    
+    setHasCustomRegionStyle(customRegionStyle);
+ 
     bool didUseAutoHeight = m_usesAutoHeight;
     m_usesAutoHeight = hasAutoHeightStyle();
     if (m_flowThread && didUseAutoHeight != m_usesAutoHeight) {
