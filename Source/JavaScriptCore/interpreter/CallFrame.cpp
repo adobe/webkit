@@ -42,13 +42,12 @@ void CallFrame::dumpCaller()
     interpreter()->retrieveLastCaller(this, signedLineNumber, sourceID, urlString, function);
     dataLog("Callpoint => %s:%d\n", urlString.utf8().data(), signedLineNumber);
 }
+#endif
 
 RegisterFile* CallFrame::registerFile()
 {
     return &interpreter()->registerFile();
 }
-
-#endif
 
 #if USE(JSVALUE32_64)
 unsigned CallFrame::bytecodeOffsetForNonDFGCode() const
@@ -182,5 +181,12 @@ CallFrame* CallFrame::trueCallerFrame()
     return machineCaller->trueCallFrame(returnPC())->removeHostCallFrameFlag();
 }
 #endif
+
+Register* CallFrame::frameExtentInternal()
+{
+    CodeBlock* codeBlock = this->codeBlock();
+    ASSERT(codeBlock);
+    return registers() + codeBlock->m_numCalleeRegisters;
+}
 
 }

@@ -189,9 +189,6 @@ WebEditorClient::WebEditorClient(WebView *webView)
 
 WebEditorClient::~WebEditorClient()
 {
-#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-    dismissCorrectionPanel(ReasonForDismissingCorrectionPanelIgnored);
-#endif
 }
 
 bool WebEditorClient::isContinuousSpellCheckingEnabled()
@@ -866,29 +863,6 @@ void WebEditorClient::updateSpellingUIWithGrammarString(const String& badGrammar
     [[NSSpellChecker sharedSpellChecker] updateSpellingPanelWithGrammarString:badGrammarPhrase detail:grammarDetailDict];
 }
 
-#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-void WebEditorClient::showCorrectionPanel(CorrectionPanelInfo::PanelType panelType, const FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings)
-{
-    m_correctionPanel.show(m_webView, panelType, boundingBoxOfReplacedString, replacedString, replacementString, alternativeReplacementStrings);
-}
-
-void WebEditorClient::dismissCorrectionPanel(ReasonForDismissingCorrectionPanel reasonForDismissing)
-{
-    m_correctionPanel.dismiss(reasonForDismissing);
-}
-
-String WebEditorClient::dismissCorrectionPanelSoon(ReasonForDismissingCorrectionPanel reasonForDismissing)
-{
-    return m_correctionPanel.dismiss(reasonForDismissing);
-}
-
-void WebEditorClient::recordAutocorrectionResponse(EditorClient::AutocorrectionResponseType responseType, const String& replacedString, const String& replacementString)
-{
-    NSCorrectionResponse response = responseType == EditorClient::AutocorrectionReverted ? NSCorrectionResponseReverted : NSCorrectionResponseEdited;
-    CorrectionPanel::recordAutocorrectionResponse(m_webView, response, replacedString, replacementString);
-}
-#endif
-
 void WebEditorClient::updateSpellingUIWithMisspelledWord(const String& misspelledWord)
 {
     [[NSSpellChecker sharedSpellChecker] updateSpellingPanelWithMisspelledWord:misspelledWord];
@@ -967,7 +941,7 @@ void WebEditorClient::setInputMethodState(bool)
 
 - (void)perform
 {
-    _sender->didCheck(_sequence, core(_results.get(), _types));
+    _sender->didCheckSucceeded(_sequence, core(_results.get(), _types));
 }
 
 @end

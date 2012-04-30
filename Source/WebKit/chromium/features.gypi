@@ -33,17 +33,21 @@
   'variables': {
     'feature_defines': [
       'ENABLE_3D_PLUGIN=1',
+      'ENABLE_BATTERY_STATUS=1',
       'ENABLE_BLOB=1',
       'ENABLE_BLOB_SLICE=1',
       'ENABLE_CHANNEL_MESSAGING=1',
       'ENABLE_CSS_FILTERS=1',
+      'ENABLE_CSS_IMAGE_SET=1',
       'ENABLE_CSS_SHADERS=1',
+      'ENABLE_DATALIST=1',
       'ENABLE_DASHBOARD_SUPPORT=0',
       'ENABLE_DATA_TRANSFER_ITEMS=1',
       'ENABLE_DETAILS=1',
       'ENABLE_DEVICE_ORIENTATION=1',
       'ENABLE_DIRECTORY_UPLOAD=1',
       'ENABLE_DOWNLOAD_ATTRIBUTE=1',
+      'ENABLE_ENCRYPTED_MEDIA=1',
       'ENABLE_FILE_SYSTEM=1',
       'ENABLE_FILTERS=1',
       'ENABLE_FULLSCREEN_API=1',
@@ -52,10 +56,8 @@
       'ENABLE_GESTURE_EVENTS=1',
       'ENABLE_ICONDATABASE=0',
       'ENABLE_INDEXED_DATABASE=1',
-      'ENABLE_INPUT_COLOR=0',
       'ENABLE_INPUT_SPEECH=1',
-      'ENABLE_INPUT_TYPE_COLOR=0',
-      'ENABLE_INPUT_TYPE_DATE=0',
+      'ENABLE_INPUT_TYPE_DATE=1',
       'ENABLE_INPUT_TYPE_DATETIME=0',
       'ENABLE_INPUT_TYPE_DATETIMELOCAL=0',
       'ENABLE_INPUT_TYPE_MONTH=0',
@@ -63,8 +65,10 @@
       'ENABLE_INPUT_TYPE_WEEK=0',
       'ENABLE_JAVASCRIPT_DEBUGGER=1',
       'ENABLE_JAVASCRIPT_I18N_API=1',
+      'ENABLE_LEGACY_CSS_VENDOR_PREFIXES=0',
       'ENABLE_LEGACY_NOTIFICATIONS=1',
       'ENABLE_LINK_PREFETCH=1',
+      'ENABLE_LINK_PRERENDER=1',
       'ENABLE_MEDIA_SOURCE=1',
       'ENABLE_MEDIA_STATISTICS=1',
       'ENABLE_MEDIA_STREAM=1',
@@ -95,7 +99,7 @@
       'ENABLE_V8_SCRIPT_DEBUG_SERVER=1',
       'ENABLE_VIDEO=1',
       'ENABLE_VIDEO_TRACK=1',
-      'ENABLE_VIEWPORT=<(enable_viewport)',
+      'ENABLE_VIEWPORT=1',
       'ENABLE_WEBGL=1',
       'ENABLE_WEB_SOCKETS=1',
       'ENABLE_WEB_TIMING=1',
@@ -131,11 +135,24 @@
     'conditions': [
       ['OS=="android"', {
         'feature_defines': [
+          'ENABLE_CALENDAR_PICKER=0',
+          'ENABLE_PAGE_POPUP=0',
           'ENABLE_WEB_AUDIO=0',
         ],
       }, {
         'feature_defines': [
+          'ENABLE_CALENDAR_PICKER=1',
+          'ENABLE_PAGE_POPUP=1',
           'ENABLE_WEB_AUDIO=1',
+        ],
+      }],
+      ['OS=="android" or use_aura==1', {
+        'feature_defines': [
+          'ENABLE_INPUT_TYPE_COLOR=0',
+        ],
+      }, {
+        'feature_defines': [
+          'ENABLE_INPUT_TYPE_COLOR=1',
         ],
       }],
       ['use_accelerated_compositing==1', {

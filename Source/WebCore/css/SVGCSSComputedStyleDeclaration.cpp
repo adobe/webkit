@@ -68,7 +68,7 @@ PassRefPtr<SVGPaint> CSSComputedStyleDeclaration::adjustSVGPaintForCurrentColor(
     return paint.release();
 }
 
-PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getSVGPropertyCSSValue(int propertyID, EUpdateLayout updateLayout) const
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getSVGPropertyCSSValue(CSSPropertyID propertyID, EUpdateLayout updateLayout) const
 {
     Node* node = m_node.get();
     if (!node)
@@ -86,7 +86,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getSVGPropertyCSSValue(int pro
     if (!svgStyle)
         return 0;
 
-    switch (static_cast<CSSPropertyID>(propertyID)) {
+    switch (propertyID) {
         case CSSPropertyClipRule:
             return CSSPrimitiveValue::create(svgStyle->clipRule());
         case CSSPropertyFloodOpacity:
@@ -174,6 +174,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getSVGPropertyCSSValue(int pro
                 case BS_LENGTH:
                     return SVGLength::toCSSPrimitiveValue(svgStyle->baselineShiftValue());
             }
+            ASSERT_NOT_REACHED();
+            return 0;
         }
         case CSSPropertyGlyphOrientationHorizontal:
             return glyphOrientationToCSSPrimitiveValue(svgStyle->glyphOrientationHorizontal());

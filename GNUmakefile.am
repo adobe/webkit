@@ -146,12 +146,24 @@ endif
 global_cppflags += \
 	-DBUILDING_CAIRO__=1 \
 	-DBUILDING_GTK__=1 \
+	-DBUILDING_SOUP__=1 \
 	-DWTF_CHANGES
+
+if ENABLE_WEBKIT2
+global_cppflags += \
+	-DBUILDING_WEBKIT2__=1
+endif
 
 # For the Gtk port we want to use XP_UNIX both in X11 and Mac
 if !TARGET_WIN32
 global_cppflags += \
 	-DXP_UNIX
+endif
+
+# Add MOZ_X11 for X11 targets only
+if TARGET_X11
+global_cppflags += \
+	-DMOZ_X11
 endif
 
 # Use the wide character version of win32 API by default
@@ -204,6 +216,16 @@ global_cppflags += \
 	-DWTF_USE_CLUTTER=1
 endif
 
+if USE_GLX
+global_cppflags += \
+	-DWTF_USE_GLX=1
+endif
+
+if USE_OPENGL
+global_cppflags += \
+	-DWTF_USE_OPENGL=1
+endif
+
 # ----
 # GTK+ 2.x/3.x support
 # ----
@@ -249,6 +271,8 @@ include Source/WebKit2/GNUmakefile.am
 include Source/WebKit2/UIProcess/API/gtk/tests/GNUmakefile.am
 include Tools/MiniBrowser/gtk/GNUmakefile.am
 include Tools/WebKitTestRunner/GNUmakefile.am
+include Source/ThirdParty/gtest/GNUmakefile.am
+include Tools/TestWebKitAPI/GNUmakefile.am
 # [GTK] Refactor the translations now that we have webkit2
 # https://bugs.webkit.org/show_bug.cgi?id=55153
 

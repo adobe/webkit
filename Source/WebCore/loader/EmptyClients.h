@@ -42,6 +42,7 @@
 #include "FrameLoaderClient.h"
 #include "FrameNetworkingContext.h"
 #include "InspectorClient.h"
+#include "Page.h"
 #include "PopupMenu.h"
 #include "ResourceError.h"
 #include "SearchPopupMenu.h"
@@ -50,7 +51,7 @@
 #include <v8.h>
 #endif
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #endif
 
@@ -200,7 +201,7 @@ public:
     virtual void enumerateChosenDirectory(FileChooser*) { }
 #endif
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) { return nullptr; }
 #endif
 
@@ -305,7 +306,6 @@ public:
     virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) { }
     virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>) { }
 
-    virtual void dispatchDidLoadMainResource(DocumentLoader*) { }
     virtual void revertToProvisionalState(DocumentLoader*) { }
     virtual void setMainDocumentError(DocumentLoader*, const ResourceError&) { }
 
@@ -520,12 +520,6 @@ public:
 #endif
     TextCheckerClient* textChecker() { return &m_textCheckerClient; }
 
-#if USE(AUTOCORRECTION_PANEL)
-    virtual void showCorrectionPanel(CorrectionPanelInfo::PanelType, const FloatRect&, const String&, const String&, const Vector<String>&) { }
-    virtual void dismissCorrectionPanel(ReasonForDismissingCorrectionPanel) { }
-    virtual String dismissCorrectionPanelSoon(ReasonForDismissingCorrectionPanel) { return String(); }
-    virtual void recordAutocorrectionResponse(AutocorrectionResponseType, const String&, const String&) { }
-#endif
     virtual void updateSpellingUIWithGrammarString(const String&, const GrammarDetail&) { }
     virtual void updateSpellingUIWithMisspelledWord(const String&) { }
     virtual void showSpellingUI(bool) { }
@@ -621,6 +615,8 @@ public:
     virtual DeviceOrientation* lastOrientation() const { return 0; }
     virtual void deviceOrientationControllerDestroyed() { }
 };
+
+void fillWithEmptyClients(Page::PageClients&);
 
 }
 

@@ -143,6 +143,10 @@ namespace WebCore {
         void setJavaEnabled(bool);
         bool isJavaEnabled() const { return m_isJavaEnabled; }
 
+        // This settings is only consulted if isJavaEnabled() returns true;
+        void setJavaEnabledForLocalFiles(bool);
+        bool isJavaEnabledForLocalFiles() const { return m_isJavaEnabledForLocalFiles; }
+
         void setImagesEnabled(bool);
         bool areImagesEnabled() const { return m_areImagesEnabled; }
 
@@ -548,8 +552,21 @@ namespace WebCore {
         void setThreadedAnimationEnabled(bool enabled) { m_threadedAnimationEnabled = enabled; }
         bool threadedAnimationEnabled() const { return m_threadedAnimationEnabled; }
 
+        void setShouldRespectImageOrientation(bool enabled) { m_shouldRespectImageOrientation = enabled; }
+        bool shouldRespectImageOrientation() const { return m_shouldRespectImageOrientation; }
+        
+        void setIncrementalRenderingSuppressionTimeoutInSeconds(double timeout) { m_incrementalRenderingSuppressionTimeoutInSeconds = timeout; }
+        double incrementalRenderingSuppressionTimeoutInSeconds() const { return m_incrementalRenderingSuppressionTimeoutInSeconds; }
+        
+#if USE(JSC)
+        static void setShouldRespectPriorityInCSSAttributeSetters(bool);
+        static bool shouldRespectPriorityInCSSAttributeSetters();
+#endif
+
     private:
         Settings(Page*);
+
+        void initializeDefaultFontFamilies();
 
         Page* m_page;
 
@@ -584,6 +601,7 @@ namespace WebCore {
         unsigned m_maximumHTMLParserDOMTreeDepth;
         bool m_isSpatialNavigationEnabled : 1;
         bool m_isJavaEnabled : 1;
+        bool m_isJavaEnabledForLocalFiles : 1;
         bool m_loadsImagesAutomatically : 1;
         bool m_loadsSiteIconsIgnoringImageLoadingSetting : 1;
         bool m_privateBrowsingEnabled : 1;
@@ -702,9 +720,12 @@ namespace WebCore {
         bool m_touchEventEmulationEnabled : 1;
 #endif
         bool m_threadedAnimationEnabled : 1;
+        bool m_shouldRespectImageOrientation : 1;
 
         Timer<Settings> m_loadsImagesAutomaticallyTimer;
         void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);
+        
+        double m_incrementalRenderingSuppressionTimeoutInSeconds;
 
 #if USE(AVFOUNDATION)
         static bool gAVFoundationEnabled;
@@ -716,6 +737,9 @@ namespace WebCore {
 #endif
 #if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
         static bool gShouldUseHighResolutionTimers;
+#endif
+#if USE(JSC)
+        static bool gShouldRespectPriorityInCSSAttributeSetters;
 #endif
     };
 

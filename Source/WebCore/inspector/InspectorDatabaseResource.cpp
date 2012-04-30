@@ -49,7 +49,7 @@ PassRefPtr<InspectorDatabaseResource> InspectorDatabaseResource::create(PassRefP
 
 InspectorDatabaseResource::InspectorDatabaseResource(PassRefPtr<Database> database, const String& domain, const String& name, const String& version)
     : m_database(database)
-    , m_id(nextUnusedId++)
+    , m_id(String::number(nextUnusedId++))
     , m_domain(domain)
     , m_name(name)
     , m_version(version)
@@ -58,11 +58,11 @@ InspectorDatabaseResource::InspectorDatabaseResource(PassRefPtr<Database> databa
 
 void InspectorDatabaseResource::bind(InspectorFrontend::Database* frontend)
 {
-    RefPtr<InspectorObject> jsonObject = InspectorObject::create();
-    jsonObject->setNumber("id", m_id);
-    jsonObject->setString("domain", m_domain);
-    jsonObject->setString("name", m_name);
-    jsonObject->setString("version", m_version);
+    RefPtr<TypeBuilder::Database::Database> jsonObject = TypeBuilder::Database::Database::create()
+        .setId(m_id)
+        .setDomain(m_domain)
+        .setName(m_name)
+        .setVersion(m_version);
     frontend->addDatabase(jsonObject);
 }
 

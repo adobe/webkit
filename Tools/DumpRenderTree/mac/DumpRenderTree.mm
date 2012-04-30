@@ -286,6 +286,7 @@ static NSSet *allowedFontFamilySet()
         @"Hiragino Kaku Gothic ProN",
         @"Hiragino Kaku Gothic Std",
         @"Hiragino Kaku Gothic StdN",
+        @"Hiragino Maru Gothic Monospaced",
         @"Hiragino Maru Gothic Pro",
         @"Hiragino Maru Gothic ProN",
         @"Hiragino Mincho Pro",
@@ -417,6 +418,9 @@ static void activateTestingFonts()
         "WebKitWeightWatcher700.ttf",
         "WebKitWeightWatcher800.ttf",
         "WebKitWeightWatcher900.ttf",
+#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
+        "SampleFont.sfont",
+#endif
         0
     };
 
@@ -572,6 +576,7 @@ static void resetDefaultsToConsistentValues()
     [defaults setObject:[NSArray arrayWithObject:@"en"] forKey:@"AppleLanguages"];
     [defaults setBool:YES forKey:WebKitEnableFullDocumentTeardownPreferenceKey];
     [defaults setBool:YES forKey:WebKitFullScreenEnabledPreferenceKey];
+    [defaults setBool:YES forKey:@"UseWebKitWebInspector"];
 
     // Scrollbars are drawn either using AppKit (which uses NSUserDefaults) or using HIToolbox (which uses CFPreferences / kCFPreferencesAnyApplication / kCFPreferencesCurrentUser / kCFPreferencesAnyHost)
     [defaults setObject:@"DoubleMax" forKey:@"AppleScrollBarVariant"];
@@ -583,7 +588,13 @@ static void resetDefaultsToConsistentValues()
     GetThemeScrollBarArrowStyle(&style); // Force HIToolbox to read from CFPreferences
 #endif
 
+
+#if !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
+    [defaults setBool:NO forKey:@"NSScrollAnimationEnabled"];
+#else
     [defaults setBool:NO forKey:@"AppleScrollAnimationEnabled"];
+#endif
+
     [defaults setBool:NO forKey:@"NSOverlayScrollersEnabled"];
     [defaults setObject:@"Always" forKey:@"AppleShowScrollBars"];
 

@@ -71,6 +71,7 @@ class WorkerContextProxy;
 class XMLHttpRequest;
 
 #if ENABLE(WEB_SOCKETS)
+struct WebSocketFrame;
 class WebSocketHandshakeRequest;
 class WebSocketHandshakeResponse;
 #endif
@@ -84,7 +85,7 @@ public:
     static void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
     static bool isDebuggerPaused(Frame*);
 
-    static void willInsertDOMNode(Document*, Node*, Node* parent);
+    static void willInsertDOMNode(Document*, Node* parent);
     static void didInsertDOMNode(Document*, Node*);
     static void willRemoveDOMNode(Document*, Node*);
     static void willModifyDOMAttr(Document*, Element*, const AtomicString& oldValue, const AtomicString& newValue);
@@ -139,6 +140,8 @@ public:
     static void applyUserAgentOverride(Frame*, String*);
     static void applyScreenWidthOverride(Frame*, long*);
     static void applyScreenHeightOverride(Frame*, long*);
+    static bool shouldApplyScreenWidthOverride(Frame*);
+    static bool shouldApplyScreenHeightOverride(Frame*);
     static void willSendRequest(Frame*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse& redirectResponse);
     static void continueAfterPingLoader(Frame*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse&);
     static void markResourceAsCached(Page*, unsigned long identifier);
@@ -215,6 +218,9 @@ public:
     static void willSendWebSocketHandshakeRequest(ScriptExecutionContext*, unsigned long identifier, const WebSocketHandshakeRequest&);
     static void didReceiveWebSocketHandshakeResponse(ScriptExecutionContext*, unsigned long identifier, const WebSocketHandshakeResponse&);
     static void didCloseWebSocket(ScriptExecutionContext*, unsigned long identifier);
+    static void didReceiveWebSocketFrame(Document*, unsigned long identifier, const WebSocketFrame&);
+    static void didSendWebSocketFrame(Document*, unsigned long identifier, const WebSocketFrame&);
+    static void didReceiveWebSocketFrameError(Document*, unsigned long identifier, const String& errorMessage);
 #endif
 
     static void networkStateChanged(Page*);
@@ -237,7 +243,7 @@ private:
     static void didClearWindowObjectInWorldImpl(InstrumentingAgents*, Frame*, DOMWrapperWorld*);
     static bool isDebuggerPausedImpl(InstrumentingAgents*);
 
-    static void willInsertDOMNodeImpl(InstrumentingAgents*, Node*, Node* parent);
+    static void willInsertDOMNodeImpl(InstrumentingAgents*, Node* parent);
     static void didInsertDOMNodeImpl(InstrumentingAgents*, Node*);
     static void willRemoveDOMNodeImpl(InstrumentingAgents*, Node*);
     static void didRemoveDOMNodeImpl(InstrumentingAgents*, Node*);
@@ -293,6 +299,8 @@ private:
     static void applyUserAgentOverrideImpl(InstrumentingAgents*, String*);
     static void applyScreenWidthOverrideImpl(InstrumentingAgents*, long*);
     static void applyScreenHeightOverrideImpl(InstrumentingAgents*, long*);
+    static bool shouldApplyScreenWidthOverrideImpl(InstrumentingAgents*);
+    static bool shouldApplyScreenHeightOverrideImpl(InstrumentingAgents*);
     static void willSendRequestImpl(InstrumentingAgents*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse& redirectResponse);
     static void continueAfterPingLoaderImpl(InstrumentingAgents*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse&);
     static void markResourceAsCachedImpl(InstrumentingAgents*, unsigned long identifier);
@@ -365,6 +373,9 @@ private:
     static void willSendWebSocketHandshakeRequestImpl(InstrumentingAgents*, unsigned long identifier, const WebSocketHandshakeRequest&);
     static void didReceiveWebSocketHandshakeResponseImpl(InstrumentingAgents*, unsigned long identifier, const WebSocketHandshakeResponse&);
     static void didCloseWebSocketImpl(InstrumentingAgents*, unsigned long identifier);
+    static void didReceiveWebSocketFrameImpl(InstrumentingAgents*, unsigned long identifier, const WebSocketFrame&);
+    static void didSendWebSocketFrameImpl(InstrumentingAgents*, unsigned long identifier, const WebSocketFrame&);
+    static void didReceiveWebSocketFrameErrorImpl(InstrumentingAgents*, unsigned long identifier, const String&);
 #endif
 
     static void networkStateChangedImpl(InstrumentingAgents*);
@@ -406,12 +417,12 @@ inline bool InspectorInstrumentation::isDebuggerPaused(Frame* frame)
     return false;
 }
 
-inline void InspectorInstrumentation::willInsertDOMNode(Document* document, Node* node, Node* parent)
+inline void InspectorInstrumentation::willInsertDOMNode(Document* document, Node* parent)
 {
 #if ENABLE(INSPECTOR)
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        willInsertDOMNodeImpl(instrumentingAgents, node, parent);
+        willInsertDOMNodeImpl(instrumentingAgents, parent);
 #endif
 }
 
@@ -884,6 +895,26 @@ inline void InspectorInstrumentation::applyScreenHeightOverride(Frame* frame, lo
 #endif
 }
 
+inline bool InspectorInstrumentation::shouldApplyScreenWidthOverride(Frame* frame)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(false);
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
+        return shouldApplyScreenWidthOverrideImpl(instrumentingAgents);
+#endif
+    return false;
+}
+
+inline bool InspectorInstrumentation::shouldApplyScreenHeightOverride(Frame* frame)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(false);
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
+        return shouldApplyScreenHeightOverrideImpl(instrumentingAgents);
+#endif
+    return false;
+}
+
 inline void InspectorInstrumentation::willSendRequest(Frame* frame, unsigned long identifier, DocumentLoader* loader, ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
 #if ENABLE(INSPECTOR)
@@ -1198,6 +1229,27 @@ inline void InspectorInstrumentation::didCloseWebSocket(ScriptExecutionContext* 
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
         didCloseWebSocketImpl(instrumentingAgents, identifier);
+#endif
+}
+inline void InspectorInstrumentation::didReceiveWebSocketFrame(Document* document, unsigned long identifier, const WebSocketFrame& frame)
+{
+#if ENABLE(INSPECTOR)
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        didReceiveWebSocketFrameImpl(instrumentingAgents, identifier, frame);
+#endif
+}
+inline void InspectorInstrumentation::didReceiveWebSocketFrameError(Document* document, unsigned long identifier, const String& errorMessage)
+{
+#if ENABLE(INSPECTOR)
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        didReceiveWebSocketFrameErrorImpl(instrumentingAgents, identifier, errorMessage);
+#endif
+}
+inline void InspectorInstrumentation::didSendWebSocketFrame(Document* document, unsigned long identifier, const WebSocketFrame& frame)
+{
+#if ENABLE(INSPECTOR)
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        didSendWebSocketFrameImpl(instrumentingAgents, identifier, frame);
 #endif
 }
 #endif

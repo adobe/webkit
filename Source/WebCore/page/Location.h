@@ -29,6 +29,7 @@
 #ifndef Location_h
 #define Location_h
 
+#include "DOMStringList.h"
 #include "DOMWindowProperty.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -71,8 +72,12 @@ public:
 
     String toString() const { return href(); }
 
+    PassRefPtr<DOMStringList> ancestorOrigins() const;
+
 private:
     explicit Location(Frame*);
+
+    void setLocation(const String&, DOMWindow* activeWindow, DOMWindow* firstWindow);
 
     const KURL& url() const;
 };

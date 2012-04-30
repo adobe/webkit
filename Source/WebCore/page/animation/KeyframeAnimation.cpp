@@ -30,13 +30,13 @@
 #include "KeyframeAnimation.h"
 
 #include "AnimationControllerPrivate.h"
+#include "CSSPropertyAnimation.h"
 #include "CSSPropertyNames.h"
-#include "CSSStyleSelector.h"
 #include "CompositeAnimation.h"
 #include "EventNames.h"
-#include "RenderLayer.h"
-#include "RenderLayerBacking.h"
+#include "RenderBoxModelObject.h"
 #include "RenderStyle.h"
+#include "StyleResolver.h"
 #include <wtf/UnusedParam.h>
 
 using namespace std;
@@ -52,7 +52,7 @@ KeyframeAnimation::KeyframeAnimation(const Animation* animation, RenderObject* r
 {
     // Get the keyframe RenderStyles
     if (m_object && m_object->node() && m_object->node()->isElementNode())
-        m_object->document()->styleSelector()->keyframeStylesForAnimation(static_cast<Element*>(m_object->node()), unanimatedStyle, m_keyframes);
+        m_object->document()->styleResolver()->keyframeStylesForAnimation(static_cast<Element*>(m_object->node()), unanimatedStyle, m_keyframes);
 
     // Update the m_transformFunctionListValid flag based on whether the function lists in the keyframes match.
     validateTransformFunctionList();
@@ -81,7 +81,7 @@ static const Animation* getAnimationFromStyleByName(const RenderStyle* style, co
     return 0;
 }
 
-void KeyframeAnimation::fetchIntervalEndpointsForProperty(int property, const RenderStyle*& fromStyle, const RenderStyle*& toStyle, double& prog) const
+void KeyframeAnimation::fetchIntervalEndpointsForProperty(CSSPropertyID property, const RenderStyle*& fromStyle, const RenderStyle*& toStyle, double& prog) const
 {
     // Find the first key
     double elapsedTime = getElapsedTime();
@@ -178,17 +178,15 @@ void KeyframeAnimation::animate(CompositeAnimation*, RenderObject*, const Render
 
     // FIXME: we need to be more efficient about determining which keyframes we are animating between.
     // We should cache the last pair or something.
-    HashSet<int>::const_iterator endProperties = m_keyframes.endProperties();
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != endProperties; ++it) {
-        int property = *it;
-
+    HashSet<CSSPropertyID>::const_iterator endProperties = m_keyframes.endProperties();
+    for (HashSet<CSSPropertyID>::const_iterator it = m_keyframes.beginProperties(); it != endProperties; ++it) {
         // Get the from/to styles and progress between
         const RenderStyle* fromStyle = 0;
         const RenderStyle* toStyle = 0;
         double progress = 0.0;
-        fetchIntervalEndpointsForProperty(property, fromStyle, toStyle, progress);
+        fetchIntervalEndpointsForProperty(*it, fromStyle, toStyle, progress);
     
-        bool needsAnim = blendProperties(this, property, animatedStyle.get(), fromStyle, toStyle, progress);
+        bool needsAnim = CSSPropertyAnimation::blendProperties(this, *it, animatedStyle.get(), fromStyle, toStyle, progress);
         if (needsAnim)
             setAnimating();
         else {
@@ -215,21 +213,19 @@ void KeyframeAnimation::getAnimatedStyle(RefPtr<RenderStyle>& animatedStyle)
     if (!animatedStyle)
         animatedStyle = RenderStyle::clone(m_object->style());
 
-    HashSet<int>::const_iterator endProperties = m_keyframes.endProperties();
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != endProperties; ++it) {
-        int property = *it;
-
+    HashSet<CSSPropertyID>::const_iterator endProperties = m_keyframes.endProperties();
+    for (HashSet<CSSPropertyID>::const_iterator it = m_keyframes.beginProperties(); it != endProperties; ++it) {
         // Get the from/to styles and progress between
         const RenderStyle* fromStyle = 0;
         const RenderStyle* toStyle = 0;
         double progress = 0.0;
-        fetchIntervalEndpointsForProperty(property, fromStyle, toStyle, progress);
+        fetchIntervalEndpointsForProperty(*it, fromStyle, toStyle, progress);
 
-        blendProperties(this, property, animatedStyle.get(), fromStyle, toStyle, progress);
+        CSSPropertyAnimation::blendProperties(this, *it, animatedStyle.get(), fromStyle, toStyle, progress);
     }
 }
 
-bool KeyframeAnimation::hasAnimationForProperty(int property) const
+bool KeyframeAnimation::hasAnimationForProperty(CSSPropertyID property) const
 {
     return m_keyframes.containsProperty(property);
 }
@@ -237,10 +233,8 @@ bool KeyframeAnimation::hasAnimationForProperty(int property) const
 bool KeyframeAnimation::startAnimation(double timeOffset)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_object && m_object->hasLayer()) {
-        RenderLayer* layer = toRenderBoxModelObject(m_object)->layer();
-        if (layer->isComposited())
-            return layer->backing()->startAnimation(timeOffset, m_animation.get(), m_keyframes);
+    if (m_object && m_object->isComposited()) {
+        return toRenderBoxModelObject(m_object)->startAnimation(timeOffset, m_animation.get(), m_keyframes);
     }
 #else
     UNUSED_PARAM(timeOffset);
@@ -254,11 +248,8 @@ void KeyframeAnimation::pauseAnimation(double timeOffset)
         return;
 
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_object->hasLayer()) {
-        RenderLayer* layer = toRenderBoxModelObject(m_object)->layer();
-        if (layer->isComposited())
-            layer->backing()->animationPaused(timeOffset, m_keyframes.animationName());
-    }
+    if (m_object->isComposited())
+        toRenderBoxModelObject(m_object)->animationPaused(timeOffset, m_keyframes.animationName());
 #else
     UNUSED_PARAM(timeOffset);
 #endif
@@ -273,11 +264,8 @@ void KeyframeAnimation::endAnimation()
         return;
 
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_object->hasLayer()) {
-        RenderLayer* layer = toRenderBoxModelObject(m_object)->layer();
-        if (layer->isComposited())
-            layer->backing()->animationFinished(m_keyframes.animationName());
-    }
+    if (m_object->isComposited())
+        toRenderBoxModelObject(m_object)->animationFinished(m_keyframes.animationName());
 #endif
     // Restore the original (unanimated) style
     if (!paused())
@@ -349,20 +337,20 @@ bool KeyframeAnimation::sendAnimationEvent(const AtomicString& eventType, double
 void KeyframeAnimation::overrideAnimations()
 {
     // This will override implicit animations that match the properties in the keyframe animation
-    HashSet<int>::const_iterator end = m_keyframes.endProperties();
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != end; ++it)
+    HashSet<CSSPropertyID>::const_iterator end = m_keyframes.endProperties();
+    for (HashSet<CSSPropertyID>::const_iterator it = m_keyframes.beginProperties(); it != end; ++it)
         compositeAnimation()->overrideImplicitAnimations(*it);
 }
 
 void KeyframeAnimation::resumeOverriddenAnimations()
 {
     // This will resume overridden implicit animations
-    HashSet<int>::const_iterator end = m_keyframes.endProperties();
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != end; ++it)
+    HashSet<CSSPropertyID>::const_iterator end = m_keyframes.endProperties();
+    for (HashSet<CSSPropertyID>::const_iterator it = m_keyframes.beginProperties(); it != end; ++it)
         compositeAnimation()->resumeOverriddenImplicitAnimations(*it);
 }
 
-bool KeyframeAnimation::affectsProperty(int property) const
+bool KeyframeAnimation::affectsProperty(CSSPropertyID property) const
 {
     return m_keyframes.containsProperty(property);
 }
@@ -458,11 +446,11 @@ double KeyframeAnimation::timeToNextService()
         
     // A return value of 0 means we need service. But if we only have accelerated animations we 
     // only need service at the end of the transition
-    HashSet<int>::const_iterator endProperties = m_keyframes.endProperties();
+    HashSet<CSSPropertyID>::const_iterator endProperties = m_keyframes.endProperties();
     bool acceleratedPropertiesOnly = true;
     
-    for (HashSet<int>::const_iterator it = m_keyframes.beginProperties(); it != endProperties; ++it) {
-        if (!animationOfPropertyIsAccelerated(*it) || !isAccelerated()) {
+    for (HashSet<CSSPropertyID>::const_iterator it = m_keyframes.beginProperties(); it != endProperties; ++it) {
+        if (!CSSPropertyAnimation::animationOfPropertyIsAccelerated(*it) || !isAccelerated()) {
             acceleratedPropertiesOnly = false;
             break;
         }

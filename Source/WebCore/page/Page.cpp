@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All Rights Reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  *
  * This library is free software; you can redistribute it and/or
@@ -20,10 +20,10 @@
 #include "config.h"
 #include "Page.h"
 
+#include "AlternativeTextClient.h"
 #include "BackForwardController.h"
 #include "BackForwardList.h"
 #include "Base64.h"
-#include "CSSStyleSelector.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "ContextMenuClient.h"
@@ -43,7 +43,6 @@
 #include "FrameSelection.h"
 #include "FrameTree.h"
 #include "FrameView.h"
-#include "GeolocationController.h"
 #include "HTMLElement.h"
 #include "HistoryItem.h"
 #include "InspectorController.h"
@@ -68,6 +67,7 @@
 #include "SharedBuffer.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
+#include "StyleResolver.h"
 #include "TextResourceDecoder.h"
 #include "VoidCallback.h"
 #include "Widget.h"
@@ -122,9 +122,6 @@ Page::Page(PageClients& pageClients)
 #if ENABLE(INSPECTOR)
     , m_inspectorController(InspectorController::create(this, pageClients.inspectorClient))
 #endif
-#if ENABLE(GEOLOCATION)
-    , m_geolocationController(GeolocationController::create(this, pageClients.geolocationClient))
-#endif
 #if ENABLE(POINTER_LOCK)
     , m_pointerLockController(PointerLockController::create(this))
 #endif
@@ -160,6 +157,11 @@ Page::Page(PageClients& pageClients)
 #endif
     , m_displayID(0)
     , m_isCountingRelevantRepaintedObjects(false)
+#ifndef NDEBUG
+    , m_isPainting(false)
+#endif
+    , m_alternativeTextClient(pageClients.alternativeTextClient)
+    , m_scriptedAnimationsSuspended(false)
 {
     if (!allPages) {
         allPages = new HashSet<Page*>;
@@ -187,6 +189,8 @@ Page::~Page()
     }
 
     m_editorClient->pageDestroyed();
+    if (m_alternativeTextClient)
+        m_alternativeTextClient->pageDestroyed();
 
 #if ENABLE(INSPECTOR)
     m_inspectorController->inspectedPageDestroyed();
@@ -252,7 +256,7 @@ void Page::setViewMode(ViewMode viewMode)
         m_mainFrame->view()->forceLayout();
 
     if (m_mainFrame->document())
-        m_mainFrame->document()->styleSelectorChanged(RecalcStyleImmediately);
+        m_mainFrame->document()->styleResolverChanged(RecalcStyleImmediately);
 }
 
 void Page::setMainFrame(PassRefPtr<Frame> mainFrame)
@@ -392,7 +396,7 @@ void Page::scheduleForcedStyleRecalcForAllPages()
 void Page::setNeedsRecalcStyleInAllFrames()
 {
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
-        frame->document()->styleSelectorChanged(DeferRecalcStyle);
+        frame->document()->styleResolverChanged(DeferRecalcStyle);
 }
 
 void Page::refreshPlugins(bool reload)
@@ -717,6 +721,7 @@ void Page::windowScreenDidChange(PlatformDisplayID displayID)
 
 void Page::suspendScriptedAnimations()
 {
+    m_scriptedAnimationsSuspended = true;
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         if (frame->document())
             frame->document()->suspendScriptedAnimationControllerCallbacks();
@@ -725,6 +730,7 @@ void Page::suspendScriptedAnimations()
 
 void Page::resumeScriptedAnimations()
 {
+    m_scriptedAnimationsSuspended = false;
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         if (frame->document())
             frame->document()->resumeScriptedAnimationControllerCallbacks();
@@ -831,8 +837,8 @@ void Page::allVisitedStateChanged(PageGroup* group)
         if (page->m_group != group)
             continue;
         for (Frame* frame = page->m_mainFrame.get(); frame; frame = frame->tree()->traverseNext()) {
-            if (CSSStyleSelector* styleSelector = frame->document()->styleSelector())
-                styleSelector->allVisitedStateChanged();
+            if (StyleResolver* styleResolver = frame->document()->styleResolver())
+                styleResolver->allVisitedStateChanged();
         }
     }
 }
@@ -849,8 +855,8 @@ void Page::visitedStateChanged(PageGroup* group, LinkHash visitedLinkHash)
         if (page->m_group != group)
             continue;
         for (Frame* frame = page->m_mainFrame.get(); frame; frame = frame->tree()->traverseNext()) {
-            if (CSSStyleSelector* styleSelector = frame->document()->styleSelector())
-                styleSelector->visitedStateChanged(visitedLinkHash);
+            if (StyleResolver* styleResolver = frame->document()->styleResolver())
+                styleResolver->visitedStateChanged(visitedLinkHash);
         }
     }
 }
@@ -1112,12 +1118,14 @@ void Page::resumeActiveDOMObjectsAndAnimations()
 }
 
 Page::PageClients::PageClients()
-    : chromeClient(0)
+    : alternativeTextClient(0)
+    , chromeClient(0)
+#if ENABLE(CONTEXT_MENUS)
     , contextMenuClient(0)
+#endif
     , editorClient(0)
     , dragClient(0)
     , inspectorClient(0)
-    , geolocationClient(0)
 {
 }
 

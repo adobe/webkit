@@ -39,12 +39,17 @@
  *     were changed due new layout, script actions or any other events.
  *  - "editorclient,contents,changed", void: reports that editor client's
  *    contents were changed
+ *  - "load,committed", void: reports load committed.
  *  - "load,document,finished", void: frame finished loading the document.
  *  - "load,error", const Ewk_Frame_Load_Error*: reports load failed
  *    and it gives a pointer to structure defining the error as an argument.
  *  - "load,finished", const Ewk_Frame_Load_Error*: reports load
  *    finished and it gives @c NULL on success or pointer to
  *    structure defining the error.
+ *  - "load,resource,finished", unsigned long*: reports resource load finished and it gives
+ *    a pointer to its identifier.
+ *  - "load,resource,failed", Ewk_Frame_Load_Error*: reports resource load failure and it
+ *    gives a pointer to structure defining the error as an argument.
  *  - "load,firstlayout,finished", void: frame finished first layout.
  *  - "load,nonemptylayout,finished", void: frame finished first
  *    non-empty layout.
@@ -55,17 +60,23 @@
  *  - "mixedcontent,displayed", void: frame has loaded and displayed mixed content.
  *  - "mixedcontent,run", void: frame has loaded and run mixed content.
  *  - "navigation,first", void: first navigation was occurred.
+ *  - "redirect,cancelled", void: client redirect was cancelled.
  *  - "resource,request,new", Ewk_Frame_Resource_Request*: reports that
  *    there's a new resource request.
- *  - "resource,request,willsend", Ewk_Frame_Resource_Request*: a resource will
- *    be requested.
+ *  - "resource,request,willsend", Ewk_Frame_Resource_Messages*: a resource will be requested.
+ *    and the possible redirect response.
+ *  - "resource,response,received", Ewk_Frame_Resource_Response*: reports that a response
+ *    to a resource request was received.
  *  - "state,save", void: frame's state will be saved as a history item.
  *  - "title,changed", const char*: title of the main frame was changed.
  *  - "uri,changed", const char*: uri of the main frame was changed.
+ *  - "xss,detected", Ewk_Frame_Xss_Notification*: reflected XSS is encountered in the page and suppressed.
  */
 
 #ifndef ewk_frame_h
 #define ewk_frame_h
+
+#include "ewk_security_origin.h"
 
 #include <Evas.h>
 
@@ -91,21 +102,62 @@ struct _Ewk_Frame_Load_Error {
     const char *domain; /**< error domain name */
     const char *description; /**< error description already localized */
     const char *failing_url; /**< the url that failed to load */
+    unsigned long resource_identifier; /**< identifier of resource */
     Evas_Object *frame; /**< frame where the failure happened */
 };
 
 /// Creates a type name for _Ewk_Frame_Resource_Request.
 typedef struct _Ewk_Frame_Resource_Request Ewk_Frame_Resource_Request;
 /**
- * @brief   Structure used to report resource request.
+ * @brief   Structure containing details about a resource request.
  *
- * Details given before a resource is loaded on a given frame. It's used by
- * ewk_frame_request_will_send() to inform the details of a to-be-loaded
- * resource, allowing them to be overridden.
+ * Details given before a resource is loaded on a given frame. It's used in
+ * Ewk_Frame_Resource_Messages to inform about the details of a resource request.
  */
 struct _Ewk_Frame_Resource_Request {
     const char *url; /**< url of the resource */
+    const char *first_party; /**< first party for cookies, can not be changed */
+    const char *http_method; /**< http method, can not be changed */
     const unsigned long identifier; /**< identifier of resource, can not be changed */
+    Evas_Object *frame; /**< frame where the resource is requested */
+    Eina_Bool is_main_frame_request; /** < indicates if the request is for the main frame */
+};
+
+/// Creates a type name for _Ewk_Frame_Resource_Response.
+typedef struct _Ewk_Frame_Resource_Response Ewk_Frame_Resource_Response;
+
+/**
+ * @brief Structure containing details about a response to a resource request.
+ *
+ * Details given in the response to a resource request. It's used by
+ * ewk_frame_response_received() to inform about the details of a response.
+ */
+struct _Ewk_Frame_Resource_Response {
+    const char *url; /**< url of the resource */
+    int status_code; /**< http status code */
+};
+
+/// Creates a type name for _Ewk_Frame_Resource_Messages.
+typedef struct _Ewk_Frame_Resource_Messages Ewk_Frame_Resource_Messages;
+
+struct _Ewk_Frame_Resource_Messages {
+    Ewk_Frame_Resource_Request *request; /**< resource request */
+    Ewk_Frame_Resource_Response *redirect_response; /**< redirect response, can not be changed */
+};
+
+/// Creates a type name for Ewk_Frame_Xss_Notification.
+typedef struct _Ewk_Frame_Xss_Notification Ewk_Frame_Xss_Notification;
+
+/**
+ * @brief   Structure used to report reflected XSS is encountered in the page.
+ *
+ * This structure contains information received from the XSSAuditor when reflected XSS 
+ * is encountered in the page. The string is temporary reference and should @b not 
+ * be used after the signal callback returns. If it's required, make a copy of it.
+ */
+struct _Ewk_Frame_Xss_Notification {
+    const char *insecure_url; /**< insecure url of the document */
+    Eina_Bool is_entire_page_blocked; /** < indicates if the entire page was blocked by XSSAuditor */
 };
 
 /// Enum containing hit test data types
@@ -199,6 +251,17 @@ typedef enum {
  * @return view object or @c 0 on failure
  */
 EAPI Evas_Object *ewk_frame_view_get(const Evas_Object *o);
+
+/**
+ * Retrieves the Ewk_Security_Origin of this frame.
+ *
+ * The returned object should be freed by ewk_security_origin_free().
+ *
+ * @param o frame object to get the security origin
+ *
+ * @return security origin object
+ */
+EAPI Ewk_Security_Origin *ewk_frame_security_origin_get(const Evas_Object *o);
 
 /**
  * Returns a new iterator over all direct children frames.

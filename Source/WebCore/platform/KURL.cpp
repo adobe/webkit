@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2004, 2007, 2008, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -761,21 +762,24 @@ void KURL::setUser(const String& user)
 
     // FIXME: Non-ASCII characters must be encoded and escaped to match parse() expectations,
     // and to avoid changing more than just the user login.
-    String u;
+
     int end = m_userEnd;
     if (!user.isEmpty()) {
-        u = user;
+        String u = user;
         if (m_userStart == m_schemeEnd + 1)
             u = "//" + u;
         // Add '@' if we didn't have one before.
         if (end == m_hostEnd || (end == m_passwordEnd && m_string[end] != '@'))
             u.append('@');
+        parse(m_string.left(m_userStart) + u + m_string.substring(end));
     } else {
         // Remove '@' if we now have neither user nor password.
         if (m_userEnd == m_passwordEnd && end != m_hostEnd && m_string[end] == '@')
             end += 1;
+        // We don't want to parse in the extremely common case where we are not going to make a change.
+        if (m_userStart != end)
+            parse(m_string.left(m_userStart) + m_string.substring(end));
     }
-    parse(m_string.left(m_userStart) + u + m_string.substring(end));
 }
 
 void KURL::setPass(const String& password)
@@ -785,21 +789,24 @@ void KURL::setPass(const String& password)
 
     // FIXME: Non-ASCII characters must be encoded and escaped to match parse() expectations,
     // and to avoid changing more than just the user password.
-    String p;
+
     int end = m_passwordEnd;
     if (!password.isEmpty()) {
-        p = ":" + password + "@";
+        String p = ":" + password + "@";
         if (m_userEnd == m_schemeEnd + 1)
             p = "//" + p;
         // Eat the existing '@' since we are going to add our own.
         if (end != m_hostEnd && m_string[end] == '@')
             end += 1;
+        parse(m_string.left(m_userEnd) + p + m_string.substring(end));
     } else {
         // Remove '@' if we now have neither user nor password.
         if (m_userStart == m_userEnd && end != m_hostEnd && m_string[end] == '@')
             end += 1;
+        // We don't want to parse in the extremely common case where we are not going to make a change.
+        if (m_userEnd != end)
+            parse(m_string.left(m_userEnd) + m_string.substring(end));
     }
-    parse(m_string.left(m_userEnd) + p + m_string.substring(end));
 }
 
 void KURL::setFragmentIdentifier(const String& s)
@@ -1106,6 +1113,17 @@ void KURL::parse(const char* url, const String* originalString)
         && isLetterMatchIgnoringCase(url[1], 'i')
         && isLetterMatchIgnoringCase(url[2], 'l')
         && isLetterMatchIgnoringCase(url[3], 'e');
+
+#if PLATFORM(BLACKBERRY)
+    // Parse local: urls the same as file: urls.
+    if (!isFile)
+        isFile = schemeEnd == 5
+            && isLetterMatchIgnoringCase(url[0], 'l')
+            && isLetterMatchIgnoringCase(url[1], 'o')
+            && isLetterMatchIgnoringCase(url[2], 'c')
+            && isLetterMatchIgnoringCase(url[3], 'a')
+            && isLetterMatchIgnoringCase(url[4], 'l');
+#endif
 
     m_protocolIsInHTTPFamily = isLetterMatchIgnoringCase(url[0], 'h')
         && isLetterMatchIgnoringCase(url[1], 't')
@@ -1870,6 +1888,11 @@ bool portAllowed(const KURL& url)
     // Allow any port number in a file URL, since the port number is ignored.
     if (url.protocolIs("file"))
         return true;
+
+#if PLATFORM(BLACKBERRY)
+    if (url.protocolIs("local"))
+        return true;
+#endif
 
     return false;
 }

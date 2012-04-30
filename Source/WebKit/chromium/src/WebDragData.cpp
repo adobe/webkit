@@ -34,6 +34,7 @@
 #include "ChromiumDataObject.h"
 #include "ClipboardMimeTypes.h"
 #include "DataTransferItem.h"
+#include "DraggedIsolatedFileSystem.h"
 #include "platform/WebData.h"
 #include "platform/WebString.h"
 #include "platform/WebURL.h"
@@ -70,8 +71,8 @@ void WebDragData::assign(const WebDragData& other)
 WebVector<WebDragData::Item> WebDragData::items() const
 {
     Vector<Item> itemList;
-    for (size_t i = 0; i < m_private->items()->length(); ++i) {
-        DataTransferItemChromium* originalItem = m_private->items()->item(i).get();
+    for (size_t i = 0; i < m_private->length(); ++i) {
+        ChromiumDataObjectItem* originalItem = m_private->item(i).get();
         WebDragData::Item item;
         if (originalItem->kind() == DataTransferItem::kindString) {
             item.storageType = Item::StorageTypeString;
@@ -126,6 +127,26 @@ void WebDragData::addItem(const Item& item)
         // This should never happen when dragging in.
         ASSERT_NOT_REACHED();
     }
+}
+
+WebString WebDragData::filesystemId() const
+{
+#if ENABLE(FILE_SYSTEM)
+    ASSERT(!isNull());
+    DraggedIsolatedFileSystem* filesystem = DraggedIsolatedFileSystem::from(m_private);
+    if (filesystem)
+        return filesystem->filesystemId();
+#endif
+    return WebString();
+}
+
+void WebDragData::setFilesystemId(const WebString& filesystemId)
+{
+#if ENABLE(FILE_SYSTEM)
+    // The ID is an opaque string, given by and validated by chromium port.
+    ensureMutable();
+    DraggedIsolatedFileSystem::provideTo(m_private, DraggedIsolatedFileSystem::supplementName(), DraggedIsolatedFileSystem::create(filesystemId));
+#endif
 }
 
 WebDragData::WebDragData(const WTF::PassRefPtr<WebCore::ChromiumDataObject>& data)

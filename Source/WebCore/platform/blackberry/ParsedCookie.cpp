@@ -38,11 +38,9 @@
 namespace WebCore {
 
 ParsedCookie::ParsedCookie(double currentTime)
-    : m_expiry(0)
+    : m_expiry(-1)
     , m_creationTime(currentTime)
     , m_lastAccessed(currentTime)
-    , m_isMaxAgeSet(false)
-    , m_hasDefaultDomain(false)
     , m_isSecure(false)
     , m_isHttpOnly(false)
     , m_isSession(true)
@@ -59,8 +57,6 @@ ParsedCookie::ParsedCookie(const String& name, const String& value, const String
     , m_expiry(expiry)
     , m_creationTime(creationTime)
     , m_lastAccessed(lastAccessed)
-    , m_isMaxAgeSet(false)
-    , m_hasDefaultDomain(false)
     , m_isSecure(isSecure)
     , m_isHttpOnly(isHttpOnly)
     , m_isSession(false)
@@ -77,8 +73,6 @@ ParsedCookie::ParsedCookie(const ParsedCookie* cookie)
     , m_expiry(cookie->m_expiry)
     , m_creationTime(cookie->m_creationTime)
     , m_lastAccessed(cookie->m_lastAccessed)
-    , m_isMaxAgeSet(cookie->m_isMaxAgeSet)
-    , m_hasDefaultDomain(cookie->m_hasDefaultDomain)
     , m_isSecure(cookie->m_isSecure)
     , m_isHttpOnly(cookie->m_isHttpOnly)
     , m_isSession(cookie->m_isSession)
@@ -94,7 +88,7 @@ void ParsedCookie::setExpiry(const String& expiry)
 {
     // If a cookie has both the Max-Age and the Expires attribute,
     // the Max-Age attribute has precedence and controls the expiration date of the cookie.
-    if (m_isMaxAgeSet || expiry.isEmpty())
+    if (m_expiry != -1 || expiry.isEmpty())
         return;
 
     m_isSession = false;
@@ -126,7 +120,6 @@ void ParsedCookie::setMaxAge(const String& maxAge)
         return;
     }
     m_expiry = value;
-    m_isMaxAgeSet = true;
     m_isSession = false;
 
     // If maxAge value is not positive, let expiry-time be the earliest representable time.
@@ -134,12 +127,6 @@ void ParsedCookie::setMaxAge(const String& maxAge)
         m_expiry += currentTime();
     else
         m_expiry = 0;
-}
-
-void ParsedCookie::setDefaultDomain(const KURL& requestURL)
-{
-    setDomain(requestURL.host());
-    m_hasDefaultDomain = true;
 }
 
 bool ParsedCookie::hasExpired() const
@@ -185,6 +172,8 @@ String ParsedCookie::toNameValuePair() const
 void ParsedCookie::appendWebCoreCookie(Vector<Cookie>& cookieVector) const
 {
     cookieVector.append(Cookie(String(m_name), String(m_value), String(m_domain),
-            String(m_path), m_expiry, m_isHttpOnly, m_isSecure, m_isSession));
+            // We multiply m_expiry by 1000 to convert from seconds to milliseconds.
+            // This value is passed to Web Inspector and used in the JavaScript Date constructor.
+            String(m_path), (m_expiry * 1000), m_isHttpOnly, m_isSecure, m_isSession));
 }
 } // namespace WebCore

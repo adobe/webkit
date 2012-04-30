@@ -30,8 +30,8 @@
 
 #include "GraphicsContext.h"
 #include "ImageBuffer.h"
+#include "SurfaceUpdateInfo.h"
 #include "TiledBackingStoreClient.h"
-#include "UpdateInfo.h"
 
 using namespace WebCore;
 
@@ -72,26 +72,25 @@ Vector<IntRect> TiledBackingStoreRemoteTile::updateBackBuffer()
     if (!isDirty())
         return Vector<IntRect>();
 
-    RefPtr<ShareableBitmap> bitmap = ShareableBitmap::createShareable(m_dirtyRect.size(), m_tiledBackingStore->supportsAlpha() ? ShareableBitmap::SupportsAlpha : 0);
-    OwnPtr<GraphicsContext> graphicsContext(bitmap->createGraphicsContext());
+    SurfaceUpdateInfo updateInfo;
+    OwnPtr<GraphicsContext> graphicsContext = m_client->beginContentUpdate(m_dirtyRect.size(), updateInfo.surfaceHandle, updateInfo.surfaceOffset);
+    if (!graphicsContext)
+        return Vector<IntRect>();
     graphicsContext->translate(-m_dirtyRect.x(), -m_dirtyRect.y());
     graphicsContext->scale(FloatSize(m_tiledBackingStore->contentsScale(), m_tiledBackingStore->contentsScale()));
     m_tiledBackingStore->client()->tiledBackingStorePaint(graphicsContext.get(), m_tiledBackingStore->mapToContents(m_dirtyRect));
 
-    UpdateInfo updateInfo;
-    updateInfo.updateRectBounds = m_rect;
-    IntRect updateRect = m_dirtyRect;
-    updateRect.move(-m_rect.x(), -m_rect.y());
-    updateInfo.updateRects.append(updateRect);
-    updateInfo.updateScaleFactor = m_tiledBackingStore->contentsScale();
-    bitmap->createHandle(updateInfo.bitmapHandle);
+    updateInfo.updateRect = m_dirtyRect;
+    updateInfo.updateRect.move(-m_rect.x(), -m_rect.y());
+    updateInfo.scaleFactor = m_tiledBackingStore->contentsScale();
+    graphicsContext.release();
 
     static int id = 0;
     if (!m_ID) {
         m_ID = ++id;
-        m_client->createTile(m_ID, updateInfo);
+        m_client->createTile(m_ID, updateInfo, m_rect);
     } else
-        m_client->updateTile(m_ID, updateInfo);
+        m_client->updateTile(m_ID, updateInfo, m_rect);
 
     m_dirtyRect = IntRect();
     return Vector<IntRect>();

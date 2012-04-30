@@ -41,6 +41,8 @@
 #include "SecurityOrigin.h"
 #include "StorageEvent.h"
 
+// FIXME: delete this almost obsolete file soon
+
 namespace WebCore {
 
 StorageEventDispatcherImpl::StorageEventDispatcherImpl(const String& groupName)

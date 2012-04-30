@@ -145,6 +145,8 @@ protected:
     virtual void setOpacityInternal(float);
 
 private:
+    virtual void willBeDestroyed();
+
     // PlatformCALayerClient overrides
     virtual void platformCALayerLayoutSublayersOfLayer(PlatformCALayer*) { }
     virtual bool platformCALayerRespondsToLayoutChanges() const { return false; }
@@ -161,6 +163,8 @@ private:
     virtual void platformCALayerLayerDidDisplay(PlatformLayer* layer) { return layerDidDisplay(layer); }
     virtual void platformCALayerDidCreateTiles(const Vector<FloatRect>& dirtyRects) OVERRIDE;
     virtual float platformCALayerDeviceScaleFactor() OVERRIDE;
+
+    virtual double backingStoreArea() const;
 
     void updateOpacityOnLayer();
     void updateBlendModeOnLayer();

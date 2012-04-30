@@ -73,20 +73,7 @@ LayerCompositingThread::LayerCompositingThread(LayerType type, PassRefPtr<LayerT
 
 LayerCompositingThread::~LayerCompositingThread()
 {
-    // Unfortunately, ThreadSafeShared<T> is hardwired to call T::~T().
-    // To switch threads in case the last reference is released on the
-    // WebKit thread, we send a sync message to the compositing thread.
-    destroyOnCompositingThread();
-}
-
-void LayerCompositingThread::destroyOnCompositingThread()
-{
-    if (!isCompositingThread()) {
-        dispatchSyncCompositingMessage(BlackBerry::Platform::createMethodCallMessage(
-            &LayerCompositingThread::destroyOnCompositingThread,
-            this));
-        return;
-    }
+    ASSERT(isCompositingThread());
 
     m_tiler->layerCompositingThreadDestroyed();
 
@@ -242,6 +229,7 @@ void LayerCompositingThread::drawTextures(int positionLocation, int texCoordLoca
 #endif
 #if ENABLE(WEBGL)
     if (layerType() == LayerData::WebGLLayer) {
+        m_layerRenderer->addLayerToReleaseTextureResourcesList(this);
         pthread_mutex_lock(m_frontBufferLock);
         glVertexAttribPointer(positionLocation, 2, GL_FLOAT, GL_FALSE, 0, &m_transformedBounds);
         float canvasWidthRatio = 1.0f;
@@ -251,7 +239,6 @@ void LayerCompositingThread::drawTextures(int positionLocation, int texCoordLoca
         glVertexAttribPointer(texCoordLocation, 2, GL_FLOAT, GL_FALSE, 0, upsideDown);
         glBindTexture(GL_TEXTURE_2D, m_texID);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        pthread_mutex_unlock(m_frontBufferLock);
         // FIXME: If the canvas/texture is larger than 2048x2048, then we'll die here
         return;
     }

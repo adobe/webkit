@@ -50,7 +50,6 @@
 #include "InlineTextBox.h"
 #include "Page.h"
 #include "Range.h"
-#include "RenderLayer.h"
 #include "RenderText.h"
 #include "RenderTextControl.h"
 #include "RenderTheme.h"
@@ -76,7 +75,7 @@ using namespace HTMLNames;
 
 static inline LayoutUnit NoXPosForVerticalArrowNavigation()
 {
-    return std::numeric_limits<LayoutUnit>::min();
+    return MIN_LAYOUT_UNIT;
 }
 
 CaretBase::CaretBase(CaretVisibility visibility)
@@ -1477,7 +1476,7 @@ bool FrameSelection::contains(const LayoutPoint& point)
     HitTestRequest request(HitTestRequest::ReadOnly |
                            HitTestRequest::Active);
     HitTestResult result(point);
-    document->renderView()->layer()->hitTest(request, result);
+    document->renderView()->hitTest(request, result);
     Node* innerNode = result.innerNode();
     if (!innerNode || !innerNode->renderer())
         return false;
@@ -1634,7 +1633,7 @@ void FrameSelection::focusedOrActiveStateChanged()
     // Update for caps lock state
     m_frame->eventHandler()->capsLockStateMayHaveChanged();
 
-    // Because CSSStyleSelector::checkOneSelector() and
+    // Because StyleResolver::checkOneSelector() and
     // RenderTheme::isFocused() check if the frame is active, we have to
     // update style and theme state that depended on those.
     if (Node* node = m_frame->document()->focusedNode()) {
@@ -1953,10 +1952,8 @@ void FrameSelection::revealSelection(const ScrollAlignment& alignment, bool reve
         // FIXME: This code only handles scrolling the startContainer's layer, but
         // the selection rect could intersect more than just that.
         // See <rdar://problem/4799899>.
-        if (RenderLayer* layer = start.deprecatedNode()->renderer()->enclosingLayer()) {
-            layer->scrollRectToVisible(rect, alignment, alignment);
+        if (start.deprecatedNode()->renderer()->scrollRectToVisible(rect, alignment, alignment))
             updateAppearance();
-        }
     }
 }
 

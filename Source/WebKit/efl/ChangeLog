@@ -1,3 +1,651 @@
+2012-04-27  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] ResourceError domain needs to be properly set in FrameLoaderClient
+        https://bugs.webkit.org/show_bug.cgi?id=84129
+
+        Reviewed by Nate Chapin.
+
+        Properly set ResourceError objects' domain instead of using a generic
+        one. This allows WebKit and NSURL errors to be distinguished, which is
+        required to properly print out information in EFL's DumpRenderTree
+        when dumpResourceLoadCallbacks() returns true.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::cancelledError):
+        (WebCore::FrameLoaderClientEfl::blockedError):
+        (WebCore::FrameLoaderClientEfl::cannotShowURLError):
+        (WebCore::FrameLoaderClientEfl::interruptedForPolicyChangeError):
+        (WebCore::FrameLoaderClientEfl::cannotShowMIMETypeError):
+        (WebCore::FrameLoaderClientEfl::fileDoesNotExistError):
+        (WebCore::FrameLoaderClientEfl::pluginWillHandleLoadError):
+
+2012-04-27  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] tabsToLinks ewk_view setting
+        https://bugs.webkit.org/show_bug.cgi?id=84340
+
+        Exporting new ewk_view setting: tabsToLinks - enbles/disables tab key focusing of page elements.
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::keyboardUIMode):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (ewk_view_setting_include_links_in_focus_chain_get):
+        (ewk_view_setting_include_links_in_focus_chain_set):
+        * ewk/ewk_view.h:
+
+2012-04-27  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] DRT should support LayoutTestController's dumpResourceLoadCallbacks()
+        https://bugs.webkit.org/show_bug.cgi?id=81891
+
+        Reviewed by Philippe Normand.
+
+        New "load,resource,finished", "load,resource,failed", and
+        "resource,response,received" signals were added to notify about different
+        resource load events. These additional signals are needed for proper
+        support of LayoutTestController's dumpResourceLoadCallbacks() in EFL's
+        DumpRenderTree.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::assignIdentifierToInitialRequest):
+        (WebCore::FrameLoaderClientEfl::dispatchDidReceiveResponse):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFinishLoading):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailLoading):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_response_received):
+        (ewk_frame_load_finished):
+        (ewk_frame_load_resource_finished):
+        (ewk_frame_load_resource_failed):
+        (ewk_frame_load_error):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.h:
+
+2012-04-26  Martin Robinson  <mrobinson@igalia.com>
+
+        [Cairo] Wrap cairo surfaces in a class when storing native images
+        https://bugs.webkit.org/show_bug.cgi?id=83611
+
+        Reviewed by Alejandro G. Castro.
+
+        * ewk/ewk_history.cpp: Updated to reflect addition of NativeImageCario.
+        * ewk/ewk_settings.cpp: Ditto.
+
+2012-04-26  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Enable VIDEO_TRACK feature
+        https://bugs.webkit.org/show_bug.cgi?id=84830
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add functions on the ewk_view to toggle runtime support for text
+        tracks in HTML5 video.
+
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (ewk_view_setting_should_display_subtitles_get):
+        (ewk_view_setting_should_display_subtitles_set):
+        (ewk_view_setting_should_display_captions_get):
+        (ewk_view_setting_should_display_captions_set):
+        (ewk_view_setting_should_display_text_descriptions_get):
+        (ewk_view_setting_should_display_text_descriptions_set):
+        * ewk/ewk_view.h:
+
+2012-04-26  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] [DRT] LayoutTestController needs implementation of setJavaScriptProfilingEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=84576
+
+        Reviewed by Martin Robinson.
+
+        Add missing implementation setJavaScriptProfilingEnabled to EFL's
+        DumpRenderTreeSupport. This setting allows layout tests to start
+        JavaScript profiling.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-26  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] WebGL support ewk_view setting
+        https://bugs.webkit.org/show_bug.cgi?id=84534
+
+        Reviewed by Antonio Gomes.
+
+        Exporting new ewk_view setting: webGLEnabled - enbles/disables WebGL support.
+
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (ewk_view_setting_enable_webgl_get):
+        (ewk_view_setting_enable_webgl_set):
+        * ewk/ewk_view.h:
+
+2012-04-26  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][DRT] "resource,request,willsend" signal needs to provide more information
+        https://bugs.webkit.org/show_bug.cgi?id=84670
+
+        Reviewed by Andreas Kling.
+
+        The "resource,request,willsend" signal now provides more information
+        about the network request as well as information about the possible
+        redirect response. This extra information will be needed to support
+        LayoutTestController's dumpResourceLoadCallbacks() in EFL's
+        DumpRenderTree.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchWillSendRequest):
+        (WebCore::FrameLoaderClientEfl::assignIdentifierToInitialRequest):
+        (WebCore::FrameLoaderClientEfl::dispatchDecidePolicyForNavigationAction):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_request_will_send):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.h:
+
+2012-04-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's LayoutTestController does not implement elementDoesAutoCompleteForElementWithId
+        https://bugs.webkit.org/show_bug.cgi?id=84425
+
+        Reviewed by Antonio Gomes.
+
+        Add a helper function to DumpRenderTreeSupportEfl, returning
+        whether or not an element does perform autocompletion.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::elementDoesAutoCompleteForElementWithId):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-20  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Add Security Origin API
+        https://bugs.webkit.org/show_bug.cgi?id=84023
+
+        Added an API to get a Security Origin handle from a Ewk_Frame. This is
+        needed for fine grained security policy. This new API will also allow
+        to define quota and get usage information of a Web Storage based on its
+        Security Origin.
+
+        Reviewed by Antonio Gomes.
+
+        * ewk/EWebKit.h:
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_security_origin_get):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_security_origin.cpp: Added.
+        (ewk_security_origin_protocol_get):
+        (ewk_security_origin_host_get):
+        (ewk_security_origin_port_get):
+        (ewk_security_origin_web_database_usage_get):
+        (ewk_security_origin_web_database_quota_get):
+        (ewk_security_origin_web_database_quota_set):
+        (ewk_security_origin_free):
+        (ewk_security_origin_new):
+        * ewk/ewk_security_origin.h: Added.
+
+2012-04-20  Kamil Blank  <k.blank@samsung.com>
+
+        [EFL] Add setting API for author and user styles.
+        https://bugs.webkit.org/show_bug.cgi?id=82860
+
+        Reviewed by Daniel Bates.
+
+        Add missing implementation setAuthorAndUserStylesEnabled to EFL's
+        DumpRenderTreeSupport.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+
+2012-04-19  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] dispatchDidCancelClientRedirect needs implementation
+        https://bugs.webkit.org/show_bug.cgi?id=83669
+
+        Reviewed by Antonio Gomes.
+
+        Emit a new "redirect,cancelled" signal on the ewk_frame when a
+        redirect is cancelled. This is needed by EFL's DumpRenderTree to dump
+        frame load callbacks information.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidCancelClientRedirect):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_redirect_cancelled):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+
+2012-04-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        EFL's LayoutTestController does not implement callShouldCloseOnWebView
+        https://bugs.webkit.org/show_bug.cgi?id=82301
+
+        Reviewed by Martin Robinson.
+
+        Implement callShouldCloseOnWebView in EFL's LayoutTestController by
+        calling shouldClose() on the FrameLoader, allowing the related
+        test to be removed from the skip list.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::callShouldCloseOnWebView):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] FrameLoaderClient should send "load,finished" signal for all frame, not just the main one
+        https://bugs.webkit.org/show_bug.cgi?id=84052
+
+        Reviewed by Antonio Gomes.
+
+        Emit the "load,finished" signal from dispatchDidFinishLoad() / instead of
+        postProgressFinishedNotification() in order to send notifications all frames,
+        not just the main one.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::postProgressFinishedNotification):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFinishLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailLoad):
+
+2012-04-17  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] Add setting API to enable/disable XSSAuditor
+        https://bugs.webkit.org/show_bug.cgi?id=83281
+
+        Add setting API to enable or disable WebKit's XSSAuditor to protect 
+        from reflective cross-site scripting attacks. Also, emit the signal 
+        'xss,detected' and provide addition information received from 
+        XSSAuditor when reflected XSS is encountered in the page.
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::didDetectXSS):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_xss_detected):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (ewk_view_setting_enable_xss_auditor_get):
+        (ewk_view_setting_enable_xss_auditor_set):
+        * ewk/ewk_view.h:
+
+2012-04-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] DRT should support LayoutTestController's dumpFrameLoadCallbacks()
+        https://bugs.webkit.org/show_bug.cgi?id=83030
+
+        Reviewed by Antonio Gomes.
+
+        Emit "load,started" and "onload,event" signals needed to support
+        LayoutTestController's dumpFrameLoadCallbacks() in EFL's DumpRenderTree.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidHandleOnloadEvents):
+        (WebCore::FrameLoaderClientEfl::dispatchDidCommitLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailLoad):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_load_committed):
+        (ewk_frame_load_started):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_load_started):
+        (ewk_view_onload_event):
+        * ewk/ewk_view.h:
+
+2012-04-17  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r114376.
+        http://trac.webkit.org/changeset/114376
+        https://bugs.webkit.org/show_bug.cgi?id=84155
+
+        Wrong patch version committed, asked by the patch author.
+        (Requested by rakuco on #webkit).
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::postProgressFinishedNotification):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFinishLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidHandleOnloadEvents):
+        (WebCore::FrameLoaderClientEfl::dispatchDidCommitLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailLoad):
+        * WebCoreSupport/FrameLoaderClientEfl.h:
+        (FrameLoaderClientEfl):
+        * ewk/ewk_frame.cpp:
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        * ewk/ewk_view.h:
+
+2012-04-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] DRT should support LayoutTestController's dumpFrameLoadCallbacks()
+        https://bugs.webkit.org/show_bug.cgi?id=83030
+
+        Reviewed by Antonio Gomes.
+
+        Implement support for LayoutTestController's dumpFrameLoadCallbacks()
+        in EFL's DumpRenderTree. We no longer emit the "load,finished" signal
+        from postProgressFinishedNotification() since it is already emitted
+        from dispatchDidFinishLoad(). This avoids unwanted extra signals we
+        prevent some tests from passing (e.g.
+        http/tests/security/mixedContent/about-blank-iframe-in-main-frame.html).
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::postProgressFinishedNotification):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFinishLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidHandleOnloadEvents):
+        (WebCore::FrameLoaderClientEfl::dispatchDidCommitLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailLoad):
+        * WebCoreSupport/FrameLoaderClientEfl.h:
+        (FrameLoaderClientEfl):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_load_committed):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_onload_event):
+        * ewk/ewk_view.h:
+
+2012-04-17  Mariusz Grzegorczyk  <mariusz.g@samsung.com>
+
+        [EFL][WK2] Fix build break when CONTEXT_MENUS is disabled.
+        https://bugs.webkit.org/show_bug.cgi?id=83285
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove WebCore namespace from PageClientEfl.
+
+        * WebCoreSupport/PageClientEfl.cpp:
+        (WebCore):
+        * WebCoreSupport/PageClientEfl.h:
+        * ewk/ewk_private.h:
+        (EWKPrivate):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (EWKPrivate::corePageClient):
+
+2012-04-13  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Add API for color chooser
+        https://bugs.webkit.org/show_bug.cgi?id=83692
+
+        Added new API to enable browsers to display a custom color picker
+        when an input field of type "color" is activated.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore):
+        (WebCore::ChromeClientEfl::createColorChooser):
+        (WebCore::ChromeClientEfl::removeColorChooser):
+        (WebCore::ChromeClientEfl::updateColorChooser):
+        * WebCoreSupport/ChromeClientEfl.h:
+        (ChromeClientEfl):
+        * ewk/ewk_private.h:
+        (WebCore):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_color_chooser_new):
+        (ewk_view_color_chooser_destroy):
+        (ewk_view_color_chooser_color_set):
+        (ewk_view_color_chooser_changed):
+        * ewk/ewk_view.h:
+
+2012-04-11  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] LayoutTestController needs implementation of pageProperty
+        https://bugs.webkit.org/show_bug.cgi?id=82449
+
+        Add missing implementation pageProperty to EFL's
+        DumpRenderTreeSupport.
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::pageProperty):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-10  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] LayoutTestController needs implementation of addUserStyleSheet
+        https://bugs.webkit.org/show_bug.cgi?id=82446
+
+        Add missing implementation addUserStyleSheet to EFL's
+        DumpRenderTreeSupport.
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::addUserStyleSheet):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-04  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        Another unreviewed attempt at getting the EFL build bot to a
+        healthy state by forcing a rebuild.
+
+        * ewk/ewk_cookies.h:
+
+2012-04-04  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        Unreviewed; touch a file to check if the EFL build bot is back to
+        normal.
+
+        * ewk/ewk_cookies.h:
+
+2012-04-04  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][DRT] Catch the "resource,request,willsend" signal
+        https://bugs.webkit.org/show_bug.cgi?id=82192
+
+        Reviewed by Gustavo Noronha Silva.
+
+        EFL's FrameLoaderClient now emits the "resource,request,willsend"
+        signal on the view for all resources about to be loaded, not just the
+        main frame. Also adds a boolean flag to Ewk_Frame_Resource_Request to
+        distinguish the request for the main frame from those for
+        sub-resources.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchWillSendRequest):
+        (WebCore::FrameLoaderClientEfl::assignIdentifierToInitialRequest):
+        (WebCore::FrameLoaderClientEfl::dispatchDecidePolicyForNavigationAction):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_view.h:
+
+2012-04-04  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] DRT support for computedStyleIncludingVisitedInfo
+        https://bugs.webkit.org/show_bug.cgi?id=82190
+
+        Add missing implementation computedStyleIncludingVisitedInfo to EFL's
+        DumpRenderTreeSupport.
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::computedStyleIncludingVisitedInfo):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-04  Dominik Röttsches  <dominik.rottsches@linux.intel.com>
+
+        [EFL][DRT] FrameloaderClientEfl needs to handle media content correctly
+        https://bugs.webkit.org/show_bug.cgi?id=83020
+
+        Reviewed by Hajime Morita.
+
+        Implementing handling of media content type and media documents
+        in the respective FrameLoaderClientEfl callbacks.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::committedLoad): Cancel loading for media documents.
+        (WebCore::FrameLoaderClientEfl::canShowMIMEType): Let media content types through.
+        (WebCore):
+        (WebCore::FrameLoaderClientEfl::pluginWillHandleLoadError): Returning appropriate error type.
+        (WebCore::FrameLoaderClientEfl::shouldFallBack): Falling back as well for media handled by media player.
+
+2012-04-04  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL] Change ewk_settings_icon_database_icon_object_add to proper API name.
+        https://bugs.webkit.org/show_bug.cgi?id=82438
+
+        Reviewed by Andreas Kling.
+
+        The purpose of ewk_settings_icon_database_icon_object_add is to get icon
+        for the given URL. This function doesn't add anything to database.
+        Documentation and API name are adjusted.
+
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_icon_database_icon_object_get):
+        * ewk/ewk_settings.h:
+
+2012-04-03  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] DRT support for setInteractiveFormValidationEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=82050
+
+        Add a setting setInteractiveFormValidationEnabled to EFL's
+        DumpRenderTreeSupport.
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-03  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] LayoutTestController needs implementation of setDefersLoading
+        https://bugs.webkit.org/show_bug.cgi?id=82890
+
+        Reviewed by Philippe Normand.
+
+        Implement setDefersLoading() in EFL's LayoutTestController so that the
+        corresponding test case can be removed from the skip list.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setDefersLoading):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-03  Alexander Shalamov  <alexander.shalamov@intel.com>
+
+        [EFL] LayoutTestController needs implementation of pageSizeAndMarginsInPixels
+        https://bugs.webkit.org/show_bug.cgi?id=82589
+
+        Add missing implementation for pageSizeAndMarginsInPixels to EFL's
+        DumpRenderTreeSupport.
+
+        Reviewed by Philippe Normand.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::pageSizeAndMarginsInPixels):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-02  Alexander Shalamov  <alexander.shalamov@intel.com>
+
+        [EFL] LayoutTestController needs implementation of isPageBoxVisible
+        https://bugs.webkit.org/show_bug.cgi?id=82591
+
+        Add missing implementation for isPageBoxVisible to EFL's
+        DumpRenderTreeSupport.
+
+        Reviewed by Hajime Morita.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::isPageBoxVisible):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-01  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Support the Network Information API
+        https://bugs.webkit.org/show_bug.cgi?id=73528
+
+        Reviewed by Adam Barth.
+
+        Add NetworkInfoClientEfl to support network information API. However,
+        functions are not implemented yet.
+
+        * WebCoreSupport/NetworkInfoClientEfl.cpp: Added.
+        (WebCore::NetworkInfoClientEfl::NetworkInfoClientEfl):
+        (WebCore):
+        (WebCore::NetworkInfoClientEfl::~NetworkInfoClientEfl):
+        (WebCore::NetworkInfoClientEfl::startUpdating):
+        (WebCore::NetworkInfoClientEfl::stopUpdating):
+        (WebCore::NetworkInfoClientEfl::bandwidth):
+        (WebCore::NetworkInfoClientEfl::metered):
+        * WebCoreSupport/NetworkInfoClientEfl.h: Added.
+        (NetworkInfoClientEfl):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+
+2012-03-30  Patrick Gansterer  <paroga@webkit.org>
+
+        [EFL] Correct <wtf/*.h> include paths.
+        https://bugs.webkit.org/show_bug.cgi?id=82741
+
+        Reviewed by Andreas Kling.
+
+        Modify the #include declarations for several EFL-related files
+        so that the wtf types are included using the full path.
+
+        * ewk/ewk_frame.cpp:
+        * ewk/ewk_tiled_backing_store.cpp:
+        (_Ewk_Tiled_Backing_Store_Item):
+        * ewk/ewk_tiled_matrix.cpp:
+
+2012-03-30  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        Add a "preview" state to Page Visibility API implementation
+        https://bugs.webkit.org/show_bug.cgi?id=81355
+
+        Reviewed by Adam Barth.
+
+        Updating the Page Visibility API implementation to the current spec version.
+
+        * WebCoreSupport/AssertMatchingEnums.cpp:
+        * ewk/ewk_view.h:
+
+2012-03-28  Nate Chapin  <japhet@chromium.org>
+
+        Remove dispatchDidLoadMainResource callback, since no
+        port implements it.
+        https://bugs.webkit.org/show_bug.cgi?id=82539
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore):
+        * WebCoreSupport/FrameLoaderClientEfl.h:
+        (FrameLoaderClientEfl):
+
+2012-03-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Implement missing methods in CookieJarSoup
+        https://bugs.webkit.org/show_bug.cgi?id=82082
+
+        Reviewed by Martin Robinson.
+
+        * ewk/ewk_cookies.cpp:
+        (ewk_cookies_clear): Use soupCookieJar() instead of
+        defaultCookieJar().
+        (ewk_cookies_get_all): Ditto.
+        (ewk_cookies_cookie_del): Ditto.
+        (ewk_cookies_policy_set): Ditto.
+        (ewk_cookies_policy_get): Ditto.
+
 2012-03-23  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
 
         [EFL][DRT] Implement LayoutTestController's methods related with editing.

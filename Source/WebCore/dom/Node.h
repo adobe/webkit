@@ -90,7 +90,7 @@ class HTMLPropertiesCollection;
 
 typedef int ExceptionCode;
 
-const int nodeStyleChangeShift = 22;
+const int nodeStyleChangeShift = 21;
 
 // SyntheticStyleChange means that we need to go through the entire style change logic even though
 // no style property has actually changed. It is used to restructure the tree when, for instance,
@@ -212,10 +212,10 @@ public:
     bool isStyledElement() const { return getFlag(IsStyledElementFlag); }
     virtual bool isFrameOwnerElement() const { return false; }
     virtual bool isAttributeNode() const { return false; }
-    bool isCommentNode() const { return getFlag(IsCommentFlag); }
     virtual bool isCharacterDataNode() const { return false; }
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootFlag); }
+    bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
 
     Node* shadowAncestorNode() const;
     // Returns 0, a ShadowRoot, or a legacy shadow root.
@@ -226,6 +226,8 @@ public:
     // Node's parent, shadow tree host.
     ContainerNode* parentOrHostNode() const;
     Element* parentOrHostElement() const;
+    Node* highestAncestor() const;
+
     // Use when it's guaranteed to that shadowHost is 0.
     ContainerNode* parentNodeGuaranteedHostFree() const;
     // Returns the parent node, but 0 if the parent node is a ShadowRoot.
@@ -325,6 +327,9 @@ public:
     void setIsLink() { setFlag(IsLinkFlag); }
     void clearIsLink() { clearFlag(IsLinkFlag); }
 
+    void setInNamedFlow() { setFlag(InNamedFlowFlag); }
+    void clearInNamedFlow() { clearFlag(InNamedFlowFlag); }
+
     enum ShouldSetAttached {
         SetAttached,
         DoNotSetAttached
@@ -348,6 +353,8 @@ public:
 
     bool isContentEditable();
     bool isContentRichlyEditable();
+
+    void inspect();
 
     bool rendererIsEditable(EditableType editableType = ContentIsEditable) const
     {
@@ -377,6 +384,7 @@ public:
     virtual LayoutRect getRect() const;
     IntRect getPixelSnappedRect() const { return pixelSnappedIntRect(getRect()); }
     LayoutRect renderRect(bool* isReplaced);
+    IntRect pixelSnappedRenderRect(bool* isReplaced) { return pixelSnappedIntRect(renderRect(isReplaced)); }
 
     // Returns true if the node has a non-empty bounding box in layout.
     // This does not 100% guarantee the user can see it, but is pretty close.
@@ -499,22 +507,34 @@ public:
 
     // -----------------------------------------------------------------------------
     // Notification of document structure changes (see ContainerNode.h for more notification methods)
-
-    // Notifies the node that it has been inserted into the document. This is called during document parsing, and also
-    // when a node is added through the DOM methods insertBefore(), appendChild() or replaceChild(). Note that this only
-    // happens when the node becomes part of the document tree, i.e. only when the document is actually an ancestor of
-    // the node. The call happens _after_ the node has been added to the tree.
     //
+    // At first, WebKit notifies the node that it has been inserted into the document. This is called during document parsing, and also
+    // when a node is added through the DOM methods insertBefore(), appendChild() or replaceChild(). The call happens _after_ the node has been added to the tree.
     // This is similar to the DOMNodeInsertedIntoDocument DOM event, but does not require the overhead of event
     // dispatching.
-    virtual void insertedIntoDocument();
-
-    // Notifies the node that it is no longer part of the document tree, i.e. when the document is no longer an ancestor
-    // node.
     //
-    // This is similar to the DOMNodeRemovedFromDocument DOM event, but does not require the overhead of event
+    // Webkit notifies this callback regardless if the subtree of the node is a document tree or a floating subtree.
+    // Implementation can determine the type of subtree by seeing insertionPoint->inDocument().
+    // For a performance reason, notifications are delivered only to ContainerNode subclasses if the insertionPoint is out of document.
+    //
+    // There are another callback named didNotifyDescendantInseretions(), which is called after all the descendant is notified.
+    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallDidNotifyDescendantInseretions
+    // from insrtedInto().
+    //
+    enum InsertionNotificationRequest {
+        InsertionDone,
+        InsertionShouldCallDidNotifyDescendantInseretions
+    };
+
+    virtual InsertionNotificationRequest insertedInto(Node* insertionPoint);
+    virtual void didNotifyDescendantInseretions(Node*) { }
+
+    // Notifies the node that it is no longer part of the tree.
+    //
+    // This is a dual of insertedInto(), and is similar to the DOMNodeRemovedFromDocument DOM event, but does not require the overhead of event
     // dispatching, and is called _after_ the node is removed from the tree.
-    virtual void removedFromDocument();
+    //
+    virtual void removedFrom(Node* insertionPoint);
 
 #ifndef NDEBUG
     virtual void formatForDebugger(char* buffer, unsigned length) const;
@@ -608,7 +628,7 @@ public:
 #endif
 
 #if ENABLE(MUTATION_OBSERVERS)
-    void getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>&, WebKitMutationObserver::MutationType, const AtomicString& attributeName = nullAtom);
+    void getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>&, WebKitMutationObserver::MutationType, const QualifiedName* attributeName);
     MutationObserverRegistration* registerMutationObserver(PassRefPtr<WebKitMutationObserver>);
     void unregisterMutationObserver(MutationObserverRegistration*);
     void registerTransientMutationObserver(MutationObserverRegistration*);
@@ -626,48 +646,48 @@ public:
 private:
     enum NodeFlags {
         IsTextFlag = 1,
-        IsCommentFlag = 1 << 1,
-        IsContainerFlag = 1 << 2,
-        IsElementFlag = 1 << 3,
-        IsStyledElementFlag = 1 << 4,
-        IsHTMLFlag = 1 << 5,
-        IsSVGFlag = 1 << 6,
-        IsAttachedFlag = 1 << 7,
-        ChildNeedsStyleRecalcFlag = 1 << 8,
-        InDocumentFlag = 1 << 9,
-        IsLinkFlag = 1 << 10,
-        IsActiveFlag = 1 << 11,
-        IsHoveredFlag = 1 << 12,
-        InActiveChainFlag = 1 << 13,
-        InDetachFlag = 1 << 14,
-        HasRareDataFlag = 1 << 15,
-        IsShadowRootFlag = 1 << 16,
+        IsContainerFlag = 1 << 1,
+        IsElementFlag = 1 << 2,
+        IsStyledElementFlag = 1 << 3,
+        IsHTMLFlag = 1 << 4,
+        IsSVGFlag = 1 << 5,
+        IsAttachedFlag = 1 << 6,
+        ChildNeedsStyleRecalcFlag = 1 << 7,
+        InDocumentFlag = 1 << 8,
+        IsLinkFlag = 1 << 9,
+        IsActiveFlag = 1 << 10,
+        IsHoveredFlag = 1 << 11,
+        InActiveChainFlag = 1 << 12,
+        InDetachFlag = 1 << 13,
+        HasRareDataFlag = 1 << 14,
+        IsShadowRootFlag = 1 << 15,
 
         // These bits are used by derived classes, pulled up here so they can
         // be stored in the same memory word as the Node bits above.
-        IsParsingChildrenFinishedFlag = 1 << 17, // Element
-        IsStyleAttributeValidFlag = 1 << 18, // StyledElement
+        IsParsingChildrenFinishedFlag = 1 << 16, // Element
+        IsStyleAttributeValidFlag = 1 << 17, // StyledElement
 #if ENABLE(SVG)
-        AreSVGAttributesValidFlag = 1 << 19, // Element
-        IsSynchronizingSVGAttributesFlag = 1 << 20, // SVGElement
-        HasSVGRareDataFlag = 1 << 21, // SVGElement
+        AreSVGAttributesValidFlag = 1 << 18, // Element
+        IsSynchronizingSVGAttributesFlag = 1 << 19, // SVGElement
+        HasSVGRareDataFlag = 1 << 20, // SVGElement
 #endif
 
         StyleChangeMask = 1 << nodeStyleChangeShift | 1 << (nodeStyleChangeShift + 1),
 
-        SelfOrAncestorHasDirAutoFlag = 1 << 24,
-        HasCustomWillOrDidRecalcStyleFlag = 1 << 25,
-        HasCustomStyleForRendererFlag = 1 << 26,
+        SelfOrAncestorHasDirAutoFlag = 1 << 23,
+        HasCustomWillOrDidRecalcStyleFlag = 1 << 24,
+        HasCustomStyleForRendererFlag = 1 << 25,
 
-        HasNameFlag = 1 << 27,
+        HasNameFlag = 1 << 26,
 
-        AttributeStyleDirtyFlag = 1 << 28,
+        AttributeStyleDirtyFlag = 1 << 27,
 
 #if ENABLE(SVG)
-        DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag | AreSVGAttributesValidFlag
+        DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag | AreSVGAttributesValidFlag,
 #else
-        DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag
+        DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag,
 #endif
+        InNamedFlowFlag = 1 << 29
     };
 
     // 3 bits remaining
@@ -681,7 +701,6 @@ protected:
     enum ConstructionType { 
         CreateOther = DefaultNodeFlags,
         CreateText = DefaultNodeFlags | IsTextFlag,
-        CreateComment = DefaultNodeFlags | IsCommentFlag,
         CreateContainer = DefaultNodeFlags | IsContainerFlag, 
         CreateElement = CreateContainer | IsElementFlag, 
         CreateShadowRoot = CreateContainer | IsShadowRootFlag,
@@ -751,7 +770,7 @@ private:
 #if ENABLE(MUTATION_OBSERVERS)
     Vector<OwnPtr<MutationObserverRegistration> >* mutationObserverRegistry();
     HashSet<MutationObserverRegistration*>* transientMutationObserverRegistry();
-    void collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>&, Node* fromNode, WebKitMutationObserver::MutationType, const AtomicString& attributeName);
+    void collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>&, Node* fromNode, WebKitMutationObserver::MutationType, const QualifiedName* attributeName);
 #endif
 
     mutable uint32_t m_nodeFlags;

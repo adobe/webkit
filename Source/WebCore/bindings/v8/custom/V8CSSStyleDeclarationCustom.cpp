@@ -85,7 +85,7 @@ static bool hasCSSPropertyNamePrefix(const String& propertyName, const char* pre
 
 class CSSPropertyInfo {
 public:
-    int propID;
+    CSSPropertyID propID;
     bool hadPixelOrPosPrefix;
 };
 
@@ -126,8 +126,11 @@ static CSSPropertyInfo* cssPropertyInfo(v8::Handle<v8::String>v8PropertyName)
             i += 3;
             hadPixelOrPosPrefix = true;
         } else if (hasCSSPropertyNamePrefix(propertyName, "webkit")
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
                 || hasCSSPropertyNamePrefix(propertyName, "khtml")
-                || hasCSSPropertyNamePrefix(propertyName, "apple"))
+                || hasCSSPropertyNamePrefix(propertyName, "apple")
+#endif
+                  )
             builder.append('-');
         else if (isASCIIUpper(propertyName[0]))
             return 0;
@@ -143,7 +146,7 @@ static CSSPropertyInfo* cssPropertyInfo(v8::Handle<v8::String>v8PropertyName)
         }
 
         String propName = builder.toString();
-        int propertyID = cssPropertyID(propName);
+        CSSPropertyID propertyID = cssPropertyID(propName);
         if (propertyID) {
             propInfo = new CSSPropertyInfo();
             propInfo->hadPixelOrPosPrefix = hadPixelOrPosPrefix;

@@ -24,8 +24,8 @@
 #include "LayerCompositingThread.h"
 #include "LayerRenderer.h"
 
+#include <BlackBerryPlatformAnimation.h>
 #include <BlackBerryPlatformGLES2Context.h>
-#include <BlackBerryPlatformTimer.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -41,7 +41,7 @@ class WebPageCompositorClient;
 class WebPagePrivate;
 
 // This class may only be used on the compositing thread. So it does not need to be threadsaferefcounted.
-class WebPageCompositorPrivate : public RefCounted<WebPageCompositorPrivate> {
+class WebPageCompositorPrivate : public RefCounted<WebPageCompositorPrivate>, public Platform::AnimationFrameRateClient {
 public:
     static PassRefPtr<WebPageCompositorPrivate> create(WebPagePrivate* page, WebPageCompositorClient* client)
     {
@@ -55,6 +55,7 @@ public:
     Platform::Graphics::GLES2Context* context() const { return m_context; }
     void setContext(Platform::Graphics::GLES2Context*);
 
+    WebCore::LayerCompositingThread* rootLayer() const { return m_rootLayer.get(); }
     void setRootLayer(WebCore::LayerCompositingThread*);
 
     void commit(WebCore::LayerWebKitThread* rootLayerProxy);
@@ -62,7 +63,11 @@ public:
     // This is mapped from the public API, thus takes transformed contents
     void render(const WebCore::IntRect& dstRect, const WebCore::IntRect& transformedContents);
 
-    // Render everything but the root layer
+    // Returns true if the WebPageCompositor draws the root layer, false if the BackingStore draws the root layer
+    bool drawsRootLayer() const;
+    void setDrawsRootLayer(bool drawsRootLayer) { m_drawsRootLayer = drawsRootLayer; }
+
+    // Render everything but the root layer, or everything if drawsRootLayer() is true.
     bool drawLayers(const WebCore::IntRect& dstRect, const WebCore::FloatRect& contents);
 
     WebCore::IntRect layoutRectForCompositing() const { return m_layoutRectForCompositing; }
@@ -74,8 +79,6 @@ public:
     WebCore::LayerRenderingResults lastCompositingResults() const { return m_lastCompositingResults; }
     void setLastCompositingResults(const WebCore::LayerRenderingResults& results) { m_lastCompositingResults = results; }
 
-    double animationFrameTimestamp() const { return m_pendingAnimationFrame; }
-
     void releaseLayerResources();
 
     WebPagePrivate* page() const { return m_webPage; }
@@ -86,7 +89,7 @@ protected:
     WebPageCompositorPrivate(WebPagePrivate*, WebPageCompositorClient*);
 
 private:
-    void animationTimerFired();
+    void animationFrameChanged();
 
     WebPageCompositorClient* m_client;
     WebPagePrivate* m_webPage;
@@ -96,9 +99,7 @@ private:
     WebCore::IntRect m_layoutRectForCompositing;
     WebCore::IntSize m_contentsSizeForCompositing;
     WebCore::LayerRenderingResults m_lastCompositingResults;
-    BlackBerry::Platform::Timer<WebPageCompositorPrivate> m_animationTimer;
-    BlackBerry::Platform::TimerClient* m_timerClient;
-    double m_pendingAnimationFrame;
+    bool m_drawsRootLayer;
 };
 
 } // namespace WebKit

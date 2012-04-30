@@ -27,6 +27,8 @@
 #ifndef ImageSource_h
 #define ImageSource_h
 
+#include "ImageOrientation.h"
+
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
@@ -44,8 +46,7 @@ QT_BEGIN_NAMESPACE
 class QPixmap;
 QT_END_NAMESPACE
 #elif USE(CAIRO)
-struct _cairo_surface;
-typedef struct _cairo_surface cairo_surface_t;
+#include "NativeImageCairo.h"
 #elif USE(SKIA)
 namespace WebCore {
 class NativeImageSkia;
@@ -56,6 +57,7 @@ class NativeImageSkia;
 
 namespace WebCore {
 
+class ImageOrientation;
 class IntPoint;
 class IntSize;
 class SharedBuffer;
@@ -87,7 +89,7 @@ typedef wxGraphicsBitmap* NativeImagePtr;
 typedef wxBitmap* NativeImagePtr;
 #endif
 #elif USE(CAIRO)
-typedef cairo_surface_t* NativeImagePtr;
+typedef WebCore::NativeImageCairo* NativeImagePtr;
 #elif USE(SKIA)
 typedef WebCore::NativeImageSkia* NativeImagePtr;
 #elif OS(WINCE)
@@ -131,9 +133,9 @@ public:
     };
 
 #if USE(CG)
-    enum ShouldSkipMetaData {
-        DoNotSkipMetaData,
-        SkipMetaData
+    enum ShouldSkipMetadata {
+        DoNotSkipMetadata,
+        SkipMetadata
     };
 #endif
 
@@ -172,8 +174,9 @@ public:
     String filenameExtension() const;
 
     bool isSizeAvailable();
-    IntSize size() const;
-    IntSize frameSizeAtIndex(size_t) const;
+    IntSize size(RespectImageOrientationEnum = DoNotRespectImageOrientation) const;
+    IntSize frameSizeAtIndex(size_t, RespectImageOrientationEnum = DoNotRespectImageOrientation) const;
+
     bool getHotSpot(IntPoint&) const;
 
     size_t bytesDecodedToDetermineProperties() const;
@@ -189,6 +192,7 @@ public:
     float frameDurationAtIndex(size_t);
     bool frameHasAlphaAtIndex(size_t); // Whether or not the frame actually used any alpha.
     bool frameIsCompleteAtIndex(size_t); // Whether or not the frame is completely decoded.
+    ImageOrientation orientationAtIndex(size_t) const; // EXIF image orientation
 
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     static unsigned maxPixelsPerDecodedImage() { return s_maxPixelsPerDecodedImage; }

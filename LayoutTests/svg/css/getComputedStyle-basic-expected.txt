@@ -282,6 +282,8 @@ rect: style.getPropertyValue(-webkit-column-span) : 1
 rect: style.getPropertyCSSValue(-webkit-column-span) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-column-width) : auto
 rect: style.getPropertyCSSValue(-webkit-column-width) : [object CSSPrimitiveValue]
+rect: style.getPropertyValue(-webkit-flex) : 0 0 auto
+rect: style.getPropertyCSSValue(-webkit-flex) : [object CSSValueList]
 rect: style.getPropertyValue(-webkit-flex-order) : 0
 rect: style.getPropertyCSSValue(-webkit-flex-order) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-flex-pack) : start
@@ -384,6 +386,10 @@ rect: style.getPropertyValue(-webkit-print-color-adjust) : economy
 rect: style.getPropertyCSSValue(-webkit-print-color-adjust) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-rtl-ordering) : logical
 rect: style.getPropertyCSSValue(-webkit-rtl-ordering) : [object CSSPrimitiveValue]
+rect: style.getPropertyValue(-webkit-shape-inside) : auto
+rect: style.getPropertyCSSValue(-webkit-shape-inside) : [object CSSPrimitiveValue]
+rect: style.getPropertyValue(-webkit-shape-outside) : auto
+rect: style.getPropertyCSSValue(-webkit-shape-outside) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-text-combine) : none
 rect: style.getPropertyCSSValue(-webkit-text-combine) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-text-decorations-in-effect) : none
@@ -804,6 +810,8 @@ g: style.getPropertyValue(-webkit-column-span) : 1
 g: style.getPropertyCSSValue(-webkit-column-span) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-column-width) : auto
 g: style.getPropertyCSSValue(-webkit-column-width) : [object CSSPrimitiveValue]
+g: style.getPropertyValue(-webkit-flex) : 0 0 auto
+g: style.getPropertyCSSValue(-webkit-flex) : [object CSSValueList]
 g: style.getPropertyValue(-webkit-flex-order) : 0
 g: style.getPropertyCSSValue(-webkit-flex-order) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-flex-pack) : start
@@ -906,6 +914,10 @@ g: style.getPropertyValue(-webkit-print-color-adjust) : economy
 g: style.getPropertyCSSValue(-webkit-print-color-adjust) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-rtl-ordering) : logical
 g: style.getPropertyCSSValue(-webkit-rtl-ordering) : [object CSSPrimitiveValue]
+g: style.getPropertyValue(-webkit-shape-inside) : auto
+g: style.getPropertyCSSValue(-webkit-shape-inside) : [object CSSPrimitiveValue]
+g: style.getPropertyValue(-webkit-shape-outside) : auto
+g: style.getPropertyCSSValue(-webkit-shape-outside) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-text-combine) : none
 g: style.getPropertyCSSValue(-webkit-text-combine) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-text-decorations-in-effect) : none

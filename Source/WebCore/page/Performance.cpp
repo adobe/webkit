@@ -31,9 +31,12 @@
 #include "config.h"
 #include "Performance.h"
 
+#include "Document.h"
+#include "DocumentLoader.h"
 #include "MemoryInfo.h"
 #include "PerformanceNavigation.h"
 #include "PerformanceTiming.h"
+#include <wtf/CurrentTime.h>
 
 #if ENABLE(WEB_TIMING)
 
@@ -65,6 +68,33 @@ PerformanceTiming* Performance::timing() const
         m_timing = PerformanceTiming::create(m_frame);
 
     return m_timing.get();
+}
+
+#if ENABLE(PERFORMANCE_TIMELINE)
+
+PassRefPtr<PerformanceEntryList> Performance::webkitGetEntries() const
+{
+    RefPtr<PerformanceEntryList> entries = PerformanceEntryList::create();
+    return entries;
+}
+
+PassRefPtr<PerformanceEntryList> Performance::webkitGetEntriesByType(const String&)
+{
+    RefPtr<PerformanceEntryList> entries = PerformanceEntryList::create();
+    return entries;
+}
+
+PassRefPtr<PerformanceEntryList> Performance::webkitGetEntriesByName(const String&, const String&)
+{
+    RefPtr<PerformanceEntryList> entries = PerformanceEntryList::create();
+    return entries;
+}
+
+#endif // ENABLE(PERFORMANCE_TIMELINE)
+
+double Performance::webkitNow() const
+{
+    return 1000.0 * m_frame->document()->loader()->timing()->convertMonotonicTimeToZeroBasedDocumentTime(monotonicallyIncreasingTime());
 }
 
 } // namespace WebCore

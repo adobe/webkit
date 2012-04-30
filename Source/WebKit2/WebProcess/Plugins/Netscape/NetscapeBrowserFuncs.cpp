@@ -417,9 +417,6 @@ static const unsigned WKNVAllowedToEnterSandbox = 74658;
 
 // WKNVSandboxFunctions = 74659 is defined in NetscapeSandboxFunctions.h
 
-// The Core Animation render server port.
-static const unsigned WKNVCALayerRenderServerPort = 71879;
-
 #endif
 
 static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
@@ -551,23 +548,9 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
            break;
 
        case NPNVToolkit: {
-#if PLATFORM(GTK)
-           *reinterpret_cast<uint32_t*>(value) = 2;
-#else
-           const uint32_t expectedGTKToolKitVersion = 2;
-
-           // Set the expected GTK version if we know that this plugin needs it or if the plugin call us
-           // with a null instance. The latter is the case with NSPluginWrapper plugins.
-           bool requiresGTKToolKitVersion;
-           if (!npp)
-               requiresGTKToolKitVersion = true;
-           else {
-               RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-               requiresGTKToolKitVersion = plugin->quirks().contains(PluginQuirks::RequiresGTKToolKit);
-           }
-
-           *reinterpret_cast<uint32_t*>(value) = requiresGTKToolKitVersion ? expectedGTKToolKitVersion : 0;
-#endif
+           // Gtk based plugins need to be assured about the toolkit version.
+           const uint32_t expectedGtkToolKitVersion = 2;
+           *reinterpret_cast<uint32_t*>(value) = expectedGtkToolKitVersion;
            break;
        }
 

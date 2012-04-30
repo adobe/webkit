@@ -67,7 +67,7 @@ public:
     String clientLocation() const;
 
     CString clientHandshakeMessage() const;
-    WebSocketHandshakeRequest clientHandshakeRequest() const;
+    PassRefPtr<WebSocketHandshakeRequest> clientHandshakeRequest() const;
 
     void reset();
     void clearScriptExecutionContext();
@@ -89,6 +89,8 @@ public:
     const WebSocketHandshakeResponse& serverHandshakeResponse() const;
 
     void addExtensionProcessor(PassOwnPtr<WebSocketExtensionProcessor>);
+
+    static String getExpectedWebSocketAccept(const String& secWebSocketKey);
 
 private:
     KURL httpURLForAuthenticationAndCookies() const;

@@ -107,6 +107,7 @@ editing/selection/user-drag-element-and-user-select-none.html
 editing/selection/word-granularity.html
 editing/spelling/context-menu-suggestions.html
 editing/spelling/spellcheck-paste.html
+editing/spelling/spellcheck-paste-disabled.html
 editing/undo/undo-smart-delete-reversed-selection.html
 fast/block/positioning/hittest-on-relative-positioned-children.html
 fast/css/user-drag-none.html
@@ -217,10 +218,6 @@ fast/events/pageshow-pagehide-on-back-cached.html
 # https://bugs.webkit.org/show_bug.cgi?id=81613
 http/tests/loading/progress-finished-callback.html
 
-# [WK2] http/tests/navigation/anchor-frames-gbk.html fails
-# https://bugs.webkit.org/show_bug.cgi?id=76896
-http/tests/navigation/anchor-frames-gbk.html
-
 # [WK2] http/tests/navigation/https-in-page-cache.html times out on mac-wk2
 # https://bugs.webkit.org/show_bug.cgi?id=81622
 http/tests/navigation/https-in-page-cache.html
@@ -240,22 +237,20 @@ http/tests/xmlhttprequest/basic-auth.html
 http/tests/xmlhttprequest/re-login-async.html
 http/tests/xmlhttprequest/workers/abort-exception-assert.html
 
-# [WK2] fast/dom/Window/timer-resume-on-navigation-back.html times out
-# https://bugs.webkit.org/show_bug.cgi?id=81637
-fast/dom/Window/timer-resume-on-navigation-back.html
-
 # fast/events/drag-link.html is failing in Mac WebKit2
 # https://bugs.webkit.org/show_bug.cgi?id=81833
 fast/events/drag-link.html
-
-# fast/events/suspend-timers.html is failing in Mac WebKit2, even though LayoutTestController.overridePreference is implemented in WebKitTestRunner
-# https://bugs.webkit.org/show_bug.cgi?id=81945
-fast/events/suspend-timers.html
 
 # appcache tests often fail on the Mac WebKit2 bot
 # https://bugs.webkit.org/show_bug.cgi?id=82061 rdar://problem/11108649
 http/tests/appcache
 http/tests/inspector/appcache
+
+# flaky storage tests
+# https://bugs.webkit.org/show_bug.cgi?id=82679
+storage/statement-success-callback-isolated-world.html
+storage/transaction-callback-isolated-world.html
+storage/transaction-error-callback-isolated-world.html
 
 ### END OF (1) Classified failures with bug reports
 ########################################
@@ -308,14 +303,6 @@ fast/canvas/webgl/texture-color-profile.html
 # All tests that crashed more than once on the Lion WebKit2 bots between r111865 and r111885
 accessibility/adjacent-continuations-cause-assertion-failure.html
 accessibility/contenteditable-hidden-div.html
-compositing/absolute-position-changed-in-composited-layer.html
-compositing/animation/animation-compositing.html
-compositing/culling/clear-fixed-iframe.html
-compositing/framesets/composited-frame-alignment.html
-compositing/iframes/become-composited-nested-iframes.html
-compositing/overflow/overflow-positioning.html
-compositing/self-painting-layers.html
-compositing/video/video-poster.html
 css3/filters/custom/effect-custom-combined-missing.html
 fast/workers/empty-worker-nocrash.html
 svg/custom/font-face-name-without-name-attr.svg
@@ -341,6 +328,10 @@ http/tests/media/video-error-abort.html
 platform/mac/accessibility/attributed-string-includes-misspelled-with-selection.html
 svg/transforms/change-transform-origin-css.xhtml
 
+# Intermittent crashes
+# https://bugs.webkit.org/show_bug.cgi?id=82939
+sputnik/Unicode/Unicode_218/S7.6_A2.4.html
+sputnik/Unicode/Unicode_218/S7.6_A5.2_T1.html
 
 ### END OF (3) Unclassified failures
 ########################################

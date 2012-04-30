@@ -57,6 +57,7 @@ TileCache::TileCache(WebTileCacheLayer* tileCacheLayer, const IntSize& tileSize)
     , m_scale(1)
     , m_deviceScaleFactor(1)
     , m_isInWindow(true)
+    , m_canHaveScrollbars(true)
     , m_acceleratesDrawing(false)
     , m_tileDebugBorderWidth(0)
 {
@@ -242,6 +243,15 @@ void TileCache::setIsInWindow(bool isInWindow)
     }
 }
 
+void TileCache::setCanHaveScrollbars(bool canHaveScrollbars)
+{
+    if (m_canHaveScrollbars == canHaveScrollbars)
+        return;
+
+    m_canHaveScrollbars = canHaveScrollbars;
+    scheduleTileRevalidation(0);
+}
+
 void TileCache::setTileDebugBorderWidth(float borderWidth)
 {
     if (m_tileDebugBorderWidth == borderWidth)
@@ -364,7 +374,7 @@ void TileCache::revalidateTiles()
             TileIndex tileIndex(x, y);
 
             IntRect tileRect = rectForTileIndex(tileIndex);
-            RetainPtr<WebTileLayer>& tileLayer = m_tiles.add(tileIndex, 0).first->second;
+            RetainPtr<WebTileLayer>& tileLayer = m_tiles.add(tileIndex, 0).iterator->second;
             if (!tileLayer) {
                 tileLayer = createTileLayer(tileRect);
                 [m_tileContainerLayer.get() addSublayer:tileLayer.get()];

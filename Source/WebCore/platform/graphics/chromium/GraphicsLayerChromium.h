@@ -102,7 +102,7 @@ public:
     virtual bool addAnimation(const KeyframeValueList&, const IntSize& boxSize, const Animation*, const String&, double timeOffset);
     virtual void pauseAnimation(const String& animationName, double timeOffset);
     virtual void removeAnimation(const String& animationName);
-    virtual void suspendAnimations(double time);
+    virtual void suspendAnimations(double wallClockTime);
     virtual void resumeAnimations();
 
     virtual PlatformLayer* platformLayer() const;
@@ -113,14 +113,18 @@ public:
 
     // ContentLayerDelegate implementation.
     virtual void paintContents(GraphicsContext&, const IntRect& clip);
+    virtual void didScroll(const IntSize&) OVERRIDE { }
 
     // CCLayerAnimationDelegate implementation.
     virtual void notifyAnimationStarted(double startTime);
+    virtual void notifyAnimationFinished(double finishTime);
 
     // Exposed for tests.
     LayerChromium* contentsLayer() const { return m_contentsLayer.get(); }
 
 private:
+    virtual void willBeDestroyed();
+
     typedef HashMap<String, int> AnimationIdMap;
 
     LayerChromium* primaryLayer() const  { return m_transformLayer.get() ? m_transformLayer.get() : m_layer.get(); }

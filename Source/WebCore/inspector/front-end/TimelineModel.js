@@ -35,6 +35,8 @@
 WebInspector.TimelineModel = function()
 {
     this._records = [];
+    this._minimumRecordTime = -1;
+    this._maximumRecordTime = -1;
     this._collectionEnabled = false;
 
     WebInspector.timelineManager.addEventListener(WebInspector.TimelineManager.EventTypes.TimelineEventRecorded, this._onRecordAdded, this);
@@ -83,6 +85,38 @@ WebInspector.TimelineModel.Events = {
     RecordsCleared: "RecordsCleared"
 }
 
+WebInspector.TimelineModel.startTimeInSeconds = function(record)
+{
+    return record.startTime / 1000;
+}
+
+WebInspector.TimelineModel.endTimeInSeconds = function(record)
+{
+    return (typeof record.endTime === "undefined" ? record.startTime : record.endTime) / 1000;
+}
+
+WebInspector.TimelineModel.durationInSeconds = function(record)
+{
+    return WebInspector.TimelineModel.endTimeInSeconds(record) - WebInspector.TimelineModel.startTimeInSeconds(record);
+}
+
+/**
+ * @param {Object} total
+ * @param {Object} rawRecord
+ */
+WebInspector.TimelineModel.aggregateTimeForRecord = function(total, rawRecord)
+{
+    var childrenTime = 0;
+    var children = rawRecord["children"] || [];
+    for (var i = 0; i < children.length; ++i)  {
+        WebInspector.TimelineModel.aggregateTimeForRecord(total, children[i]);
+        childrenTime += WebInspector.TimelineModel.durationInSeconds(children[i]);
+    }
+    var categoryName = WebInspector.TimelinePresentationModel.recordStyle(rawRecord).category.name;
+    var ownTime = WebInspector.TimelineModel.durationInSeconds(rawRecord) - childrenTime;
+    total[categoryName] = (total[categoryName] || 0) + ownTime;
+}
+
 WebInspector.TimelineModel.prototype = {
     startRecord: function()
     {
@@ -115,6 +149,7 @@ WebInspector.TimelineModel.prototype = {
     _addRecord: function(record)
     {
         this._records.push(record);
+        this._updateBoundaries(record);
         this.dispatchEventToListeners(WebInspector.TimelineModel.Events.RecordAdded, record);
     },
 
@@ -167,14 +202,45 @@ WebInspector.TimelineModel.prototype = {
         records[records.length - 1] = records[records.length - 1] + "]";
 
         var now = new Date();
-        var suggestedFileName = "TimelineRawData-" + now.toISO8601Compact() + ".json";
-        InspectorFrontendHost.saveAs(suggestedFileName, records.join(",\n"));
+        var fileName = "TimelineRawData-" + now.toISO8601Compact() + ".json";
+        WebInspector.save(fileName, records.join(",\n"), true);
     },
 
     reset: function()
     {
         this._records = [];
+        this._minimumRecordTime = -1;
+        this._maximumRecordTime = -1;
         this.dispatchEventToListeners(WebInspector.TimelineModel.Events.RecordsCleared);
+    },
+
+    minimumRecordTime: function()
+    {
+        return this._minimumRecordTime;
+    },
+
+    maximumRecordTime: function()
+    {
+        return this._maximumRecordTime;
+    },
+
+    _updateBoundaries: function(record)
+    {
+        var startTime = WebInspector.TimelineModel.startTimeInSeconds(record);
+        var endTime = WebInspector.TimelineModel.endTimeInSeconds(record);
+
+        if (this._minimumRecordTime === -1 || startTime < this._minimumRecordTime)
+            this._minimumRecordTime = startTime;
+        if (this._maximumRecordTime === -1 || endTime > this._maximumRecordTime)
+            this._maximumRecordTime = endTime;
+    },
+
+    /**
+     * @param {Object} rawRecord
+     */
+    recordOffsetInSeconds: function(rawRecord)
+    {
+        return WebInspector.TimelineModel.startTimeInSeconds(rawRecord) - this._minimumRecordTime;
     }
 }
 

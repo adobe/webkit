@@ -58,6 +58,7 @@ MediaControlRootElementChromium::MediaControlRootElementChromium(Document* docum
     , m_panel(0)
 #if ENABLE(VIDEO_TRACK)
     , m_textDisplayContainer(0)
+    , m_textTrackDisplay(0)
 #endif
     , m_opaque(true)
     , m_isMouseOverControls(false)
@@ -105,11 +106,7 @@ PassRefPtr<MediaControlRootElementChromium> MediaControlRootElementChromium::cre
     if (ec)
         return 0;
 
-    RefPtr<MediaControlPanelMuteButtonElement> panelMuteButton = MediaControlPanelMuteButtonElement::create(document, controls.get());
-    controls->m_panelMuteButton = panelMuteButton.get();
-    panel->appendChild(panelMuteButton.release(), ec, true);
-    if (ec)
-        return 0;
+    RefPtr<HTMLDivElement> panelVolumeControlContainer = HTMLDivElement::create(document);
 
     RefPtr<MediaControlVolumeSliderContainerElement> volumeSliderContainer = MediaControlVolumeSliderContainerElement::create(document);
 
@@ -120,7 +117,17 @@ PassRefPtr<MediaControlRootElementChromium> MediaControlRootElementChromium::cre
         return 0;
 
     controls->m_volumeSliderContainer = volumeSliderContainer.get();
-    panel->appendChild(volumeSliderContainer.release(), ec, true);
+    panelVolumeControlContainer->appendChild(volumeSliderContainer.release(), ec, true);
+    if (ec)
+        return 0;
+
+    RefPtr<MediaControlPanelMuteButtonElement> panelMuteButton = MediaControlPanelMuteButtonElement::create(document, controls.get());
+    controls->m_panelMuteButton = panelMuteButton.get();
+    panelVolumeControlContainer->appendChild(panelMuteButton.release(), ec, true);
+    if (ec)
+        return 0;
+
+    panel->appendChild(panelVolumeControlContainer, ec, true);
     if (ec)
         return 0;
 
@@ -163,11 +170,13 @@ void MediaControlRootElementChromium::setMediaController(MediaControllerInterfac
 
 void MediaControlRootElementChromium::show()
 {
+    m_panel->setIsDisplayed(true);
     m_panel->show();
 }
 
 void MediaControlRootElementChromium::hide()
 {
+    m_panel->setIsDisplayed(false);
     m_panel->hide();
 }
 

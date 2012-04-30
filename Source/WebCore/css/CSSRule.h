@@ -69,15 +69,6 @@ public:
     bool isRegionRule() const { return type() == WEBKIT_REGION_RULE; }
     bool isImportRule() const { return type() == IMPORT_RULE; }
 
-    bool useStrictParsing() const
-    {
-        if (parentRule())
-            return parentRule()->useStrictParsing();
-        if (parentStyleSheet())
-            return parentStyleSheet()->useStrictParsing();
-        return true;
-    }
-
     void setParentStyleSheet(CSSStyleSheet* styleSheet)
     {
         m_parentIsRule = false;
@@ -102,13 +93,6 @@ public:
     String cssText() const;
     void setCssText(const String&, ExceptionCode&);
 
-    KURL baseURL() const
-    {
-        if (CSSStyleSheet* parentSheet = parentStyleSheet())
-            return parentSheet->baseURL();
-        return KURL();
-    }
-
 protected:
     CSSRule(CSSStyleSheet* parent, Type type)
         : m_hasCachedSelectorText(false)
@@ -125,6 +109,12 @@ protected:
 
     bool hasCachedSelectorText() const { return m_hasCachedSelectorText; }
     void setHasCachedSelectorText(bool hasCachedSelectorText) const { m_hasCachedSelectorText = hasCachedSelectorText; }
+
+    const CSSParserContext& parserContext() const 
+    {
+        CSSStyleSheet* styleSheet = parentStyleSheet();
+        return styleSheet ? styleSheet->internal()->parserContext() : strictCSSParserContext();
+    }
 
 private:
     mutable unsigned m_hasCachedSelectorText : 1;

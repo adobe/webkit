@@ -130,9 +130,9 @@ struct PropertyAccessRecord {
     enum RegisterMode { RegistersFlushed, RegistersInUse };
     
 #if USE(JSVALUE64)
-    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
+    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::PatchableJump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
 #elif USE(JSVALUE32_64)
-    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
+    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::PatchableJump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
 #endif
         : m_codeOrigin(codeOrigin)
         , m_deltaCheckImmToCall(deltaCheckImmToCall)
@@ -159,7 +159,7 @@ struct PropertyAccessRecord {
     CodeOrigin m_codeOrigin;
     MacroAssembler::DataLabelPtr m_deltaCheckImmToCall;
     MacroAssembler::Call m_functionCall;
-    MacroAssembler::Jump m_deltaCallToStructCheck;
+    MacroAssembler::PatchableJump m_deltaCallToStructCheck;
 #if USE(JSVALUE64)
     MacroAssembler::DataLabelCompact m_deltaCallToLoadOrStore;
 #elif USE(JSVALUE32_64)
@@ -199,12 +199,6 @@ public:
 
     // Accessors for properties.
     Graph& graph() { return m_graph; }
-    
-    // Just get a token for beginning a call.
-    CallBeginToken beginJSCall()
-    {
-        return CallBeginToken(m_currentCodeOriginIndex++);
-    }
     
     // Get a token for beginning a call, and set the current code origin index in
     // the call frame.

@@ -64,8 +64,8 @@ public:
     virtual bool addAnimation(const KeyframeValueList&, const IntSize& boxSize, const Animation*, int animationId, int groupId, double timeOffset);
     virtual void pauseAnimation(int animationId, double timeOffset);
     virtual void removeAnimation(int animationId);
-    virtual void suspendAnimations(double time);
-    virtual void resumeAnimations();
+    virtual void suspendAnimations(double monotonicTime);
+    virtual void resumeAnimations(double monotonicTime);
 
     // Ensures that the list of active animations on the main thread and the impl thread
     // are kept in sync. This function does not take ownership of the impl thread controller.
@@ -77,7 +77,7 @@ public:
 
     // Returns the active animation in the given group, animating the given property if such an
     // animation exists.
-    CCActiveAnimation* getActiveAnimation(int groupId, CCActiveAnimation::TargetProperty);
+    CCActiveAnimation* getActiveAnimation(int groupId, CCActiveAnimation::TargetProperty) const;
 
     // Returns true if there are any animations that have neither finished nor aborted.
     bool hasActiveAnimation() const;
@@ -88,7 +88,7 @@ public:
 
     // This is called in response to an animation being started on the impl thread. This
     // function updates the corresponding main thread animation's start time.
-    void notifyAnimationStarted(const CCAnimationStartedEvent&);
+    void notifyAnimationStarted(const CCAnimationEvent&);
 
 protected:
     explicit CCLayerAnimationController(CCLayerAnimationControllerClient*);
@@ -96,14 +96,15 @@ protected:
 private:
     typedef HashSet<int> TargetProperties;
 
-    void pushNewAnimationsToImplThread(CCLayerAnimationController*);
-    void removeAnimationsCompletedOnMainThread(CCLayerAnimationController*);
+    void pushNewAnimationsToImplThread(CCLayerAnimationController*) const;
+    void removeAnimationsCompletedOnMainThread(CCLayerAnimationController*) const;
+    void pushPropertiesToImplThread(CCLayerAnimationController*) const;
 
     void startAnimationsWaitingForNextTick(double monotonicTime, CCAnimationEventsVector*);
     void startAnimationsWaitingForStartTime(double monotonicTime, CCAnimationEventsVector*);
     void startAnimationsWaitingForTargetAvailability(double monotonicTime, CCAnimationEventsVector*);
     void resolveConflicts(double monotonicTime);
-    void purgeFinishedAnimations();
+    void purgeFinishedAnimations(double monotonicTime, CCAnimationEventsVector*);
 
     void tickAnimations(double monotonicTime);
 

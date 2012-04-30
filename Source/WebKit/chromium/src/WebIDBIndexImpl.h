@@ -45,15 +45,18 @@ public:
 
     virtual WebString name() const;
     virtual WebString storeName() const;
-    virtual WebString keyPath() const;
+    virtual WebIDBKeyPath keyPath() const;
+    // FIXME: Remove this method once callers are updated.
+    // http://webkit.org/b/84207
+    virtual WebString keyPathString() const;
     virtual bool unique() const;
     virtual bool multiEntry() const;
 
     virtual void openObjectCursor(const WebIDBKeyRange&, unsigned short direction, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&); 
     virtual void openKeyCursor(const WebIDBKeyRange&, unsigned short direction, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&);
     virtual void count(const WebIDBKeyRange&, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&);
-    virtual void getObject(const WebIDBKey&, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&);
-    virtual void getKey(const WebIDBKey&, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&);
+    virtual void getObject(const WebIDBKeyRange&, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&);
+    virtual void getKey(const WebIDBKeyRange&, WebIDBCallbacks*, const WebIDBTransaction&, WebExceptionCode&);
 
 private:
     WTF::RefPtr<WebCore::IDBIndexBackendInterface> m_backend;

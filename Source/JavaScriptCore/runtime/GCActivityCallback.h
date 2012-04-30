@@ -42,9 +42,10 @@ class Heap;
 
 class GCActivityCallback {
 public:
-    virtual ~GCActivityCallback() {}
-    virtual void operator()() {}
-    virtual void synchronize() {}
+    virtual ~GCActivityCallback() { }
+    virtual void didAllocate(size_t) { }
+    virtual void willCollect() { }
+    virtual void synchronize() { }
 
 protected:
     GCActivityCallback() {}
@@ -57,10 +58,11 @@ public:
     static PassOwnPtr<DefaultGCActivityCallback> create(Heap*);
 
     DefaultGCActivityCallback(Heap*);
-    ~DefaultGCActivityCallback();
+    virtual ~DefaultGCActivityCallback();
 
-    void operator()();
-    void synchronize();
+    virtual void didAllocate(size_t);
+    virtual void willCollect();
+    virtual void synchronize();
 
 #if USE(CF)
 protected:

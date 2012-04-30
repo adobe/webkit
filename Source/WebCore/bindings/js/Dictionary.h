@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,45 +27,81 @@
 #ifndef Dictionary_h
 #define Dictionary_h
 
-#include "SerializedScriptValue.h"
-#include <wtf/HashSet.h>
-#include <wtf/text/AtomicString.h>
+#include "JSDictionary.h"
+#include "JSEventListener.h"
+#include "NotImplemented.h"
+#include "ScriptValue.h"
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
+
+namespace JSC {
+class JSValue;
+}
 
 namespace WebCore {
+class EventListener;
 
-class DOMStringList;
-class DOMWindow;
-class IDBKeyRange;
-class ScriptValue;
-class Storage;
-class TrackBase;
-
-// FIXME: Implement.
 class Dictionary {
 public:
-    Dictionary() { }
+    Dictionary(JSC::ExecState*, JSC::JSValue);
 
-    bool isObject() const { return false; }
-    bool isUndefinedOrNull() const { return false; }
+    // Returns true if a value was found for the provided property.
+    template <typename Result>
+    bool get(const char* propertyName, Result&) const;
+    template <typename Result>
+    bool get(const String& propertyName, Result&) const;
+    
+    template <typename T>
+    PassRefPtr<EventListener> getEventListener(const char* propertyName, T* target) const;
+    template <typename T>
+    PassRefPtr<EventListener> getEventListener(const String& propertyName, T* target) const;
 
-    bool get(const String&, bool&) const { return false; }
-    bool get(const String&, int32_t&) const { return false; }
-    bool get(const String&, double&) const { return false; }
-    bool get(const String&, String&) const { return false; }
-    bool get(const String&, ScriptValue&) const { return false; }
-    bool get(const String&, unsigned short&) const { return false; }
-    bool get(const String&, unsigned&) const { return false; }
-    bool get(const String&, unsigned long long&) const { return false; }
-    bool get(const String&, RefPtr<DOMWindow>&) const { return false; }
-    bool get(const String&, RefPtr<Storage>&) const { return false; }
-    bool get(const String&, MessagePortArray&) const { return false; }
-#if ENABLE(VIDEO_TRACK)
-    bool get(const String&, RefPtr<TrackBase>&) const { return false; }
-#endif
-    bool get(const String&, HashSet<AtomicString>&) const { return false; }
+    bool isObject() const { return m_dictionary.isValid(); }
+    bool isUndefinedOrNull() const { return !m_dictionary.isValid(); }
+    bool getWithUndefinedOrNullCheck(const String&, String&) const { notImplemented(); return false; }
 
-    bool getWithUndefinedOrNullCheck(const String&, String&) const { return false; }
+private:
+    template <typename T>
+    JSC::JSObject* asJSObject(T*) const;
+    
+    JSDictionary m_dictionary;
 };
+
+template <typename Result>
+bool Dictionary::get(const char* propertyName, Result& result) const
+{
+    if (!m_dictionary.isValid())
+        return false;
+    
+    return m_dictionary.get(propertyName, result);
+}
+
+template <typename Result>
+bool Dictionary::get(const String& propertyName, Result& result) const
+{
+    return get(propertyName.utf8().data(), result);
+}
+
+template <typename T>
+PassRefPtr<EventListener> Dictionary::getEventListener(const char* propertyName, T* target) const
+{
+    if (!m_dictionary.isValid())
+        return 0;
+
+    ScriptValue eventListener;
+    if (!m_dictionary.tryGetProperty(propertyName, eventListener))
+        return 0;
+    if (eventListener.hasNoValue())
+        return 0;
+    
+    return JSEventListener::create(asObject(eventListener.jsValue()), asJSObject(target), true, currentWorld(m_dictionary.execState()));
+}
+
+template <typename T>
+PassRefPtr<EventListener> Dictionary::getEventListener(const String& propertyName, T* target) const
+{
+    return getEventListener(propertyName.utf8().data(), target);
+}
 
 }
 

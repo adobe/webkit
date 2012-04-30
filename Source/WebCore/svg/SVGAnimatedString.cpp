@@ -38,38 +38,52 @@ PassOwnPtr<SVGAnimatedType> SVGAnimatedStringAnimator::constructFromString(const
     return animatedType.release();
 }
 
-void SVGAnimatedStringAnimator::calculateFromAndToValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& toString)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedStringAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-
-    from = constructFromString(fromString);
-    to = constructFromString(toString);
+    return SVGAnimatedType::createString(constructFromBaseValue<SVGAnimatedString>(animatedTypes));
 }
 
-void SVGAnimatedStringAnimator::calculateFromAndByValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& byString)
+void SVGAnimatedStringAnimator::stopAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    
-    // Not specified what to do on 'by'-animations with string. Fallback to 'to'-animation right now. 
-    from = constructFromString(fromString);
-    to = constructFromString(byString);
+    stopAnimValAnimationForType<SVGAnimatedString>(animatedTypes);
 }
 
-void SVGAnimatedStringAnimator::calculateAnimatedValue(float percentage, unsigned,
-                                                       OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+void SVGAnimatedStringAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+{
+    resetFromBaseValue<SVGAnimatedString>(animatedTypes, type, &SVGAnimatedType::string);
+}
+
+void SVGAnimatedStringAnimator::animValWillChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValWillChangeForType<SVGAnimatedString>(animatedTypes);
+}
+
+void SVGAnimatedStringAnimator::animValDidChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValDidChangeForType<SVGAnimatedString>(animatedTypes);
+}
+
+void SVGAnimatedStringAnimator::addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*)
+{
+    ASSERT_NOT_REACHED();
+}
+
+static String parseStringFromString(SVGAnimationElement*, const String& string)
+{
+    return string;
+}
+
+void SVGAnimatedStringAnimator::calculateAnimatedValue(float percentage, unsigned, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
 {
     ASSERT(m_animationElement);
     ASSERT(m_contextElement);
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    
-    AnimationMode animationMode = animationElement->animationMode();
-    String& animateString = animated->string();
-    if ((animationMode == FromToAnimation && percentage > 0.5) || animationMode == ToAnimation || percentage == 1)
-        animateString = to->string();
-    else
-        animateString = from->string();
+
+    String& fromString = from->string();
+    String& toString = to->string();
+    String& animatedString = animated->string();
+    m_animationElement->adjustFromToValues<String>(parseStringFromString, fromString, toString, animatedString, percentage, m_contextElement);
+
+    m_animationElement->animateDiscreteType<String>(percentage, fromString, toString, animatedString);
 }
 
 float SVGAnimatedStringAnimator::calculateDistance(const String&, const String&)

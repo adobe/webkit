@@ -7,7 +7,6 @@ LIST(APPEND WebKit2_LINK_FLAGS
 
 LIST(APPEND WebKit2_SOURCES
     Platform/efl/ModuleEfl.cpp
-    Platform/efl/RunLoopEfl.cpp
     Platform/efl/WorkQueueEfl.cpp
     Platform/unix/SharedMemoryUnix.cpp
 
@@ -32,6 +31,7 @@ LIST(APPEND WebKit2_SOURCES
 
     UIProcess/efl/TextCheckerEfl.cpp
     UIProcess/efl/WebContextEfl.cpp
+    UIProcess/efl/WebFullScreenManagerProxyEfl.cpp
     UIProcess/efl/WebInspectorEfl.cpp
     UIProcess/efl/WebPageProxyEfl.cpp
     UIProcess/efl/WebPreferencesEfl.cpp

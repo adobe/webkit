@@ -62,13 +62,6 @@ RenderSVGShape::RenderSVGShape(SVGStyledTransformableElement* node)
 {
 }
 
-RenderSVGShape::RenderSVGShape(SVGStyledTransformableElement* node, Path* path, bool isFillFallback)
-    : RenderSVGModelObject(node)
-    , m_path(adoptPtr(path))
-    , m_fillFallback(isFillFallback)
-{
-}
-
 RenderSVGShape::~RenderSVGShape()
 {
 }
@@ -101,7 +94,8 @@ FloatRect RenderSVGShape::objectBoundingBox() const
 
 void RenderSVGShape::strokeShape(GraphicsContext* context) const
 {
-    context->strokePath(path());
+    if (style()->svgStyle()->hasVisibleStroke())
+        context->strokePath(path());
 }
 
 bool RenderSVGShape::shapeDependentStrokeContains(const FloatPoint& point) const
@@ -129,7 +123,7 @@ bool RenderSVGShape::fillContains(const FloatPoint& point, bool requiresFill, co
 
 bool RenderSVGShape::strokeContains(const FloatPoint& point, bool requiresStroke)
 {
-    if (!m_strokeAndMarkerBoundingBox.contains(point))
+    if (!strokeBoundingBox().contains(point))
         return false;
 
     Color fallbackColor;
@@ -152,7 +146,7 @@ bool RenderSVGShape::strokeContains(const FloatPoint& point, bool requiresStroke
     }
 
     if (!svgStyle->strokeDashArray().isEmpty() || svgStyle->strokeMiterLimit() != svgStyle->initialStrokeMiterLimit()
-        || svgStyle->joinStyle() != svgStyle->initialJoinStyle() || svgStyle->capStyle() != svgStyle->initialCapStyle() || static_cast<SVGElement*>(node())->isStyled()) {
+        || svgStyle->joinStyle() != svgStyle->initialJoinStyle() || svgStyle->capStyle() != svgStyle->initialCapStyle()) {
         if (!m_path)
             RenderSVGShape::createShape();
         return RenderSVGShape::shapeDependentStrokeContains(point);
@@ -272,6 +266,8 @@ void RenderSVGShape::strokePath(RenderStyle* style, GraphicsContext* context, Pa
                                 const Color& fallbackColor, bool nonScalingStroke, const AffineTransform& nonScalingStrokeTransform,
                                 int applyMode)
 {
+    if (!style->svgStyle()->hasVisibleStroke())
+        return;
     Path* usePath = path;
     if (nonScalingStroke) {
         usePath = nonScalingStrokePath(path, nonScalingStrokeTransform);
@@ -318,7 +314,7 @@ void RenderSVGShape::fillAndStrokePath(GraphicsContext* context)
 
 }
 
-void RenderSVGShape::paint(PaintInfo& paintInfo, const IntPoint&)
+void RenderSVGShape::paint(PaintInfo& paintInfo, const LayoutPoint&)
 {
     if (paintInfo.context->paintingDisabled() || style()->visibility() == HIDDEN || isEmpty())
         return;

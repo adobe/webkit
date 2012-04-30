@@ -25,6 +25,9 @@
 #include "BackingStoreClient.h"
 #include "BackingStoreCompositingSurface.h"
 #include "BackingStore_p.h"
+#if ENABLE(BATTERY_STATUS)
+#include "BatteryClientBlackBerry.h"
+#endif
 #include "CString.h"
 #include "CachedImage.h"
 #include "Chrome.h"
@@ -83,6 +86,8 @@
 #include "PlatformWheelEvent.h"
 #include "PluginDatabase.h"
 #include "PluginView.h"
+#include "RenderLayerBacking.h"
+#include "RenderLayerCompositor.h"
 #include "RenderText.h"
 #include "RenderThemeBlackBerry.h"
 #include "RenderTreeAsText.h"
@@ -100,6 +105,9 @@
 #include "ThreadCheck.h"
 #include "TouchEventHandler.h"
 #include "TransformationMatrix.h"
+#if ENABLE(VIBRATION)
+#include "VibrationClientBlackBerry.h"
+#endif
 #include "VisiblePosition.h"
 #if ENABLE(WEBDOM)
 #include "WebDOMDocument.h"
@@ -107,6 +115,7 @@
 #include "WebKitVersion.h"
 #include "WebPageClient.h"
 #include "WebSocket.h"
+#include "WebViewportArguments.h"
 #include "npapi.h"
 #include "runtime_root.h"
 
@@ -155,6 +164,7 @@
 #define DEBUG_BLOCK_ZOOM 0
 #define DEBUG_TOUCH_EVENTS 0
 #define DEBUG_WEBPAGE_LOAD 0
+#define DEBUG_AC_COMMIT 0
 
 using namespace std;
 using namespace WebCore;
@@ -269,6 +279,31 @@ static inline WebPage::BackForwardId backForwardIdFromHistoryItem(HistoryItem* i
     return reinterpret_cast<WebPage::BackForwardId>(item);
 }
 
+void WebPage::setUserViewportArguments(const WebViewportArguments& viewportArguments)
+{
+    d->m_userViewportArguments = *(viewportArguments.d);
+}
+
+void WebPage::resetUserViewportArguments()
+{
+    d->m_userViewportArguments = ViewportArguments();
+}
+
+template <bool WebPagePrivate::* isActive>
+class DeferredTask: public WebPagePrivate::DeferredTaskBase {
+public:
+    static void finishOrCancel(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->*isActive = false;
+    }
+protected:
+    DeferredTask(WebPagePrivate* webPagePrivate)
+        : DeferredTaskBase(webPagePrivate, isActive)
+    {
+    }
+    typedef DeferredTask<isActive> DeferredTaskType;
+};
+
 WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const IntRect& rect)
     : m_webPage(webPage)
     , m_client(client)
@@ -325,7 +360,6 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
     , m_lastUserEventTimestamp(0.0)
     , m_pluginMouseButtonPressed(false)
     , m_pluginMayOpenNewTab(false)
-    , m_geolocationClient(0)
     , m_inRegionScrollStartingNode(0)
 #if USE(ACCELERATED_COMPOSITING)
     , m_rootLayerCommitTimer(adoptPtr(new Timer<WebPagePrivate>(this, &WebPagePrivate::rootLayerCommitTimerFired)))
@@ -337,6 +371,7 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
     , m_fullscreenVideoNode(0)
     , m_hasInRegionScrollableAreas(false)
     , m_updateDelegatedOverlaysDispatched(false)
+    , m_deferredTasksTimer(this, &WebPagePrivate::deferredTasksTimerFired)
 {
     static bool isInitialized = false;
     if (!isInitialized) {
@@ -393,7 +428,7 @@ WebPagePrivate::~WebPagePrivate()
 
 WebPage::~WebPage()
 {
-    delete d;
+    deleteGuardedObject(d);
     d = 0;
 }
 
@@ -428,28 +463,29 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     pageClients.dragClient = dragClient;
     pageClients.inspectorClient = inspectorClient;
 
-    // Note the object will be destroyed when the page is destroyed.
-#if ENABLE_DRT
-    if (getenv("drtRun"))
-        pageClients.geolocationClient = new GeolocationClientMock();
-    else
-#endif
-        pageClients.geolocationClient = m_geolocationClient = new GeolocationControllerClientBlackBerry(this);
-#else
-    pageClients.geolocationClient = m_geolocationClient;
-
     m_page = new Page(pageClients);
+#if ENABLE_DRT
+    if (getenv("drtRun")) {
+        // In case running in DumpRenderTree mode set the controller to mock provider.
+        GeolocationClientMock* mock = new GeolocationClientMock();
+        WebCore::provideGeolocationTo(m_page, mock);
+        mock->setController(WebCore::GeolocationController::from(m_page));
+    } else
+#else
+        WebCore::provideGeolocationTo(m_page, new GeolocationControllerClientBlackBerry(this));
+#endif
     WebCore::provideDeviceOrientationTo(m_page, new DeviceOrientationClientBlackBerry(this));
     WebCore::provideDeviceMotionTo(m_page, new DeviceMotionClientBlackBerry(this));
+#if ENABLE(VIBRATION)
+    WebCore::provideVibrationTo(m_page, new VibrationClientBlackBerry());
+#endif
+
+#if ENABLE(BATTERY_STATUS)
+    WebCore::provideBatteryTo(m_page, new WebCore::BatteryClientBlackBerry);
+#endif
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebCore::provideNotification(m_page, NotificationPresenterImpl::instance());
-#endif
-
-#if ENABLE_DRT
-    // In case running in DumpRenderTree mode set the controller to mock provider.
-    if (getenv("drtRun"))
-        static_cast<GeolocationClientMock*>(pageClients.geolocationClient)->setController(m_page->geolocationController());
 #endif
 
     m_page->setCustomHTMLTokenizerChunkSize(256);
@@ -507,9 +543,24 @@ void WebPagePrivate::init(const WebString& pageGroupName)
 #endif
 }
 
+class DeferredTaskLoadManualScript: public DeferredTask<&WebPagePrivate::m_wouldLoadManualScript> {
+public:
+    explicit DeferredTaskLoadManualScript(WebPagePrivate* webPagePrivate, const KURL& url)
+        : DeferredTaskType(webPagePrivate)
+    {
+        webPagePrivate->m_cachedManualScript = url;
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_mainFrame->script()->executeIfJavaScriptURL(webPagePrivate->m_cachedManualScript, DoNotReplaceDocumentIfJavaScriptURL);
+    }
+};
+
 void WebPagePrivate::load(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy cachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool isInitial, bool mustHandleInternally, bool forceDownload, const char* overrideContentType)
 {
     stopCurrentLoad();
+    DeferredTaskLoadManualScript::finishOrCancel(this);
 
     String urlString(url);
     if (urlString.startsWith("vs:", false)) {
@@ -521,10 +572,9 @@ void WebPagePrivate::load(const char* url, const char* networkToken, const char*
     KURL kurl = parseUrl(urlString);
     if (protocolIs(kurl, "javascript")) {
         // Never run javascript while loading is deferred.
-        if (m_page->defersLoading()) {
-            FrameLoaderClientBlackBerry* frameLoaderClient = static_cast<FrameLoaderClientBlackBerry*>(m_mainFrame->loader()->client());
-            frameLoaderClient->setDeferredManualScript(kurl);
-        } else
+        if (m_page->defersLoading())
+            m_deferredTasks.append(adoptPtr(new DeferredTaskLoadManualScript(this, kurl)));
+        else
             m_mainFrame->script()->executeIfJavaScriptURL(kurl, DoNotReplaceDocumentIfJavaScriptURL);
         return;
     }
@@ -532,7 +582,7 @@ void WebPagePrivate::load(const char* url, const char* networkToken, const char*
     if (isInitial)
         NetworkManager::instance()->setInitialURL(kurl);
 
-    ResourceRequest request(kurl, "" /* referrer */);
+    ResourceRequest request(kurl);
     request.setToken(networkToken);
     if (isInitial || mustHandleInternally)
         request.setMustHandleInternally(true);
@@ -731,8 +781,7 @@ void WebPagePrivate::stopCurrentLoad()
     m_mainFrame->loader()->stopAllLoaders();
 
     // Cancel any deferred script that hasn't been processed yet.
-    FrameLoaderClientBlackBerry* frameLoaderClient = static_cast<FrameLoaderClientBlackBerry*>(m_mainFrame->loader()->client());
-    frameLoaderClient->setDeferredManualScript(KURL());
+    DeferredTaskLoadManualScript::finishOrCancel(this);
 }
 
 void WebPage::stopLoading()
@@ -812,12 +861,8 @@ void WebPagePrivate::setLoadState(LoadState state)
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
-            // FIXME: compositor may only be touched on the compositing thread.
-            // However, it's created/destroyed by a sync command so this is harmless.
-            if (m_compositor) {
-                m_compositor->setLayoutRectForCompositing(IntRect());
-                m_compositor->setContentsSizeForCompositing(IntSize());
-            }
+            if (isAcceleratedCompositingActive() && !compositorDrawsRootLayer())
+                syncDestroyCompositorOnCompositingThread();
 #endif
             m_previousContentsSize = IntSize();
             m_backingStore->d->resetRenderQueue();
@@ -837,6 +882,12 @@ void WebPagePrivate::setLoadState(LoadState state)
             // Check if we have already process the meta viewport tag, this only happens on history navigation
             if (!m_didRestoreFromPageCache) {
                 m_viewportArguments = ViewportArguments();
+
+                // At the moment we commit a new load, set the viewport arguments
+                // to any fallback values. If there is a meta viewport in the
+                // content it will overwrite the fallback arguments soon.
+                dispatchViewportPropertiesDidChange(m_userViewportArguments);
+
                 m_userScalable = m_webSettings->isUserScalable();
                 resetScales();
             } else {
@@ -1198,12 +1249,30 @@ bool WebPagePrivate::shouldSendResizeEvent()
 
 void WebPagePrivate::willDeferLoading()
 {
+    m_deferredTasksTimer.stop();
     m_client->willDeferLoading();
 }
 
 void WebPagePrivate::didResumeLoading()
 {
+    if (!m_deferredTasks.isEmpty())
+        m_deferredTasksTimer.startOneShot(0);
     m_client->didResumeLoading();
+}
+
+void WebPagePrivate::deferredTasksTimerFired(WebCore::Timer<WebPagePrivate>*)
+{
+    ASSERT(!m_deferredTasks.isEmpty());
+    if (!m_deferredTasks.isEmpty())
+        return;
+
+    OwnPtr<DeferredTaskBase> task = m_deferredTasks[0].release();
+    m_deferredTasks.remove(0);
+
+    if (!m_deferredTasks.isEmpty())
+        m_deferredTasksTimer.startOneShot(0);
+
+    task->perform(this);
 }
 
 bool WebPagePrivate::scrollBy(int deltaX, int deltaY, bool scrollMainFrame)
@@ -1568,6 +1637,11 @@ void WebPage::initializeIconDataBase()
 bool WebPage::isUserScalable() const
 {
     return d->isUserScalable();
+}
+
+void WebPage::setUserScalable(bool userScalable)
+{
+    d->setUserScalable(userScalable);
 }
 
 double WebPage::currentScale() const
@@ -2018,7 +2092,7 @@ bool WebPagePrivate::isActive() const
     return m_client->isActive();
 }
 
-bool WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace, Credential& inputCredential)
+Credential WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace)
 {
     WebString username;
     WebString password;
@@ -2028,17 +2102,16 @@ bool WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSp
         credentialManager().autofillAuthenticationChallenge(protectionSpace, username, password);
 #endif
 
-    bool isConfirmed = m_client->authenticationChallenge(protectionSpace.realm().characters(), protectionSpace.realm().length(), username, password);
+    m_client->authenticationChallenge(protectionSpace.realm().characters(), protectionSpace.realm().length(), username, password);
 
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-    Credential credential(username, password, CredentialPersistencePermanent);
+    Credential inputCredential(username, password, CredentialPersistencePermanent);
     if (!m_webSettings->isPrivateBrowsingEnabled())
         credentialManager().saveCredentialIfConfirmed(this, CredentialTransformData(url, protectionSpace, inputCredential));
 #else
-    Credential credential(username, password, CredentialPersistenceNone);
+    Credential inputCredential(username, password, CredentialPersistenceNone);
 #endif
-    inputCredential = credential;
-    return isConfirmed;
+    return inputCredential;
 }
 
 PageClientBlackBerry::SaveCredentialType WebPagePrivate::notifyShouldSaveCredential(bool isNew)
@@ -2066,7 +2139,7 @@ Platform::WebContext WebPagePrivate::webContext(TargetDetectionStrategy strategy
     if (Node* linkNode = node->enclosingLinkEventParentOrSelf()) {
         KURL href;
         if (linkNode->isLink() && linkNode->hasAttributes()) {
-            if (Attribute* attribute = linkNode->attributes()->getAttributeItem(HTMLNames::hrefAttr))
+            if (Attribute* attribute = static_cast<Element*>(linkNode)->getAttributeItem(HTMLNames::hrefAttr))
                 href = linkNode->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(attribute->value()));
         }
 
@@ -2166,7 +2239,7 @@ void WebPagePrivate::updateCursor()
     else if (m_lastMouseEvent.button() == RightButton)
         buttonMask = Platform::MouseEvent::ScreenRightMouseButton;
 
-    BlackBerry::Platform::MouseEvent event(buttonMask, buttonMask, mapToTransformed(m_lastMouseEvent.position()), mapToTransformed(m_lastMouseEvent.globalPos()), 0, 0);
+    BlackBerry::Platform::MouseEvent event(buttonMask, buttonMask, mapToTransformed(m_lastMouseEvent.position()), mapToTransformed(m_lastMouseEvent.globalPosition()), 0, 0);
     m_webPage->mouseEvent(event);
 }
 
@@ -2423,6 +2496,8 @@ void WebPagePrivate::assignFocus(Platform::FocusDirection direction)
 
 void WebPage::assignFocus(Platform::FocusDirection direction)
 {
+    if (d->m_page->defersLoading())
+       return;
     d->assignFocus(direction);
 }
 
@@ -2721,7 +2796,7 @@ IntRect WebPagePrivate::blockZoomRectForNode(Node* node)
 
     int originalArea = originalRect.width() * originalRect.height();
     int pageArea = contentsSize().width() * contentsSize().height();
-    double blockToPageRatio = static_cast<double>(1 - originalArea / pageArea);
+    double blockToPageRatio = static_cast<double>(pageArea - originalArea) / pageArea;
     double blockExpansionRatio = 5.0 * blockToPageRatio * blockToPageRatio;
 
     if (!tnode->hasTagName(HTMLNames::imgTag) && !tnode->hasTagName(HTMLNames::inputTag) && !tnode->hasTagName(HTMLNames::textareaTag)) {
@@ -2730,7 +2805,7 @@ IntRect WebPagePrivate::blockZoomRectForNode(Node* node)
             IntRect tRect = rectForNode(tnode);
             int tempBlockArea = tRect.width() * tRect.height();
             // Don't expand the block if it will be too large relative to the content.
-            if (static_cast<double>(1 - tempBlockArea / pageArea) < minimumExpandingRatio)
+            if (static_cast<double>(pageArea - tempBlockArea) / pageArea < minimumExpandingRatio)
                 break;
             if (tRect.isEmpty())
                 continue; // No renderer.
@@ -2738,7 +2813,7 @@ IntRect WebPagePrivate::blockZoomRectForNode(Node* node)
                 continue; // The size of this parent is very close to the child, no need to go to this parent.
             // Don't expand the block if the parent node size is already almost the size of actual visible size.
             IntSize actualSize = actualVisibleSize();
-            if (static_cast<double>(1 - tRect.width() / actualSize.width()) < minimumExpandingRatio)
+            if (static_cast<double>(actualSize.width() - tRect.width()) / actualSize.width() < minimumExpandingRatio)
                 break;
             if (tempBlockArea < blockExpansionRatio * originalArea) {
                 blockRect = tRect;
@@ -2901,7 +2976,7 @@ void WebPage::destroy()
     if (loader)
         loader->detachFromParent();
 
-    delete this;
+    deleteGuardedObject(this);
 }
 
 WebPageClient* WebPage::client() const
@@ -2956,12 +3031,31 @@ bool WebPage::isVisible() const
 }
 
 #if ENABLE(PAGE_VISIBILITY_API)
+class DeferredTaskSetPageVisibilityState: public DeferredTask<&WebPagePrivate::m_wouldSetPageVisibilityState> {
+public:
+    explicit DeferredTaskSetPageVisibilityState(WebPagePrivate* webPagePrivate)
+        : DeferredTaskType(webPagePrivate)
+    {
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->setPageVisibilityState();
+    }
+};
+
 void WebPagePrivate::setPageVisibilityState()
 {
-    static bool s_initialVisibilityState = true;
+    if (m_page->defersLoading())
+        m_deferredTasks.append(adoptPtr(new DeferredTaskSetPageVisibilityState(this)));
+    else {
+        DeferredTaskSetPageVisibilityState::finishOrCancel(this);
 
-    m_page->setVisibilityState(m_visible && m_activationState == ActivationActive ? PageVisibilityStateVisible : PageVisibilityStateHidden, s_initialVisibilityState);
-    s_initialVisibilityState = false;
+        static bool s_initialVisibilityState = true;
+
+        m_page->setVisibilityState(m_visible && m_activationState == ActivationActive ? PageVisibilityStateVisible : PageVisibilityStateHidden, s_initialVisibilityState);
+        s_initialVisibilityState = false;
+    }
 }
 #endif
 
@@ -2998,6 +3092,7 @@ void WebPage::setVisible(bool visible)
         // And release layer resources can reduce memory consumption.
         d->suspendRootLayerCommit();
 #endif
+
         return;
     }
 
@@ -3066,6 +3161,8 @@ bool WebPage::setBatchEditingActive(bool active)
 
 bool WebPage::setInputSelection(unsigned start, unsigned end)
 {
+    if (d->m_page->defersLoading())
+        return false;
     return d->m_inputHandler->setSelection(start, end);
 }
 
@@ -3074,23 +3171,101 @@ int WebPage::inputCaretPosition() const
     return d->m_inputHandler->caretPosition();
 }
 
-void WebPage::popupListClosed(int size, bool* selecteds)
+class DeferredTaskPopupListSelectMultiple: public DeferredTask<&WebPagePrivate::m_wouldPopupListSelectMultiple> {
+public:
+    DeferredTaskPopupListSelectMultiple(WebPagePrivate* webPagePrivate, int size, const bool* selecteds) 
+        : DeferredTaskType(webPagePrivate)
+    {
+        webPagePrivate->m_cachedPopupListSelecteds.append(selecteds, size);
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_webPage->popupListClosed(webPagePrivate->m_cachedPopupListSelecteds.size(), webPagePrivate->m_cachedPopupListSelecteds.data());
+    }
+};
+
+class DeferredTaskPopupListSelectSingle: public DeferredTask<&WebPagePrivate::m_wouldPopupListSelectSingle> {
+public:
+    explicit DeferredTaskPopupListSelectSingle(WebPagePrivate* webPagePrivate, int index)
+        : DeferredTaskType(webPagePrivate)
+    {
+        webPagePrivate->m_cachedPopupListSelectedIndex = index;
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_webPage->popupListClosed(webPagePrivate->m_cachedPopupListSelectedIndex);
+    }
+};
+
+void WebPage::popupListClosed(int size, const bool* selecteds)
 {
+    DeferredTaskPopupListSelectSingle::finishOrCancel(d);
+    if (d->m_page->defersLoading()) {
+        d->m_deferredTasks.append(adoptPtr(new DeferredTaskPopupListSelectMultiple(d, size, selecteds)));
+        return;
+    }
+    DeferredTaskPopupListSelectMultiple::finishOrCancel(d);
     d->m_inputHandler->setPopupListIndexes(size, selecteds);
 }
 
 void WebPage::popupListClosed(int index)
 {
+    DeferredTaskPopupListSelectMultiple::finishOrCancel(d);
+    if (d->m_page->defersLoading()) {
+        d->m_deferredTasks.append(adoptPtr(new DeferredTaskPopupListSelectSingle(d, index)));
+        return;
+    }
+    DeferredTaskPopupListSelectSingle::finishOrCancel(d);
     d->m_inputHandler->setPopupListIndex(index);
 }
 
+class DeferredTaskSetDateTimeInput: public DeferredTask<&WebPagePrivate::m_wouldSetDateTimeInput> {
+public:
+    explicit DeferredTaskSetDateTimeInput(WebPagePrivate* webPagePrivate, WebString value)
+        : DeferredTaskType(webPagePrivate)
+    {
+        webPagePrivate->m_cachedDateTimeInput = value;
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_webPage->setDateTimeInput(webPagePrivate->m_cachedDateTimeInput);
+    }
+};
+
 void WebPage::setDateTimeInput(const WebString& value)
 {
+    if (d->m_page->defersLoading()) {
+        d->m_deferredTasks.append(adoptPtr(new DeferredTaskSetDateTimeInput(d, value)));
+        return;
+    }
+    DeferredTaskSetDateTimeInput::finishOrCancel(d);
     d->m_inputHandler->setInputValue(String(value.impl()));
 }
 
+class DeferredTaskSetColorInput: public DeferredTask<&WebPagePrivate::m_wouldSetColorInput> {
+public:
+    explicit DeferredTaskSetColorInput(WebPagePrivate* webPagePrivate, WebString value)
+        : DeferredTaskType(webPagePrivate)
+    {
+        webPagePrivate->m_cachedColorInput = value;
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_webPage->setColorInput(webPagePrivate->m_cachedColorInput);
+    }
+};
+
 void WebPage::setColorInput(const WebString& value)
 {
+    if (d->m_page->defersLoading()) {
+        d->m_deferredTasks.append(adoptPtr(new DeferredTaskSetColorInput(d, value)));
+        return;
+    }
+    DeferredTaskSetColorInput::finishOrCancel(d);
     d->m_inputHandler->setInputValue(String(value.impl()));
 }
 
@@ -3107,7 +3282,7 @@ void WebPage::resetVirtualViewportOnCommitted(bool reset)
 
 IntSize WebPagePrivate::recomputeVirtualViewportFromViewportArguments()
 {
-    static ViewportArguments defaultViewportArguments;
+    static const ViewportArguments defaultViewportArguments;
     if (m_viewportArguments == defaultViewportArguments)
         return IntSize();
 
@@ -3195,6 +3370,15 @@ void WebPage::onInputLocaleChanged(bool isRTL)
 void WebPagePrivate::suspendBackingStore()
 {
 #if USE(ACCELERATED_COMPOSITING)
+    if (m_backingStore->d->isOpenGLCompositing()) {
+        // A visible web page's backing store can be suspended when another web
+        // page is taking over the backing store.
+        if (m_visible)
+            setCompositorDrawsRootLayer(true);
+
+        return;
+    }
+
     resetCompositingSurface();
 #endif
 }
@@ -3203,10 +3387,6 @@ void WebPagePrivate::resumeBackingStore()
 {
     ASSERT(m_webPage->isVisible());
 
-#if USE(ACCELERATED_COMPOSITING)
-    setNeedsOneShotDrawingSynchronization();
-#endif
-
     bool directRendering = m_backingStore->d->shouldDirectRenderingToWindow();
     if (!m_backingStore->d->isActive()
         || shouldResetTilesWhenShown()
@@ -3214,6 +3394,12 @@ void WebPagePrivate::resumeBackingStore()
         // We need to reset all tiles so that we do not show any tiles whose content may
         // have been replaced by another WebPage instance (i.e. another tab).
         BackingStorePrivate::setCurrentBackingStoreOwner(m_webPage);
+
+        // If we're OpenGL compositing, switching to accel comp drawing of the root layer
+        // is a good substitute for backingstore blitting.
+        if (m_backingStore->d->isOpenGLCompositing())
+            setCompositorDrawsRootLayer(!m_backingStore->d->isActive());
+
         m_backingStore->d->orientationChanged(); // Updates tile geometry and creates visible tile buffer.
         m_backingStore->d->resetTiles(true /* resetBackground */);
         m_backingStore->d->updateTiles(false /* updateVisible */, false /* immediate */);
@@ -3222,9 +3408,16 @@ void WebPagePrivate::resumeBackingStore()
         if (m_backingStore->d->renderVisibleContents() && !m_backingStore->d->isSuspended() && !directRendering)
             m_backingStore->d->blitVisibleContents();
     } else {
+        if (m_backingStore->d->isOpenGLCompositing())
+           setCompositorDrawsRootLayer(false);
+
         // Rendering was disabled while we were hidden, so we need to update all tiles.
         m_backingStore->d->updateTiles(true /* updateVisible */, false /* immediate */);
     }
+
+#if USE(ACCELERATED_COMPOSITING)
+    setNeedsOneShotDrawingSynchronization();
+#endif
 
     setShouldResetTilesWhenShown(false);
 }
@@ -3508,6 +3701,9 @@ bool WebPage::mouseEvent(const Platform::MouseEvent& mouseEvent, bool* wheelDelt
     if (!d->m_mainFrame->view())
         return false;
 
+    if (d->m_page->defersLoading())
+        return false;
+
     PluginView* pluginView = d->m_fullScreenPluginView.get();
     if (pluginView)
         return d->dispatchMouseEventToFullScreenPlugin(pluginView, mouseEvent);
@@ -3684,12 +3880,15 @@ bool WebPage::touchEvent(const Platform::TouchEvent& event)
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
+    if (!d->m_mainFrame)
+        return false;
+
+    if (d->m_page->defersLoading())
+        return false;
+
     PluginView* pluginView = d->m_fullScreenPluginView.get();
     if (pluginView)
         return d->dispatchTouchEventToFullScreenPlugin(pluginView, event);
-
-    if (!d->m_mainFrame)
-        return false;
 
     Platform::TouchEvent tEvent = event;
     for (unsigned i = 0; i < event.m_points.size(); i++) {
@@ -3808,6 +4007,9 @@ bool WebPagePrivate::dispatchTouchEventToFullScreenPlugin(PluginView* plugin, co
 
 bool WebPage::touchPointAsMouseEvent(const Platform::TouchPoint& point)
 {
+    if (d->m_page->defersLoading())
+        return false;
+
     PluginView* pluginView = d->m_fullScreenPluginView.get();
     if (pluginView)
         return d->dispatchTouchPointAsMouseEventToFullScreenPlugin(pluginView, point);
@@ -3853,11 +4055,15 @@ bool WebPagePrivate::dispatchTouchPointAsMouseEventToFullScreenPlugin(PluginView
 void WebPage::touchEventCancel()
 {
     d->m_pluginMayOpenNewTab = false;
+    if (d->m_page->defersLoading())
+        return;
     d->m_touchEventHandler->touchEventCancel();
 }
 
 void WebPage::touchEventCancelAndClearFocusedNode()
 {
+    if (d->m_page->defersLoading())
+        return;
     d->m_touchEventHandler->touchEventCancelAndClearFocusedNode();
 }
 
@@ -4076,6 +4282,9 @@ bool WebPage::keyEvent(const Platform::KeyboardEvent& keyboardEvent)
     if (!d->m_mainFrame->view())
         return false;
 
+    if (d->m_page->defersLoading())
+        return false;
+
     ASSERT(d->m_page->focusController());
 
     bool handled = d->m_inputHandler->handleKeyboardInput(keyboardEvent);
@@ -4091,6 +4300,9 @@ bool WebPage::keyEvent(const Platform::KeyboardEvent& keyboardEvent)
 
 bool WebPage::deleteTextRelativeToCursor(unsigned int leftOffset, unsigned int rightOffset)
 {
+    if (d->m_page->defersLoading())
+        return false;
+
     return d->m_inputHandler->deleteTextRelativeToCursor(leftOffset, rightOffset);
 }
 
@@ -4126,11 +4338,15 @@ int32_t WebPage::finishComposition()
 
 int32_t WebPage::setComposingText(spannable_string_t* spannableString, int32_t relativeCursorPosition)
 {
+    if (d->m_page->defersLoading())
+        return -1;
     return d->m_inputHandler->setComposingText(spannableString, relativeCursorPosition);
 }
 
 int32_t WebPage::commitText(spannable_string_t* spannableString, int32_t relativeCursorPosition)
 {
+    if (d->m_page->defersLoading())
+        return -1;
     return d->m_inputHandler->commitText(spannableString, relativeCursorPosition);
 }
 
@@ -4139,8 +4355,26 @@ void WebPage::setSpellCheckingEnabled(bool enabled)
     static_cast<EditorClientBlackBerry*>(d->m_page->editorClient())->enableSpellChecking(enabled);
 }
 
+class DeferredTaskSelectionCancelled: public DeferredTask<&WebPagePrivate::m_wouldCancelSelection> {
+public:
+    explicit DeferredTaskSelectionCancelled(WebPagePrivate* webPagePrivate)
+        : DeferredTaskType(webPagePrivate)
+    {
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_webPage->selectionCancelled();
+    }
+};
+
 void WebPage::selectionCancelled()
 {
+    if (d->m_page->defersLoading()) {
+        d->m_deferredTasks.append(adoptPtr(new DeferredTaskSelectionCancelled(d)));
+        return;
+    }
+    DeferredTaskSelectionCancelled::finishOrCancel(d);
     d->m_selectionHandler->cancelSelection();
 }
 
@@ -4164,23 +4398,29 @@ WebString WebPage::selectedText() const
 WebString WebPage::cutSelectedText()
 {
     WebString selectedText = d->m_selectionHandler->selectedText();
-    if (!selectedText.isEmpty())
+    if (!d->m_page->defersLoading() && !selectedText.isEmpty())
         d->m_inputHandler->deleteSelection();
     return selectedText;
 }
 
 void WebPage::insertText(const WebString& string)
 {
+    if (d->m_page->defersLoading())
+        return;
     d->m_inputHandler->insertText(string);
 }
 
 void WebPage::clearCurrentInputField()
 {
+    if (d->m_page->defersLoading())
+        return;
     d->m_inputHandler->clearField();
 }
 
 void WebPage::cut()
 {
+    if (d->m_page->defersLoading())
+        return;
     d->m_inputHandler->cut();
 }
 
@@ -4191,11 +4431,15 @@ void WebPage::copy()
 
 void WebPage::paste()
 {
+    if (d->m_page->defersLoading())
+        return;
     d->m_inputHandler->paste();
 }
 
 void WebPage::setSelection(const Platform::IntPoint& startPoint, const Platform::IntPoint& endPoint)
 {
+    if (d->m_page->defersLoading())
+        return;
     // Transform this events coordinates to webkit content coordinates.
     // FIXME: Don't transform the sentinel, because it may be transformed to a floating number
     // which could be rounded to 0 or other numbers. This workaround should be removed after
@@ -4210,6 +4454,8 @@ void WebPage::setSelection(const Platform::IntPoint& startPoint, const Platform:
 
 void WebPage::setCaretPosition(const Platform::IntPoint& position)
 {
+    if (d->m_page->defersLoading())
+        return;
     // Handled by selection handler as it's point based.
     // Transform this events coordinates to webkit content coordinates.
     d->m_selectionHandler->setCaretPosition(d->mapFromTransformed(position));
@@ -4217,6 +4463,8 @@ void WebPage::setCaretPosition(const Platform::IntPoint& position)
 
 void WebPage::selectAtPoint(const Platform::IntPoint& location)
 {
+    if (d->m_page->defersLoading())
+        return;
     // Transform this events coordinates to webkit content coordinates if it
     // is not the sentinel value.
     IntPoint selectionLocation =
@@ -4441,7 +4689,7 @@ bool WebPage::blockZoom(int x, int y)
             IntRect tRect = d->mapFromTransformed(blockRect);
             int blockArea = tRect.width() * tRect.height();
             int pageArea = d->contentsSize().width() * d->contentsSize().height();
-            double blockToPageRatio = static_cast<double>(1 - blockArea / pageArea);
+            double blockToPageRatio = static_cast<double>(pageArea - blockArea) / pageArea;
             if (blockToPageRatio < minimumExpandingRatio) {
                 // Restore old adjust node because zoom was canceled.
                 d->m_currentBlockZoomAdjustedNode = tempBlockZoomAdjustedNode;
@@ -4650,8 +4898,27 @@ bool WebPage::zoomToOneOne()
     return d->zoomAboutPoint(scale, d->centerOfVisibleContentsRect());
 }
 
+class DeferredTaskSetFocused: public DeferredTask<&WebPagePrivate::m_wouldSetFocused> {
+public:
+    explicit DeferredTaskSetFocused(WebPagePrivate* webPagePrivate, bool focused)
+        : DeferredTaskType(webPagePrivate)
+    {
+        webPagePrivate->m_cachedFocused = focused;
+    }
+private:
+    virtual void performInternal(WebPagePrivate* webPagePrivate)
+    {
+        webPagePrivate->m_webPage->setFocused(webPagePrivate->m_cachedFocused);
+    }
+};
+
 void WebPage::setFocused(bool focused)
 {
+    if (d->m_page->defersLoading()) {
+        d->m_deferredTasks.append(adoptPtr(new DeferredTaskSetFocused(d, focused)));
+        return;
+    }
+    DeferredTaskSetFocused::finishOrCancel(d);
     FocusController* focusController = d->m_page->focusController();
     focusController->setActive(focused);
     if (focused) {
@@ -4662,9 +4929,18 @@ void WebPage::setFocused(bool focused)
     focusController->setFocused(focused);
 }
 
-bool WebPage::findNextString(const char* text, bool forward)
+bool WebPage::findNextString(const char* text, bool forward, bool caseSensitive, bool wrap, bool highlightAllMatches)
 {
-    return d->m_inPageSearchManager->findNextString(String::fromUTF8(text), forward);
+    WebCore::FindOptions findOptions = WebCore::StartInSelection;
+    if (!forward)
+        findOptions |= WebCore::Backwards;
+    if (!caseSensitive)
+        findOptions |= WebCore::CaseInsensitive;
+
+    // The WebCore::FindOptions::WrapAround boolean actually wraps the search
+    // within the current frame as opposed to the entire Document, so we have to
+    // provide our own wrapping code to wrap at the whole Document level.
+    return d->m_inPageSearchManager->findNextString(String::fromUTF8(text), findOptions, wrap, highlightAllMatches);
 }
 
 void WebPage::runLayoutTests()
@@ -4869,8 +5145,10 @@ void WebPage::clearCookies()
 
 void WebPage::clearLocalStorage()
 {
-    BlackBerry::WebKit::clearLocalStorage(d->m_page->groupName());
-    clearDatabase(d->m_page->groupName());
+    if (PageGroup* group = d->m_page->groupPtr()) {
+        if (StorageNamespace* storage = group->localStorage())
+            storage->clearAllOriginsForDeletion();
+    }
 }
 
 void WebPage::clearCredentials()
@@ -5081,9 +5359,6 @@ void WebPage::notifyAppActivationStateChange(ActivationStateType activationState
         case ActivationStandby:
             (*it)->handleAppStandbyEvent();
             break;
-        default: // FIXME: Get rid of the default to force a compiler error instead of using a runtime error. See PR #121109.
-            ASSERT_NOT_REACHED();
-            break;
         }
     }
 
@@ -5166,8 +5441,39 @@ void WebPage::disablePasswordEcho()
 
 void WebPage::dispatchInspectorMessage(const std::string& message)
 {
-    String stringMessage(message.c_str(), message.length());
+    String stringMessage = String::fromUTF8(message.data(), message.length());
     d->m_page->inspectorController()->dispatchMessageFromFrontend(stringMessage);
+}
+
+bool WebPagePrivate::compositorDrawsRootLayer() const
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (Platform::userInterfaceThreadMessageClient()->isCurrentThread())
+        return m_compositor && m_compositor->drawsRootLayer();
+
+    // WebKit thread implementation:
+    RenderView* renderView = m_mainFrame->contentRenderer();
+    if (!renderView || !renderView->layer() || !renderView->layer()->backing())
+        return false;
+
+    return !renderView->layer()->backing()->paintingGoesToWindow();
+#else
+    return false;
+#endif
+}
+
+void WebPagePrivate::setCompositorDrawsRootLayer(bool compositorDrawsRootLayer)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_page->settings()->forceCompositingMode() == compositorDrawsRootLayer)
+        return;
+
+    // When the BlackBerry port forces compositing mode, the root layer stops
+    // painting to window and starts painting to layer instead.
+    m_page->settings()->setForceCompositingMode(compositorDrawsRootLayer);
+    if (FrameView* view = m_mainFrame->view())
+        view->updateCompositingLayers();
+#endif
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -5178,7 +5484,7 @@ void WebPagePrivate::drawLayersOnCommit()
         // animations. And only if we don't need a one shot drawing sync.
         ASSERT(!needsOneShotDrawingSynchronization());
 
-        if (!m_webPage->isVisible() || !m_backingStore->d->isActive())
+        if (!m_webPage->isVisible())
             return;
 
         m_backingStore->d->willDrawLayersOnCommit();
@@ -5188,28 +5494,12 @@ void WebPagePrivate::drawLayersOnCommit()
         return;
     }
 
-    if (m_backingStore->d->isOpenGLCompositing()) {
+#if DEBUG_AC_COMMIT
+    Platform::log(Platform::LogLevelCritical, "%s", WTF_PRETTY_FUNCTION);
+#endif
+
+    if (!m_backingStore->d->shouldDirectRenderingToWindow())
         m_backingStore->d->blitVisibleContents();
-        return; // blitVisibleContents() includes drawSubLayers() in this case.
-    }
-
-    if (!m_backingStore->d->drawSubLayers())
-        return;
-
-    // If we use the compositing surface, we need to re-blit the
-    // backingstore and blend the compositing surface on top of that
-    // in order to get the newly drawn layers on screen.
-    if (!SurfacePool::globalSurfacePool()->compositingSurface())
-        return;
-
-    // If there are no visible layers, return early.
-    if (lastCompositingResults().isEmpty() && lastCompositingResults().wasEmpty)
-        return;
-
-    if (m_backingStore->d->shouldDirectRenderingToWindow())
-        return;
-
-    m_backingStore->d->blitVisibleContents();
 }
 
 void WebPagePrivate::scheduleRootLayerCommit()
@@ -5218,8 +5508,12 @@ void WebPagePrivate::scheduleRootLayerCommit()
         return;
 
     m_needsCommit = true;
-    if (!m_rootLayerCommitTimer->isActive())
+    if (!m_rootLayerCommitTimer->isActive()) {
+#if DEBUG_AC_COMMIT
+        Platform::log(Platform::LogLevelCritical, "%s: m_rootLayerCommitTimer->isActive() = %d", WTF_PRETTY_FUNCTION, m_rootLayerCommitTimer->isActive());
+#endif
         m_rootLayerCommitTimer->startOneShot(0);
+    }
 }
 
 static bool needsLayoutRecursive(FrameView* view)
@@ -5265,18 +5559,38 @@ void WebPagePrivate::setCompositor(PassRefPtr<WebPageCompositorPrivate> composit
 }
 
 void WebPagePrivate::commitRootLayer(const IntRect& layoutRectForCompositing,
-                                     const IntSize& contentsSizeForCompositing)
+                                     const IntSize& contentsSizeForCompositing,
+                                     bool drawsRootLayer)
 {
+#if DEBUG_AC_COMMIT
+    Platform::log(Platform::LogLevelCritical, "%s: m_compositor = 0x%x",
+            WTF_PRETTY_FUNCTION, m_compositor.get());
+#endif
+
     if (!m_frameLayers || !m_compositor)
         return;
 
+    if (m_frameLayers->rootLayer() && m_frameLayers->rootLayer()->layerCompositingThread() != m_compositor->rootLayer())
+        m_compositor->setRootLayer(m_frameLayers->rootLayer()->layerCompositingThread());
+
     m_compositor->setLayoutRectForCompositing(layoutRectForCompositing);
     m_compositor->setContentsSizeForCompositing(contentsSizeForCompositing);
+    m_compositor->setDrawsRootLayer(drawsRootLayer);
     m_compositor->commit(m_frameLayers->rootLayer());
 }
 
 bool WebPagePrivate::commitRootLayerIfNeeded()
 {
+#if DEBUG_AC_COMMIT
+    Platform::log(Platform::LogLevelCritical, "%s: m_suspendRootLayerCommit = %d, m_needsCommit = %d, m_frameLayers = 0x%x, m_frameLayers->hasLayer() = %d, needsLayoutRecursive() = %d",
+            WTF_PRETTY_FUNCTION,
+            m_suspendRootLayerCommit,
+            m_needsCommit,
+            m_frameLayers.get(),
+            m_frameLayers && m_frameLayers->hasLayer(),
+            m_mainFrame && m_mainFrame->view() && needsLayoutRecursive(m_mainFrame->view()));
+#endif
+
     if (m_suspendRootLayerCommit)
         return false;
 
@@ -5316,6 +5630,7 @@ bool WebPagePrivate::commitRootLayerIfNeeded()
     // and that's what the layer renderer wants.
     IntRect layoutRectForCompositing(scrollPosition(), actualVisibleSize());
     IntSize contentsSizeForCompositing = contentsSize();
+    bool drawsRootLayer = compositorDrawsRootLayer();
 
     // Commit changes made to the layers synchronously with the compositing thread.
     Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
@@ -5323,7 +5638,8 @@ bool WebPagePrivate::commitRootLayerIfNeeded()
             &WebPagePrivate::commitRootLayer,
             this,
             layoutRectForCompositing,
-            contentsSizeForCompositing));
+            contentsSizeForCompositing,
+            drawsRootLayer));
 
     return true;
 }
@@ -5333,6 +5649,10 @@ void WebPagePrivate::rootLayerCommitTimerFired(Timer<WebPagePrivate>*)
     if (m_suspendRootLayerCommit)
         return;
 
+#if DEBUG_AC_COMMIT
+    Platform::log(Platform::LogLevelCritical, "%s", WTF_PRETTY_FUNCTION);
+#endif
+
     // The commit timer may have fired just before the layout timer, or for some
     // other reason we need layout. It's not allowed to commit when a layout is
     // pending, becaues a commit can cause parts of the web page to be rendered
@@ -5341,20 +5661,30 @@ void WebPagePrivate::rootLayerCommitTimerFired(Timer<WebPagePrivate>*)
     // to handle a one shot drawing synchronization after the layout.
     requestLayoutIfNeeded();
 
-    bool isSingleTargetWindow = SurfacePool::globalSurfacePool()->compositingSurface()
-        || m_backingStore->d->isOpenGLCompositing();
+    // If we transitioned to drawing the root layer using compositor instead of
+    // backing store, doing a one shot drawing synchronization with the
+    // backing store is never necessary, because the backing store draws
+    // nothing.
+    if (!compositorDrawsRootLayer()) {
+        bool isSingleTargetWindow = SurfacePool::globalSurfacePool()->compositingSurface()
+            || m_backingStore->d->isOpenGLCompositing();
 
-    // If we are doing direct rendering and have a single rendering target,
-    // committing is equivalent to a one shot drawing synchronization.
-    // We need to re-render the web page, re-render the layers, and
-    // then blit them on top of the re-rendered web page.
-    if (isSingleTargetWindow && m_backingStore->d->shouldDirectRenderingToWindow())
-        setNeedsOneShotDrawingSynchronization();
+        // If we are doing direct rendering and have a single rendering target,
+        // committing is equivalent to a one shot drawing synchronization.
+        // We need to re-render the web page, re-render the layers, and
+        // then blit them on top of the re-rendered web page.
+        if (isSingleTargetWindow && m_backingStore->d->shouldDirectRenderingToWindow())
+            setNeedsOneShotDrawingSynchronization();
 
-    if (needsOneShotDrawingSynchronization()) {
-        const IntRect windowRect = IntRect(IntPoint::zero(), viewportSize());
-        m_backingStore->d->repaint(windowRect, true /*contentChanged*/, true /*immediate*/);
-        return;
+        if (needsOneShotDrawingSynchronization()) {
+#if DEBUG_AC_COMMIT
+            Platform::log(Platform::LogLevelCritical, "%s: OneShotDrawingSynchronization code path!", WTF_PRETTY_FUNCTION);
+#endif
+
+            const IntRect windowRect = IntRect(IntPoint::zero(), viewportSize());
+            m_backingStore->d->repaint(windowRect, true /*contentChanged*/, true /*immediate*/);
+            return;
+        }
     }
 
     // If the web page needs layout, the commit will fail.
@@ -5414,19 +5744,12 @@ void WebPagePrivate::setRootLayerCompositingThread(LayerCompositingThread* layer
         return;
     }
 
-    // Depending on whether we have a root layer or not,
-    // this method will turn on or off accelerated compositing.
     if (!layer) {
-         // Don't ASSERT(m_compositor) here because we may be called in
-         // the process of destruction of WebPage where we have already
-         // called syncDestroyCompositorOnCompositingThread() to destroy
-         // the compositor.
-         destroyCompositor();
-         resetCompositingSurface();
-         return;
-    }
-
-    if (!m_compositor)
+        // Keep the compositor around, a single web page will frequently enter
+        // and leave compositing mode many times. Instead we destroy it when
+        // navigating to a new page.
+        resetCompositingSurface();
+    } else if (!m_compositor)
         createCompositor();
 
     // Don't ASSERT(m_compositor) here because setIsAcceleratedCompositingActive(true)
@@ -5437,6 +5760,10 @@ void WebPagePrivate::setRootLayerCompositingThread(LayerCompositingThread* layer
 
 bool WebPagePrivate::createCompositor()
 {
+    // If there's no window, the compositor will be supplied by the API client
+    if (!m_client->window())
+        return false;
+
     m_ownedContext = GLES2Context::create(this);
     m_compositor = WebPageCompositorPrivate::create(this, 0);
     m_compositor->setContext(m_ownedContext.get());
@@ -5483,7 +5810,7 @@ void WebPagePrivate::suspendRootLayerCommit()
 
     m_suspendRootLayerCommit = true;
 
-    if (!m_frameLayers || !m_frameLayers->hasLayer() || !m_compositor)
+    if (!m_compositor)
         return;
 
     Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
@@ -5509,6 +5836,11 @@ bool WebPagePrivate::needsOneShotDrawingSynchronization()
 
 void WebPagePrivate::setNeedsOneShotDrawingSynchronization()
 {
+    if (compositorDrawsRootLayer()) {
+        scheduleRootLayerCommit();
+        return;
+    }
+
     // This means we have to commit layers on next render, or render on the next commit,
     // whichever happens first.
     m_needsCommit = true;
@@ -5593,9 +5925,6 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
     coreSettings->setDefaultTextEncodingName(webSettings->defaultTextEncodingName().impl());
     coreSettings->setDownloadableBinaryFontsEnabled(webSettings->downloadableBinaryFontsEnabled());
     coreSettings->setSpatialNavigationEnabled(m_webSettings->isSpatialNavigationEnabled());
-
-    // UserScalable should be reset by new settings.
-    setUserScalable(webSettings->isUserScalable());
 
     WebString stylesheetURL = webSettings->userStyleSheetString();
     if (stylesheetURL.isEmpty())

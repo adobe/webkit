@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2011, 2012 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -97,11 +97,6 @@ void MediaPlayerPrivate::setCertificatePath(const String& caPath)
 
 MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
     : m_webCorePlayer(player)
-#if USE(ACCELERATED_COMPOSITING)
-    , m_platformPlayer(new MMRPlayer(this, true))
-#else
-    , m_platformPlayer(new MMRPlayer(this, false))
-#endif
     , m_networkState(MediaPlayer::Empty)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_fullscreenWebPageClient(0)
@@ -112,7 +107,17 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
 #endif
     , m_userDrivenSeekTimer(this, &MediaPlayerPrivate::userDrivenSeekTimerFired)
     , m_lastSeekTime(0)
+    , m_waitMetadataTimer(this, &MediaPlayerPrivate::waitMetadataTimerFired)
+    , m_waitMetadataPopDialogCounter(0)
 {
+    void* tabId = 0;
+    if (frameView() && frameView()->hostWindow())
+        tabId = frameView()->hostWindow()->platformPageClient();
+#if USE(ACCELERATED_COMPOSITING)
+    m_platformPlayer = new MMRPlayer(this, tabId, true);
+#else
+    m_platformPlayer = new MMRPlayer(this, tabId, false);
+#endif
 }
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
@@ -127,7 +132,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
         static_cast<VideoLayerWebKitThread*>(m_platformLayer.get())->setMediaPlayer(0);
 #endif
 
-    delete m_platformPlayer;
+    deleteGuardedObject(m_platformPlayer);
 }
 
 void MediaPlayerPrivate::load(const String& url)
@@ -601,6 +606,50 @@ void MediaPlayerPrivate::onPauseNotified()
         element->pause();
 }
 
+static const int popupDialogInterval = 10;
+static const double checkMetadataReadyInterval = 0.5;
+void MediaPlayerPrivate::onWaitMetadataNotified(bool hasFinished, int timeWaited)
+{
+    if (!hasFinished) {
+        if (!m_waitMetadataTimer.isActive()) {
+            // Make sure to popup dialog every 10 seconds after metadata start to load.
+            // This should be set only once at the first time when user press the play button.
+            m_waitMetadataPopDialogCounter = static_cast<int>(timeWaited / checkMetadataReadyInterval);
+            m_waitMetadataTimer.startOneShot(checkMetadataReadyInterval);
+        }
+    } else if (m_waitMetadataTimer.isActive()) {
+        m_waitMetadataTimer.stop();
+        m_waitMetadataPopDialogCounter = 0;
+    }
+}
+
+void MediaPlayerPrivate::waitMetadataTimerFired(Timer<MediaPlayerPrivate>*)
+{
+    if (m_platformPlayer->isMetadataReady()) {
+        m_platformPlayer->playWithMetadataReady();
+        m_waitMetadataPopDialogCounter = 0;
+        return;
+    }
+
+    static const int hitTimeToPopupDialog = static_cast<int>(popupDialogInterval / checkMetadataReadyInterval);
+    m_waitMetadataPopDialogCounter++;
+    if (m_waitMetadataPopDialogCounter < hitTimeToPopupDialog) {
+        m_waitMetadataTimer.startOneShot(checkMetadataReadyInterval);
+        return;
+    }
+    m_waitMetadataPopDialogCounter = 0;
+
+    int wait = showErrorDialog(MMRPlayer::MediaMetaDataTimeoutError);
+    if (!wait)
+        onPauseNotified();
+    else {
+        if (m_platformPlayer->isMetadataReady())
+            m_platformPlayer->playWithMetadataReady();
+        else
+            m_waitMetadataTimer.startOneShot(checkMetadataReadyInterval);
+    }
+}
+
 #if USE(ACCELERATED_COMPOSITING)
 void MediaPlayerPrivate::onBuffering(bool flag)
 {
@@ -644,10 +693,8 @@ int MediaPlayerPrivate::showErrorDialog(MMRPlayer::Error type)
     }
 
     int rc = 0;
-    HTMLMediaElement* element = static_cast<HTMLMediaElement*>(m_webCorePlayer->mediaPlayerClient());
-    Document* topdoc = element->document()->topDocument();
-    if (topdoc->view() && topdoc->view()->hostWindow())
-        rc = topdoc->view()->hostWindow()->platformPageClient()->showAlertDialog(atype);
+    if (frameView() && frameView()->hostWindow())
+        rc = frameView()->hostWindow()->platformPageClient()->showAlertDialog(atype);
     return rc;
 }
 
@@ -673,6 +720,13 @@ BlackBerry::Platform::Graphics::Window* MediaPlayerPrivate::platformWindow()
 bool MediaPlayerPrivate::isFullscreen() const
 {
     return m_fullscreenWebPageClient;
+}
+
+bool MediaPlayerPrivate::isTabVisible() const
+{
+    if (frameView() && frameView()->hostWindow())
+        return frameView()->hostWindow()->platformPageClient()->isVisible();
+    return true;
 }
 
 #if USE(ACCELERATED_COMPOSITING)

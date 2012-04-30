@@ -102,20 +102,8 @@ SVGImage::~SVGImage()
 
 void SVGImage::setContainerSize(const IntSize&)
 {
+    // SVGImageCache already intercepted this call, as it stores & caches the desired container sizes & zoom levels.
     ASSERT_NOT_REACHED();
-}
-
-bool SVGImage::usesContainerSize() const
-{
-    if (!m_page)
-        return false;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = static_cast<SVGDocument*>(frame->document())->rootElement();
-    if (!rootElement)
-        return false;
-    if (RenderSVGRoot* renderer = toRenderSVGRoot(rootElement->renderer()))
-        return !renderer->containerSize().isEmpty();
-    return false;
 }
 
 IntSize SVGImage::size() const
@@ -338,20 +326,9 @@ bool SVGImage::dataChanged(bool allDataReceived)
         static FrameLoaderClient* dummyFrameLoaderClient =  new EmptyFrameLoaderClient;
 
         Page::PageClients pageClients;
+        fillWithEmptyClients(pageClients);
         m_chromeClient = adoptPtr(new SVGImageChromeClient(this));
         pageClients.chromeClient = m_chromeClient.get();
-#if ENABLE(CONTEXT_MENUS)
-        static ContextMenuClient* dummyContextMenuClient = new EmptyContextMenuClient;
-        pageClients.contextMenuClient = dummyContextMenuClient;
-#endif
-        static EditorClient* dummyEditorClient = new EmptyEditorClient;
-        pageClients.editorClient = dummyEditorClient;
-#if ENABLE(DRAG_SUPPORT)
-        static DragClient* dummyDragClient = new EmptyDragClient;
-        pageClients.dragClient = dummyDragClient;
-#endif
-        static InspectorClient* dummyInspectorClient = new EmptyInspectorClient;
-        pageClients.inspectorClient = dummyInspectorClient;
 
         // FIXME: If this SVG ends up loading itself, we might leak the world.
         // The Cache code does not know about CachedImages holding Frames and

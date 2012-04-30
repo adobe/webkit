@@ -68,7 +68,6 @@ TestController& TestController::shared()
 
 TestController::TestController(int argc, const char* argv[])
     : m_dumpPixels(false)
-    , m_skipPixelTestOption(false)
     , m_verbose(false)
     , m_printSeparators(false)
     , m_usingServerMode(false)
@@ -260,11 +259,6 @@ void TestController::initialize(int argc, const char* argv[])
             continue;
         }
 
-        if (argument == "--skip-pixel-test-if-no-baseline") {
-            m_skipPixelTestOption = true;
-            continue;
-        }
-
         if (argument == "--pixel-tests") {
             m_dumpPixels = true;
             continue;
@@ -411,6 +405,7 @@ void TestController::initialize(int argc, const char* argv[])
         0, // didDetectXSSForFrame
         0, // didNewFirstVisuallyNonEmptyLayout
         0, // willGoToBackForwardListItem
+        0, // interactionOccurredWhileProcessUnresponsive
     };
     WKPageSetPageLoaderClient(m_mainWebView->page(), &pageLoaderClient);
 }
@@ -431,6 +426,8 @@ bool TestController::resetStateToConsistentValues()
     WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), resetMessageBody.get());
 
     WKContextSetShouldUseFontSmoothing(TestController::shared().context(), false);
+
+    WKContextSetCacheModel(TestController::shared().context(), kWKCacheModelDocumentBrowser);
 
     // FIXME: This function should also ensure that there is only one page open.
 
@@ -475,6 +472,7 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetSansSerifFontFamily(preferences, sansSerifFontFamily);
     WKPreferencesSetSerifFontFamily(preferences, serifFontFamily);
 #endif
+    WKPreferencesSetInspectorUsesWebKitUserInterface(preferences, true);
 
     // in the case that a test using the chrome input field failed, be sure to clean up for the next test
     m_mainWebView->removeChromeInputField();
@@ -515,7 +513,6 @@ bool TestController::runTest(const char* test)
     m_state = RunningTest;
 
     m_currentInvocation = adoptPtr(new TestInvocation(pathOrURL));
-    m_currentInvocation->setSkipPixelTestOption(m_skipPixelTestOption);
     if (m_dumpPixels)
         m_currentInvocation->setIsPixelTest(expectedPixelHash);
 
@@ -707,6 +704,17 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             bool enable = static_cast<bool>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, enableKey.get()))));
 
             m_eventSenderProxy->setTouchModifier(modifier, enable);
+            return 0;
+        }
+
+        if (WKStringIsEqualToUTF8CString(subMessageName, "SetTouchPointRadius")) {
+            WKRetainPtr<WKStringRef> xKey = adoptWK(WKStringCreateWithUTF8CString("RadiusX"));
+            int x = static_cast<int>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, xKey.get()))));
+
+            WKRetainPtr<WKStringRef> yKey = adoptWK(WKStringCreateWithUTF8CString("RadiusY"));
+            int y = static_cast<int>(WKUInt64GetValue(static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, yKey.get()))));
+
+            m_eventSenderProxy->setTouchPointRadius(x, y);
             return 0;
         }
 

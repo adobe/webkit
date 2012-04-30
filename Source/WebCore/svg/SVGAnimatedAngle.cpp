@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Research In Motion Limited 2011. All rights reserved.
+ * Copyright (C) Research In Motion Limited 2011, 2012. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,6 +23,7 @@
 #include "SVGAnimatedAngle.h"
 
 #include "SVGAnimateElement.h"
+#include "SVGMarkerElement.h"
 
 namespace WebCore {
 
@@ -34,102 +35,124 @@ SVGAnimatedAngleAnimator::SVGAnimatedAngleAnimator(SVGAnimationElement* animatio
 static inline SVGAngle& sharedSVGAngle(const String& valueAsString)
 {
     DEFINE_STATIC_LOCAL(SVGAngle, sharedAngle, ());
-    ExceptionCode ec = 0;
-    sharedAngle.setValueAsString(valueAsString, ec);
-    ASSERT(!ec);
+    sharedAngle.setValueAsString(valueAsString, ASSERT_NO_EXCEPTION);
     return sharedAngle;
 }
 
 PassOwnPtr<SVGAnimatedType> SVGAnimatedAngleAnimator::constructFromString(const String& string)
 {
-    OwnPtr<SVGAnimatedType> animatedType = SVGAnimatedType::createAngle(new SVGAngle);
-    ExceptionCode ec = 0;
-    animatedType->angle().setValueAsString(string, ec);
-    ASSERT(!ec);
+    OwnPtr<SVGAnimatedType> animatedType = SVGAnimatedType::createAngleAndEnumeration(new pair<SVGAngle, unsigned>);
+    pair<SVGAngle, unsigned>& animatedPair = animatedType->angleAndEnumeration();
+
+    SVGAngle angle;
+    SVGMarkerOrientType orientType = SVGPropertyTraits<SVGMarkerOrientType>::fromString(string,  angle);
+    if (orientType > 0)
+        animatedPair.second = orientType;
+    if (orientType == SVGMarkerOrientAngle)
+        animatedPair.first = angle;
+
     return animatedType.release();
 }
 
-void SVGAnimatedAngleAnimator::calculateFromAndToValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& toString)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedAngleAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    animationElement->determinePropertyValueTypes(fromString, toString);
-
-    from = constructFromString(fromString);
-    to = constructFromString(toString);
+    return SVGAnimatedType::createAngleAndEnumeration(constructFromBaseValues<SVGAnimatedAngle, SVGAnimatedEnumeration>(animatedTypes));
 }
 
-void SVGAnimatedAngleAnimator::calculateFromAndByValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& byString)
+void SVGAnimatedAngleAnimator::stopAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    animationElement->determinePropertyValueTypes(fromString, byString);
-    
-    from = constructFromString(fromString);
-    to = constructFromString(byString);
-    
-    SVGAngle& fromAngle = from->angle();
-    SVGAngle& toAngle = to->angle();
+    stopAnimValAnimationForTypes<SVGAnimatedAngle, SVGAnimatedEnumeration>(animatedTypes);
+}
+
+void SVGAnimatedAngleAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+{
+    resetFromBaseValues<SVGAnimatedAngle, SVGAnimatedEnumeration>(animatedTypes, type, &SVGAnimatedType::angleAndEnumeration);
+}
+
+void SVGAnimatedAngleAnimator::animValWillChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValWillChangeForTypes<SVGAnimatedAngle, SVGAnimatedEnumeration>(animatedTypes);
+}
+
+void SVGAnimatedAngleAnimator::animValDidChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValDidChangeForTypes<SVGAnimatedAngle, SVGAnimatedEnumeration>(animatedTypes);
+}
+
+void SVGAnimatedAngleAnimator::addAnimatedTypes(SVGAnimatedType* from, SVGAnimatedType* to)
+{
+    ASSERT(from->type() == AnimatedAngle);
+    ASSERT(from->type() == to->type());
+
+    pair<SVGAngle, unsigned>& fromAngleAndEnumeration = from->angleAndEnumeration();
+    pair<SVGAngle, unsigned>& toAngleAndEnumeration = to->angleAndEnumeration();
+    // Only respect by animations, if from and by are both specified in angles (and not eg. 'auto').
+    if (fromAngleAndEnumeration.second != toAngleAndEnumeration.second || fromAngleAndEnumeration.second != SVGMarkerOrientAngle)
+        return;
+    SVGAngle& fromAngle = fromAngleAndEnumeration.first;
+    SVGAngle& toAngle = toAngleAndEnumeration.first;
     toAngle.setValue(toAngle.value() + fromAngle.value());
 }
 
-void SVGAnimatedAngleAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount,
-                                                      OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+void SVGAnimatedAngleAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
 {
     ASSERT(m_animationElement);
     ASSERT(m_contextElement);
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
     
-    AnimationMode animationMode = animationElement->animationMode();
-    // To animation uses contributions from the lower priority animations as the base value.
-    // FIXME: Avoid string parsing.
-    if (animationMode == ToAnimation)
-        from = constructFromString(animated->angle().valueAsString());
-    
-    // Replace 'inherit' by their computed property values.
-    float number;
-    float fromAngle = from->angle().value();
-    float toAngle = to->angle().value();
-    
-    if (animationElement->fromPropertyValueType() == InheritValue) {
-        String fromAngleString;
-        animationElement->adjustForInheritance(m_contextElement, animationElement->attributeName(), fromAngleString);
-        fromAngle = sharedSVGAngle(fromAngleString).value();
+    pair<SVGAngle, unsigned>& fromAngleAndEnumeration = from->angleAndEnumeration();
+    pair<SVGAngle, unsigned>& toAngleAndEnumeration = to->angleAndEnumeration();
+    pair<SVGAngle, unsigned>& animatedAngleAndEnumeration = animated->angleAndEnumeration();
+    m_animationElement->adjustFromToValues<pair<SVGAngle, unsigned> >(0, fromAngleAndEnumeration, toAngleAndEnumeration, animatedAngleAndEnumeration, percentage, m_contextElement);
+
+    if (fromAngleAndEnumeration.second != toAngleAndEnumeration.second) {
+        // Animating from eg. auto to 90deg, or auto to 90deg.
+        if (fromAngleAndEnumeration.second == SVGMarkerOrientAngle) {
+            // Animating from an angle value to eg. 'auto' - this disabled additive as 'auto' is a keyword..
+            if (toAngleAndEnumeration.second == SVGMarkerOrientAuto) {
+                if (percentage < 0.5f) {
+                    animatedAngleAndEnumeration.first = fromAngleAndEnumeration.first;
+                    animatedAngleAndEnumeration.second = SVGMarkerOrientAngle;
+                    return;
+                }
+                animatedAngleAndEnumeration.first.setValue(0);
+                animatedAngleAndEnumeration.second = SVGMarkerOrientAuto;
+                return;
+            }
+            animatedAngleAndEnumeration.first.setValue(0);
+            animatedAngleAndEnumeration.second = SVGMarkerOrientUnknown;
+            return;
+        }
     }
-    if (animationElement->toPropertyValueType() == InheritValue) {
-        String toAngleString;
-        animationElement->adjustForInheritance(m_contextElement, animationElement->attributeName(), toAngleString);
-        toAngle = sharedSVGAngle(toAngleString).value(); 
+
+    // From 'auto' to 'auto'.
+    if (fromAngleAndEnumeration.second == SVGMarkerOrientAuto) {
+        animatedAngleAndEnumeration.first.setValue(0);
+        animatedAngleAndEnumeration.second = SVGMarkerOrientAuto;
+        return;
     }
-    
-    if (animationElement->calcMode() == CalcModeDiscrete)
-        number = percentage < 0.5f ? fromAngle : toAngle;
-    else
-        number = (toAngle - fromAngle) * percentage + fromAngle;
-    
-    // FIXME: This is not correct for values animation.
-    if (animationElement->isAccumulated() && repeatCount)
-        number += toAngle * repeatCount;
-    SVGAngle& animatedSVGAngle = animated->angle();
-    if (animationElement->isAdditive() && animationMode != ToAnimation) {
-        float animatedSVGAngleValue = animatedSVGAngle.value();
-        animatedSVGAngleValue += number;
-        animatedSVGAngle.setValue(animatedSVGAngleValue);
-    } else
-        animatedSVGAngle.setValue(number);
+
+    // If the enumeration value is not angle or auto, its unknown.
+    if (fromAngleAndEnumeration.second != SVGMarkerOrientAngle) {
+        animatedAngleAndEnumeration.first.setValue(0);
+        animatedAngleAndEnumeration.second = SVGMarkerOrientUnknown;
+        return;
+    }
+
+    // Regular from angle to angle animation, with all features like additive etc.
+    animatedAngleAndEnumeration.second = SVGMarkerOrientAngle;
+
+    SVGAngle& animatedSVGAngle = animatedAngleAndEnumeration.first;
+    float animatedAngle = animatedSVGAngle.value();
+    m_animationElement->animateAdditiveNumber(percentage, repeatCount, fromAngleAndEnumeration.first.value(), toAngleAndEnumeration.first.value(), animatedAngle);
+    animatedSVGAngle.setValue(animatedAngle);
 }
 
 float SVGAnimatedAngleAnimator::calculateDistance(const String& fromString, const String& toString)
 {
-    ExceptionCode ec = 0;
     SVGAngle from = SVGAngle();
-    from.setValueAsString(fromString, ec);
-    ASSERT(!ec);
+    from.setValueAsString(fromString, ASSERT_NO_EXCEPTION);
     SVGAngle to = SVGAngle();
-    to.setValueAsString(toString, ec);
-    ASSERT(!ec);
+    to.setValueAsString(toString, ASSERT_NO_EXCEPTION);
     return fabsf(to.value() - from.value());
 }
 

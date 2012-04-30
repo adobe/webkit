@@ -66,7 +66,7 @@ WebInspector.ScriptFormatter.positionToLocation = function(lineEndings, position
 WebInspector.ScriptFormatter.prototype = {
     /**
      * @param {string} mimeType
-     * @param {string} content
+     * @param {?string} content
      * @param {function(string, WebInspector.FormattedSourceMapping)} callback
      */
     formatContent: function(mimeType, content, callback)
@@ -78,9 +78,6 @@ WebInspector.ScriptFormatter.prototype = {
         this._worker.postMessage({ method: method, params: parameters });
     },
 
-    /**
-     * @param {WebInspector.Event} event
-     */
     _didFormatContent: function(event)
     {
         var task = this._tasks.shift();
@@ -98,7 +95,7 @@ WebInspector.ScriptFormatter.prototype = {
     {
         if (!this._cachedWorker) {
             this._cachedWorker = new Worker("ScriptFormatterWorker.js");
-            this._cachedWorker.onmessage = this._didFormatContent.bind(this);
+            this._cachedWorker.onmessage = /** @type {function(this:Worker)} */ this._didFormatContent.bind(this);
         }
         return this._cachedWorker;
     }

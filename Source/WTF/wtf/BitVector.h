@@ -146,7 +146,13 @@ public:
         ensureSize(bit + 1);
         quickSet(bit);
     }
-    
+
+    void ensureSizeAndSet(size_t bit, size_t size)
+    {
+        ensureSize(size);
+        quickSet(bit);
+    }
+
     void clear(size_t bit)
     {
         if (bit >= size())
@@ -169,17 +175,17 @@ private:
     {
         return sizeof(void*) << 3;
     }
-    
+
     static unsigned maxInlineBits()
     {
         return bitsInPointer() - 1;
     }
-    
+
     static size_t byteCount(size_t bitCount)
     {
         return (bitCount + 7) >> 3;
     }
-    
+
     static uintptr_t makeInlineBits(uintptr_t bits)
     {
         ASSERT(!(bits & (static_cast<uintptr_t>(1) << maxInlineBits())));

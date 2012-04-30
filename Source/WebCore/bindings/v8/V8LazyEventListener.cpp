@@ -44,24 +44,25 @@
 #include "V8HiddenPropertyName.h"
 #include "V8Node.h"
 #include "V8Proxy.h"
+#include "V8RecursionScope.h"
 #include "WorldContextHandle.h"
 
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
-V8LazyEventListener::V8LazyEventListener(const AtomicString& functionName, const AtomicString& eventParameterName, const String& code, const String sourceURL, const TextPosition& position, PassRefPtr<Node> node, const WorldContextHandle& worldContext)
+V8LazyEventListener::V8LazyEventListener(const AtomicString& functionName, const AtomicString& eventParameterName, const String& code, const String sourceURL, const TextPosition& position, Node* node, const WorldContextHandle& worldContext)
     : V8AbstractEventListener(true, worldContext)
     , m_functionName(functionName)
     , m_eventParameterName(eventParameterName)
     , m_code(code)
     , m_sourceURL(sourceURL)
     , m_node(node)
-    , m_formElement(0)
     , m_position(position)
+#ifndef NDEBUG
+    , m_prepared(false)
+#endif
 {
-    if (m_node && m_node->isHTMLElement())
-        m_formElement = static_cast<HTMLElement*>(m_node.get())->form();
 }
 
 template<typename T>
@@ -155,9 +156,12 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
     if (script.IsEmpty())
         return;
 
-    // Call v8::Script::Run() directly to avoid an erroneous call to V8RecursionScope::didLeaveScriptContext().
     // FIXME: Remove this code when we stop doing the 'with' hack above.
-    v8::Local<v8::Value> value = script->Run();
+    v8::Local<v8::Value> value;
+    {
+        V8RecursionScope::MicrotaskSuppression scope;
+        value = script->Run();
+    }
     if (value.IsEmpty())
         return;
 
@@ -165,19 +169,22 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
     ASSERT(value->IsFunction());
     v8::Local<v8::Function> intermediateFunction = value.As<v8::Function>();
 
-    v8::Handle<v8::Object> nodeWrapper = toObjectWrapper<Node>(m_node.get());
-    v8::Handle<v8::Object> formWrapper = toObjectWrapper<HTMLFormElement>(m_formElement.get());
-    v8::Handle<v8::Object> documentWrapper = toObjectWrapper<Document>(m_node ? m_node->ownerDocument() : 0);
+    HTMLFormElement* formElement = 0;
+    if (m_node && m_node->isHTMLElement())
+        formElement = static_cast<HTMLElement*>(m_node)->form();
 
-    m_node.clear();
-    m_formElement.clear();
+    v8::Handle<v8::Object> nodeWrapper = toObjectWrapper<Node>(m_node);
+    v8::Handle<v8::Object> formWrapper = toObjectWrapper<HTMLFormElement>(formElement);
+    v8::Handle<v8::Object> documentWrapper = toObjectWrapper<Document>(m_node ? m_node->ownerDocument() : 0);
 
     v8::Handle<v8::Value> parameters[3] = { nodeWrapper, formWrapper, documentWrapper };
 
-    // Use Call directly to avoid an erroneous call to V8RecursionScope::didLeaveScriptContext().
     // FIXME: Remove this code when we stop doing the 'with' hack above.
-    v8::Local<v8::Value> innerValue = intermediateFunction->Call(v8Context->Global(), 3, parameters);
-
+    v8::Local<v8::Value> innerValue;
+    {
+        V8RecursionScope::MicrotaskSuppression scope;
+        innerValue = intermediateFunction->Call(v8Context->Global(), 3, parameters);
+    }
     if (innerValue.IsEmpty() || !innerValue->IsFunction())
         return;
 
@@ -211,6 +218,21 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
     }
 
     wrappedFunction->SetName(v8::String::New(fromWebCoreString(m_functionName), m_functionName.length()));
+
+    // FIXME: Remove m_prepared and the following comment-outs.
+    // See https://bugs.webkit.org/show_bug.cgi?id=85152 for more details.
+#ifndef NDEBUG
+    // Checks if the second parsing never happens. Currently the second parsing can happen
+    // in a popup window.
+    ASSERT(!m_prepared);
+    m_prepared = true;
+#endif
+    // Comments out the following code since the second parsing can happen.
+    // // Since we only parse once, there's no need to keep data used for parsing around anymore.
+    // m_functionName = String();
+    // m_code = String();
+    // m_eventParameterName = String();
+    // m_sourceURL = String();
 
     setListenerObject(wrappedFunction);
 }

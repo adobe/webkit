@@ -68,15 +68,14 @@ static bool hasTouchListener(Element* element)
         || element->hasEventListeners(eventNames().touchendEvent);
 }
 
-static bool elementExpectsMouseEvents(Element* element)
+static bool isRangeControlElement(Element* element)
 {
-    // Make sure we are not operating a shadow node here, since the webpages
-    // aren't able to attach event listeners to shadow content.
     ASSERT(element);
-    while (element->isInShadowTree())
-        element = toElement(element->shadowAncestorNode());
+    if (!element->hasTagName(HTMLNames::inputTag))
+        return false;
 
-    return hasMouseMoveListener(element) && !hasTouchListener(element);
+    HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(element);
+    return inputElement->isRangeControl();
 }
 
 static bool shouldConvertTouchToMouse(Element* element)
@@ -84,23 +83,25 @@ static bool shouldConvertTouchToMouse(Element* element)
     if (!element)
         return false;
 
-    // Range element are a special case that require natural mouse events in order to allow
-    // dragging of the slider handle.
-    if (element->hasTagName(HTMLNames::inputTag)) {
-        HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(element);
-        if (inputElement->isRangeControl())
-            return true;
-    }
-
     if ((element->hasTagName(HTMLNames::objectTag) || element->hasTagName(HTMLNames::embedTag)) && static_cast<HTMLPlugInElement*>(element))
         return true;
 
+    // Input Range element is a special case that requires natural mouse events
+    // in order to allow dragging of the slider handle.
+    // Input Range element might appear in the webpage, or it might appear in the shadow tree,
+    // like the timeline and volume media controls all use Input Range.
+    // won't operate on the shadow node of other element type, because the webpages
+    // aren't able to attach listeners to shadow content.
+    do {
+        element = toElement(element->shadowAncestorNode()); // If an element is not in shadow tree, shadowAncestorNode returns itself.
+        if (isRangeControlElement(element))
+            return true;
+    } while (element->isInShadowTree());
+
     // Check if the element has a mouse listener and no touch listener. If so,
     // the field will require touch events be converted to mouse events to function properly.
-    if (elementExpectsMouseEvents(element))
-        return true;
+    return hasMouseMoveListener(element) && !hasTouchListener(element);
 
-    return false;
 }
 
 TouchEventHandler::TouchEventHandler(WebPagePrivate* webpage)
@@ -215,6 +216,7 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
         }
     case Platform::TouchPoint::TouchReleased:
         {
+            unsigned spellLength = spellCheck(point);
             // Apply any suppressed changes. This does not eliminate the need
             // for the show after the handling of fat finger pressed as it may
             // have triggered a state change.
@@ -240,8 +242,6 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
             PlatformMouseEvent mouseEvent(adjustedPoint, m_lastScreenPoint, PlatformEvent::MouseReleased, 1, LeftButton, TouchScreen);
             m_webPage->handleMouseEvent(mouseEvent);
             m_lastFatFingersResult.reset(); // Reset the fat finger result as its no longer valid when a user's finger is not on the screen.
-
-            unsigned spellLength = spellCheck(point);
             if (spellLength) {
                 unsigned end = m_webPage->m_inputHandler->caretPosition();
                 unsigned start = end - spellLength;
@@ -272,7 +272,7 @@ unsigned TouchEventHandler::spellCheck(Platform::TouchPoint& touchPoint)
     if (!m_lastFatFingersResult.isTextInput() || !elementUnderFatFinger)
         return 0;
 
-    IntPoint contentPos(m_webPage->mapFromViewportToContents(touchPoint.m_pos));
+    LayoutPoint contentPos(m_webPage->mapFromViewportToContents(touchPoint.m_pos));
     contentPos = DOMSupport::convertPointToFrame(m_webPage->mainFrame(), m_webPage->focusedOrMainFrame(), contentPos);
 
     Document* document = elementUnderFatFinger->document();
@@ -282,7 +282,7 @@ unsigned TouchEventHandler::spellCheck(Platform::TouchPoint& touchPoint)
         return 0;
 
     IntRect rect = marker->renderedRect();
-    IntPoint newContentPos = IntPoint(rect.x() + rect.width(), rect.y() + rect.height() / 2);
+    LayoutPoint newContentPos = LayoutPoint(rect.x() + rect.width(), rect.y() + rect.height() / 2);
     Frame* frame = m_webPage->focusedOrMainFrame();
     if (frame != m_webPage->mainFrame())
         newContentPos = m_webPage->mainFrame()->view()->windowToContents(frame->view()->contentsToWindow(newContentPos));

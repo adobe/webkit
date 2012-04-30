@@ -44,6 +44,7 @@ WebInspector.TabbedPane = function()
     this._tabs = [];
     this._tabsHistory = [];
     this._tabsById = {};
+    this.element.addEventListener("click", this.focus.bind(this), false);
 
     this._dropDownButton = this._createDropDownButton();
 }
@@ -55,7 +56,7 @@ WebInspector.TabbedPane.EventTypes = {
 
 WebInspector.TabbedPane.prototype = {
     /**
-     * @type {WebInspector.View}
+     * @return {WebInspector.View}
      */
     get visibleView()
     {
@@ -63,7 +64,7 @@ WebInspector.TabbedPane.prototype = {
     },
 
     /**
-     * @type {string}
+     * @return {string}
      */
     get selectedTabId()
     {
@@ -84,6 +85,11 @@ WebInspector.TabbedPane.prototype = {
     set closeableTabs(closeableTabs)
     {
         this._closeableTabs = closeableTabs;
+    },
+
+    defaultFocusedElement: function()
+    {
+        return this.visibleView ? this.visibleView.defaultFocusedElement() : null;
     },
 
     /**
@@ -172,7 +178,7 @@ WebInspector.TabbedPane.prototype = {
         this._tabsHistory.splice(0, 0, tab);
         
         this._updateTabElements();
-        
+
         var eventData = { tabId: id, view: tab.view, isUserGesture: userGesture };
         this.dispatchEventToListeners(WebInspector.TabbedPane.EventTypes.TabSelected, eventData);
         return true;
@@ -488,11 +494,13 @@ WebInspector.TabbedPaneTab = function(tabbedPane, measureElement, id, title, clo
     this._tooltip = tooltip;
     this._view = view;
     this.shown = false;
+    /** @type {number} */ this._measuredWidth;
+    /** @type {Element} */ this._tabElement;
 }
 
 WebInspector.TabbedPaneTab.prototype = {
     /**
-     * @type {string}
+     * @return {string}
      */
     get id()
     {
@@ -500,7 +508,7 @@ WebInspector.TabbedPaneTab.prototype = {
     },
 
     /**
-     * @type {string}
+     * @return {string}
      */
     get title()
     {
@@ -516,7 +524,7 @@ WebInspector.TabbedPaneTab.prototype = {
     },
 
     /**
-     * @type {WebInspector.View}
+     * @return {WebInspector.View}
      */
     get view()
     {
@@ -529,7 +537,7 @@ WebInspector.TabbedPaneTab.prototype = {
     },
 
     /**
-     * @type {string|undefined}
+     * @return {string|undefined}
      */
     get tooltip()
     {
@@ -544,7 +552,7 @@ WebInspector.TabbedPaneTab.prototype = {
     },
 
     /**
-     * @type {Element}
+     * @return {Element}
      */
     get tabElement()
     {
@@ -556,7 +564,7 @@ WebInspector.TabbedPaneTab.prototype = {
     },
 
     /**
-     * @type {number}
+     * @return {number}
      */
     get measuredWidth()
     {
@@ -568,7 +576,7 @@ WebInspector.TabbedPaneTab.prototype = {
     },
 
     /**
-     * @type {number}
+     * @return {number}
      */
     get width()
     {
@@ -588,6 +596,7 @@ WebInspector.TabbedPaneTab.prototype = {
     {
         var tabElement = document.createElement("div");
         tabElement.addStyleClass("tabbed-pane-header-tab");
+        tabElement.tabIndex = -1;
         
         var titleElement = tabElement.createChild("span", "tabbed-pane-header-tab-title");
         titleElement.textContent = this.title;
@@ -627,5 +636,6 @@ WebInspector.TabbedPaneTab.prototype = {
             this._tabbedPane.closeTab(this.id, true);
         else
             this._tabbedPane.selectTab(this.id, true);
+        this._tabbedPane.focus();
     }
 }

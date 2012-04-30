@@ -164,7 +164,7 @@ OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSC
 
 OpaqueJSClassContextData& OpaqueJSClass::contextData(ExecState* exec)
 {
-    OwnPtr<OpaqueJSClassContextData>& contextData = exec->globalData().opaqueJSClassData.add(this, nullptr).first->second;
+    OwnPtr<OpaqueJSClassContextData>& contextData = exec->globalData().opaqueJSClassData.add(this, nullptr).iterator->second;
     if (!contextData)
         contextData = adoptPtr(new OpaqueJSClassContextData(exec->globalData(), this));
     return *contextData;
@@ -211,7 +211,7 @@ JSObject* OpaqueJSClass::prototype(ExecState* exec)
 
     if (!jsClassData.cachedPrototype) {
         // Recursive, but should be good enough for our purposes
-        jsClassData.cachedPrototype = PassWeak<JSObject>(exec->globalData(), JSCallbackObject<JSNonFinalObject>::create(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackObjectStructure(), prototypeClass, &jsClassData), 0); // set jsClassData as the object's private data, so it can clear our reference on destruction
+        jsClassData.cachedPrototype = PassWeak<JSObject>(JSCallbackObject<JSNonFinalObject>::create(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackObjectStructure(), prototypeClass, &jsClassData), 0); // set jsClassData as the object's private data, so it can clear our reference on destruction
         if (parentClass) {
             if (JSObject* prototype = parentClass->prototype(exec))
                 jsClassData.cachedPrototype->setPrototype(exec->globalData(), prototype);

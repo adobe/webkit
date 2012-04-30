@@ -236,7 +236,7 @@ void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
     [NSCursor setHiddenUntilMouseMoves:hiddenUntilMouseMoves];
 }
 
-void PageClientImpl::didChangeViewportProperties(const WebCore::ViewportArguments&)
+void PageClientImpl::didChangeViewportProperties(const WebCore::ViewportAttributes&)
 {
 }
 
@@ -463,7 +463,7 @@ void PageClientImpl::dismissDictionaryLookupPanel()
 #endif
 }
 
-void PageClientImpl::showCorrectionPanel(CorrectionPanelInfo::PanelType type, const FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings)
+void PageClientImpl::showCorrectionPanel(AlternativeTextType type, const FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings)
 {
 #if !defined(BUILDING_ON_SNOW_LEOPARD)
     if (!isViewVisible() || !isViewInWindow())
@@ -472,14 +472,14 @@ void PageClientImpl::showCorrectionPanel(CorrectionPanelInfo::PanelType type, co
 #endif
 }
 
-void PageClientImpl::dismissCorrectionPanel(ReasonForDismissingCorrectionPanel reason)
+void PageClientImpl::dismissCorrectionPanel(ReasonForDismissingAlternativeText reason)
 {
 #if !defined(BUILDING_ON_SNOW_LEOPARD)
     m_correctionPanel.dismiss(reason);
 #endif
 }
 
-String PageClientImpl::dismissCorrectionPanelSoon(WebCore::ReasonForDismissingCorrectionPanel reason)
+String PageClientImpl::dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText reason)
 {
 #if !defined(BUILDING_ON_SNOW_LEOPARD)
     return m_correctionPanel.dismiss(reason);
@@ -488,10 +488,10 @@ String PageClientImpl::dismissCorrectionPanelSoon(WebCore::ReasonForDismissingCo
 #endif
 }
 
-void PageClientImpl::recordAutocorrectionResponse(EditorClient::AutocorrectionResponseType responseType, const String& replacedString, const String& replacementString)
+void PageClientImpl::recordAutocorrectionResponse(AutocorrectionResponseType responseType, const String& replacedString, const String& replacementString)
 {
 #if !defined(BUILDING_ON_SNOW_LEOPARD)
-    NSCorrectionResponse response = responseType == EditorClient::AutocorrectionReverted ? NSCorrectionResponseReverted : NSCorrectionResponseEdited;
+    NSCorrectionResponse response = responseType == AutocorrectionReverted ? NSCorrectionResponseReverted : NSCorrectionResponseEdited;
     CorrectionPanel::recordAutocorrectionResponse(m_wkView, response, replacedString, replacementString);
 #endif
 }

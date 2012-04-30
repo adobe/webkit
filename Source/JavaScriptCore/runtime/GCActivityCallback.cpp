@@ -42,7 +42,11 @@ DefaultGCActivityCallback::~DefaultGCActivityCallback()
 {
 }
 
-void DefaultGCActivityCallback::operator()()
+void DefaultGCActivityCallback::didAllocate(size_t)
+{
+}
+
+void DefaultGCActivityCallback::willCollect()
 {
 }
 

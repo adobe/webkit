@@ -72,8 +72,9 @@ public:
 
     bool complete() const;
 
-    bool haveFiredLoadEvent() const { return m_imageLoader.haveFiredLoadEvent(); }
-    bool hasPendingActivity() const { return !m_imageLoader.haveFiredLoadEvent(); }
+    // FIXME: Why do we have two names for the same thing?
+    bool hasPendingLoadEvent() const { return m_imageLoader.hasPendingLoadEvent(); }
+    bool hasPendingActivity() const { return m_imageLoader.hasPendingLoadEvent(); }
 
     virtual bool canContainRangeEndPoint() const { return false; }
     
@@ -101,10 +102,8 @@ private:
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
-    virtual void insertedIntoDocument();
-    virtual void insertedIntoTree(bool deep);
-    virtual void removedFromTree(bool deep);
-
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
     virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return true; }
 

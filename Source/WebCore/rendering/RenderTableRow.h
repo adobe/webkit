@@ -42,6 +42,12 @@ public:
     void updateBeforeAndAfterContent();
     void paintOutlineForRowIfNeeded(PaintInfo&, const LayoutPoint&);
 
+    static RenderTableRow* createAnonymousWithParentRenderer(const RenderObject*);
+    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE
+    {
+        return createAnonymousWithParentRenderer(parent);
+    }
+
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }

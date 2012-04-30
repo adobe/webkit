@@ -54,10 +54,6 @@ WebInspector.SourceFrame = function(url)
     this._textViewer.readOnly = !this.canEditSource();
 }
 
-WebInspector.SourceFrame.Events = {
-    Loaded: "loaded"
-}
-
 WebInspector.SourceFrame.createSearchRegex = function(query)
 {
     var regex;
@@ -94,9 +90,9 @@ WebInspector.SourceFrame.prototype = {
         this._clearLineToReveal();
     },
 
-    focus: function()
+    defaultFocusedElement: function()
     {
-        this._textViewer.focus();
+        return this._textViewer.defaultFocusedElement();
     },
 
     get loaded()
@@ -122,6 +118,9 @@ WebInspector.SourceFrame.prototype = {
         }
     },
 
+    /**
+     * @param {function(?string, boolean, string)} callback
+     */
     requestContent: function(callback)
     {
     },
@@ -211,12 +210,17 @@ WebInspector.SourceFrame.prototype = {
     {
     },
 
-    setContent: function(mimeType, content)
+    /**
+     * @param {?string} content
+     * @param {boolean} contentEncoded
+     * @param {string} mimeType
+     */
+    setContent: function(content, contentEncoded, mimeType)
     {
         this._textViewer.mimeType = mimeType;
 
         this._loaded = true;
-        this._textModel.setText(null, content);
+        this._textModel.setText(content || "");
 
         this._textViewer.beginUpdates();
 
@@ -237,10 +241,12 @@ WebInspector.SourceFrame.prototype = {
             delete this._delayedFindSearchMatches;
         }
 
-        this.dispatchEventToListeners(WebInspector.SourceFrame.Events.Loaded);
+        this.onTextViewerContentLoaded();
 
         this._textViewer.endUpdates();
     },
+
+    onTextViewerContentLoaded: function() {},
 
     _setTextViewerDecorations: function()
     {
@@ -478,10 +484,6 @@ WebInspector.SourceFrame.prototype = {
         WebInspector.populateResourceContextMenu(contextMenu, this._url, lineNumber);
     },
 
-    suggestedFileName: function()
-    {
-    },
-
     inheritScrollPositions: function(sourceFrame)
     {
         this._textViewer.inheritScrollPositions(sourceFrame._textViewer);
@@ -551,11 +553,6 @@ WebInspector.TextViewerDelegateForSourceFrame.prototype = {
     populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
         this._sourceFrame.populateTextAreaContextMenu(contextMenu, lineNumber);
-    },
-
-    suggestedFileName: function()
-    {
-        return this._sourceFrame.suggestedFileName();
     }
 }
 

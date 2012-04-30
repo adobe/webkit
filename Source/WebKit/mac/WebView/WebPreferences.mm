@@ -397,6 +397,7 @@ static WebCacheModel cacheModelForMainBundle(void)
         [NSNumber numberWithBool:NO],   WebKitShouldDisplayCaptionsPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplayTextDescriptionsPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitNotificationsEnabledKey,
+        [NSNumber numberWithBool:NO],   WebKitShouldRespectImageOrientationKey,
 
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheTotalQuota,
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheDefaultOriginQuota,
@@ -1606,16 +1607,6 @@ static NSString *classIBCreatorID = nil;
 
 }
 
-- (void)setSuppressIncrementalRendering:(BOOL)flag
-{
-    [self _setBoolValue:flag forKey:WebKitSuppressesIncrementalRenderingKey];
-}
-
-- (BOOL)suppressIncrementalRendering
-{
-    return [self _boolValueForKey:WebKitSuppressesIncrementalRenderingKey];
-}
-
 - (void)setBackspaceKeyNavigationEnabled:(BOOL)flag
 {
     [self _setBoolValue:flag forKey:WebKitBackspaceKeyNavigationEnabledKey];
@@ -1674,6 +1665,26 @@ static NSString *classIBCreatorID = nil;
 - (BOOL)regionBasedColumnsEnabled
 {
     return [self _boolValueForKey:WebKitRegionBasedColumnsEnabledKey];
+}
+
+- (void)setShouldRespectImageOrientation:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitShouldRespectImageOrientationKey];
+}
+
+- (BOOL)shouldRespectImageOrientation
+{
+    return [self _boolValueForKey:WebKitShouldRespectImageOrientationKey];
+}
+
+- (void)setIncrementalRenderingSuppressionTimeoutInSeconds:(NSTimeInterval)timeout
+{
+    [self _setFloatValue:timeout forKey:WebKitIncrementalRenderingSuppressionTimeoutInSecondsKey];
+}
+
+- (NSTimeInterval)incrementalRenderingSuppressionTimeoutInSeconds
+{
+    return [self _floatValueForKey:WebKitIncrementalRenderingSuppressionTimeoutInSecondsKey];
 }
 
 - (void)setCSSRegionsAutoHeightEnabled:(BOOL)flag

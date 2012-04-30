@@ -31,6 +31,7 @@
 #include "AudioContext.h"
 #include "AudioNodeInput.h"
 #include "AudioNodeOutput.h"
+#include "AudioParam.h"
 #include "ExceptionCode.h"
 #include <wtf/Atomics.h>
 #include <wtf/MainThread.h>
@@ -42,7 +43,8 @@ AudioNode::AudioNode(AudioContext* context, float sampleRate)
     , m_nodeType(NodeTypeUnknown)
     , m_context(context)
     , m_sampleRate(sampleRate)
-    , m_lastProcessingTime(-1.0)
+    , m_lastProcessingTime(-1)
+    , m_lastNonSilentTime(-1)
     , m_normalRefCount(1) // start out with normal refCount == 1 (like WTF::RefCounted class)
     , m_connectionRefCount(0)
     , m_disabledRefCount(0)
@@ -148,6 +150,30 @@ void AudioNode::connect(AudioNode* destination, unsigned outputIndex, unsigned i
     context()->incrementConnectionCount();
 }
 
+void AudioNode::connect(AudioParam* param, unsigned outputIndex, ExceptionCode& ec)
+{
+    ASSERT(isMainThread());
+    AudioContext::AutoLocker locker(context());
+
+    if (!param) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
+    if (outputIndex >= numberOfOutputs()) {
+        ec = INDEX_SIZE_ERR;
+        return;
+    }
+
+    if (context() != param->context()) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
+    AudioNodeOutput* output = this->output(outputIndex);
+    param->connect(output);
+}
+
 void AudioNode::disconnect(unsigned outputIndex, ExceptionCode& ec)
 {
     ASSERT(isMainThread());
@@ -160,7 +186,7 @@ void AudioNode::disconnect(unsigned outputIndex, ExceptionCode& ec)
     }
 
     AudioNodeOutput* output = this->output(outputIndex);
-    output->disconnectAllInputs();
+    output->disconnectAll();
 }
 
 void AudioNode::processIfNecessary(size_t framesToProcess)
@@ -177,8 +203,19 @@ void AudioNode::processIfNecessary(size_t framesToProcess)
     double currentTime = context()->currentTime();
     if (m_lastProcessingTime != currentTime) {
         m_lastProcessingTime = currentTime; // important to first update this time because of feedback loops in the rendering graph
+
         pullInputs(framesToProcess);
-        process(framesToProcess);
+
+        bool silentInputs = inputsAreSilent();
+        if (!silentInputs)
+            m_lastNonSilentTime = (context()->currentSampleFrame() + framesToProcess) / static_cast<double>(m_sampleRate);
+
+        if (silentInputs && propagatesSilence())
+            silenceOutputs();
+        else {
+            process(framesToProcess);
+            unsilenceOutputs();
+        }
     }
 }
 
@@ -193,6 +230,11 @@ void AudioNode::checkNumberOfChannelsForInput(AudioNodeInput* input)
     input->updateInternalBus();
 }
 
+bool AudioNode::propagatesSilence() const
+{
+    return m_lastNonSilentTime + latencyTime() + tailTime() < context()->currentTime();
+}
+
 void AudioNode::pullInputs(size_t framesToProcess)
 {
     ASSERT(context()->isAudioThread());
@@ -200,6 +242,27 @@ void AudioNode::pullInputs(size_t framesToProcess)
     // Process all of the AudioNodes connected to our inputs.
     for (unsigned i = 0; i < m_inputs.size(); ++i)
         input(i)->pull(0, framesToProcess);
+}
+
+bool AudioNode::inputsAreSilent()
+{
+    for (unsigned i = 0; i < m_inputs.size(); ++i) {
+        if (!input(i)->bus()->isSilent())
+            return false;
+    }
+    return true;
+}
+
+void AudioNode::silenceOutputs()
+{
+    for (unsigned i = 0; i < m_outputs.size(); ++i)
+        output(i)->bus()->zero();
+}
+
+void AudioNode::unsilenceOutputs()
+{
+    for (unsigned i = 0; i < m_outputs.size(); ++i)
+        output(i)->bus()->clearSilentFlag();
 }
 
 void AudioNode::ref(RefType refType)
@@ -299,7 +362,7 @@ void AudioNode::finishDeref(RefType refType)
             if (!m_isMarkedForDeletion) {
                 // All references are gone - we need to go away.
                 for (unsigned i = 0; i < m_outputs.size(); ++i)
-                    output(i)->disconnectAllInputs(); // this will deref() nodes we're connected to...
+                    output(i)->disconnectAll(); // This will deref() nodes we're connected to.
 
                 // Mark for deletion at end of each render quantum or when context shuts down.
                 context()->markForDeletion(this);

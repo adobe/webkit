@@ -32,7 +32,6 @@
 
 #include "AXObjectCache.h"
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "Document.h"
 #include "DocumentEventQueue.h"
 #include "EventHandler.h"
@@ -58,6 +57,7 @@
 #include "Scrollbar.h"
 #include "ScrollbarTheme.h"
 #include "SpatialNavigation.h"
+#include "StyleResolver.h"
 #include <math.h>
 
 using namespace std;
@@ -125,7 +125,7 @@ void RenderListBox::updateFromElement()
                 FontDescription d = itemFont.fontDescription();
                 d.setWeight(d.bolderWeight());
                 itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-                itemFont.update(document()->styleSelector()->fontSelector());
+                itemFont.update(document()->styleResolver()->fontSelector());
             }
 
             if (!text.isEmpty()) {
@@ -409,7 +409,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
 
     unsigned length = itemText.length();
     const UChar* string = itemText.characters();
-    TextRun textRun(string, length, false, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), isOverride(itemStyle->unicodeBidi()), TextRun::NoRounding);
+    TextRun textRun(string, length, false, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), isOverride(itemStyle->unicodeBidi()), true, TextRun::NoRounding);
     Font itemFont = style()->font();
     LayoutRect r = itemBoundingBoxRect(paintOffset, listIndex);
     r.move(itemOffsetForAlignment(textRun, itemStyle, itemFont, r));
@@ -418,7 +418,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
         FontDescription d = itemFont.fontDescription();
         d.setWeight(d.bolderWeight());
         itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-        itemFont.update(document()->styleSelector()->fontSelector());
+        itemFont.update(document()->styleResolver()->fontSelector());
     }
 
     // Draw the item text

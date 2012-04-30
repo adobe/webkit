@@ -82,111 +82,6 @@ inline float square(float n)
 
 }  // namespace
 
-// "Seatbelt" functions ------------------------------------------------------
-//
-// These functions check certain graphics primitives for being "safe".
-// Skia has historically crashed when sent crazy data. These functions do
-// additional checking to prevent crashes.
-//
-// Ideally, all of these would be fixed in the graphics layer and we would not
-// have to do any checking. You can uncomment the ENSURE_VALUE_SAFETY_FOR_SKIA
-// flag to check the graphics layer.
-
-// Disabling these checks (20/01/2010), since we think we've fixed all the Skia
-// bugs.  Leaving the code in for now, so we can revert easily if necessary.
-// #define ENSURE_VALUE_SAFETY_FOR_SKIA
-
-#ifdef ENSURE_VALUE_SAFETY_FOR_SKIA
-static bool isCoordinateSkiaSafe(float coord)
-{
-    // First check for valid floats.
-#if defined(_MSC_VER)
-    if (!_finite(coord))
-#else
-    if (!finite(coord))
-#endif
-        return false;
-
-    // Skia uses 16.16 fixed point and 26.6 fixed point in various places. If
-    // the transformed point exceeds 15 bits, we just declare that it's
-    // unreasonable to catch both of these cases.
-    static const int maxPointMagnitude = 32767;
-    if (coord > maxPointMagnitude || coord < -maxPointMagnitude)
-        return false;
-
-    return true;
-}
-#endif
-
-static bool isPointSkiaSafe(const SkMatrix& transform, const SkPoint& pt)
-{
-#ifdef ENSURE_VALUE_SAFETY_FOR_SKIA
-    // Now check for points that will overflow. We check the *transformed*
-    // points since this is what will be rasterized.
-    SkPoint xPt;
-    transform.mapPoints(&xPt, &pt, 1);
-    return isCoordinateSkiaSafe(xPt.fX) && isCoordinateSkiaSafe(xPt.fY);
-#else
-    return true;
-#endif
-}
-
-static bool isRectSkiaSafe(const SkMatrix& transform, const SkRect& rc)
-{
-#ifdef ENSURE_VALUE_SAFETY_FOR_SKIA
-    SkPoint topleft = {rc.fLeft, rc.fTop};
-    SkPoint bottomright = {rc.fRight, rc.fBottom};
-    return isPointSkiaSafe(transform, topleft) && isPointSkiaSafe(transform, bottomright);
-#else
-    return true;
-#endif
-}
-
-bool isPathSkiaSafe(const SkMatrix& transform, const SkPath& path)
-{
-#ifdef ENSURE_VALUE_SAFETY_FOR_SKIA
-    SkPoint current_points[4];
-    SkPath::Iter iter(path, false);
-    for (SkPath::Verb verb = iter.next(current_points);
-         verb != SkPath::kDone_Verb;
-         verb = iter.next(current_points)) {
-        switch (verb) {
-        case SkPath::kMove_Verb:
-            // This move will be duplicated in the next verb, so we can ignore.
-            break;
-        case SkPath::kLine_Verb:
-            // iter.next returns 2 points.
-            if (!isPointSkiaSafe(transform, current_points[0])
-                || !isPointSkiaSafe(transform, current_points[1]))
-                return false;
-            break;
-        case SkPath::kQuad_Verb:
-            // iter.next returns 3 points.
-            if (!isPointSkiaSafe(transform, current_points[0])
-                || !isPointSkiaSafe(transform, current_points[1])
-                || !isPointSkiaSafe(transform, current_points[2]))
-                return false;
-            break;
-        case SkPath::kCubic_Verb:
-            // iter.next returns 4 points.
-            if (!isPointSkiaSafe(transform, current_points[0])
-                || !isPointSkiaSafe(transform, current_points[1])
-                || !isPointSkiaSafe(transform, current_points[2])
-                || !isPointSkiaSafe(transform, current_points[3]))
-                return false;
-            break;
-        case SkPath::kClose_Verb:
-        case SkPath::kDone_Verb:
-        default:
-            break;
-        }
-    }
-    return true;
-#else
-    return true;
-#endif
-}
-
 // Local helper functions ------------------------------------------------------
 
 void addCornerArc(SkPath* path, const SkRect& rect, const IntSize& size, int startAngle)
@@ -271,23 +166,20 @@ void GraphicsContext::beginPlatformTransparencyLayer(float opacity)
     // (the surface of the page) but layers on top may have transparent parts.
     // Without explicitly setting the alpha flag, the layer will inherit the
     // opaque setting of the base and some things won't work properly.
+    SkCanvas::SaveFlags saveFlags = static_cast<SkCanvas::SaveFlags>(SkCanvas::kHasAlphaLayer_SaveFlag | SkCanvas::kFullColorLayer_SaveFlag);
 
     SkPaint layerPaint;
     layerPaint.setAlpha(static_cast<unsigned char>(opacity * 255));
     layerPaint.setXfermodeMode(platformContext()->getXfermodeMode());
 
-    platformContext()->canvas()->saveLayer(
-        0,
-        &layerPaint,
-        static_cast<SkCanvas::SaveFlags>(SkCanvas::kHasAlphaLayer_SaveFlag |
-                                         SkCanvas::kFullColorLayer_SaveFlag));
+    platformContext()->saveLayer(0, &layerPaint, saveFlags);
 }
 
 void GraphicsContext::endPlatformTransparencyLayer()
 {
     if (paintingDisabled())
         return;
-    platformContext()->canvas()->restore();
+    platformContext()->restoreLayer();
 }
 
 bool GraphicsContext::supportsTransparencyLayers()
@@ -303,9 +195,6 @@ void GraphicsContext::addInnerRoundedRectClip(const IntRect& rect, int thickness
         return;
 
     SkRect r(rect);
-    if (!isRectSkiaSafe(getCTM(), r))
-        return;
-
     SkPath path;
     path.addOval(r, SkPath::kCW_Direction);
     // only perform the inset if we won't invert r
@@ -332,9 +221,6 @@ void GraphicsContext::clearRect(const FloatRect& rect)
         return;
 
     SkRect r = rect;
-    if (!isRectSkiaSafe(getCTM(), r))
-        ClipRectToCanvas(*platformContext()->canvas(), r, &r);
-
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     paint.setXfermodeMode(SkXfermode::kClear_Mode);
@@ -347,11 +233,7 @@ void GraphicsContext::clip(const FloatRect& rect)
     if (paintingDisabled())
         return;
 
-    SkRect r(rect);
-    if (!isRectSkiaSafe(getCTM(), r))
-        return;
-
-    platformContext()->canvas()->clipRect(r);
+    platformContext()->canvas()->clipRect(rect);
 }
 
 void GraphicsContext::clip(const Path& path)
@@ -359,11 +241,7 @@ void GraphicsContext::clip(const Path& path)
     if (paintingDisabled())
         return;
 
-    const SkPath& p = *path.platformPath();
-    if (!isPathSkiaSafe(getCTM(), p))
-        return;
-
-    platformContext()->clipPathAntiAliased(p);
+    platformContext()->clipPathAntiAliased(*path.platformPath());
 }
 
 void GraphicsContext::canvasClip(const Path& path)
@@ -371,11 +249,7 @@ void GraphicsContext::canvasClip(const Path& path)
     if (paintingDisabled())
         return;
 
-    const SkPath& p = *path.platformPath();
-    if (!isPathSkiaSafe(getCTM(), p))
-        return;
-
-    platformContext()->canvasClipPath(p);
+    platformContext()->canvasClipPath(*path.platformPath());
 }
 
 void GraphicsContext::clipOut(const IntRect& rect)
@@ -383,11 +257,7 @@ void GraphicsContext::clipOut(const IntRect& rect)
     if (paintingDisabled())
         return;
 
-    SkRect r(rect);
-    if (!isRectSkiaSafe(getCTM(), r))
-        return;
-
-    platformContext()->canvas()->clipRect(r, SkRegion::kDifference_Op);
+    platformContext()->canvas()->clipRect(rect, SkRegion::kDifference_Op);
 }
 
 void GraphicsContext::clipOut(const Path& p)
@@ -395,10 +265,8 @@ void GraphicsContext::clipOut(const Path& p)
     if (paintingDisabled())
         return;
 
-    SkPath path = *p.platformPath();
-    if (!isPathSkiaSafe(getCTM(), path))
-        return;
-
+    // We must make a copy of the path, to mark it as inverse-filled.
+    SkPath path(*p.platformPath());
     path.toggleInverseFillType();
     platformContext()->clipPathAntiAliased(path);
 }
@@ -408,12 +276,15 @@ void GraphicsContext::clipPath(const Path& pathToClip, WindRule clipRule)
     if (paintingDisabled())
         return;
 
-    SkPath path = *pathToClip.platformPath();
-    if (!isPathSkiaSafe(getCTM(), path))
-        return;
-
-    path.setFillType(clipRule == RULE_EVENODD ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType);
-    platformContext()->clipPathAntiAliased(path);
+    const SkPath* path = pathToClip.platformPath();
+    SkPath::FillType ftype = (clipRule == RULE_EVENODD) ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+    SkPath storage;
+    if (path->getFillType() != ftype) {
+        storage = *path;
+        storage.setFillType(ftype);
+        path = &storage;
+    }
+    platformContext()->clipPathAntiAliased(*path);
 }
 
 void GraphicsContext::concatCTM(const AffineTransform& affine)
@@ -467,9 +338,6 @@ void GraphicsContext::drawConvexPolygon(size_t numPoints,
     SkPath path;
     setPathFromConvexPoints(&path, numPoints, points);
 
-    if (!isPathSkiaSafe(getCTM(), path))
-        return;
-
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     paint.setAntiAlias(shouldAntialias);
@@ -493,9 +361,6 @@ void GraphicsContext::clipConvexPolygon(size_t numPoints, const FloatPoint* poin
         return;
 
     SkPath path;
-    if (!isPathSkiaSafe(getCTM(), path))
-        return;
-
     setPathFromConvexPoints(&path, numPoints, points);
     if (antialiased)
         platformContext()->clipPathAntiAliased(path);
@@ -510,9 +375,6 @@ void GraphicsContext::drawEllipse(const IntRect& elipseRect)
         return;
 
     SkRect rect = elipseRect;
-    if (!isRectSkiaSafe(getCTM(), rect))
-        return;
-
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     platformContext()->canvas()->drawOval(rect, paint);
@@ -603,9 +465,6 @@ void GraphicsContext::drawLine(const IntPoint& point1, const IntPoint& point2)
         return;
 
     SkPaint paint;
-    if (!isPointSkiaSafe(getCTM(), point1) || !isPointSkiaSafe(getCTM(), point2))
-        return;
-
     FloatPoint p1 = point1;
     FloatPoint p2 = point2;
     bool isVerticalLine = (p1.x() == p2.x());
@@ -648,7 +507,7 @@ void GraphicsContext::drawLine(const IntPoint& point1, const IntPoint& point2)
     platformContext()->didDrawPoints(SkCanvas::kLines_PointMode, 2, pts, paint);
 }
 
-void GraphicsContext::drawLineForTextChecking(const FloatPoint& pt, float width, TextCheckingLineStyle style)
+void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float width, DocumentMarkerLineStyle style)
 {
     if (paintingDisabled())
         return;
@@ -788,13 +647,7 @@ void GraphicsContext::drawRect(const IntRect& rect)
     if (paintingDisabled())
         return;
 
-    SkRect r = rect;
-    if (!isRectSkiaSafe(getCTM(), r)) {
-        // See the fillRect below.
-        ClipRectToCanvas(*platformContext()->canvas(), r, &r);
-    }
-
-    platformContext()->drawRect(r);
+    platformContext()->drawRect(rect);
 }
 
 void GraphicsContext::fillPath(const Path& pathToFill)
@@ -802,19 +655,23 @@ void GraphicsContext::fillPath(const Path& pathToFill)
     if (paintingDisabled())
         return;
 
-    SkPath path = *pathToFill.platformPath();
-    if (!isPathSkiaSafe(getCTM(), path))
-      return;
-
     const GraphicsContextState& state = m_state;
-    path.setFillType(state.fillRule == RULE_EVENODD ?
-        SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType);
+    SkPath::FillType ftype = state.fillRule == RULE_EVENODD ?
+        SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+
+    const SkPath* path = pathToFill.platformPath();
+    SkPath storage;
+    if (path->getFillType() != ftype) {
+        storage = *path;
+        storage.setFillType(ftype);
+        path = &storage;
+    }
 
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
 
-    platformContext()->canvas()->drawPath(path, paint);
-    platformContext()->didDrawPath(path, paint);
+    platformContext()->canvas()->drawPath(*path, paint);
+    platformContext()->didDrawPath(*path, paint);
 }
 
 void GraphicsContext::fillRect(const FloatRect& rect)
@@ -823,19 +680,11 @@ void GraphicsContext::fillRect(const FloatRect& rect)
         return;
 
     SkRect r = rect;
-    if (!isRectSkiaSafe(getCTM(), r)) {
-        // See the other version of fillRect below.
-        ClipRectToCanvas(*platformContext()->canvas(), r, &r);
-    }
-
-    platformContext()->save();
 
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     platformContext()->canvas()->drawRect(r, paint);
     platformContext()->didDrawRect(r, paint);
-
-    platformContext()->restore();
 }
 
 void GraphicsContext::fillRect(const FloatRect& rect, const Color& color, ColorSpace colorSpace)
@@ -844,20 +693,6 @@ void GraphicsContext::fillRect(const FloatRect& rect, const Color& color, ColorS
         return;
 
     SkRect r = rect;
-    if (!isRectSkiaSafe(getCTM(), r)) {
-        // Special case when the rectangle overflows fixed point. This is a
-        // workaround to fix bug 1212844. When the input rectangle is very
-        // large, it can overflow Skia's internal fixed point rect. This
-        // should be fixable in Skia (since the output bitmap isn't that
-        // large), but until that is fixed, we try to handle it ourselves.
-        //
-        // We manually clip the rectangle to the current clip rect. This
-        // will prevent overflow. The rectangle will be transformed to the
-        // canvas' coordinate space before it is converted to fixed point
-        // so we are guaranteed not to overflow after doing this.
-        ClipRectToCanvas(*platformContext()->canvas(), r, &r);
-    }
-
     SkPaint paint;
     platformContext()->setupPaintCommon(&paint);
     paint.setColor(color.rgb());
@@ -876,11 +711,6 @@ void GraphicsContext::fillRoundedRect(const IntRect& rect,
     if (paintingDisabled())
         return;
 
-    SkRect r = rect;
-    if (!isRectSkiaSafe(getCTM(), r))
-        // See fillRect().
-        ClipRectToCanvas(*platformContext()->canvas(), r, &r);
-
     if (topLeft.width() + topRight.width() > rect.width()
             || bottomLeft.width() + bottomRight.width() > rect.width()
             || topLeft.height() + bottomLeft.height() > rect.height()
@@ -892,6 +722,7 @@ void GraphicsContext::fillRoundedRect(const IntRect& rect,
         return;
     }
 
+    SkRect r = rect;
     SkPath path;
     addCornerArc(&path, r, topRight, 270);
     addCornerArc(&path, r, bottomRight, 0);
@@ -1184,8 +1015,6 @@ void GraphicsContext::strokeArc(const IntRect& r, int startAngle, int angleSpan)
 
     SkPath path;
     path.addArc(oval, SkIntToScalar(-startAngle), SkIntToScalar(-angleSpan));
-    if (!isPathSkiaSafe(getCTM(), path))
-        return;
     platformContext()->canvas()->drawPath(path, paint);
     platformContext()->didDrawPath(path, paint);
 }
@@ -1195,10 +1024,7 @@ void GraphicsContext::strokePath(const Path& pathToStroke)
     if (paintingDisabled())
         return;
 
-    SkPath path = *pathToStroke.platformPath();
-    if (!isPathSkiaSafe(getCTM(), path))
-        return;
-
+    const SkPath& path = *pathToStroke.platformPath();
     SkPaint paint;
     platformContext()->setupPaintForStroking(&paint, 0, 0);
     platformContext()->canvas()->drawPath(path, paint);
@@ -1208,9 +1034,6 @@ void GraphicsContext::strokePath(const Path& pathToStroke)
 void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
 {
     if (paintingDisabled())
-        return;
-
-    if (!isRectSkiaSafe(getCTM(), rect))
         return;
 
     SkPaint paint;
@@ -1269,4 +1092,29 @@ CGColorSpaceRef deviceRGBColorSpaceRef()
 }
 #endif
 
+void GraphicsContext::platformFillEllipse(const FloatRect& ellipse)
+{
+    if (paintingDisabled())
+        return;
+
+    SkRect rect = ellipse;
+    SkPaint paint;
+    platformContext()->setupPaintForFilling(&paint);
+    platformContext()->canvas()->drawOval(rect, paint);
+    platformContext()->didDrawBounded(rect, paint);
+}
+
+void GraphicsContext::platformStrokeEllipse(const FloatRect& ellipse)
+{
+    if (paintingDisabled())
+        return;
+
+    SkRect rect(ellipse);
+    SkPaint paint;
+    platformContext()->setupPaintForStroking(&paint, 0, 0);
+    platformContext()->canvas()->drawOval(rect, paint);
+    platformContext()->didDrawBounded(rect, paint);
+}
+
 }  // namespace WebCore
+

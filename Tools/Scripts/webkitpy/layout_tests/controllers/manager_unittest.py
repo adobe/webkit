@@ -214,7 +214,7 @@ class ManagerTest(unittest.TestCase):
         host = MockHost()
         port = host.port_factory.get(port_name=options.platform, options=options)
         run_webkit_tests._set_up_derived_options(port, options)
-        printer = printing.Printer(port, options, StringIO.StringIO(), StringIO.StringIO(), configure_logging=False)
+        printer = printing.Printer(port, options, StringIO.StringIO(), StringIO.StringIO())
         manager = LockCheckingManager(port, options, printer)
         manager.collect_tests(args)
         manager.parse_expectations()
@@ -229,7 +229,8 @@ class ManagerTest(unittest.TestCase):
         manager = Manager(port=port, options=MockOptions(), printer=Mock())
 
         manager._options = MockOptions(exit_after_n_failures=None, exit_after_n_crashes_or_timeouts=None)
-        result_summary = ResultSummary(expectations=Mock(), test_files=[])
+        manager._test_files = ['foo/bar.html', 'baz.html']
+        result_summary = ResultSummary(expectations=Mock(), test_files=manager._test_files)
         result_summary.unexpected_failures = 100
         result_summary.unexpected_crashes = 50
         result_summary.unexpected_timeouts = 50
@@ -244,6 +245,9 @@ class ManagerTest(unittest.TestCase):
         # Interrupt if we've exceeded either limit:
         manager._options.exit_after_n_crashes_or_timeouts = 10
         self.assertRaises(TestRunInterruptedException, manager._interrupt_if_at_failure_limits, result_summary)
+
+        self.assertEquals(result_summary.results['foo/bar.html'].type, test_expectations.SKIP)
+        self.assertEquals(result_summary.results['baz.html'].type, test_expectations.SKIP)
 
         manager._options.exit_after_n_crashes_or_timeouts = None
         manager._options.exit_after_n_failures = 10

@@ -382,11 +382,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
         case ListboxPart:
             m_value.ident = CSSValueListbox;
             break;
-        case ListButtonPart:
-#if ENABLE(DATALIST)
-            m_value.ident = CSSValueListButton;
-#endif
-            break;
         case ListItemPart:
             m_value.ident = CSSValueListitem;
             break;
@@ -3834,11 +3829,11 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(WrapFlow wrapFlow)
     case WrapFlowBoth:
         m_value.ident = CSSValueBoth;
         break;
-    case WrapFlowLeft:
-        m_value.ident = CSSValueLeft;
+    case WrapFlowStart:
+        m_value.ident = CSSValueStart;
         break;
-    case WrapFlowRight:
-        m_value.ident = CSSValueRight;
+    case WrapFlowEnd:
+        m_value.ident = CSSValueEnd;
         break;
     case WrapFlowMaximum:
         m_value.ident = CSSValueMaximum;
@@ -3856,10 +3851,10 @@ template<> inline CSSPrimitiveValue::operator WrapFlow() const
         return WrapFlowAuto;
     case CSSValueBoth:
         return WrapFlowBoth;
-    case CSSValueLeft:
-        return WrapFlowLeft;
-    case CSSValueRight:
-        return WrapFlowRight;
+    case CSSValueStart:
+        return WrapFlowStart;
+    case CSSValueEnd:
+        return WrapFlowEnd;
     case CSSValueMaximum:
         return WrapFlowMaximum;
     case CSSValueClear:
@@ -3904,7 +3899,8 @@ enum LengthConversion {
     AutoConversion = 1 << 2,
     PercentConversion = 1 << 3,
     FractionConversion = 1 << 4,
-    CalculatedConversion = 1 << 5
+    CalculatedConversion = 1 << 5,
+    ViewportPercentageConversion = 1 << 6
 };
 
 template<int supported> Length CSSPrimitiveValue::convertToLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
@@ -3923,6 +3919,8 @@ template<int supported> Length CSSPrimitiveValue::convertToLength(RenderStyle* s
         return Length(Auto);
     if ((supported & CalculatedConversion) && isCalculated())
         return Length(cssCalcValue()->toCalcValue(style, rootStyle, multiplier));
+    if ((supported & ViewportPercentageConversion) && isViewportPercentageLength())
+        return viewportPercentageLength();
     return Length(Undefined);
 }
 

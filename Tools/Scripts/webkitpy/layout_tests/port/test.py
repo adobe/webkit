@@ -372,9 +372,6 @@ class TestPort(Port):
     def default_child_processes(self):
         return 1
 
-    def default_worker_model(self):
-        return 'inline'
-
     def worker_startup_delay_secs(self):
         return 0
 
@@ -402,11 +399,12 @@ class TestPort(Port):
     def webkit_base(self):
         return '/test.checkout'
 
-    def skipped_tests(self, test_list):
+    def skipped_layout_tests(self, test_list):
         # This allows us to test the handling Skipped files, both with a test
         # that actually passes, and a test that does fail.
         return set(['failures/expected/skip_text.html',
-                    'failures/unexpected/skip_pass.html'])
+                    'failures/unexpected/skip_pass.html',
+                    'virtual/skipped'])
 
     def name(self):
         return self._name
@@ -491,6 +489,7 @@ class TestPort(Port):
     def virtual_test_suites(self):
         return [
             VirtualTestSuite('virtual/passes', 'passes', ['--virtual-arg']),
+            VirtualTestSuite('virtual/skipped', 'failures/expected', ['--virtual-arg2']),
         ]
 
 class TestDriver(Driver):

@@ -27,12 +27,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import unittest
+import sys
+import os
 
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.layout_tests.port.gtk import GtkPort
 from webkitpy.layout_tests.port import port_testcase
 from webkitpy.common.system.executive_mock import MockExecutive
-
+from webkitpy.thirdparty.mock import Mock
+from webkitpy.common.system.filesystem_mock import MockFileSystem
+from webkitpy.tool.mocktool import MockOptions
 
 class GtkPortTest(port_testcase.PortTestCase):
     port_name = 'gtk'
@@ -43,3 +47,36 @@ class GtkPortTest(port_testcase.PortTestCase):
         port._executive = MockExecutive(should_log=True)
         expected_stderr = "MOCK run_command: ['Tools/Scripts/run-launcher', '--release', '--gtk', 'file://test.html'], cwd=/mock-checkout\n"
         OutputCapture().assert_outputs(self, port.show_results_html_file, ["test.html"], expected_stderr=expected_stderr)
+
+    def assertLinesEqual(self, a, b):
+        if hasattr(self, 'assertMultiLineEqual'):
+            self.assertMultiLineEqual(a, b)
+        else:
+            self.assertEqual(a.splitlines(), b.splitlines())
+
+
+    def test_get_crash_log(self):
+        core_directory = os.environ.get('WEBKIT_CORE_DUMPS_DIRECTORY', '/path/to/coredumps')
+        core_pattern = os.path.join(core_directory, "core-pid_%p-_-process_%e")
+        mock_empty_crash_log = """\
+Crash log for DumpRenderTree (pid 28529):
+
+Coredump core-pid_28529-_-process_DumpRenderTree not found. To enable crash logs:
+
+- run this command as super-user: echo "%(core_pattern)s" > /proc/sys/kernel/core_pattern
+- enable core dumps: ulimit -c unlimited
+- set the WEBKIT_CORE_DUMPS_DIRECTORY environment variable: export WEBKIT_CORE_DUMPS_DIRECTORY=%(core_directory)s
+
+
+STDERR: <empty>""" % locals()
+
+        def _mock_gdb_output(coredump_path):
+            return (mock_empty_crash_log, [])
+
+        port = self.make_port()
+        port._get_gdb_output = mock_empty_crash_log
+        log = port._get_crash_log("DumpRenderTree", 28529, "", "", newer_than=None)
+        self.assertLinesEqual(log, mock_empty_crash_log)
+
+        log = port._get_crash_log("DumpRenderTree", 28529, "", "", newer_than=0.0)
+        self.assertLinesEqual(log, mock_empty_crash_log)

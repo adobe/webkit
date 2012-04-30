@@ -34,6 +34,7 @@
 #include "FloatSize.h"
 #include "Font.h"
 #include "GraphicsTypes.h"
+#include "ImageBuffer.h"
 #include "Path.h"
 #include "PlatformString.h"
 #include <wtf/Vector.h>
@@ -197,8 +198,13 @@ public:
     PassRefPtr<ImageData> createImageData(PassRefPtr<ImageData>, ExceptionCode&) const;
     PassRefPtr<ImageData> createImageData(float width, float height, ExceptionCode&) const;
     PassRefPtr<ImageData> getImageData(float sx, float sy, float sw, float sh, ExceptionCode&) const;
+    PassRefPtr<ImageData> webkitGetImageDataHD(float sx, float sy, float sw, float sh, ExceptionCode&) const;
     void putImageData(ImageData*, float dx, float dy, ExceptionCode&);
     void putImageData(ImageData*, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
+    void webkitPutImageDataHD(ImageData*, float dx, float dy, ExceptionCode&);
+    void webkitPutImageDataHD(ImageData*, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
+
+    float webkitBackingStorePixelRatio() const { return canvas()->deviceScaleFactor(); }
 
     void reset();
 
@@ -306,10 +312,15 @@ private:
     PassOwnPtr<ImageBuffer> createCompositingBuffer(const IntRect&);
     void compositeBuffer(ImageBuffer*, const IntRect&, CompositeOperator);
 
+    void inflateStrokeRect(FloatRect&) const;
+
     template<class T> void fullCanvasCompositedFill(const T&);
     template<class T> void fullCanvasCompositedDrawImage(T*, ColorSpace, const FloatRect&, const FloatRect&, CompositeOperator);
 
     void prepareGradientForDashboard(CanvasGradient* gradient) const;
+
+    PassRefPtr<ImageData> getImageData(ImageBuffer::CoordinateSystem, float sx, float sy, float sw, float sh, ExceptionCode&) const;
+    void putImageData(ImageData*, ImageBuffer::CoordinateSystem, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
 
     Vector<State, 1> m_stateStack;
     bool m_usesCSSCompatibilityParseMode;

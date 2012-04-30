@@ -311,6 +311,7 @@ public:
     void closeWebInspector();
     void evaluateInWebInspector(long callId, JSStringRef script);
     void evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
+    void evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
     void allowRoundingHacks();
 
     bool shouldStayOnPageAfterHandlingBeforeUnload() const { return m_shouldStayOnPageAfterHandlingBeforeUnload; }
@@ -360,6 +361,10 @@ public:
     void setMinimumTimerInterval(double);
 
     void setTextDirection(JSStringRef);
+
+    // Custom full screen behavior.
+    void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
+    bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
 
 private:
     LayoutTestController(const std::string& testPathOrURL, const std::string& expectedPixelHash);
@@ -413,6 +418,7 @@ private:
     bool m_shouldPaintBrokenImage;
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
     bool m_areDesktopNotificationPermissionRequestsIgnored;
+    bool m_customFullScreenBehavior;
 
     std::string m_authenticationUsername;
     std::string m_authenticationPassword; 

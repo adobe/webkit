@@ -177,7 +177,6 @@ struct WKViewInterpretKeyEventsParameters {
     bool _inResignFirstResponder;
     NSEvent *_mouseDownEvent;
     BOOL _ignoringMouseDraggedEvents;
-    BOOL _dragHasStarted;
 
     id _flagsChangedEventMonitor;
 #if ENABLE(GESTURE_EVENTS)
@@ -385,7 +384,6 @@ struct WKViewInterpretKeyEventsParameters {
 
     // Send back an empty string to the plug-in. This will disable text input.
     _data->_page->sendComplexTextInputToPlugin(_data->_pluginComplexTextInputIdentifier, String());
-    _data->_pluginComplexTextInputIdentifier = 0;   // Always reset the identifier when the plugin is disabled.
 }
 
 typedef HashMap<SEL, String> SelectorNameMap;
@@ -538,11 +536,17 @@ WEBCORE_COMMAND(yankAndSelect)
 
 - (BOOL)writeSelectionToPasteboard:(NSPasteboard *)pasteboard types:(NSArray *)types
 {
-    Vector<String> pasteboardTypes;
     size_t numTypes = [types count];
-    for (size_t i = 0; i < numTypes; ++i)
-        pasteboardTypes.append([types objectAtIndex:i]);
-    return _data->_page->writeSelectionToPasteboard([pasteboard name], pasteboardTypes);
+    [pasteboard declareTypes:types owner:nil];
+    for (size_t i = 0; i < numTypes; ++i) {
+        if ([[types objectAtIndex:i] isEqualTo:NSStringPboardType])
+            [pasteboard setString:_data->_page->stringSelectionForPasteboard() forType:NSStringPboardType];
+        else {
+            RefPtr<SharedBuffer> buffer = _data->_page->dataSelectionForPasteboard([types objectAtIndex:i]);
+            [pasteboard setData:buffer ? [buffer->createNSData() autorelease] : nil forType:[types objectAtIndex:i]];
+       }
+    }
+    return YES;
 }
 
 - (void)centerSelectionInVisibleArea:(id)sender 
@@ -722,9 +726,9 @@ static void validateCommandCallback(WKStringRef commandName, bool isEnabled, int
         return YES;
 
     // Add this item to the vector of items for a given command that are awaiting validation.
-    pair<ValidationMap::iterator, bool> addResult = _data->_validationMap.add(commandName, ValidationVector());
-    addResult.first->second.append(item);
-    if (addResult.second) {
+    ValidationMap::AddResult addResult = _data->_validationMap.add(commandName, ValidationVector());
+    addResult.iterator->second.append(item);
+    if (addResult.isNewEntry) {
         // If we are not already awaiting validation for this command, start the asynchronous validation process.
         // FIXME: Theoretically, there is a race here; when we get the answer it might be old, from a previous time
         // we asked for the same command; there is no guarantee the answer is still valid.
@@ -1035,7 +1039,6 @@ NATIVE_EVENT_HANDLER(scrollWheel, Wheel)
 {
     [self _setMouseDownEvent:event];
     _data->_ignoringMouseDraggedEvents = NO;
-    _data->_dragHasStarted = NO;
     [self mouseDownInternal:event];
 }
 
@@ -1275,10 +1278,8 @@ static const short kIOHIDEventTypeScroll = 6;
     if (string) {
         _data->_page->sendComplexTextInputToPlugin(_data->_pluginComplexTextInputIdentifier, string);
 
-        if (!usingLegacyCocoaTextInput) {
+        if (!usingLegacyCocoaTextInput)
             _data->_pluginComplexTextInputState = PluginComplexTextInputDisabled;
-            _data->_pluginComplexTextInputIdentifier = 0;   // Always reset the identifier when the plugin is disabled.
-        }
     }
 
     return didHandleEvent;
@@ -2152,7 +2153,8 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     NSEvent *fakeEvent = [NSEvent mouseEventWithType:NSMouseMoved location:[[flagsChangedEvent window] convertScreenToBase:[NSEvent mouseLocation]]
         modifierFlags:[flagsChangedEvent modifierFlags] timestamp:[flagsChangedEvent timestamp] windowNumber:[flagsChangedEvent windowNumber]
         context:[flagsChangedEvent context] eventNumber:0 clickCount:0 pressure:0];
-    [self mouseMoved:fakeEvent];
+    NativeWebMouseEvent webEvent(fakeEvent, self);
+    _data->_page->handleMouseEvent(webEvent);
 }
 
 - (NSInteger)conversationIdentifier
@@ -2219,6 +2221,9 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 
 - (void)_processDidCrash
 {
+    if (_data->_layerHostingView)
+        [self _exitAcceleratedCompositingMode];
+
     [self _updateRemoteAccessibilityRegistration:NO];
 }
 
@@ -2600,12 +2605,6 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 
 - (void)_setDragImage:(NSImage *)image at:(NSPoint)clientPoint linkDrag:(BOOL)linkDrag
 {
-    // We need to prevent re-entering this call to avoid crashing in AppKit.
-    // Given the asynchronous nature of WebKit2 this can now happen.
-    if (_data->_dragHasStarted)
-        return;
-    
-    _data->_dragHasStarted = YES;
     IntSize size([image size]);
     size.scale(1.0 / _data->_page->deviceScaleFactor());
     [image setSize:size];
@@ -2620,7 +2619,6 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
           pasteboard:[NSPasteboard pasteboardWithName:NSDragPboard]
               source:self
            slideBack:YES];
-    _data->_dragHasStarted = NO;
 }
 
 static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension)
@@ -2799,6 +2797,11 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 }
 
 #if ENABLE(FULLSCREEN_API)
+- (BOOL)hasFullScreenWindowController
+{
+    return (bool)_data->_fullScreenWindowController;
+}
+
 - (WKFullScreenWindowController*)fullScreenWindowController
 {
     if (!_data->_fullScreenWindowController) {
@@ -2852,7 +2855,7 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 
 - (void)handleCorrectionPanelResult:(NSString*)result
 {
-    _data->_page->handleCorrectionPanelResult(result);
+    _data->_page->handleAlternativeTextUIResult(result);
 }
 
 @end
@@ -2927,6 +2930,9 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 - (void)updateLayer
 {
     self.layer.backgroundColor = CGColorGetConstantColor(kCGColorWhite);
+
+    if (DrawingAreaProxy* drawingArea = _data->_page->drawingArea())
+        drawingArea->waitForPossibleGeometryUpdate();
 }
 #endif
 

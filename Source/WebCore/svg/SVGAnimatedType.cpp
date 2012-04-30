@@ -29,12 +29,10 @@
 #include "SVGLengthList.h"
 #include "SVGNumberList.h"
 #include "SVGParserUtilities.h"
-#include "SVGPathParserFactory.h"
+#include "SVGPathByteStream.h"
 #include "SVGPointList.h"
 #include "SVGPreserveAspectRatio.h"
 #include "SVGTransformList.h"
-
-using namespace std;
 
 namespace WebCore {
 
@@ -47,7 +45,7 @@ SVGAnimatedType::~SVGAnimatedType()
 {
     switch (m_type) {
     case AnimatedAngle:
-        delete m_data.angle;
+        delete m_data.angleAndEnumeration;
         break;
     case AnimatedBoolean:
         delete m_data.boolean;
@@ -55,8 +53,14 @@ SVGAnimatedType::~SVGAnimatedType()
     case AnimatedColor:
         delete m_data.color;
         break;
+    case AnimatedEnumeration:
+        delete m_data.enumeration;
+        break;
     case AnimatedInteger:
         delete m_data.integer;
+        break;
+    case AnimatedIntegerOptionalInteger:
+        delete m_data.integerOptionalInteger;
         break;
     case AnimatedLength:
         delete m_data.length;
@@ -91,17 +95,17 @@ SVGAnimatedType::~SVGAnimatedType()
     case AnimatedTransformList:
         delete m_data.transformList;
         break;
-    default:
+    case AnimatedUnknown:
         ASSERT_NOT_REACHED();
         break;
     }
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createAngle(SVGAngle* angle)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createAngleAndEnumeration(std::pair<SVGAngle, unsigned>* angleAndEnumeration)
 {
-    ASSERT(angle);
+    ASSERT(angleAndEnumeration);
     OwnPtr<SVGAnimatedType> animatedType = adoptPtr(new SVGAnimatedType(AnimatedAngle));
-    animatedType->m_data.angle = angle;
+    animatedType->m_data.angleAndEnumeration = angleAndEnumeration;
     return animatedType.release();
 }
 
@@ -121,11 +125,27 @@ PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createColor(Color* color)
     return animatedType.release();
 }
 
+PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createEnumeration(unsigned* enumeration)
+{
+    ASSERT(enumeration);
+    OwnPtr<SVGAnimatedType> animatedType = adoptPtr(new SVGAnimatedType(AnimatedEnumeration));
+    animatedType->m_data.enumeration = enumeration;
+    return animatedType.release();
+}
+
 PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createInteger(int* integer)
 {
     ASSERT(integer);
     OwnPtr<SVGAnimatedType> animatedType = adoptPtr(new SVGAnimatedType(AnimatedInteger));
     animatedType->m_data.integer = integer;
+    return animatedType.release();
+}
+
+PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createIntegerOptionalInteger(pair<int, int>* integerOptionalInteger)
+{
+    ASSERT(integerOptionalInteger);
+    OwnPtr<SVGAnimatedType> animatedType = adoptPtr(new SVGAnimatedType(AnimatedIntegerOptionalInteger));
+    animatedType->m_data.integerOptionalInteger = integerOptionalInteger;
     return animatedType.release();
 }
 
@@ -217,10 +237,10 @@ PassOwnPtr<SVGAnimatedType> SVGAnimatedType::createTransformList(SVGTransformLis
     return animatedType.release();
 }
 
-SVGAngle& SVGAnimatedType::angle()
+std::pair<SVGAngle, unsigned>& SVGAnimatedType::angleAndEnumeration()
 {
     ASSERT(m_type == AnimatedAngle);
-    return *m_data.angle;
+    return *m_data.angleAndEnumeration;
 }
 
 bool& SVGAnimatedType::boolean()
@@ -235,10 +255,22 @@ Color& SVGAnimatedType::color()
     return *m_data.color;
 }
 
+unsigned& SVGAnimatedType::enumeration()
+{
+    ASSERT(m_type == AnimatedEnumeration);
+    return *m_data.enumeration;
+}
+
 int& SVGAnimatedType::integer()
 {
     ASSERT(m_type == AnimatedInteger);
     return *m_data.integer;
+}
+
+pair<int, int>& SVGAnimatedType::integerOptionalInteger()
+{
+    ASSERT(m_type == AnimatedIntegerOptionalInteger);
+    return *m_data.integerOptionalInteger;        
 }
 
 SVGLength& SVGAnimatedType::length()
@@ -310,18 +342,9 @@ SVGTransformList& SVGAnimatedType::transformList()
 String SVGAnimatedType::valueAsString()
 {
     switch (m_type) {
-    case AnimatedAngle:
-        ASSERT(m_data.angle);
-        return m_data.angle->valueAsString();
-    case AnimatedBoolean:
-        ASSERT(m_data.boolean);
-        return *m_data.boolean ? "true" : "false";
     case AnimatedColor:
         ASSERT(m_data.color);
         return m_data.color->serialized();
-    case AnimatedInteger:
-        ASSERT(m_data.integer);
-        return String::number(*m_data.integer);
     case AnimatedLength:
         ASSERT(m_data.length);
         return m_data.length->valueAsString();
@@ -331,24 +354,6 @@ String SVGAnimatedType::valueAsString()
     case AnimatedNumber:
         ASSERT(m_data.number);
         return String::number(*m_data.number);
-    case AnimatedNumberList:
-        ASSERT(m_data.numberList);
-        return m_data.numberList->valueAsString();
-    case AnimatedNumberOptionalNumber:
-        ASSERT(m_data.numberOptionalNumber);
-        return String::number(m_data.numberOptionalNumber->first) + ' ' + String::number(m_data.numberOptionalNumber->second);
-    case AnimatedPath: {
-        ASSERT(m_data.path);
-        String result;
-        SVGPathParserFactory::self()->buildStringFromByteStream(m_data.path, result, UnalteredParsing);
-        return result;
-    }
-    case AnimatedPoints:
-        ASSERT(m_data.pointList);
-        return m_data.pointList->valueAsString();
-    case AnimatedPreserveAspectRatio:
-        ASSERT(m_data.preserveAspectRatio);
-        return m_data.preserveAspectRatio->valueAsString();
     case AnimatedRect:
         ASSERT(m_data.rect);
         return String::number(m_data.rect->x()) + ' ' + String::number(m_data.rect->y()) + ' '
@@ -356,10 +361,22 @@ String SVGAnimatedType::valueAsString()
     case AnimatedString:
         ASSERT(m_data.string);
         return *m_data.string;
-     case AnimatedTransformList:
-        ASSERT(m_data.transformList);
-        return m_data.transformList->valueAsString();
-    default:
+
+    // These types don't appear in the table in SVGStyledElement::cssPropertyToTypeMap() and thus don't need valueAsString() support.
+    case AnimatedAngle:
+    case AnimatedBoolean:
+    case AnimatedEnumeration:
+    case AnimatedInteger:
+    case AnimatedIntegerOptionalInteger:
+    case AnimatedNumberList:
+    case AnimatedNumberOptionalNumber:
+    case AnimatedPath:
+    case AnimatedPoints:
+    case AnimatedPreserveAspectRatio:
+    case AnimatedTransformList:
+    case AnimatedUnknown:
+        // Only SVG DOM animations use these property types - that means valueAsString() is never used for those.
+        ASSERT_NOT_REACHED();
         break;
     }
     ASSERT_NOT_REACHED();
@@ -368,32 +385,17 @@ String SVGAnimatedType::valueAsString()
 
 bool SVGAnimatedType::setValueAsString(const QualifiedName& attrName, const String& value)
 {
-    ExceptionCode ec = 0;
     switch (m_type) {
-    case AnimatedAngle:
-        ASSERT(m_data.angle);
-        m_data.angle->setValueAsString(value, ec);
-        break;
-    case AnimatedBoolean:
-        ASSERT(m_data.boolean);
-        *m_data.boolean = value == "true" ? true : false;
-        break;
     case AnimatedColor:
         ASSERT(m_data.color);
         *m_data.color = value.isEmpty() ? Color() : SVGColor::colorFromRGBColorString(value);
         break;
-    case AnimatedInteger: {
-        ASSERT(m_data.integer);
-        bool ok;
-        *m_data.integer = value.toIntStrict(&ok);
-        if (!ok)
-            ec = 1; // Arbitary value > 0, it doesn't matter as we don't report the exception code.
-        break;
-    }
-    case AnimatedLength:
+    case AnimatedLength: {
         ASSERT(m_data.length);
+        ExceptionCode ec = 0;
         m_data.length->setValueAsString(value, SVGLength::lengthModeForAnimatedLengthAttribute(attrName), ec);
-        break;
+        return !ec;
+    }
     case AnimatedLengthList:
         ASSERT(m_data.lengthList);
         m_data.lengthList->parse(value, SVGLength::lengthModeForAnimatedLengthAttribute(attrName));
@@ -401,31 +403,6 @@ bool SVGAnimatedType::setValueAsString(const QualifiedName& attrName, const Stri
     case AnimatedNumber:
         ASSERT(m_data.number);
         parseNumberFromString(value, *m_data.number);
-        break;
-    case AnimatedNumberList:
-        ASSERT(m_data.numberList);
-        m_data.numberList->parse(value);
-        break;
-    case AnimatedNumberOptionalNumber:
-        ASSERT(m_data.numberOptionalNumber);
-        parseNumberOptionalNumber(value, m_data.numberOptionalNumber->first, m_data.numberOptionalNumber->second);
-        break;
-    case AnimatedPath: {
-        ASSERT(m_data.path);
-        OwnPtr<SVGPathByteStream> pathByteStream = adoptPtr(m_data.path);
-        if (!SVGPathParserFactory::self()->buildSVGPathByteStreamFromString(value, pathByteStream, UnalteredParsing))
-            ec = 1; // Arbitary value > 0, it doesn't matter as we don't report the exception code.
-        m_data.path = pathByteStream.leakPtr();
-        break;
-    }
-    case AnimatedPoints:
-        ASSERT(m_data.pointList);
-        m_data.pointList->clear();
-        pointsListFromSVGData(*m_data.pointList, value);
-        break;
-    case AnimatedPreserveAspectRatio:
-        ASSERT(m_data.preserveAspectRatio);
-        SVGPreserveAspectRatio::parsePreserveAspectRatio(this, value);
         break;
     case AnimatedRect:
         ASSERT(m_data.rect);
@@ -435,47 +412,31 @@ bool SVGAnimatedType::setValueAsString(const QualifiedName& attrName, const Stri
         ASSERT(m_data.string);
         *m_data.string = value;
         break;
+
+    // These types don't appear in the table in SVGStyledElement::cssPropertyToTypeMap() and thus don't need setValueAsString() support. 
+    case AnimatedAngle:
+    case AnimatedBoolean:
+    case AnimatedEnumeration:
+    case AnimatedInteger:
+    case AnimatedIntegerOptionalInteger:
+    case AnimatedNumberList:
+    case AnimatedNumberOptionalNumber:
+    case AnimatedPath:
+    case AnimatedPoints:
+    case AnimatedPreserveAspectRatio:
     case AnimatedTransformList:
-    default:
+    case AnimatedUnknown:
+        // Only SVG DOM animations use these property types - that means setValueAsString() is never used for those.
         ASSERT_NOT_REACHED();
         break;
     }
-    return !ec;
-}
-
-void SVGAnimatedType::setPreserveAspectRatioBaseValue(const SVGPreserveAspectRatio& preserveAspectRatio)
-{
-    ASSERT(m_type == AnimatedPreserveAspectRatio);
-    *m_data.preserveAspectRatio = preserveAspectRatio;
+    return true;
 }
 
 bool SVGAnimatedType::supportsAnimVal(AnimatedPropertyType type)
 {
-    // FIXME: This lists the current state of our animVal support.
-    switch (type) {
-    case AnimatedLength:
-    case AnimatedLengthList:
-    case AnimatedNumber:
-    case AnimatedNumberList:
-    case AnimatedNumberOptionalNumber:
-    case AnimatedTransformList:
-        return true;
-    case AnimatedAngle:
-    case AnimatedBoolean:
-    case AnimatedColor:
-    case AnimatedEnumeration:
-    case AnimatedInteger:
-    case AnimatedPath:
-    case AnimatedPoints:
-    case AnimatedPreserveAspectRatio:
-    case AnimatedRect:
-    case AnimatedString:
-    case AnimatedUnknown:
-        return false;
-    }
-
-    ASSERT_NOT_REACHED();
-    return false;
+    // AnimatedColor is only used for CSS property animations.
+    return type != AnimatedUnknown && type != AnimatedColor;
 }
 
 } // namespace WebCore

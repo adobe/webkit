@@ -60,8 +60,19 @@ messages -> PluginProxy {
     # Called when the plug-in's focus or its containing window focus changes.
     PluginFocusOrWindowFocusChanged(bool pluginHasFocusAndWindowHasFocus)
 
-    # Change whether complext text input is enabled for this plug-in.
+    # Change whether complex text input is enabled for this plug-in.
     SetComplexTextInputState(uint64_t complexTextInputState)
+
+    # Update the layer hosting context ID. Called whenever the layer hosting state changes.
+    SetLayerHostingContextID(uint32_t layerHostingContextID)
+#endif
+
+#if PLUGIN_ARCHITECTURE(X11)
+    # Create the plugin container for windowed plugins
+    CreatePluginContainer() -> (uint64_t windowID)
+
+    # Update geometry of windowed plugin widget
+    WindowedPluginGeometryDidChange(WebCore::IntRect frameRect, WebCore::IntRect clipRect, uint64_t windowID)
 #endif
 }
 

@@ -92,7 +92,7 @@ public:
     // inflexible because it's harder to add new input types if there is
     // scattered code with special cases for various types.
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     virtual bool isColorControl() const;
 #endif
     virtual bool isCheckbox() const;
@@ -235,7 +235,14 @@ public:
     virtual bool isCheckable();
     virtual bool isSteppable() const;
     virtual bool shouldRespectHeightAndWidthAttributes();
+    // If supportsPlaceholder() && !usesFixedPlaceholder(), it means a type
+    // supports the 'placeholder' attribute.
+    // If supportsPlaceholder() && usesFixedPlaceholder(), it means a type
+    // doesn't support the 'placeholder' attribute, but shows
+    // fixedPlaceholder() string as a placeholder.
     virtual bool supportsPlaceholder() const;
+    virtual bool usesFixedPlaceholder() const;
+    virtual String fixedPlaceholder();
     virtual void updatePlaceholderText();
     virtual void multipleAttributeChanged();
     virtual void disabledAttributeChanged();
@@ -283,7 +290,7 @@ namespace InputTypeNames {
 
 const AtomicString& button();
 const AtomicString& checkbox();
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 const AtomicString& color();
 #endif
 const AtomicString& date();

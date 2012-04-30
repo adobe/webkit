@@ -135,6 +135,9 @@ WebProcess::WebProcess()
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     , m_compositingRenderServerPort(MACH_PORT_NULL)
 #endif
+#if PLATFORM(MAC)
+    , m_clearResourceCachesDispatchGroup(0)
+#endif
     , m_fullKeyboardAccessEnabled(false)
 #if PLATFORM(QT)
     , m_networkAccessManager(0)
@@ -147,6 +150,9 @@ WebProcess::WebProcess()
     , m_iconDatabaseProxy(this)
 #if ENABLE(PLUGIN_PROCESS)
     , m_disablePluginProcessMessageTimeout(false)
+#endif
+#if USE(SOUP)
+    , m_soupRequestManager(this)
 #endif
 {
 #if USE(PLATFORM_STRATEGIES)
@@ -503,7 +509,7 @@ WebPage* WebProcess::focusedWebPage() const
     HashMap<uint64_t, RefPtr<WebPage> >::const_iterator end = m_pageMap.end();
     for (HashMap<uint64_t, RefPtr<WebPage> >::const_iterator it = m_pageMap.begin(); it != end; ++it) {
         WebPage* page = (*it).second.get();
-        if (page->windowIsFocused())
+        if (page->windowAndWebPageAreFocused())
             return page;
     }
     return 0;
@@ -518,16 +524,16 @@ void WebProcess::createWebPage(uint64_t pageID, const WebPageCreationParameters&
 {
     // It is necessary to check for page existence here since during a window.open() (or targeted
     // link) the WebPage gets created both in the synchronous handler and through the normal way. 
-    std::pair<HashMap<uint64_t, RefPtr<WebPage> >::iterator, bool> result = m_pageMap.add(pageID, 0);
-    if (result.second) {
-        ASSERT(!result.first->second);
-        result.first->second = WebPage::create(pageID, parameters);
+    HashMap<uint64_t, RefPtr<WebPage> >::AddResult result = m_pageMap.add(pageID, 0);
+    if (result.isNewEntry) {
+        ASSERT(!result.iterator->second);
+        result.iterator->second = WebPage::create(pageID, parameters);
 
         // Balanced by an enableTermination in removeWebPage.
         disableTermination();
     }
 
-    ASSERT(result.first->second);
+    ASSERT(result.iterator->second);
 }
 
 void WebProcess::removeWebPage(uint64_t pageID)
@@ -650,6 +656,13 @@ void WebProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Mes
         return;
     }
 
+#if USE(SOUP)
+    if (messageID.is<CoreIPC::MessageClassWebSoupRequestManager>()) {
+        m_soupRequestManager.didReceiveMessage(connection, messageID, arguments);
+        return;
+    }
+#endif
+
     if (messageID.is<CoreIPC::MessageClassInjectedBundle>()) {
         if (!m_injectedBundle)
             return;
@@ -683,7 +696,7 @@ void WebProcess::didClose(CoreIPC::Connection*)
         pages[i]->close();
     pages.clear();
 
-    gcController().garbageCollectNow();
+    gcController().garbageCollectSoon();
     memoryCache()->setDisabled(true);
 #endif    
 
@@ -739,13 +752,13 @@ WebPageGroupProxy* WebProcess::webPageGroup(uint64_t pageGroupID)
 
 WebPageGroupProxy* WebProcess::webPageGroup(const WebPageGroupData& pageGroupData)
 {
-    std::pair<HashMap<uint64_t, RefPtr<WebPageGroupProxy> >::iterator, bool> result = m_pageGroupMap.add(pageGroupData.pageGroupID, 0);
-    if (result.second) {
-        ASSERT(!result.first->second);
-        result.first->second = WebPageGroupProxy::create(pageGroupData);
+    HashMap<uint64_t, RefPtr<WebPageGroupProxy> >::AddResult result = m_pageGroupMap.add(pageGroupData.pageGroupID, 0);
+    if (result.isNewEntry) {
+        ASSERT(!result.iterator->second);
+        result.iterator->second = WebPageGroupProxy::create(pageGroupData);
     }
 
-    return result.first->second.get();
+    return result.iterator->second.get();
 }
 
 static bool canPluginHandleResponse(const ResourceResponse& response)

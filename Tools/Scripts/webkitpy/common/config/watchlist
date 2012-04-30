@@ -141,6 +141,9 @@
         },
         "WebKitGTKTranslations": {
             "filename": r"Source/WebKit/gtk/po/",
+        },
+        "Media": {
+            "filename": r"(Source|LayoutTests)/.*([Mm]edia|[Aa]udio|[Vv]ideo)",
         }
     },
     "CC_RULES": {
@@ -149,7 +152,7 @@
         # two different accounts as far as bugzilla is concerned.
         "ChromiumDumpRenderTree": [ "tkent@chromium.org", ],
         "ChromiumGraphics": [ "jamesr@chromium.org", "cc-bugs@google.com" ],
-        "ChromiumPublicApi": [ "abarth@webkit.org", "dglazkov@chromium.org", "fishd@chromium.org", "jamesr@chromium.org", "tkent@chromium.org" ],
+        "ChromiumPublicApi": [ "abarth@webkit.org", "dglazkov@chromium.org", "fishd@chromium.org", "jamesr@chromium.org", "tkent+wkapi@chromium.org" ],
         "AppleMacPublicApi": [ "timothy@apple.com" ],
         "Forms": [ "tkent@chromium.org", ],
         "GStreamerGraphics": [ "alexis.menard@openbossa.org", "pnormand@igalia.com", "gns@gnome.org", "mrobinson@webkit.org" ],
@@ -168,11 +171,12 @@
         "QtWebKit2PublicAPI": [ "alexis.menard@openbossa.org", "zoltan@webkit.org", ],
         "QtWebKit2PlatformSpecific": [ "alexis.menard@openbossa.org", "zoltan@webkit.org", ],
         "CSS": [ "alexis.menard@openbossa.org", "macpherson@chromium.org", ],
-        "EFL": [ "rakuco@FreeBSD.org", ],
-        "CMake": [ "rakuco@FreeBSD.org", ],
-        "SoupNetwork": [ "rakuco@FreeBSD.org", "gns@gnome.org", "mrobinson@webkit.org" ],
+        "EFL": [ "rakuco@webkit.org", ],
+        "CMake": [ "rakuco@webkit.org", ],
+        "SoupNetwork": [ "rakuco@webkit.org", "gns@gnome.org", "mrobinson@webkit.org", "danw@gnome.org" ],
         "ScrollingCoordinator": [ "andersca@apple.com", "jamesr@chromium.org", "tonikitoo@webkit.org" ],
         "WebKitGTKTranslations": [ "gns@gnome.org", "mrobinson@webkit.org" ],
+        "Media": [ "feature-media-reviews@chromium.org", "eric.carlson@apple.com" ],
     },
     "MESSAGE_RULES": {
         "ChromiumPublicApi": [ "Please wait for approval from abarth@webkit.org, dglazkov@chromium.org, "

@@ -21,8 +21,8 @@
 #define WebLayerTreeRenderer_h
 
 #if USE(UI_SIDE_COMPOSITING)
-
 #include "BackingStore.h"
+#include "ShareableSurface.h"
 #include "TextureMapper.h"
 #include "TextureMapperBackingStore.h"
 #include "WebLayerTreeInfo.h"
@@ -45,24 +45,41 @@ class WebLayerUpdateInfo;
 
 class WebLayerTreeRenderer : public ThreadSafeRefCounted<WebLayerTreeRenderer>, public WebCore::GraphicsLayerClient {
 public:
+    struct TileUpdate {
+        WebCore::IntRect sourceRect;
+        WebCore::IntRect targetRect;
+        RefPtr<ShareableSurface> surface;
+        WebCore::IntPoint offset;
+        TileUpdate(const WebCore::IntRect& source, const WebCore::IntRect& target, PassRefPtr<ShareableSurface> newSurface, const WebCore::IntPoint& newOffset)
+            : sourceRect(source)
+            , targetRect(target)
+            , surface(newSurface)
+            , offset(newOffset)
+        {
+        }
+    };
     WebLayerTreeRenderer(LayerTreeHostProxy*);
     virtual ~WebLayerTreeRenderer();
     void purgeGLResources();
-    void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&);
+    void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&, WebCore::TextureMapper::PaintFlags = 0);
     void paintToGraphicsContext(BackingStore::PlatformGraphicsContext);
     void syncRemoteContent();
+    void setContentsSize(const WebCore::FloatSize&);
     void setVisibleContentsRect(const WebCore::IntRect&, float scale);
+    void didChangeScrollPosition(const WebCore::IntPoint& position);
 
     void detach();
     void appendUpdate(const Function<void()>&);
     void updateViewport();
+    void setActive(bool);
 
     void deleteLayer(WebLayerID);
     void setRootLayerID(WebLayerID);
-    void syncLayerParameters(const WebLayerInfo&);
+    void setLayerChildren(WebLayerID, const Vector<WebLayerID>&);
+    void setLayerState(WebLayerID, const WebLayerInfo&);
     void createTile(WebLayerID, int, float scale);
     void removeTile(WebLayerID, int);
-    void updateTile(WebLayerID, int, const WebCore::IntRect&, const WebCore::IntRect&, PassRefPtr<ShareableBitmap>);
+    void updateTile(WebLayerID, int, const TileUpdate&);
     void flushLayerChanges();
     void createImage(int64_t, PassRefPtr<ShareableBitmap>);
     void destroyImage(int64_t);
@@ -80,8 +97,10 @@ private:
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const { return false; }
     void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect&) { }
     void callOnMainTread(const Function<void()>&);
+    void adjustPositionForFixedLayers();
 
     typedef HashMap<WebLayerID, WebCore::GraphicsLayer*> LayerMap;
+    WebCore::FloatSize m_contentsSize;
     WebCore::IntRect m_visibleContentsRect;
     float m_contentsScale;
 
@@ -110,7 +129,11 @@ private:
     Vector<WebLayerID> m_layersToDelete;
 
     LayerMap m_layers;
+    LayerMap m_fixedLayers;
     WebLayerID m_rootLayerID;
+    WebCore::IntPoint m_renderedContentsScrollPosition;
+    WebCore::IntPoint m_pendingRenderedContentsScrollPosition;
+    bool m_isActive;
 };
 
 };

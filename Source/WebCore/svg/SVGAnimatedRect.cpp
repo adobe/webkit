@@ -39,58 +39,59 @@ PassOwnPtr<SVGAnimatedType> SVGAnimatedRectAnimator::constructFromString(const S
     return animatedType.release();
 }
 
-void SVGAnimatedRectAnimator::calculateFromAndToValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& toString)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedRectAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    from = constructFromString(fromString);
-    to = constructFromString(toString);
+    return SVGAnimatedType::createRect(constructFromBaseValue<SVGAnimatedRect>(animatedTypes));
 }
 
-void SVGAnimatedRectAnimator::calculateFromAndByValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& byString)
+void SVGAnimatedRectAnimator::stopAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    ASSERT(m_contextElement);
-    
-    from = constructFromString(fromString);
-    to = constructFromString(byString);
+    stopAnimValAnimationForType<SVGAnimatedRect>(animatedTypes);
+}
+
+void SVGAnimatedRectAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+{
+    resetFromBaseValue<SVGAnimatedRect>(animatedTypes, type, &SVGAnimatedType::rect);
+}
+
+void SVGAnimatedRectAnimator::animValWillChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValWillChangeForType<SVGAnimatedRect>(animatedTypes);
+}
+
+void SVGAnimatedRectAnimator::animValDidChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValDidChangeForType<SVGAnimatedRect>(animatedTypes);
+}
+
+void SVGAnimatedRectAnimator::addAnimatedTypes(SVGAnimatedType* from, SVGAnimatedType* to)
+{
+    ASSERT(from->type() == AnimatedRect);
+    ASSERT(from->type() == to->type());
 
     to->rect() += from->rect();
 }
 
-void SVGAnimatedRectAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount,
-                                                       OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+void SVGAnimatedRectAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
 {
     ASSERT(m_animationElement);
     ASSERT(m_contextElement);
 
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    AnimationMode animationMode = animationElement->animationMode();
-    // To animation uses contributions from the lower priority animations as the base value.
+    FloatRect& fromRect = from->rect();
+    FloatRect& toRect = to->rect();
     FloatRect& animatedRect = animated->rect();
-    if (animationMode == ToAnimation)
-        from->rect() = animatedRect;
-    
-    const FloatRect& fromRect = from->rect();
-    const FloatRect& toRect = to->rect();
-    FloatRect newRect;    
-    if (animationElement->calcMode() == CalcModeDiscrete)
-        newRect = percentage < 0.5 ? fromRect : toRect;
-    else
-        newRect = FloatRect((toRect.x() - fromRect.x()) * percentage + fromRect.x(),
-                            (toRect.y() - fromRect.y()) * percentage + fromRect.y(),
-                            (toRect.width() - fromRect.width()) * percentage + fromRect.width(),
-                            (toRect.height() - fromRect.height()) * percentage + fromRect.height());
-    
-    // FIXME: This is not correct for values animation. Right now we transform values-animation to multiple from-to-animations and
-    // accumulate every single value to the previous one. But accumulation should just take into account after a complete cycle
-    // of values-animaiton. See example at: http://www.w3.org/TR/2001/REC-smil-animation-20010904/#RepeatingAnim
-    if (animationElement->isAccumulated() && repeatCount) {
-        newRect += toRect;
-        newRect.scale(repeatCount);
-    }
-    
-    if (animationElement->isAdditive() && animationMode != ToAnimation)
-        animatedRect += newRect;
-    else
-        animatedRect = newRect;
+    m_animationElement->adjustFromToValues<FloatRect>(0, fromRect, toRect, animatedRect, percentage, m_contextElement);
+
+    float animatedX = animatedRect.x();
+    float animatedY = animatedRect.y();
+    float animatedWidth = animatedRect.width();
+    float animatedHeight = animatedRect.height();
+    m_animationElement->animateAdditiveNumber(percentage, repeatCount, fromRect.x(), toRect.x(), animatedX);
+    m_animationElement->animateAdditiveNumber(percentage, repeatCount, fromRect.y(), toRect.y(), animatedY);
+    m_animationElement->animateAdditiveNumber(percentage, repeatCount, fromRect.width(), toRect.width(), animatedWidth);
+    m_animationElement->animateAdditiveNumber(percentage, repeatCount, fromRect.height(), toRect.height(), animatedHeight);
+
+    animatedRect = FloatRect(animatedX, animatedY, animatedWidth, animatedHeight);
 }
 
 float SVGAnimatedRectAnimator::calculateDistance(const String&, const String&)

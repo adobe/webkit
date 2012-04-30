@@ -27,46 +27,41 @@
 #define CCVideoLayerImpl_h
 
 #include "ManagedTexture.h"
-#include "ShaderChromium.h"
-#include "VideoFrameChromium.h"
-#include "VideoFrameProvider.h"
-#include "VideoLayerChromium.h"
 #include "cc/CCLayerImpl.h"
+#include <public/WebVideoFrameProvider.h>
+
+namespace WebKit {
+class WebVideoFrame;
+}
 
 namespace WebCore {
 
 class CCLayerTreeHostImpl;
 class CCVideoLayerImpl;
 
-template<class VertexShader, class FragmentShader> class ProgramBinding;
-
 class CCVideoLayerImpl : public CCLayerImpl
-                       , public VideoFrameProvider::Client {
+                       , public WebKit::WebVideoFrameProvider::Client {
 public:
-    static PassOwnPtr<CCVideoLayerImpl> create(int id, VideoFrameProvider* provider)
+    static PassOwnPtr<CCVideoLayerImpl> create(int id, WebKit::WebVideoFrameProvider* provider)
     {
         return adoptPtr(new CCVideoLayerImpl(id, provider));
     }
     virtual ~CCVideoLayerImpl();
 
-    virtual void willDraw(LayerRendererChromium*);
-    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& usedCheckerboard);
-    virtual void didDraw();
+    virtual void willDraw(LayerRendererChromium*) OVERRIDE;
+    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& hadMissingTiles) OVERRIDE;
+    virtual void didDraw() OVERRIDE;
 
-    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexFlipAlpha> RGBAProgram;
-    typedef ProgramBinding<VertexShaderPosTexYUVStretch, FragmentShaderYUVVideo> YUVProgram;
-    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexFlipAlpha> NativeTextureProgram;
-    typedef ProgramBinding<VertexShaderVideoTransform, FragmentShaderOESImageExternal> StreamTextureProgram;
-
-    virtual void dumpLayerProperties(TextStream&, int indent) const;
+    virtual void dumpLayerProperties(TextStream&, int indent) const OVERRIDE;
 
     Mutex& providerMutex() { return m_providerMutex; }
-    VideoFrameProvider* provider() const { return m_provider; }
 
-    // VideoFrameProvider::Client implementation.
+    // WebKit::WebVideoFrameProvider::Client implementation.
     virtual void stopUsingProvider(); // Callable on any thread.
     virtual void didReceiveFrame(); // Callable on impl thread.
     virtual void didUpdateMatrix(const float*); // Callable on impl thread.
+
+    virtual void didLoseContext() OVERRIDE;
 
     void setNeedsRedraw();
 
@@ -81,22 +76,24 @@ public:
     enum { MaxPlanes = 3 };
 
 private:
-    explicit CCVideoLayerImpl(int, VideoFrameProvider*);
+    CCVideoLayerImpl(int, WebKit::WebVideoFrameProvider*);
 
-    static IntSize computeVisibleSize(const VideoFrameChromium*, unsigned plane);
-    virtual const char* layerTypeAsString() const { return "VideoLayer"; }
+    static IntSize computeVisibleSize(const WebKit::WebVideoFrame&, unsigned plane);
+    virtual const char* layerTypeAsString() const OVERRIDE { return "VideoLayer"; }
 
-    bool reserveTextures(const VideoFrameChromium*, GC3Denum format, LayerRendererChromium*);
+    void willDrawInternal(LayerRendererChromium*);
+    bool reserveTextures(const WebKit::WebVideoFrame&, GC3Denum format, LayerRendererChromium*);
 
-    Mutex m_providerMutex; // Guards m_provider below.
-    VideoFrameProvider* m_provider;
+    // Guards the destruction of m_provider and the frame that it provides
+    Mutex m_providerMutex;
+    WebKit::WebVideoFrameProvider* m_provider;
 
     Texture m_textures[MaxPlanes];
 
     float m_streamTextureMatrix[16];
     CCLayerTreeHostImpl* m_layerTreeHostImpl;
 
-    VideoFrameChromium* m_frame;
+    WebKit::WebVideoFrame* m_frame;
     GC3Denum m_format;
 };
 

@@ -37,13 +37,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cstddef>
 
+// libstdc++ supports nullptr_t starting with gcc 4.6.
+#if defined(__GLIBCXX__) && __GLIBCXX__ < 20110325
+namespace std {
+typedef decltype(nullptr) nullptr_t;
+}
+#endif
+
 #else
 
 namespace std {
-    class nullptr_t { };
+class WTF_EXPORT_PRIVATE nullptr_t { };
 }
-
-extern std::nullptr_t nullptr;
+extern WTF_EXPORT_PRIVATE std::nullptr_t nullptr;
 
 #endif
 

@@ -39,7 +39,9 @@
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxyGtk.h"
 #include <WebCore/Cursor.h>
+#include <WebCore/EventNames.h>
 #include <WebCore/GtkUtilities.h>
+#include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -156,7 +158,7 @@ void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
     notImplemented();
 }
 
-void PageClientImpl::didChangeViewportProperties(const WebCore::ViewportArguments&)
+void PageClientImpl::didChangeViewportProperties(const WebCore::ViewportAttributes&)
 {
     notImplemented();
 }

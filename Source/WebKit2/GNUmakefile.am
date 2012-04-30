@@ -1,6 +1,7 @@
 libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_HEADERS = \
 	$(WebKit2)/Shared/API/c/gtk/WKBaseGtk.h \
 	$(WebKit2)/Shared/API/c/gtk/WKGraphicsContextGtk.h \
+	$(WebKit2)/Shared/API/c/soup/WKBaseSoup.h \
 	$(WebKit2)/Shared/API/c/WKArray.h \
 	$(WebKit2)/Shared/API/c/WKBase.h \
 	$(WebKit2)/Shared/API/c/WKCertificateInfo.h \
@@ -33,7 +34,11 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_HEA
 	$(WebKit2)/Shared/API/c/WKURLResponse.h \
 	$(WebKit2)/Shared/API/c/WKUserContentURLPattern.h \
 	$(WebKit2)/UIProcess/API/C/gtk/WKAPICastGtk.h \
+	$(WebKit2)/UIProcess/API/C/gtk/WKFullScreenClientGtk.h \
 	$(WebKit2)/UIProcess/API/C/gtk/WKView.h \
+	$(WebKit2)/UIProcess/API/C/soup/WKAPICastSoup.h \
+	$(WebKit2)/UIProcess/API/C/soup/WKContextSoup.h \
+	$(WebKit2)/UIProcess/API/C/soup/WKSoupRequestManager.h \
 	$(WebKit2)/UIProcess/API/C/WebKit2.h \
 	$(WebKit2)/UIProcess/API/C/WKAPICast.h \
 	$(WebKit2)/UIProcess/API/C/WKApplicationCacheManager.h \
@@ -86,6 +91,7 @@ nodist_libwebkit2gtkinclude_HEADERS = \
 libwebkit2gtkinclude_HEADERS = \
 	$(WebKit2)/UIProcess/API/gtk/WebKitBackForwardList.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitBackForwardListItem.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitCookieManager.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitDefines.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitDownload.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitEditingCommands.h \
@@ -102,6 +108,7 @@ libwebkit2gtkinclude_HEADERS = \
 	$(WebKit2)/UIProcess/API/gtk/WebKitURIRequest.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitURIResponse.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitWebContext.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitWebResource.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitWebView.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitWebViewBase.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitWindowProperties.h \
@@ -187,7 +194,11 @@ webkit2_built_sources += \
 	DerivedSources/WebKit2/WebProcessMessageReceiver.cpp \
 	DerivedSources/WebKit2/WebProcessMessages.h \
 	DerivedSources/WebKit2/WebProcessProxyMessageReceiver.cpp \
-	DerivedSources/WebKit2/WebProcessProxyMessages.h
+	DerivedSources/WebKit2/WebProcessProxyMessages.h \
+	DerivedSources/WebKit2/WebSoupRequestManagerMessageReceiver.cpp \
+	DerivedSources/WebKit2/WebSoupRequestManagerMessages.h \
+	DerivedSources/WebKit2/WebSoupRequestManagerProxyMessageReceiver.cpp \
+	DerivedSources/WebKit2/WebSoupRequestManagerProxyMessages.h
 
 webkit2_built_sources += \
 	DerivedSources/WebKit2/webkit2gtk/webkit2/WebKitEnumTypes.cpp \
@@ -260,6 +271,7 @@ webkit2_sources += \
 	Source/WebKit2/Shared/API/c/gtk/WKBaseGtk.h \
 	Source/WebKit2/Shared/API/c/gtk/WKGraphicsContextGtk.h \
 	Source/WebKit2/Shared/API/c/gtk/WKGraphicsContextGtk.cpp \
+	Source/WebKit2/Shared/API/c/soup/WKBaseSoup.h \
 	Source/WebKit2/Shared/API/c/WKArray.cpp \
 	Source/WebKit2/Shared/API/c/WKArray.h \
 	Source/WebKit2/Shared/API/c/WKBase.h \
@@ -330,6 +342,7 @@ webkit2_sources += \
 	Source/WebKit2/Shared/EditorState.cpp \
 	Source/WebKit2/Shared/EditorState.h \
 	Source/WebKit2/Shared/FontSmoothingLevel.h \
+	Source/WebKit2/Shared/ProcessExecutablePath.h \
 	Source/WebKit2/Shared/cairo/LayerTreeContextCairo.cpp \
 	Source/WebKit2/Shared/cairo/ShareableBitmapCairo.cpp \
 	Source/WebKit2/Shared/gtk/ArgumentCodersGtk.h \
@@ -339,6 +352,7 @@ webkit2_sources += \
 	Source/WebKit2/Shared/gtk/NativeWebWheelEventGtk.cpp \
 	Source/WebKit2/Shared/gtk/PlatformCertificateInfo.h \
 	Source/WebKit2/Shared/gtk/PrintInfoGtk.cpp \
+	Source/WebKit2/Shared/gtk/ProcessExecutablePathGtk.cpp \
 	Source/WebKit2/Shared/gtk/WebCoreArgumentCodersGtk.cpp \
 	Source/WebKit2/Shared/gtk/WebEventFactory.cpp \
 	Source/WebKit2/Shared/gtk/WebEventFactory.h \
@@ -458,8 +472,15 @@ webkit2_sources += \
 	Source/WebKit2/Shared/WebUserContentURLPattern.h \
 	Source/WebKit2/Shared/WebWheelEvent.cpp \
 	Source/WebKit2/UIProcess/API/C/gtk/WKAPICastGtk.h \
+	Source/WebKit2/UIProcess/API/C/gtk/WKFullScreenClientGtk.cpp \
+	Source/WebKit2/UIProcess/API/C/gtk/WKFullScreenClientGtk.h \
 	Source/WebKit2/UIProcess/API/C/gtk/WKView.cpp \
 	Source/WebKit2/UIProcess/API/C/gtk/WKView.h \
+	Source/WebKit2/UIProcess/API/C/soup/WKAPICastSoup.h \
+	Source/WebKit2/UIProcess/API/C/soup/WKContextSoup.cpp \
+	Source/WebKit2/UIProcess/API/C/soup/WKContextSoup.h \
+	Source/WebKit2/UIProcess/API/C/soup/WKSoupRequestManager.cpp \
+	Source/WebKit2/UIProcess/API/C/soup/WKSoupRequestManager.h \
 	Source/WebKit2/UIProcess/API/C/WebKit2.h \
 	Source/WebKit2/UIProcess/API/C/WKAPICast.h \
 	Source/WebKit2/UIProcess/API/C/WKApplicationCacheManager.h \
@@ -544,6 +565,9 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitBackForwardListItem.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitBackForwardListItem.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitBackForwardListPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitCookieManager.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitCookieManager.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitCookieManagerPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitDefines.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitDownload.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitDownload.h \
@@ -553,6 +577,8 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitEditingCommands.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitError.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitError.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFullscreenClient.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFullscreenClient.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResult.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResult.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResultPrivate.h \
@@ -576,6 +602,8 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitPrintOperationPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitPrivate.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitResourceLoadClient.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitResourceLoadClient.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecision.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecision.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecisionPrivate.h \
@@ -596,6 +624,9 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitWebContext.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitWebContext.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitWebContextPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitWebResource.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitWebResource.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitWebResourcePrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitWebView.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitWebView.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitWebView.h \
@@ -637,6 +668,8 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/gtk/WebContextGtk.cpp \
 	Source/WebKit2/UIProcess/gtk/WebContextMenuProxyGtk.cpp \
 	Source/WebKit2/UIProcess/gtk/WebContextMenuProxyGtk.h \
+	Source/WebKit2/UIProcess/gtk/WebFullScreenClientGtk.cpp \
+	Source/WebKit2/UIProcess/gtk/WebFullScreenClientGtk.h \
 	Source/WebKit2/UIProcess/gtk/WebFullScreenManagerProxyGtk.cpp \
 	Source/WebKit2/UIProcess/gtk/WebInspectorGtk.cpp \
 	Source/WebKit2/UIProcess/gtk/WebPageProxyGtk.cpp \
@@ -673,6 +706,10 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/ProcessModel.h \
 	Source/WebKit2/UIProcess/ResponsivenessTimer.cpp \
 	Source/WebKit2/UIProcess/ResponsivenessTimer.h \
+	Source/WebKit2/UIProcess/soup/WebSoupRequestManagerClient.cpp \
+	Source/WebKit2/UIProcess/soup/WebSoupRequestManagerClient.h \
+	Source/WebKit2/UIProcess/soup/WebSoupRequestManagerProxy.cpp \
+	Source/WebKit2/UIProcess/soup/WebSoupRequestManagerProxy.h \
 	Source/WebKit2/UIProcess/TextChecker.h \
 	Source/WebKit2/UIProcess/VisitedLinkProvider.cpp \
 	Source/WebKit2/UIProcess/VisitedLinkProvider.h \
@@ -797,6 +834,8 @@ webkit2_sources += \
 	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleBackForwardListItem.cpp \
 	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleBackForwardListItem.h \
 	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundle.cpp \
+	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleDOMWindowExtension.cpp \
+	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleDOMWindowExtension.h \
 	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleFrame.cpp \
 	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleFrame.h \
 	Source/WebKit2/WebProcess/InjectedBundle/API/c/WKBundleFramePrivate.h \
@@ -836,6 +875,8 @@ webkit2_sources += \
 	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleBackForwardListItem.h \
 	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleClient.cpp \
 	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleClient.h \
+	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleDOMWindowExtension.cpp \
+	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleDOMWindowExtension.h \
 	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleHitTestResult.cpp \
 	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleHitTestResult.h \
 	Source/WebKit2/WebProcess/InjectedBundle/InjectedBundleNavigationAction.cpp \
@@ -899,12 +940,18 @@ webkit2_sources += \
 	Source/WebKit2/WebProcess/Plugins/PluginView.h \
 	Source/WebKit2/WebProcess/ResourceCache/WebResourceCacheManager.h \
 	Source/WebKit2/WebProcess/ResourceCache/WebResourceCacheManager.cpp \
+	Source/WebKit2/WebProcess/soup/WebSoupRequestManager.cpp \
+	Source/WebKit2/WebProcess/soup/WebSoupRequestManager.h \
+	Source/WebKit2/WebProcess/soup/WebKitSoupRequestGeneric.cpp \
+	Source/WebKit2/WebProcess/soup/WebKitSoupRequestGeneric.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebContextMenuClientGtk.cpp \
 	Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebDragClientGtk.cpp \
 	Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebEditorClientGtk.cpp \
 	Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebErrorsGtk.cpp \
-	Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebFrameNetworkingContext.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebPopupMenuGtk.cpp \
+	Source/WebKit2/WebProcess/WebCoreSupport/soup/WebFrameNetworkingContext.cpp \
+	Source/WebKit2/WebProcess/WebCoreSupport/soup/WebFrameNetworkingContext.h \
+	Source/WebKit2/WebProcess/WebCoreSupport/WebAlternativeTextClient.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebChromeClient.cpp \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebChromeClient.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebContextMenuClient.cpp \
@@ -996,6 +1043,7 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPP
 	-I$(srcdir)/Source/WebKit2/Shared/API \
 	-I$(srcdir)/Source/WebKit2/Shared/API/c \
 	-I$(srcdir)/Source/WebKit2/Shared/API/c/gtk \
+	-I$(srcdir)/Source/WebKit2/Shared/API/c/soup \
 	-I$(srcdir)/Source/WebKit2/Shared/CoreIPCSupport \
 	-I$(srcdir)/Source/WebKit2/Shared/gtk \
 	-I$(srcdir)/Source/WebKit2/Shared/Plugins \
@@ -1005,6 +1053,7 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPP
 	-I$(srcdir)/Source/WebKit2/UIProcess/API \
 	-I$(srcdir)/Source/WebKit2/UIProcess/API/C \
 	-I$(srcdir)/Source/WebKit2/UIProcess/API/C/gtk \
+	-I$(srcdir)/Source/WebKit2/UIProcess/API/C/soup \
 	-I$(srcdir)/Source/WebKit2/UIProcess/API/cpp \
 	-I$(srcdir)/Source/WebKit2/UIProcess/API/gtk \
 	-I$(srcdir)/Source/WebKit2/UIProcess/Authentication \
@@ -1015,6 +1064,7 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPP
 	-I$(srcdir)/Source/WebKit2/UIProcess/Notifications \
 	-I$(srcdir)/Source/WebKit2/UIProcess/Plugins \
 	-I$(srcdir)/Source/WebKit2/UIProcess/Plugins/gtk \
+	-I$(srcdir)/Source/WebKit2/UIProcess/soup \
 	-I$(srcdir)/Source/WebKit2/WebProcess \
 	-I$(srcdir)/Source/WebKit2/WebProcess/ApplicationCache \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Authentication \
@@ -1034,11 +1084,13 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPP
 	-I$(srcdir)/Source/WebKit2/WebProcess/MediaCache \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Notifications \
 	-I$(srcdir)/Source/WebKit2/WebProcess/ResourceCache \
+	-I$(srcdir)/Source/WebKit2/WebProcess/soup \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Plugins \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Plugins/Netscape \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Plugins/Netscape/gtk \
 	-I$(srcdir)/Source/WebKit2/WebProcess/WebCoreSupport \
 	-I$(srcdir)/Source/WebKit2/WebProcess/WebCoreSupport/gtk \
+	-I$(srcdir)/Source/WebKit2/WebProcess/WebCoreSupport/soup \
 	-I$(srcdir)/Source/WebKit2/WebProcess/WebPage \
 	-I$(srcdir)/Source/WebKit2/WebProcess/WebPage/gtk \
 	-I$(top_builddir)/DerivedSources/WebKit2 \
@@ -1087,6 +1139,12 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_ladir 
 if !TARGET_WIN32
 libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPFLAGS += \
 	-DXP_UNIX
+endif
+
+# Add MOZ_X11 for X11 targets only
+if TARGET_X11
+libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPFLAGS += \
+	-DMOZ_X11
 endif
 
 # Plugin process
@@ -1156,6 +1214,7 @@ vpath %.messages.in = \
 	$(WebKit2)/UIProcess/Notifications \
 	$(WebKit2)/UIProcess/Plugins \
 	$(WebKit2)/UIProcess/ResourceCache \
+	$(WebKit2)/UIProcess/soup \
 	$(WebKit2)/WebProcess \
 	$(WebKit2)/WebProcess/ApplicationCache \
 	$(WebKit2)/WebProcess/Authentication \
@@ -1169,7 +1228,8 @@ vpath %.messages.in = \
 	$(WebKit2)/WebProcess/Plugins \
 	$(WebKit2)/WebProcess/ResourceCache \
 	$(WebKit2)/WebProcess/WebCoreSupport \
-	$(WebKit2)/WebProcess/WebPage
+	$(WebKit2)/WebProcess/WebPage \
+	$(WebKit2)/WebProcess/soup
 
 message_gen_scripts = \
 	$(WebKit2)/Scripts/generate-message-receiver.py \
@@ -1361,6 +1421,7 @@ Programs_WebKitPluginProcess_CPPFLAGS = \
 	-I$(srcdir)/Source/WebKit2/Shared/Plugins \
 	-I$(srcdir)/Source/WebKit2/Shared/Plugins/Netscape/ \
 	-I$(srcdir)/Source/WebKit2/UIProcess/Plugins/ \
+	-I$(srcdir)/Source/WebKit2/UIProcess/Launcher \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Plugins/ \
 	-I$(srcdir)/Source/WebKit2/WebProcess/Plugins/Netscape/ \
 	-I$(top_builddir)/DerivedSources/WebKit2 \
@@ -1371,6 +1432,7 @@ Programs_WebKitPluginProcess_CPPFLAGS = \
 	-DBUILDING_WEBKIT \
 	-DGTK_API_VERSION_2=1 \
 	-DENABLE_PLUGIN_PROCESS=1 \
+	-DLIBEXECDIR=\""$(libexecdir)"\" \
 	$(global_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
@@ -1453,6 +1515,7 @@ webkit2_plugin_process_sources += \
 	Source/WebKit2/PluginProcess/gtk/PluginProcessMainGtk.cpp \
 	Source/WebKit2/Shared/ChildProcess.cpp \
 	Source/WebKit2/Shared/ChildProcess.h \
+	Source/WebKit2/Shared/ProcessExecutablePath.h \
 	Source/WebKit2/Shared/Plugins/NPIdentifierData.cpp \
 	Source/WebKit2/Shared/Plugins/NPIdentifierData.h \
 	Source/WebKit2/Shared/Plugins/NPObjectMessageReceiver.cpp \
@@ -1479,8 +1542,10 @@ webkit2_plugin_process_sources += \
 	Source/WebKit2/Shared/gtk/NativeWebKeyboardEventGtk.cpp \
 	Source/WebKit2/Shared/gtk/NativeWebWheelEventGtk.cpp \
 	Source/WebKit2/Shared/gtk/NativeWebMouseEventGtk.cpp \
+	Source/WebKit2/Shared/gtk/ProcessExecutablePathGtk.cpp \
 	Source/WebKit2/Shared/gtk/WebEventFactory.cpp \
 	Source/WebKit2/Shared/cairo/ShareableBitmapCairo.cpp \
+	Source/WebKit2/UIProcess/Plugins/gtk/PluginProcessProxyGtk.cpp \
 	Source/WebKit2/WebProcess/Plugins/Plugin.cpp \
 	Source/WebKit2/WebProcess/Plugins/Plugin.h \
 	Source/WebKit2/WebProcess/Plugins/Netscape/NPRuntimeUtilities.cpp \
@@ -1552,6 +1617,7 @@ EXTRA_DIST += \
 	$(shell ls $(WebKit2)/UIProcess/Downloads/*.in) \
 	$(shell ls $(WebKit2)/UIProcess/Notifications/*.in) \
 	$(shell ls $(WebKit2)/UIProcess/Plugins/*.in) \
+	$(shell ls $(WebKit2)/UIProcess/soup/*.in) \
 	$(shell ls $(WebKit2)/WebProcess/*.in) \
 	$(shell ls $(WebKit2)/WebProcess/ApplicationCache/*.in) \
 	$(shell ls $(WebKit2)/WebProcess/Authentication/*.in) \
@@ -1565,4 +1631,5 @@ EXTRA_DIST += \
 	$(shell ls $(WebKit2)/WebProcess/Plugins/*.in) \
 	$(shell ls $(WebKit2)/WebProcess/ResourceCache/*.in) \
 	$(shell ls $(WebKit2)/WebProcess/WebCoreSupport/*.in) \
-	$(shell ls $(WebKit2)/WebProcess/WebPage/*.in)
+	$(shell ls $(WebKit2)/WebProcess/WebPage/*.in) \
+	$(shell ls $(WebKit2)/WebProcess/soup/*.in)

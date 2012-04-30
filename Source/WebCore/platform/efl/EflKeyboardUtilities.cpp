@@ -77,6 +77,7 @@ static void createKeyMap()
     keyMap().set("Tab", "U+0009");
     keyMap().set("ISO_Left_Tab", "U+0009");
     keyMap().set("BackSpace", "U+0008");
+    keyMap().set("space", "U+0020");
 }
 
 static void createWindowsKeyMap()
@@ -99,7 +100,7 @@ static void createWindowsKeyMap()
     windowsKeyMap().set("Tab", VK_TAB);
     windowsKeyMap().set("ISO_Left_Tab", VK_TAB);
     windowsKeyMap().set("BackSpace", VK_BACK);
-    windowsKeyMap().set("Space", VK_SPACE);
+    windowsKeyMap().set("space", VK_SPACE);
     windowsKeyMap().set("Next", VK_NEXT);
     windowsKeyMap().set("Prior", VK_PRIOR);
     windowsKeyMap().set("Home", VK_HOME);
@@ -163,7 +164,7 @@ static void createWindowsKeyMap()
     // Set F_XX keys to the windowsKeyMap.
     for (unsigned int i = 1; i < 25; i++) {
         String key = "F" + String::number(i);
-        windowsKeyMap().set(key, VK_F1 + i);
+        windowsKeyMap().set(key, VK_F1 + i - 1);
     }
 }
 

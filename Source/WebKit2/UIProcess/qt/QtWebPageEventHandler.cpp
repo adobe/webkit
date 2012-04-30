@@ -25,6 +25,7 @@
 #include "NativeWebMouseEvent.h"
 #include "NativeWebWheelEvent.h"
 #include "QtViewportInteractionEngine.h"
+#include "WebPageProxy.h"
 #include "qquickwebpage_p.h"
 #include "qquickwebview_p.h"
 #include <QCursor>
@@ -40,8 +41,9 @@
 #include <WebCore/DragData.h>
 #include <WebCore/Editor.h>
 
-using namespace WebKit;
 using namespace WebCore;
+
+namespace WebKit {
 
 static inline Qt::DropAction dragOperationToDropAction(unsigned dragOperation)
 {
@@ -255,7 +257,7 @@ void QtWebPageEventHandler::handleSingleTapEvent(const QTouchEvent::TouchPoint& 
 void QtWebPageEventHandler::handleDoubleTapEvent(const QTouchEvent::TouchPoint& point)
 {
     QTransform fromItemTransform = m_webPage->transformFromItem();
-    m_webPageProxy->findZoomableAreaForPoint(fromItemTransform.map(point.pos()).toPoint());
+    m_webPageProxy->findZoomableAreaForPoint(fromItemTransform.map(point.pos()).toPoint(), IntSize(point.rect().size().toSize()));
 }
 
 void QtWebPageEventHandler::timerEvent(QTimerEvent* ev)
@@ -373,9 +375,9 @@ void QtWebPageEventHandler::handleTouchEvent(QTouchEvent* event)
 
 void QtWebPageEventHandler::resetGestureRecognizers()
 {
-    m_panGestureRecognizer.reset();
-    m_pinchGestureRecognizer.reset();
-    m_tapGestureRecognizer.reset();
+    m_panGestureRecognizer.cancel();
+    m_pinchGestureRecognizer.cancel();
+    m_tapGestureRecognizer.cancel();
 }
 
 static void setInputPanelVisible(bool visible)
@@ -453,7 +455,7 @@ void QtWebPageEventHandler::doneWithTouchEvent(const NativeWebTouchEvent& event,
         // The interaction engine might still be animating kinetic scrolling or a scale animation
         // such as double-tap to zoom or the bounce back effect. A touch stops the kinetic scrolling
         // where as it does not stop the scale animation.
-        // Sending the event to the flickProvider will stop the kinetic scrolling animation.
+        // The gesture recognizer stops the kinetic scrolling animation if needed.
         break;
     case QEvent::TouchUpdate:
         // The scale animation can only be interrupted by a pinch gesture, which will then take over.
@@ -472,16 +474,45 @@ void QtWebPageEventHandler::doneWithTouchEvent(const NativeWebTouchEvent& event,
     if (m_interactionEngine->scaleAnimationActive())
         return;
 
-    m_panGestureRecognizer.recognize(ev);
-    m_pinchGestureRecognizer.recognize(ev);
+    const QList<QTouchEvent::TouchPoint>& touchPoints = ev->touchPoints();
+    const int touchPointCount = touchPoints.size();
+    qint64 eventTimestampMillis = ev->timestamp();
+    QList<QTouchEvent::TouchPoint> activeTouchPoints;
+    activeTouchPoints.reserve(touchPointCount);
 
-    if (m_panGestureRecognizer.isRecognized() || m_pinchGestureRecognizer.isRecognized())
-        m_tapGestureRecognizer.reset();
-    else {
-        // Convert the event timestamp from second to millisecond.
-        qint64 eventTimestampMillis = static_cast<qint64>(event.timestamp() * 1000);
-        m_tapGestureRecognizer.recognize(ev, eventTimestampMillis);
+    for (int i = 0; i < touchPointCount; ++i) {
+        if (touchPoints[i].state() != Qt::TouchPointReleased)
+            activeTouchPoints << touchPoints[i];
     }
+
+    const int activeTouchPointCount = activeTouchPoints.size();
+
+    if (!activeTouchPointCount) {
+        if (touchPointCount == 1) {
+            // No active touch points, one finger released.
+            if (!m_panGestureRecognizer.isRecognized())
+                m_tapGestureRecognizer.update(ev->type(), touchPoints.first());
+            m_panGestureRecognizer.finish(touchPoints.first(), eventTimestampMillis);
+        } else
+            m_pinchGestureRecognizer.finish();
+
+        // Early return since this was a touch-end event.
+        return;
+    } else if (activeTouchPointCount == 1) {
+        // If the pinch gesture recognizer was previously in active state the content might
+        // be out of valid zoom boundaries, thus we need to finish the pinch gesture here.
+        // This will resume the content to valid zoom levels before the pan gesture is started.
+        m_pinchGestureRecognizer.finish();
+        m_panGestureRecognizer.update(activeTouchPoints.first(), eventTimestampMillis);
+    } else if (activeTouchPointCount == 2) {
+        m_panGestureRecognizer.cancel();
+        m_pinchGestureRecognizer.update(activeTouchPoints.first(), activeTouchPoints.last());
+    }
+
+    if (m_panGestureRecognizer.isRecognized() || m_pinchGestureRecognizer.isRecognized() || m_webView->isMoving())
+        m_tapGestureRecognizer.cancel();
+    else if (touchPointCount == 1)
+        m_tapGestureRecognizer.update(ev->type(), touchPoints.first());
 }
 #endif
 
@@ -523,4 +554,7 @@ void QtWebPageEventHandler::startDrag(const WebCore::DragData& dragData, PassRef
     m_webPageProxy->dragEnded(clientPosition, globalPosition, dropActionToDragOperation(actualDropAction));
 }
 
+} // namespace WebKit
+
 #include "moc_QtWebPageEventHandler.cpp"
+

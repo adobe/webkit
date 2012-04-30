@@ -39,7 +39,7 @@ private:
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(Attribute*) OVERRIDE;
 
-    virtual void resetToBaseValue(const String&);
+    virtual void resetToBaseValue();
     virtual bool calculateFromAndToValues(const String& fromString, const String& toString);
     virtual bool calculateFromAndByValues(const String& fromString, const String& byString);
     virtual void calculateAnimatedValue(float percentage, unsigned repeat, SVGSMILElement* resultElement);
@@ -53,21 +53,13 @@ private:
         RotateAutoReverse
     };
     RotateMode rotateMode() const;
-
-    FloatSize m_animatedTranslation;
-    float m_animatedAngle;
+    void buildTransformForProgress(AffineTransform*, float percentage);
 
     // Note: we do not support percentage values for to/from coords as the spec implies we should (opera doesn't either)
     FloatPoint m_fromPoint;
-    float m_fromAngle;
     FloatPoint m_toPoint;
-    float m_toAngle;
-
-    unsigned m_baseIndexInTransformList;
 
     Path m_path;
-    Vector<float> m_keyPoints;
-    float m_angle;
 };
     
 } // namespace WebCore

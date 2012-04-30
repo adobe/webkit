@@ -66,7 +66,6 @@ namespace WebCore {
         
         virtual void setDefersLoading(bool);
 
-        void setIdentifier(unsigned long identifier) { m_identifier = identifier; }
         unsigned long identifier() const { return m_identifier; }
 
         virtual void releaseResources();
@@ -178,7 +177,7 @@ namespace WebCore {
         bool m_reachedTerminalState;
         bool m_calledWillCancel;
         bool m_cancelled;
-        bool m_calledDidFinishLoad;
+        bool m_notifiedLoadComplete;
 
         bool m_defersLoading;
         ResourceRequest m_deferredRequest;

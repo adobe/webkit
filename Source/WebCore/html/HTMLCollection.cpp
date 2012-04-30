@@ -100,6 +100,9 @@ void HTMLCollection::invalidateCacheIfNeeded() const
 
 inline bool HTMLCollection::isAcceptableElement(Element* element) const
 {
+    if (!element->isHTMLElement() && !(m_type == DocAll || m_type == NodeChildren))
+        return false;
+
     switch (m_type) {
     case DocImages:
         return element->hasLocalName(imgTag);
@@ -146,7 +149,7 @@ inline bool HTMLCollection::isAcceptableElement(Element* element) const
         return true;
 #if ENABLE(MICRODATA)
     case ItemProperties:
-        return element->isHTMLElement() && element->fastHasAttribute(itempropAttr);
+        return element->fastHasAttribute(itempropAttr);
 #endif
     case DocumentNamedItems:
     case OtherCollection:
@@ -359,7 +362,7 @@ PassRefPtr<NodeList> HTMLCollection::tags(const String& name)
 
 void HTMLCollection::append(NodeCacheMap& map, const AtomicString& key, Element* element)
 {
-    OwnPtr<Vector<Element*> >& vector = map.add(key.impl(), nullptr).first->second;
+    OwnPtr<Vector<Element*> >& vector = map.add(key.impl(), nullptr).iterator->second;
     if (!vector)
         vector = adoptPtr(new Vector<Element*>);
     vector->append(element);

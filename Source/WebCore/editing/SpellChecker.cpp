@@ -118,7 +118,12 @@ bool SpellChecker::canCheckAsynchronously(Range* range) const
 
 bool SpellChecker::isCheckable(Range* range) const
 {
-    return range && range->firstNode() && range->firstNode()->renderer();
+    if (!range || !range->firstNode() || !range->firstNode()->renderer())
+        return false;
+    const Node* node = range->startContainer();
+    if (node && node->isElementNode() && !toElement(node)->isSpellCheckingEnabled())
+        return false;
+    return true;
 }
 
 void SpellChecker::requestCheckingFor(PassRefPtr<SpellCheckRequest> request)
@@ -183,5 +188,24 @@ void SpellChecker::didCheck(int sequence, const Vector<TextCheckingResult>& resu
         m_timerToProcessQueuedRequest.startOneShot(0);
 }
 
+void SpellChecker::didCheckSucceeded(int sequence, const Vector<TextCheckingResult>& results)
+{
+    if (m_processingRequest->sequence() == sequence) {
+        unsigned markers = 0;
+        if (m_processingRequest->mask() & TextCheckingTypeSpelling)
+            markers |= DocumentMarker::Spelling;
+        if (m_processingRequest->mask() & TextCheckingTypeGrammar)
+            markers |= DocumentMarker::Grammar;
+        if (markers)
+            m_frame->document()->markers()->removeMarkers(m_processingRequest->checkingRange().get(), markers);
+    }
+    didCheck(sequence, results);
+}
+
+void SpellChecker::didCheckCanceled(int sequence)
+{
+    Vector<TextCheckingResult> results;
+    didCheck(sequence, results);
+}
 
 } // namespace WebCore

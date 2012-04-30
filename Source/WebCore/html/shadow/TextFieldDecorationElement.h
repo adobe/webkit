@@ -52,6 +52,9 @@ public:
     virtual CachedImage* imageForReadonlyState() = 0;
 
     virtual void handleClick(HTMLInputElement*) = 0;
+    // This function is called just before detaching the decoration. It must not
+    // call functions which updating state of the specified HTMLInputElement
+    // object.
     virtual void willDetach(HTMLInputElement*) = 0;
 
     virtual ~TextFieldDecorator();
@@ -63,6 +66,7 @@ class TextFieldDecorationElement : public HTMLDivElement {
 public:
     static PassRefPtr<TextFieldDecorationElement> create(Document*, TextFieldDecorator*);
     TextFieldDecorator* textFieldDecorator() { return m_textFieldDecorator; }
+    void decorate(HTMLInputElement*);
 
 private:
     TextFieldDecorationElement(Document*, TextFieldDecorator*);

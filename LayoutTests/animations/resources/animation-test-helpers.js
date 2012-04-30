@@ -62,7 +62,15 @@ function parseCrossFade(s)
 // Return an array of numeric filter params in 0-1.
 function getFilterParameters(s)
 {
-    var filterParams = s.match(/\((.+)\)/)[1];
+    var filterResult = s.match(/(\w+)\((.+)\)/);
+    if (!filterResult)
+        throw new Error("There's no filter in \"" + s + "\"");
+    var filterParams = filterResult[2];
+    if (filterResult[1] == "custom") {
+        if (!window.getCustomFilterParameters)
+            throw new Error("getCustomFilterParameters not found. Did you include custom-filter-parser.js?");
+        return getCustomFilterParameters(filterParams);
+    }
     var paramList = filterParams.split(' '); // FIXME: the spec may allow comma separation at some point.
     
     // Normalize percentage values.
@@ -80,9 +88,29 @@ function filterParametersMatch(paramList1, paramList2, tolerance)
 {
     if (paramList1.length != paramList2.length)
         return false;
-
     for (var i = 0; i < paramList1.length; ++i) {
-        var match = isCloseEnough(paramList1[i], paramList2[i], tolerance);
+        var param1 = paramList1[i], 
+            param2 = paramList2[i];
+        if (typeof param1 == "object") {
+            // This is a custom filter parameter.
+            if (param1.type != "parameter") {
+                // Checking for shader uris and other keywords. They need to be exactly the same.
+                if (param1.type != param2.type
+                    || param1.value != param2.value)
+                    return false;
+                continue;
+            }
+            if (param1.name != param2.name
+                || param1.value.length != param2.value.length)
+                return false;
+            // For now we only support floats.
+            for (var j = 0; j < param1.value.length; ++j) {
+                if (!isCloseEnough(param1.value[j].value, param2.value[j].value, tolerance))
+                    return false;
+            }
+            continue;
+        }
+        var match = isCloseEnough(param1, param2, tolerance);
         if (!match)
             return false;
     }
@@ -138,125 +166,11 @@ function checkExpectedValue(expected, index)
     }
     
     var computedValue, computedValue2;
-    var pass = true;
-    if (!property.indexOf("webkitTransform")) {
-        var element;
-        if (iframeId)
-            element = document.getElementById(iframeId).contentDocument.getElementById(elementId);
-        else
-            element = document.getElementById(elementId);
-            
-        computedValue = window.getComputedStyle(element).webkitTransform;
-        if (compareElements) {
-            computedValue2 = window.getComputedStyle(document.getElementById(elementId2)).webkitTransform;
-            var m1 = matrixStringToArray(computedValue);
-            var m2 = matrixStringToArray(computedValue2);
-            
-            // for now we assume that both matrices are either both 2D or both 3D
-            var count = (computedValue.substring(0, 7) == "matrix3d") ? 16 : 6;
-            for (var i = 0; i < count; ++i) {
-                pass = isCloseEnough(parseFloat(m1[i]), m2[i], tolerance);
-                if (!pass)
-                    break;
-            }
-        } else {
-            if (typeof expectedValue == "string")
-                pass = (computedValue == expectedValue);
-            else if (typeof expectedValue == "number") {
-                var m = matrixStringToArray(computedValue);
-                pass = isCloseEnough(parseFloat(m[parseInt(property.substring(16))]), expectedValue, tolerance);
-            } else {
-                var m = matrixStringToArray(computedValue);
-                for (i = 0; i < expectedValue.length; ++i) {
-                    pass = isCloseEnough(parseFloat(m[i]), expectedValue[i], tolerance);
-                    if (!pass)
-                        break;
-                }
-            }
-        }
-    } else if (property == "webkitFilter") {
-        var element;
-        if (iframeId)
-            element = document.getElementById(iframeId).contentDocument.getElementById(elementId);
-        else
-            element = document.getElementById(elementId);
- 
-        computedValue = window.getComputedStyle(element).webkitFilter;
-        var filterParameters = getFilterParameters(computedValue);
-
-        if (compareElements) {
-            computedValue2 = window.getComputedStyle(document.getElementById(elementId2)).webkitFilter;
-            var filter2Parameters = getFilterParameters(computedValue2);
-            pass = filterParametersMatch(filterParameters, filter2Parameters, tolerance);
-        } else {
-            pass = filterParametersMatch(filterParameters, getFilterParameters(expectedValue), tolerance);
-        }
-    } else if (property == "lineHeight") {
-        var element;
-        if (iframeId)
-            element = document.getElementById(iframeId).contentDocument.getElementById(elementId);
-        else
-            element = document.getElementById(elementId);
-            
-        computedValue = parseInt(window.getComputedStyle(element).lineHeight);
-        if (compareElements) {
-            computedValue2 = parseInt(window.getComputedStyle(document.getElementById(elementId2)).lineHeight);
-            pass = isCloseEnough(computedValue, computedValue2, tolerance);
-        }
-        else
-            pass = isCloseEnough(computedValue, expectedValue, tolerance);
-    } else if (property == "backgroundImage"
-               || property == "borderImageSource"
-               || property == "listStyleImage"
-               || property == "webkitMaskImage"
-               || property == "webkitMaskBoxImage") {
-        var element;
-        if (iframeId)
-            element = document.getElementById(iframeId).contentDocument.getElementById(elementId);
-        else
-            element = document.getElementById(elementId);
-
-        computedValue = window.getComputedStyle(element)[property];
-        computedCrossFade = parseCrossFade(computedValue);
-
-        if (!computedCrossFade) {
-            pass = false;
-        } else {
-            if (compareElements) {
-                computedValue2 = window.getComputedStyle(document.getElementById(elementId2))[property];
-                computedCrossFade2 = parseCrossFade(computedValue2);
-                if (computedCrossFade2) {
-                    pass = (isCloseEnough(computedCrossFade.percent, computedCrossFade2.percent, tolerance) &&
-                        computedCrossFade.from == computedCrossFade2.from &&
-                        computedCrossFade.to == computedCrossFade2.to);
-                }
-                else {
-                    pass = false;
-                }
-            } else {
-                pass = isCloseEnough(computedCrossFade.percent, expectedValue, tolerance);
-            }
-        }
-    } else {
-        var element;
-        if (iframeId)
-            element = document.getElementById(iframeId).contentDocument.getElementById(elementId);
-        else
-            element = document.getElementById(elementId);
-
-        var computedStyle = window.getComputedStyle(element).getPropertyCSSValue(property);
-        computedValue = computedStyle.getFloatValue(CSSPrimitiveValue.CSS_NUMBER);
-        if (compareElements) {
-            var computedStyle2 = window.getComputedStyle(document.getElementById(elementId2)).getPropertyCSSValue(property);
-            computedValue2 = computedStyle2.getFloatValue(CSSPrimitiveValue.CSS_NUMBER);
-            pass = isCloseEnough(computedValue, computedValue2, tolerance);
-        }
-        else
-            pass = isCloseEnough(computedValue, expectedValue, tolerance);
-    }
-
     if (compareElements) {
-        if (pass)
+        computedValue = getPropertyValue(property, elementId, iframeId);
+        computedValue2 = getPropertyValue(property, elementId2, iframeId);
+
+        if (comparePropertyValue(property, computedValue, computedValue2, tolerance))
             result += "PASS - \"" + property + "\" property for \"" + elementId + "\" and \"" + elementId2 + 
                             "\" elements at " + time + "s are close enough to each other" + "<br>";
         else
@@ -269,13 +183,89 @@ function checkExpectedValue(expected, index)
             elementName = iframeId + '.' + elementId;
         else
             elementName = elementId;
-        if (pass)
+
+        computedValue = getPropertyValue(property, elementId, iframeId);
+
+        if (comparePropertyValue(property, computedValue, expectedValue, tolerance))
             result += "PASS - \"" + property + "\" property for \"" + elementName + "\" element at " + time + 
                             "s saw something close to: " + expectedValue + "<br>";
         else
             result += "FAIL - \"" + property + "\" property for \"" + elementName + "\" element at " + time + 
                             "s expected: " + expectedValue + " but saw: " + computedValue + "<br>";
     }
+}
+
+
+function getPropertyValue(property, elementId, iframeId)
+{
+    var computedValue;
+    var element;
+    if (iframeId)
+        element = document.getElementById(iframeId).contentDocument.getElementById(elementId);
+    else
+        element = document.getElementById(elementId);
+
+    if (property == "lineHeight")
+        computedValue = parseInt(window.getComputedStyle(element).lineHeight);
+    else if (property == "backgroundImage"
+               || property == "borderImageSource"
+               || property == "listStyleImage"
+               || property == "webkitMaskImage"
+               || property == "webkitMaskBoxImage"
+               || property == "webkitFilter"
+               || !property.indexOf("webkitTransform")) {
+        computedValue = window.getComputedStyle(element)[property.split(".")[0]];
+    } else {
+        var computedStyle = window.getComputedStyle(element).getPropertyCSSValue(property);
+        computedValue = computedStyle.getFloatValue(CSSPrimitiveValue.CSS_NUMBER);
+    }
+
+    return computedValue;
+}
+
+function comparePropertyValue(property, computedValue, expectedValue, tolerance)
+{
+    var result = true;
+
+    if (!property.indexOf("webkitTransform")) {
+        if (typeof expectedValue == "string")
+            result = (computedValue == expectedValue);
+        else if (typeof expectedValue == "number") {
+            var m = matrixStringToArray(computedValue);
+            result = isCloseEnough(parseFloat(m[parseInt(property.substring(16))]), expectedValue, tolerance);
+        } else {
+            var m = matrixStringToArray(computedValue);
+            for (i = 0; i < expectedValue.length; ++i) {
+                result = isCloseEnough(parseFloat(m[i]), expectedValue[i], tolerance);
+                if (!result)
+                    break;
+            }
+        }
+    } else if (property == "webkitFilter") {
+        var filterParameters = getFilterParameters(computedValue);
+        var filter2Parameters = getFilterParameters(expectedValue);
+        result = filterParametersMatch(filterParameters, filter2Parameters, tolerance);
+    } else if (property == "backgroundImage"
+               || property == "borderImageSource"
+               || property == "listStyleImage"
+               || property == "webkitMaskImage"
+               || property == "webkitMaskBoxImage") {
+        var computedCrossFade = parseCrossFade(computedValue);
+
+        if (!computedCrossFade) {
+            result = false;
+        } else {
+            if (typeof expectedValue == "string") {
+                var computedCrossFade2 = parseCrossFade(expectedValue);
+                result = isCloseEnough(computedCrossFade.percent, computedCrossFade2.percent, tolerance) && computedCrossFade.from == computedCrossFade2.from && computedCrossFade.to == computedCrossFade2.to;
+            } else {
+                result = isCloseEnough(computedCrossFade.percent, expectedValue, tolerance)
+            }
+        }
+    } else {
+        result = isCloseEnough(computedValue, expectedValue, tolerance);
+    }
+    return result;
 }
 
 function endTest()

@@ -48,23 +48,17 @@ class ChromiumMacPort(chromium.ChromiumPort):
             'chromium-mac-snowleopard',
             'chromium-mac',
             'chromium',
-            'mac-leopard',
-            'mac-snowleopard',
-            'mac-lion',
             'mac',
         ],
         'snowleopard': [
             'chromium-mac-snowleopard',
             'chromium-mac',
             'chromium',
-            'mac-snowleopard',
-            'mac-lion',
             'mac',
         ],
         'lion': [
             'chromium-mac',
             'chromium',
-            'mac-lion',
             'mac',
         ],
         'future': [
@@ -104,6 +98,16 @@ class ChromiumMacPort(chromium.ChromiumPort):
 
     def operating_system(self):
         return 'mac'
+
+    def default_child_processes(self):
+        # FIXME: As a temporary workaround while we figure out what's going
+        # on with https://bugs.webkit.org/show_bug.cgi?id=83076, reduce by
+        # half the # of workers we run by default on bigger machines.
+        default_count = super(ChromiumMacPort, self).default_child_processes()
+        if default_count >= 8:
+            cpu_count = self._executive.cpu_count()
+            return max(1, min(default_count, int(cpu_count / 2)))
+        return default_count
 
     #
     # PROTECTED METHODS

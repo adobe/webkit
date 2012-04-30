@@ -65,10 +65,8 @@ public:
     void setDeviceScaleFactor(float);
     void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     bool sendComplexTextInput(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
-#endif
-
-#if USE(CG)
-    RetainPtr<CGPDFDocumentRef> pdfDocumentForPrinting() const { return m_plugin->pdfDocumentForPrinting(); }
+    void setLayerHostingMode(LayerHostingMode);
+    RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return m_plugin->pdfDocumentForPrinting(); }
 #endif
 
     // FIXME: Remove this; nobody should have to know about the plug-in view's renderer except the plug-in view itself.
@@ -162,6 +160,10 @@ private:
     virtual bool isPrivateBrowsingEnabled();
     virtual void protectPluginFromDestruction();
     virtual void unprotectPluginFromDestruction();
+#if PLUGIN_ARCHITECTURE(X11)
+    virtual uint64_t createPluginContainer();
+    virtual void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID);
+#endif
 
     // WebFrame::LoadListener
     virtual void didFinishLoad(WebFrame*);

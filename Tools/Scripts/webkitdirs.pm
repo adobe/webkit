@@ -1,4 +1,4 @@
-# Copyright (C) 2005, 2006, 2007, 2010, 2012 Apple Inc. All rights reserved.
+# Copyright (C) 2005, 2006, 2007, 2010, 2011, 2012 Apple Inc. All rights reserved.
 # Copyright (C) 2009 Google Inc. All rights reserved.
 # Copyright (C) 2011 Research In Motion Limited. All rights reserved.
 #
@@ -56,6 +56,7 @@ BEGIN {
        &cmakeBasedPortName
        &currentSVNRevision
        &debugSafari
+       &nmPath
        &passedConfiguration
        &printHelpAndExitForRunAndDebugWebKitAppIfNeeded
        &productDir
@@ -81,6 +82,7 @@ my $configurationForVisualStudio;
 my $configurationProductDir;
 my $sourceDir;
 my $currentSVNRevision;
+my $nmPath;
 my $osXVersion;
 my $generateDsym;
 my $isQt;
@@ -930,6 +932,7 @@ sub blackberryCMakeArguments()
     if ($cpu eq "a9") {
         $cpu = $arch . "v7le";
         push @cmakeExtraOptions, '-DTARGETING_PLAYBOOK=1';
+        push @cmakeExtraOptions, '-DENABLE_GLES2=1';
     }
 
     my $stageDir = $ENV{"STAGE_DIR"};
@@ -956,6 +959,7 @@ sub blackberryCMakeArguments()
 
     push @cmakeExtraOptions, "-DCMAKE_SKIP_RPATH='ON'" if isDarwin();
     push @cmakeExtraOptions, "-DENABLE_DRT=1" if $ENV{"ENABLE_DRT"};
+    push @cmakeExtraOptions, "-DENABLE_GLES2=1" if $ENV{"ENABLE_GLES2"};
 
     my @includeSystemDirectories;
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "grskia", "skia");
@@ -965,6 +969,7 @@ sub blackberryCMakeArguments()
     push @includeSystemDirectories, $stageInc;
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "platform");
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "qsk");
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "ots");
 
     my @cxxFlags;
     push @cxxFlags, "-Wl,-rpath-link,$stageLib";
@@ -1151,7 +1156,7 @@ sub determineIsChromiumNinja()
 
     my $hasUpToDateNinjabuild = 0;
     if (-e "out/$config/build.ninja") {
-        my $statNinja = stat("out/$config/build.ninja");
+        my $statNinja = stat("out/$config/build.ninja")->mtime;
 
         my $statXcode = 0;
         if (-e 'Source/WebKit/chromium/WebKit.xcodeproj') {
@@ -1160,7 +1165,7 @@ sub determineIsChromiumNinja()
 
         my $statMake = 0;
         if (-e 'Makefile.chromium') {
-          $statXcode = stat('Makefile.chromium')->mtime;
+          $statMake = stat('Makefile.chromium')->mtime;
         }
 
         $hasUpToDateNinjabuild = $statNinja > $statXcode && $statNinja > $statMake;
@@ -1305,6 +1310,23 @@ sub isPerianInstalled()
     }
 
     return 0;
+}
+
+sub determineNmPath()
+{
+    return if $nmPath;
+
+    if (isAppleMacWebKit()) {
+        $nmPath = `xcrun -find nm`;
+        chomp $nmPath;
+    }
+    $nmPath = "nm" if !$nmPath;
+}
+
+sub nmPath()
+{
+    determineNmPath();
+    return $nmPath;
 }
 
 sub determineOSXVersion()
@@ -1791,14 +1813,6 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
     print "Calling autogen.sh in " . $dir . "\n\n";
     print "Installation prefix directory: $prefix\n" if(defined($prefix));
 
-    # Save md5sum for jhbuild-related files.
-    foreach my $file (qw(jhbuildrc jhbuild.modules)) {
-        my $path = join('/', $sourceDir, 'Tools', 'gtk', $file);
-        open(SUM, ">$file.md5sum");
-        print SUM getMD5HashForFile($path);
-        close(SUM);
-    }
-
     # Only for WebKit, write the autogen.sh arguments to a file so that we can detect
     # when they change and automatically re-run it.
     if ($project eq 'WebKit') {
@@ -1827,10 +1841,16 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
     }
 }
 
+sub getJhbuildPath()
+{
+    return join(baseProductDir(), "Dependencies");
+}
+
 sub jhbuildConfigurationChanged()
 {
     foreach my $file (qw(jhbuildrc.md5sum jhbuild.modules.md5sum)) {
-        if (! -e $file) {
+        my $path = join(getJhbuildPath(), $file);
+        if (! -e $path) {
             return 1;
         }
 
@@ -1840,7 +1860,7 @@ sub jhbuildConfigurationChanged()
         my $currentSum = getMD5HashForFile($actualFile);
 
         # Get our previous record.
-        open(PREVIOUS_MD5, $file);
+        open(PREVIOUS_MD5, $path);
         chomp(my $previousSum = <PREVIOUS_MD5>);
         close(PREVIOUS_MD5);
 
@@ -1942,7 +1962,8 @@ sub buildAutotoolsProject($@)
         # If the configuration changed, dependencies may have been removed.
         # Since we lack a granular way of uninstalling those we wipe out the
         # jhbuild root and start from scratch.
-        if (system("rm -rf $baseProductDir/Dependencies/Root") ne 0) {
+        my $jhbuildPath = getJhbuildPath();
+        if (system("rm -rf $jhbuildPath/Root") ne 0) {
             die "Cleaning jhbuild root failed!";
         }
 
@@ -1964,6 +1985,15 @@ sub buildAutotoolsProject($@)
         system("perl", "$sourceDir/Tools/Scripts/update-webkitgtk-libs") == 0 or die $!;
     }
 
+    # Save md5sum for jhbuild-related files.
+    foreach my $file (qw(jhbuildrc jhbuild.modules)) {
+        my $source = join('/', $sourceDir, "Tools", "gtk", $file);
+        my $destination = join(getJhbuildPath(), $file);
+        open(SUM, ">$destination" . ".md5sum");
+        print SUM getMD5HashForFile($source);
+        close(SUM);
+    }
+
     # If GNUmakefile exists, don't run autogen.sh unless its arguments
     # have changed. The makefile should be smart enough to track autotools
     # dependencies and re-run autogen.sh when build files change.
@@ -1979,9 +2009,7 @@ sub buildAutotoolsProject($@)
 
     if ($project eq 'WebKit' && !isCrossCompilation()) {
         my @docGenerationOptions = ($runWithJhbuild, "$gtkScriptsPath/generate-gtkdoc", "--skip-html");
-        if ($debug) {
-            push(@docGenerationOptions, "--debug");
-        }
+        push(@docGenerationOptions, productDir());
 
         if (system(@docGenerationOptions)) {
             die "\n gtkdoc did not build without warnings\n";
@@ -2460,7 +2488,7 @@ EOF
 sub argumentsForRunAndDebugMacWebKitApp()
 {
     my @args = @ARGV;
-    push @args, ("-ApplePersistenceIgnoreState", "YES") if isLion() && checkForArgumentAndRemoveFromArrayRef("--no-saved-state", \@args);
+    push @args, ("-ApplePersistenceIgnoreState", "YES") if !isLeopard() && !isSnowLeopard() && checkForArgumentAndRemoveFromArrayRef("--no-saved-state", \@args);
     return @args;
 }
 

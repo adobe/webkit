@@ -10,7 +10,6 @@
 #include <sstream>
 
 #include "compiler/debug.h"
-#include "Lexer.h"
 #include "stl_utils.h"
 #include "token_type.h"
 
@@ -32,12 +31,24 @@ static bool isMacroNameReserved(const std::string* name)
 namespace pp
 {
 
-Context::Context() : mOutput(NULL)
+Context::Context()
+    : mLexer(NULL),
+      mInput(NULL),
+      mOutput(NULL)
 {
 }
 
 Context::~Context()
 {
+    destroyLexer();
+}
+
+bool Context::init()
+{
+    return initLexer();
+
+    // TODO(alokp): Define built-in macros here so that we do not need to
+    // define them everytime in process().
 }
 
 bool Context::process(int count,
@@ -48,8 +59,7 @@ bool Context::process(int count,
     ASSERT((count >=0) && (string != NULL) && (output != NULL));
 
     // Setup.
-    mLexer.reset(new Lexer);
-    if (!mLexer->init(count, string, length)) return false;
+    mInput = new Input(count, string, length);
     mOutput = output;
     defineBuiltInMacro("GL_ES", 1);
 
@@ -59,11 +69,6 @@ bool Context::process(int count,
     // Cleanup.
     reset();
     return success;
-}
-
-int Context::lex(YYSTYPE* lvalp, YYLTYPE* llocp)
-{
-    return mLexer->lex(lvalp, llocp);
 }
 
 bool Context::defineMacro(pp::Token::Location location,
@@ -111,8 +116,10 @@ void Context::reset()
     std::for_each(mMacros.begin(), mMacros.end(), DeleteSecond());
     mMacros.clear();
 
+    delete mInput;
+    mInput = NULL;
+
     mOutput = NULL;
-    mLexer.reset();
 }
 
 void Context::defineBuiltInMacro(const std::string& name, int value)

@@ -73,16 +73,16 @@ v8::Handle<v8::Value> V8PopStateEvent::stateAccessorGetter(v8::Local<v8::String>
     bool isSameState = history->isSameAsCurrentState(event->serializedState());
 
     if (isSameState) {
-        v8::Handle<v8::Object> v8History = toV8(history).As<v8::Object>();
+        v8::Handle<v8::Object> v8History = toV8(history, info.GetIsolate()).As<v8::Object>();
         if (!history->stateChanged()) {
             result = v8History->GetHiddenValue(V8HiddenPropertyName::state());
             if (!result.IsEmpty())
                 return cacheState(info.Holder(), result);
         }
-        result = event->serializedState()->deserialize();
+        result = event->serializedState()->deserialize(0, info.GetIsolate());
         v8History->SetHiddenValue(V8HiddenPropertyName::state(), result);
     } else
-        result = event->serializedState()->deserialize();
+        result = event->serializedState()->deserialize(0, info.GetIsolate());
 
     return cacheState(info.Holder(), result);
 }

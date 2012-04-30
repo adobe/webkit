@@ -35,7 +35,7 @@ namespace WebCore {
 
 WrapperTypeInfo V8TestEventConstructor::info = { V8TestEventConstructor::GetTemplate, V8TestEventConstructor::derefObject, 0, 0 };
 
-namespace TestEventConstructorInternal {
+namespace TestEventConstructorV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
@@ -43,23 +43,23 @@ static v8::Handle<v8::Value> attr1AttrGetter(v8::Local<v8::String> name, const v
 {
     INC_STATS("DOM.TestEventConstructor.attr1._get");
     TestEventConstructor* imp = V8TestEventConstructor::toNative(info.Holder());
-    return v8String(imp->attr1());
+    return v8String(imp->attr1(), info.GetIsolate());
 }
 
 static v8::Handle<v8::Value> attr2AttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
     INC_STATS("DOM.TestEventConstructor.attr2._get");
     TestEventConstructor* imp = V8TestEventConstructor::toNative(info.Holder());
-    return v8String(imp->attr2());
+    return v8String(imp->attr2(), info.GetIsolate());
 }
 
-} // namespace TestEventConstructorInternal
+} // namespace TestEventConstructorV8Internal
 
 static const BatchedAttribute TestEventConstructorAttrs[] = {
     // Attribute 'attr1' (Type: 'readonly attribute' ExtAttr: '')
-    {"attr1", TestEventConstructorInternal::attr1AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"attr1", TestEventConstructorV8Internal::attr1AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'attr2' (Type: 'readonly attribute' ExtAttr: 'InitializedByEventConstructor')
-    {"attr2", TestEventConstructorInternal::attr2AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"attr2", TestEventConstructorV8Internal::attr2AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
 v8::Handle<v8::Value> V8TestEventConstructor::constructorCallback(const v8::Arguments& args)
@@ -73,7 +73,7 @@ v8::Handle<v8::Value> V8TestEventConstructor::constructorCallback(const v8::Argu
         return args.Holder();
 
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
 
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, type, args[0]);
     TestEventConstructorInit eventInit;
@@ -86,7 +86,8 @@ v8::Handle<v8::Value> V8TestEventConstructor::constructorCallback(const v8::Argu
     RefPtr<TestEventConstructor> event = TestEventConstructor::create(type, eventInit);
 
     V8DOMWrapper::setDOMWrapper(args.Holder(), &info, event.get());
-    return toV8(event.release(), args.Holder());
+    V8DOMWrapper::setJSWrapperForDOMObject(event.release(), v8::Persistent<v8::Object>::New(args.Holder()));
+    return args.Holder();
 }
 
 bool fillTestEventConstructorInit(TestEventConstructorInit& eventInit, const Dictionary& options)
@@ -145,7 +146,7 @@ bool V8TestEventConstructor::HasInstance(v8::Handle<v8::Value> value)
 }
 
 
-v8::Handle<v8::Object> V8TestEventConstructor::wrapSlow(PassRefPtr<TestEventConstructor> impl)
+v8::Handle<v8::Object> V8TestEventConstructor::wrapSlow(PassRefPtr<TestEventConstructor> impl, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
     V8Proxy* proxy = 0;
@@ -157,7 +158,7 @@ v8::Handle<v8::Object> V8TestEventConstructor::wrapSlow(PassRefPtr<TestEventCons
 
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();
-    getDOMObjectMap().set(impl.leakRef(), wrapperHandle);
+    V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapperHandle);
     return wrapper;
 }
 

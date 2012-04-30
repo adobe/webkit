@@ -39,15 +39,18 @@ DEFINE_ANIMATED_PROPERTY(AnimatedPreserveAspectRatio, OwnerType, DOMAttribute, D
 class SVGAnimationElement;
 
 class SVGAnimatedPreserveAspectRatioAnimator : public SVGAnimatedTypeAnimator {
-    
 public:
     SVGAnimatedPreserveAspectRatioAnimator(SVGAnimationElement*, SVGElement*);
     virtual ~SVGAnimatedPreserveAspectRatioAnimator() { }
     
     virtual PassOwnPtr<SVGAnimatedType> constructFromString(const String&);
-    
-    virtual void calculateFromAndToValues(OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, const String& fromString, const String& toString);
-    virtual void calculateFromAndByValues(OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, const String& fromString, const String& byString);
+    virtual PassOwnPtr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&);
+    virtual void stopAnimValAnimation(const SVGElementAnimatedPropertyList&);
+    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType*);
+    virtual void animValWillChange(const SVGElementAnimatedPropertyList&);
+    virtual void animValDidChange(const SVGElementAnimatedPropertyList&);
+
+    virtual void addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*);
     virtual void calculateAnimatedValue(float percentage, unsigned repeatCount,
                                         OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, OwnPtr<SVGAnimatedType>& animatedValue);
     virtual float calculateDistance(const String& fromString, const String& toString);

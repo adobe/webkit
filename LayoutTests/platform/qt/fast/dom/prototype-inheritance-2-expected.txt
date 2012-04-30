@@ -75,6 +75,9 @@ PASS DOMApplicationCachePrototype from inner.document.forms.testForm.0.ownerDocu
 PASS DOMImplementation from inner.document.forms.testForm.0.ownerDocument.implementation
 PASS DOMImplementationConstructor from inner.document.forms.testForm.0.ownerDocument.implementation.constructor
 PASS DOMImplementationPrototype from inner.document.forms.testForm.0.ownerDocument.implementation.__proto__
+PASS DOMStringList from inner.document.location.ancestorOrigins
+PASS DOMStringListConstructor from inner.document.location.ancestorOrigins.constructor
+PASS DOMStringListPrototype from inner.document.location.ancestorOrigins.__proto__
 PASS DOMStringMap from inner.document.forms.testForm.0.dataset
 PASS DOMStringMapConstructor from inner.document.forms.testForm.0.dataset.constructor
 PASS DOMStringMapPrototype from inner.document.forms.testForm.0.dataset.__proto__
@@ -119,6 +122,9 @@ PASS HTMLCollectionPrototype from inner.document.forms.testForm.0.0.children.__p
 PASS HTMLDListElement from inner.document.getElementsByTagName("canvas")[0].getContext("2d").canvas.nextElementSibling
 PASS HTMLDListElementConstructor from inner.document.getElementsByTagName("canvas")[0].getContext("2d").canvas.nextElementSibling.constructor
 PASS HTMLDListElementPrototype from inner.document.getElementsByTagName("canvas")[0].getContext("2d").canvas.nextElementSibling.__proto__
+PASS HTMLDataListElement from inner.document.getElementsByTagName("canvas")[0].getContext("2d").canvas.nextElementSibling.nextElementSibling
+PASS HTMLDataListElementConstructor from inner.document.getElementsByTagName("canvas")[0].getContext("2d").canvas.nextElementSibling.nextElementSibling.constructor
+PASS HTMLDataListElementPrototype from inner.document.getElementsByTagName("canvas")[0].getContext("2d").canvas.nextElementSibling.nextElementSibling.__proto__
 PASS HTMLDocument from inner.document.forms.testForm.0.ownerDocument
 PASS HTMLDocumentConstructor from inner.document.forms.testForm.0.ownerDocument.constructor
 PASS HTMLDocumentPrototype from inner.document.forms.testForm.0.ownerDocument.__proto__
@@ -241,7 +247,6 @@ Never found CharacterData
 Never found Clipboard
 Never found DOMParser
 Never found DOMSettableTokenList
-Never found DOMStringList
 Never found Document
 Never found DocumentFragment
 Never found DocumentType
@@ -303,6 +308,7 @@ Never found MessagePort
 Never found Node
 Never found NodeFilter
 Never found Notation
+Never found Notification
 Never found Option
 Never found ProcessingInstruction
 Never found Range

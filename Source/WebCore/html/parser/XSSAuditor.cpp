@@ -211,7 +211,7 @@ void XSSAuditor::init()
 
     TextResourceDecoder* decoder = m_parser->document()->decoder();
     m_decodedURL = fullyDecodeString(url.string(), decoder);
-    if (m_decodedURL.find(isRequiredForInjection, 0) == notFound)
+    if (m_decodedURL.find(isRequiredForInjection) == notFound)
         m_decodedURL = String();
 
     if (DocumentLoader* documentLoader = m_parser->document()->frame()->loader()->documentLoader()) {
@@ -223,7 +223,7 @@ void XSSAuditor::init()
             String httpBodyAsString = httpBody->flattenToString();
             if (!httpBodyAsString.isEmpty()) {
                 m_decodedHTTPBody = fullyDecodeString(httpBodyAsString, decoder);
-                if (m_decodedHTTPBody.find(isRequiredForInjection, 0) == notFound)
+                if (m_decodedHTTPBody.find(isRequiredForInjection) == notFound)
                     m_decodedHTTPBody = String();
                 if (m_decodedHTTPBody.length() >= miniumLengthForSuffixTree)
                     m_decodedHTTPBodySuffixTree = adoptPtr(new SuffixTree<ASCIICodebook>(m_decodedHTTPBody, suffixTreeDepth));
@@ -326,7 +326,7 @@ bool XSSAuditor::filterScriptToken(HTMLToken& token)
     ASSERT(token.type() == HTMLTokenTypes::StartTag);
     ASSERT(hasName(token, scriptTag));
 
-    m_cachedDecodedSnippet = stripLeadingAndTrailingHTMLSpaces(decodedSnippetForToken(token));
+    m_cachedDecodedSnippet = decodedSnippetForName(token);
     m_shouldAllowCDATA = m_parser->tokenizer()->shouldAllowCDATA();
 
     if (isContainedInRequest(decodedSnippetForName(token)))
@@ -399,10 +399,12 @@ bool XSSAuditor::filterIframeToken(HTMLToken& token)
     ASSERT(token.type() == HTMLTokenTypes::StartTag);
     ASSERT(hasName(token, iframeTag));
 
-    if (isContainedInRequest(decodedSnippetForName(token)))
-        return eraseAttributeIfInjected(token, srcAttr, String(), SrcLikeAttribute);
-
-    return false;
+    bool didBlockScript = false;
+    if (isContainedInRequest(decodedSnippetForName(token))) {
+        didBlockScript |= eraseAttributeIfInjected(token, srcAttr, String(), SrcLikeAttribute);
+        didBlockScript |= eraseAttributeIfInjected(token, srcdocAttr, String(), ScriptLikeAttribute);
+    }
+    return didBlockScript;
 }
 
 bool XSSAuditor::filterMetaToken(HTMLToken& token)
@@ -440,30 +442,7 @@ bool XSSAuditor::eraseDangerousAttributesIfInjected(HTMLToken& token)
         bool valueContainsJavaScriptURL = !isInlineEventHandler && protocolIsJavaScript(stripLeadingAndTrailingHTMLSpaces(String(attribute.m_value.data(), attribute.m_value.size())));
         if (!isInlineEventHandler && !valueContainsJavaScriptURL)
             continue;
-        // Beware of trailing characters which came from the page itself, not the 
-        // injected vector. Excluding the terminating character covers common cases
-        // where the page immediately ends the attribute, but doesn't cover more
-        // complex cases where there is other page data following the injection. 
-        // Generally, these won't parse as javascript, so the injected vector
-        // typically excludes them from consideration via a single-line comment or
-        // by enclosing them in a string literal terminated later by the page's own
-        // closing punctuation. Since the snippet has not been parsed, the vector
-        // may also try to introduce these via entities. As a result, we'd like to
-        // stop before the first "//", the first <!--, the first entity, or the first
-        // quote not immediately following the first equals sign (taking whitespace
-        // into consideration). To keep things simpler, we don't try to distinguish
-        // between entity-introducing amperands vs. other uses, nor do we bother to
-        // check for a second slash for a comment, nor do we bother to check for
-        // !-- following a less-than sign. We stop instead on any ampersand
-        // slash, or less-than sign.
-        String decodedSnippet = decodedSnippetForAttribute(token, attribute);
-        size_t position;
-        if ((position = decodedSnippet.find("=")) != notFound
-            && (position = decodedSnippet.find(isNotHTMLSpace, position + 1)) != notFound
-            && (position = decodedSnippet.find(isTerminatingCharacter, isHTMLQuote(decodedSnippet[position]) ? position + 1 : position)) != notFound) {
-            decodedSnippet.truncate(position);
-        }
-        if (!isContainedInRequest(decodedSnippet))
+        if (!isContainedInRequest(decodedSnippetForAttribute(token, attribute, ScriptLikeAttribute)))
             continue;
         token.eraseValueOfAttribute(i);
         if (valueContainsJavaScriptURL)
@@ -475,7 +454,7 @@ bool XSSAuditor::eraseDangerousAttributesIfInjected(HTMLToken& token)
 
 bool XSSAuditor::eraseAttributeIfInjected(HTMLToken& token, const QualifiedName& attributeName, const String& replacementValue, AttributeKind treatment)
 {
-    size_t indexOfAttribute;
+    size_t indexOfAttribute = 0;
     if (findAttributeWithName(token, attributeName, indexOfAttribute)) {
         const HTMLToken::Attribute& attribute = token.attributes().at(indexOfAttribute);
         if (isContainedInRequest(decodedSnippetForAttribute(token, attribute, treatment))) {
@@ -492,17 +471,10 @@ bool XSSAuditor::eraseAttributeIfInjected(HTMLToken& token, const QualifiedName&
     return false;
 }
 
-String XSSAuditor::decodedSnippetForToken(const HTMLToken& token)
-{
-    String snippet = m_parser->sourceForToken(token);
-    return fullyDecodeString(snippet, m_parser->document()->decoder());
-}
-
 String XSSAuditor::decodedSnippetForName(const HTMLToken& token)
 {
-    // Grab a fixed number of characters equal to the length of the token's
-    // name plus one (to account for the "<").
-    return decodedSnippetForToken(token).substring(0, token.name().size() + 1);
+    // Grab a fixed number of characters equal to the length of the token's name plus one (to account for the "<").
+    return fullyDecodeString(m_parser->sourceForToken(token), m_parser->document()->decoder()).substring(0, token.name().size() + 1);
 }
 
 String XSSAuditor::decodedSnippetForAttribute(const HTMLToken& token, const HTMLToken::Attribute& attribute, AttributeKind treatment)
@@ -533,6 +505,29 @@ String XSSAuditor::decodedSnippetForAttribute(const HTMLToken& token, const HTML
             }
             if (currentChar == ',')
                 commaSeen = true;
+        }
+    } else if (treatment == ScriptLikeAttribute) {
+        // Beware of trailing characters which came from the page itself, not the 
+        // injected vector. Excluding the terminating character covers common cases
+        // where the page immediately ends the attribute, but doesn't cover more
+        // complex cases where there is other page data following the injection. 
+        // Generally, these won't parse as javascript, so the injected vector
+        // typically excludes them from consideration via a single-line comment or
+        // by enclosing them in a string literal terminated later by the page's own
+        // closing punctuation. Since the snippet has not been parsed, the vector
+        // may also try to introduce these via entities. As a result, we'd like to
+        // stop before the first "//", the first <!--, the first entity, or the first
+        // quote not immediately following the first equals sign (taking whitespace
+        // into consideration). To keep things simpler, we don't try to distinguish
+        // between entity-introducing amperands vs. other uses, nor do we bother to
+        // check for a second slash for a comment, nor do we bother to check for
+        // !-- following a less-than sign. We stop instead on any ampersand
+        // slash, or less-than sign.
+        size_t position = 0;
+        if ((position = decodedSnippet.find("=")) != notFound
+            && (position = decodedSnippet.find(isNotHTMLSpace, position + 1)) != notFound
+            && (position = decodedSnippet.find(isTerminatingCharacter, isHTMLQuote(decodedSnippet[position]) ? position + 1 : position)) != notFound) {
+            decodedSnippet.truncate(position);
         }
     }
     return decodedSnippet;
@@ -570,12 +565,13 @@ String XSSAuditor::decodedSnippetForJavaScript(const HTMLToken& token)
             break;
     }
 
-    // Stop at next comment (using the same rules as above for SVG/XML vs HTML), or when
-    // we exceed the maximum length target. After hitting the length target, we can only
-    // stop at a point where we know we are not in the middle of a %-escape sequence. For
-    // the sake of simplicity, approximate not stopping inside a (possibly multiply encoded)
-    // %-esacpe sequence by breaking on whitespace only. We should have enough text in
-    // these cases to avoid false positives.
+    // Stop at next comment (using the same rules as above for SVG/XML vs HTML), when we 
+    // encounter a comma, or when we  exceed the maximum length target. The comma rule
+    // covers a common parameter concatenation case performed by some webservers.
+    // After hitting the length target, we can only stop at a point where we know we are
+    // not in the middle of a %-escape sequence. For the sake of simplicity, approximate
+    // not stopping inside a (possibly multiply encoded) %-esacpe sequence by breaking on
+    // whitespace only. We should have enough text in these cases to avoid false positives.
     for (foundPosition = startPosition; foundPosition < endPosition; foundPosition++) {
         if (!m_shouldAllowCDATA) {
             if (startsSingleLineCommentAt(string, foundPosition) || startsMultiLineCommentAt(string, foundPosition)) {
@@ -587,7 +583,7 @@ String XSSAuditor::decodedSnippetForJavaScript(const HTMLToken& token)
                 break;
             }
         }
-        if (foundPosition > startPosition + kMaximumFragmentLengthTarget && isHTMLSpace(string[foundPosition])) {
+        if (string[foundPosition] == ',' || (foundPosition > startPosition + kMaximumFragmentLengthTarget && isHTMLSpace(string[foundPosition]))) {
             endPosition = foundPosition;
             break;
         }

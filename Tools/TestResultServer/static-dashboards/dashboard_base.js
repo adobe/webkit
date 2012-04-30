@@ -49,7 +49,7 @@ function handleValidHashParameter(key, value)
 
 // Default hash parameters for the page. The page should override this to create
 // default states.
-var g_defaultStateValues = {};
+var g_defaultDashboardSpecificStateValues = {};
 
 
 // The page should override this to modify page state due to
@@ -107,7 +107,8 @@ var WEBKIT_REVISIONS_KEY = 'webkitRevision';
 var TIMESTAMPS_KEY = 'secondsSinceEpoch';
 var BUILD_NUMBERS_KEY = 'buildNumbers';
 var TESTS_KEY = 'tests';
-var TWO_WEEKS_SECONDS = 60 * 60 * 24 * 14;
+var ONE_DAY_SECONDS = 60 * 60 * 24;
+var ONE_WEEK_SECONDS = ONE_DAY_SECONDS * 7;
 
 // These should match the testtype uploaded to test-results.appspot.com.
 // See http://test-results.appspot.com/testfile.
@@ -172,12 +173,12 @@ function handleValidHashParameterWrapper(key, value)
 {
     switch(key) {
     case 'testType':
-        validateParameter(g_currentState, key, value,
+        validateParameter(g_crossDashboardState, key, value,
             function() { return TEST_TYPES.indexOf(value) != -1; });
         return true;
 
     case 'group':
-        validateParameter(g_currentState, key, value,
+        validateParameter(g_crossDashboardState, key, value,
             function() {
               return value in LAYOUT_TESTS_BUILDER_GROUPS ||
                   value in CHROMIUM_GPU_TESTS_BUILDER_GROUPS ||
@@ -185,13 +186,7 @@ function handleValidHashParameterWrapper(key, value)
             });
         return true;
 
-    // FIXME: remove support for this parameter once the waterfall starts to
-    // pass in the builder name instead.
-    case 'master':
-        validateParameter(g_currentState, key, value,
-            function() { return value in LEGACY_BUILDER_MASTERS_TO_GROUPS; });
-        return true;
-
+    // FIXME: This should probably be stored on g_crossDashboardState like everything else in this function.
     case 'builder':
         validateParameter(g_currentState, key, value,
             function() { return value in g_builders; });
@@ -199,13 +194,13 @@ function handleValidHashParameterWrapper(key, value)
 
     case 'useTestData':
     case 'showAllRuns':
-        g_currentState[key] = value == 'true';
+        g_crossDashboardState[key] = value == 'true';
         return true;
 
     case 'buildDir':
-        g_currentState['testType'] = 'layout-test-results';
         if (value === 'Debug' || value == 'Release') {
-            g_currentState[key] = value;
+            g_crossDashboardState['testType'] = 'layout-tests';
+            g_crossDashboardState[key] = value;
             return true;
         } else
             return false;
@@ -219,7 +214,8 @@ var g_defaultCrossDashboardStateValues = {
     group: '@ToT - chromium.org',
     showAllRuns: false,
     testType: 'layout-tests',
-    buildDir : ''
+    buildDir: '',
+    useTestData: false,
 }
 
 // Generic utility functions.
@@ -289,11 +285,8 @@ function validateParameter(state, key, value, validateFn)
         console.log(key + ' value is not valid: ' + value);
 }
 
-function parseParameters(parameterStr)
+function queryHashAsMap()
 {
-    g_oldState = g_currentState;
-    g_currentState = {};
-
     var hash = window.location.hash;
     var paramsList = hash ? hash.substring(1).split('&') : [];
     var paramsMap = {};
@@ -308,61 +301,90 @@ function parseParameters(parameterStr)
         paramsMap[thisParam[0]] = decodeURIComponent(thisParam[1]);
     }
 
-    function parseParam(key)
-    {
-        var value = paramsMap[key];
-        if (!handleValidHashParameterWrapper(key, value))
-            invalidKeys.push(key + '=' + value);
+    // FIXME: remove support for mapping from the master parameter to the group
+    // one once the waterfall starts to pass in the builder name instead.
+    if (paramsMap.master) {
+        paramsMap.group = LEGACY_BUILDER_MASTERS_TO_GROUPS[paramsMap.master];
+        if (!paramsMap.group)
+            console.log('ERROR: Unknown master name: ' + paramsMap.master);
+        window.location.hash = window.location.hash.replace('master=' + paramsMap.master, 'group=' + paramsMap.group);
+        delete paramsMap.master;
     }
 
-    // Parse builder param last, since the list of valid builders depends on the other parameters.
-    for (var key in paramsMap) {
-        if (key != 'builder')
-            parseParam(key);
-    }
-    if ('builder' in paramsMap) {
-        if (!g_builders) {
-            var tempState = {};
-            for (var key in g_currentState)
-                tempState[key] = g_currentState[key];
-            fillMissingValues(tempState, g_defaultCrossDashboardStateValues);
-            fillMissingValues(tempState, g_defaultStateValues);
-            initBuilders(tempState);
-        }
-        parseParam('builder');
-    }
+    return paramsMap;
+}
 
-    if (invalidKeys.length)
-        console.log("Invalid query parameters: " + invalidKeys.join(','));
+function parseParameter(parameters, key)
+{
+    if (!(key in parameters))
+        return;
+    var value = parameters[key];
+    if (!handleValidHashParameterWrapper(key, value))
+        console.log("Invalid query parameter: " + key + '=' + value);
+}
 
-    var diffState = diffStates();
+function parseCrossDashboardParameters()
+{
+    g_crossDashboardState = {};
+    var parameters = queryHashAsMap();
+    for (parameterName in g_defaultCrossDashboardStateValues)
+        parseParameter(parameters, parameterName);
 
-    fillMissingValues(g_currentState, g_defaultCrossDashboardStateValues);
-    fillMissingValues(g_currentState, g_defaultStateValues);
+    fillMissingValues(g_crossDashboardState, g_defaultCrossDashboardStateValues);
+    if (currentBuilderGroup() === undefined)
+        g_crossDashboardState.group = g_defaultCrossDashboardStateValues.group;
+}
+
+function parseDashboardSpecificParameters()
+{
+    g_currentState = {};
+    var parameters = queryHashAsMap();
+    for (parameterName in g_defaultDashboardSpecificStateValues)
+        parseParameter(parameters, parameterName);
+}
+
+function parseParameters()
+{
+    var oldCrossDashboardState = g_crossDashboardState;
+    var oldDashboardSpecificState = g_currentState;
+
+    parseCrossDashboardParameters();
+    parseDashboardSpecificParameters();
+    parseParameter(queryHashAsMap(), 'builder');
+
+    var crossDashboardDiffState = diffStates(oldCrossDashboardState, g_crossDashboardState);
+    var dashboardSpecificDiffState = diffStates(oldDashboardSpecificState, g_currentState);
+
+    fillMissingValues(g_currentState, g_defaultDashboardSpecificStateValues);
+    fillMissingValues(g_currentState, {'builder': g_defaultBuilderName});
+
+    // FIXME: dashboard_base shouldn't know anything about specific dashboard specific keys.
+    if (dashboardSpecificDiffState.builder)
+        delete g_currentState.tests;
+    if (g_currentState.tests)
+        delete g_currentState.builder;
 
     // Some parameters require loading different JSON files when the value changes. Do a reload.
-    if (g_oldState) {
-        for (var key in g_currentState) {
-            if (g_oldState[key] != g_currentState[key] && RELOAD_REQUIRING_PARAMETERS.indexOf(key) != -1)
+    if (Object.keys(oldCrossDashboardState).length) {
+        for (var key in g_crossDashboardState) {
+            if (oldCrossDashboardState[key] != g_crossDashboardState[key] && RELOAD_REQUIRING_PARAMETERS.indexOf(key) != -1)
                 window.location.reload();
         }
     }
 
-    return diffState;
+    return dashboardSpecificDiffState;
 }
 
-// Find the difference of g_currentState with g_oldState.
-// @return {Object} key:values of the new or changed params.
-function diffStates()
+function diffStates(oldState, newState)
 {
     // If there is no old state, everything in the current state is new.
-    if (!g_oldState)
-        return g_currentState;
+    if (!oldState)
+        return newState;
 
     var changedParams = {};
-    for (curKey in g_currentState) {
-        var oldVal = g_oldState[curKey];
-        var newVal = g_currentState[curKey];
+    for (curKey in newState) {
+        var oldVal = oldState[curKey];
+        var newVal = newState[curKey];
         // Add new keys or changed values.
         if (!oldVal || oldVal != newVal)
             changedParams[curKey] = newVal;
@@ -372,8 +394,8 @@ function diffStates()
 
 function defaultValue(key)
 {
-    if (key in g_defaultStateValues)
-        return g_defaultStateValues[key];
+    if (key in g_defaultDashboardSpecificStateValues)
+        return g_defaultDashboardSpecificStateValues[key];
     return g_defaultCrossDashboardStateValues[key];
 }
 
@@ -407,69 +429,35 @@ function appendScript(path, opt_onError, opt_onLoad)
     document.getElementsByTagName('head')[0].appendChild(script);
 }
 
-// Permalinkable state of the page.
-var g_currentState;
-
-// Saved value of previous g_currentState. This is used to detect changing from
-// one set of builders to another, which requires reloading the page.
-var g_oldState;
-
-// Parse cross-dashboard parameters before using them.
-parseParameters();
+// FIXME: Rename this to g_dashboardSpecificState;
+var g_currentState = {};
+var g_crossDashboardState = {};
+var g_waitingOnExpectations;
+parseCrossDashboardParameters();
+loadBuildersList(g_crossDashboardState.group, g_crossDashboardState.testType);
 
 function isLayoutTestResults()
 {
-    return g_currentState.testType == 'layout-tests';
+    return g_crossDashboardState.testType == 'layout-tests';
 }
 
-function currentBuilderGroupCategory(opt_state)
+function isGPUTestResults()
 {
-    var state = opt_state || g_currentState;
-    switch (state.testType) {
-    case 'layout-tests':
-        return LAYOUT_TESTS_BUILDER_GROUPS
-    case 'gpu_tests':
-        return CHROMIUM_GPU_TESTS_BUILDER_GROUPS
-    case 'aura_unittests':
-    case 'aura_shell_unittests':
-    case 'base_unittests':
-    case 'browser_tests':
-    case 'cacheinvalidation_unittests':
-    case 'compositor_unittests':
-    case 'content_unittests':
-    case 'courgette_unittests':
-    case 'crypto_unittests':
-    case 'googleurl_unittests':
-    case 'gfx_unittests':
-    case 'gpu_unittests':
-    case 'installer_util_unittests':
-    case 'interactive_ui_tests':
-    case 'ipc_tests':
-    case 'jingle_unittests':
-    case 'media_unittests':
-    case 'mini_installer_test':
-    case 'nacl_ui_tests':
-    case 'net_unittests':
-    case 'printing_unittests':
-    case 'remoting_unittests':
-    case 'safe_browsing_tests':
-    case 'sql_unittests':
-    case 'sync_unit_tests':
-    case 'sync_integration_tests':
-    case 'test_shell_tests':
-    case 'ui_tests':
-    case 'unit_tests':
-    case 'views_unittests':
-        return CHROMIUM_GTESTS_BUILDER_GROUPS
-    default:
-        console.log('invalid testType parameter: ' + state.testType);
-    }
+    return g_crossDashboardState.testType == 'gpu_tests';
 }
 
-function currentBuilderGroup(opt_state)
+function currentBuilderGroupCategory()
 {
-    var state = opt_state || g_currentState;
-    return currentBuilderGroupCategory(state)[state.group]
+    if (g_crossDashboardState.testType == 'layout-tests')
+        return LAYOUT_TESTS_BUILDER_GROUPS;
+    if (g_crossDashboardState.testType == 'gpu_tests')
+        return CHROMIUM_GPU_TESTS_BUILDER_GROUPS;
+    return CHROMIUM_GTESTS_BUILDER_GROUPS;
+}
+
+function currentBuilderGroup()
+{
+    return currentBuilderGroupCategory()[g_crossDashboardState.group]
 }
 
 function builderMaster(builderName)
@@ -482,31 +470,24 @@ function isTipOfTreeWebKitBuilder()
     return currentBuilderGroup().isToTWebKit;
 }
 
-var g_defaultBuilderName, g_builders, g_expectationsBuilder;
-function initBuilders(state)
+var g_defaultBuilderName, g_builders;
+function initBuilders()
 {
-    if (state.buildDir) {
+    if (g_crossDashboardState.buildDir) {
         // If buildDir is set, point to the results.json in the local tree. Useful for debugging changes to the python JSON generator.
         g_defaultBuilderName = 'DUMMY_BUILDER_NAME';
         g_builders = {'DUMMY_BUILDER_NAME': ''};
         var loc = document.location.toString();
         var offset = loc.indexOf('webkit/');
-    } else {
-        // FIXME: remove support for mapping from the master parameter to the group
-        // one once the waterfall starts to pass in the builder name instead.
-        if (state.master) {
-            state.group = LEGACY_BUILDER_MASTERS_TO_GROUPS[state.master];
-            window.location.hash = window.location.hash.replace('master=' + state.master, 'group=' + state.group);
-            delete state.master;
-        }
-        currentBuilderGroup(state).setup();
-    }
+    } else
+        currentBuilderGroup().setup();
 }
-initBuilders(g_currentState);
 
-// Append JSON script elements.
 var g_resultsByBuilder = {};
 var g_expectations;
+var g_staleBuilders = [];
+var g_buildersThatFailedToLoad = [];
+
 function ADD_RESULTS(builds)
 {
     var json_version = builds['version'];
@@ -519,8 +500,11 @@ function ADD_RESULTS(builds)
         // running that suite anymore.
         // FIXME: Grab which bots run which tests directly from the buildbot JSON instead.
         var lastRunSeconds = builds[builderName].secondsSinceEpoch[0];
-        if ((Date.now() / 1000) - lastRunSeconds > TWO_WEEKS_SECONDS)
+        if ((Date.now() / 1000) - lastRunSeconds > ONE_WEEK_SECONDS)
             continue;
+
+        if ((Date.now() / 1000) - lastRunSeconds > ONE_DAY_SECONDS)
+            g_staleBuilders.push(builderName);
 
         if (json_version >= 4)
             builds[builderName][TESTS_KEY] = flattenTrie(builds[builderName][TESTS_KEY]);
@@ -554,7 +538,7 @@ function pathToBuilderResultsFile(builderName)
 {
     return TEST_RESULTS_SERVER + 'testfile?builder=' + builderName +
             '&master=' + builderMaster(builderName).name +
-            '&testtype=' + g_currentState.testType + '&name=';
+            '&testtype=' + g_crossDashboardState.testType + '&name=';
 }
 
 // FIXME: Make the dashboard understand different ports' expectations files.
@@ -572,8 +556,6 @@ function requestExpectationsFile()
     });
 }
 
-var g_waitingOnExpectations = isLayoutTestResults() && !isTreeMap();
-
 function isTreeMap()
 {
     return endsWith(window.location.pathname, 'treemap.html');
@@ -584,7 +566,7 @@ function appendJSONScriptElementFor(builderName)
     var resultsFilename;
     if (isTreeMap())
         resultsFilename = 'times_ms.json';
-    else if (g_currentState.showAllRuns)
+    else if (g_crossDashboardState.showAllRuns)
         resultsFilename = 'results.json';
     else
         resultsFilename = 'results-small.json';
@@ -603,14 +585,15 @@ function appendJSONScriptElements()
 
     parseParameters();
 
-    if (g_currentState.useTestData) {
-        appendScript('flakiness_dashboard_tests.js');
+    if (g_crossDashboardState.useTestData) {
+        appendScript('flakiness_dashboard_unittests.js');
         return;
     }
 
     for (var builderName in g_builders)
         appendJSONScriptElementFor(builderName);
 
+    var g_waitingOnExpectations = isLayoutTestResults() && !isTreeMap();
     if (g_waitingOnExpectations)
         requestExpectationsFile();
 }
@@ -649,7 +632,7 @@ function handleResourceLoadError(builderName, e)
 
     if (isLayoutTestResults()) {
         console.error(error);
-        addError(error);
+        g_buildersThatFailedToLoad.push(builderName);
     } else {
         // Avoid to show error/warning messages for non-layout tests. We may be
         // checking the builders that are not running the tests.
@@ -665,11 +648,11 @@ function handleResourceLoadError(builderName, e)
         g_defaultBuilderName = null;
         for (var availableBuilderName in g_builders) {
             g_defaultBuilderName = availableBuilderName;
-            g_defaultStateValues.builder = availableBuilderName;
+            g_defaultDashboardSpecificStateValues.builder = availableBuilderName;
             break;
         }
         if (!g_defaultBuilderName) {
-            var error = 'No tests results found for ' + g_currentState.testType + '. Reload the page to try fetching it again.';
+            var error = 'No tests results found for ' + g_crossDashboardState.testType + '. Reload the page to try fetching it again.';
             console.error(error);
             addError(error);
         }
@@ -684,7 +667,7 @@ function handleResourceLoadError(builderName, e)
 // @param {string} errorMsg The message to show to the user.
 function addError(errorMsg)
 {
-    g_errorMessages += errorMsg + '<br />';
+    g_errorMessages += errorMsg + '<br>';
 }
 
 // Clear out error and warning messages.
@@ -717,6 +700,9 @@ function showErrors()
 // @return {boolean} Whether the json files have all completed loading.
 function haveJsonFilesLoaded()
 {
+    if (!currentBuilderGroup())
+        return false;
+
     if (g_waitingOnExpectations)
         return false;
 
@@ -730,11 +716,24 @@ function haveJsonFilesLoaded()
     return true;
 }
 
+function addBuilderLoadErrors()
+{
+    if (g_hasDoneInitialPageGeneration)
+        return;
+
+    if (g_buildersThatFailedToLoad.length)
+        addError('ERROR: Failed to get data from ' + g_buildersThatFailedToLoad.toString() + '.');
+
+    if (g_staleBuilders.length)
+        addError('ERROR: Data from ' + g_staleBuilders.toString() + ' is more than 1 day stale.');
+}
+
 function handleLocationChange()
 {
     if(!haveJsonFilesLoaded())
         return;
 
+    addBuilderLoadErrors();
     g_hasDoneInitialPageGeneration = true;
 
     var params = parseParameters();
@@ -756,10 +755,18 @@ function handleLocationChange()
 
 window.onhashchange = handleLocationChange;
 
+function combinedDashboardState()
+{
+    var combinedState = Object.create(g_currentState);
+    for (var key in g_crossDashboardState)
+        combinedState[key] = g_crossDashboardState[key];
+    return combinedState;    
+}
+
 // Sets the page state. Takes varargs of key, value pairs.
 function setQueryParameter(var_args)
 {
-    var state = Object.create(g_currentState);
+    var state = combinedDashboardState();
     for (var i = 0; i < arguments.length; i += 2) {
         var key = arguments[i];
         state[key] = arguments[i + 1];
@@ -773,7 +780,7 @@ function setQueryParameter(var_args)
 
 function permaLinkURLHash(opt_state)
 {
-    var state = opt_state || g_currentState;
+    var state = opt_state || combinedDashboardState();
     return '#' + joinParameters(state);
 }
 
@@ -852,7 +859,12 @@ function expectationsMap()
 
 function toggleQueryParameter(param)
 {
-    setQueryParameter(param, !g_currentState[param]);
+    setQueryParameter(param, !queryParameterValue(param));
+}
+
+function queryParameterValue(parameter)
+{
+    return g_currentState[parameter] || g_crossDashboardState[parameter];
 }
 
 function checkboxHTML(queryParameter, label, isChecked, opt_extraJavaScript)
@@ -872,7 +884,7 @@ function selectHTML(label, queryParameter, options)
     for (var i = 0; i < options.length; i++) {
         var value = options[i];
         html += '<option value="' + value + '" ' +
-            (g_currentState[queryParameter] == value ? 'selected' : '') +
+            (queryParameterValue(queryParameter) == value ? 'selected' : '') +
             '>' + value + '</option>'
     }
     html += '</select></label> ';
@@ -902,7 +914,7 @@ function htmlForTestTypeSwitcher(opt_noBuilderMenu, opt_extraHtml, opt_includeNo
         Object.keys(currentBuilderGroupCategory()));
 
     if (!isTreeMap())
-        html += checkboxHTML('showAllRuns', 'Show all runs', g_currentState.showAllRuns);
+        html += checkboxHTML('showAllRuns', 'Show all runs', g_crossDashboardState.showAllRuns);
 
     if (opt_extraHtml)
         html += opt_extraHtml;
@@ -1076,8 +1088,12 @@ function decompressResults(builderResults)
     };
 }
 
-
-appendJSONScriptElements();
+function g_handleBuildersListLoaded() {
+    if (!currentBuilderGroup())
+        return;
+    initBuilders();
+    appendJSONScriptElements();
+}
 
 document.addEventListener('mousedown', function(e) {
     // Clear the open popup, unless the click was inside the popup.

@@ -228,6 +228,7 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
     Label nativeCallThunk = align();
 
     emitPutImmediateToCallFrameHeader(0, RegisterFile::CodeBlock);
+    storePtr(callFrameRegister, &m_globalData->topCallFrame);
 
 #if CPU(X86)
     // Load caller frame's scope chain into this callframe so that whatever we call can
@@ -362,6 +363,7 @@ JIT::CodeRef JIT::privateCompileCTINativeCall(JSGlobalData* globalData, NativeFu
     Call nativeCall;
 
     emitPutImmediateToCallFrameHeader(0, RegisterFile::CodeBlock);
+    storePtr(callFrameRegister, &m_globalData->topCallFrame);
 
 #if CPU(X86)
     // Load caller frame's scope chain into this callframe so that whatever we call can
@@ -629,6 +631,65 @@ void JIT::emitSlow_op_instanceof(Instruction* currentInstruction, Vector<SlowCas
     stubCall.addArgument(baseVal);
     stubCall.addArgument(proto);
     stubCall.call(dst);
+}
+
+void JIT::emit_op_is_undefined(Instruction* currentInstruction)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    unsigned value = currentInstruction[2].u.operand;
+    
+    emitLoad(value, regT1, regT0);
+    Jump isCell = branch32(Equal, regT1, TrustedImm32(JSValue::CellTag));
+
+    compare32(Equal, regT1, TrustedImm32(JSValue::UndefinedTag), regT0);
+    Jump done = jump();
+    
+    isCell.link(this);
+    loadPtr(Address(regT0, JSCell::structureOffset()), regT1);
+    test8(NonZero, Address(regT1, Structure::typeInfoFlagsOffset()), TrustedImm32(MasqueradesAsUndefined), regT0);
+    
+    done.link(this);
+    emitStoreBool(dst, regT0);
+}
+
+void JIT::emit_op_is_boolean(Instruction* currentInstruction)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    unsigned value = currentInstruction[2].u.operand;
+    
+    emitLoadTag(value, regT0);
+    compare32(Equal, regT0, TrustedImm32(JSValue::BooleanTag), regT0);
+    emitStoreBool(dst, regT0);
+}
+
+void JIT::emit_op_is_number(Instruction* currentInstruction)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    unsigned value = currentInstruction[2].u.operand;
+    
+    emitLoadTag(value, regT0);
+    add32(TrustedImm32(1), regT0);
+    compare32(Below, regT0, TrustedImm32(JSValue::LowestTag + 1), regT0);
+    emitStoreBool(dst, regT0);
+}
+
+void JIT::emit_op_is_string(Instruction* currentInstruction)
+{
+    unsigned dst = currentInstruction[1].u.operand;
+    unsigned value = currentInstruction[2].u.operand;
+    
+    emitLoad(value, regT1, regT0);
+    Jump isNotCell = branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag));
+    
+    loadPtr(Address(regT0, JSCell::structureOffset()), regT1);
+    compare8(Equal, Address(regT1, Structure::typeInfoTypeOffset()), TrustedImm32(StringType), regT0);
+    Jump done = jump();
+    
+    isNotCell.link(this);
+    move(TrustedImm32(0), regT0);
+    
+    done.link(this);
+    emitStoreBool(dst, regT0);
 }
 
 void JIT::emit_op_tear_off_activation(Instruction* currentInstruction)
@@ -919,20 +980,6 @@ void JIT::emit_op_jneq_ptr(Instruction* currentInstruction)
     emitLoad(src, regT1, regT0);
     addJump(branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag)), target);
     addJump(branchPtr(NotEqual, regT0, TrustedImmPtr(ptr)), target);
-}
-
-void JIT::emit_op_jsr(Instruction* currentInstruction)
-{
-    int retAddrDst = currentInstruction[1].u.operand;
-    int target = currentInstruction[2].u.operand;
-    DataLabelPtr storeLocation = storePtrWithPatch(TrustedImmPtr(0), Address(callFrameRegister, sizeof(Register) * retAddrDst));
-    addJump(jump(), target);
-    m_jsrSites.append(JSRInfo(storeLocation, label()));
-}
-
-void JIT::emit_op_sret(Instruction* currentInstruction)
-{
-    jump(Address(callFrameRegister, sizeof(Register) * currentInstruction[1].u.operand));
 }
 
 void JIT::emit_op_eq(Instruction* currentInstruction)

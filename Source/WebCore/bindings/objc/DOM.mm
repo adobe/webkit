@@ -389,6 +389,7 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
     range->textRects(rects);
     return kit(rects);
 }
+
 @end
 
 @implementation DOMRange (DOMRangeExtensions)

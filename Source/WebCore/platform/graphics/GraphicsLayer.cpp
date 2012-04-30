@@ -63,10 +63,6 @@ void KeyframeValueList::insert(const AnimationValue* value)
     m_values.append(value);
 }
 
-#ifndef NDEBUG
-static bool s_inPaintContents = false;
-#endif
-
 GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     : m_client(client)
     , m_anchorPoint(0.5f, 0.5f, 0)
@@ -91,12 +87,30 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_replicatedLayer(0)
     , m_repaintCount(0)
 {
-    ASSERT(!s_inPaintContents);
+#ifndef NDEBUG
+    if (m_client)
+        m_client->verifyNotPainting();
+#endif
 }
 
 GraphicsLayer::~GraphicsLayer()
 {
-    ASSERT(!s_inPaintContents);
+    ASSERT(!m_parent); // willBeDestroyed should have been called already.
+}
+
+void GraphicsLayer::willBeDestroyed()
+{
+#ifndef NDEBUG
+    if (m_client)
+        m_client->verifyNotPainting();
+#endif
+
+    if (m_replicaLayer)
+        m_replicaLayer->setReplicatedLayer(0);
+
+    if (m_replicatedLayer)
+        m_replicatedLayer->setReplicatedByLayer(0);
+
     removeAllChildren();
     removeFromParent();
 }
@@ -257,6 +271,12 @@ void GraphicsLayer::noteDeviceOrPageScaleFactorChangedIncludingDescendants()
 
 void GraphicsLayer::setReplicatedByLayer(GraphicsLayer* layer)
 {
+    if (m_replicaLayer == layer)
+        return;
+
+    if (m_replicaLayer)
+        m_replicaLayer->setReplicatedLayer(0);
+
     if (layer)
         layer->setReplicatedLayer(this);
 
@@ -288,9 +308,6 @@ void GraphicsLayer::clearBackgroundColor()
 
 void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const IntRect& clip)
 {
-#ifndef NDEBUG
-    s_inPaintContents = true;
-#endif
     if (m_client) {
         LayoutSize offset = offsetFromRenderer();
         context.translate(-offset);
@@ -300,9 +317,6 @@ void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const I
 
         m_client->paintContents(this, context, m_paintingPhase, pixelSnappedIntRect(clipRect));
     }
-#ifndef NDEBUG
-    s_inPaintContents = false;
-#endif
 }
 
 String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
@@ -495,6 +509,14 @@ int GraphicsLayer::validateTransformOperations(const KeyframeValueList& valueLis
     return firstIndex;
 }
 
+double GraphicsLayer::backingStoreArea() const
+{
+    if (!drawsContent())
+        return 0;
+    
+    // Effects of page and device scale are ignored; subclasses should override to take these into account.
+    return static_cast<double>(size().width()) * size().height();
+}
 
 static void writeIndent(TextStream& ts, int indent)
 {

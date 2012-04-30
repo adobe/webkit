@@ -42,6 +42,7 @@
 #import <WebCore/RenderView.h>
 #import <WebCore/ScrollingCoordinator.h>
 #import <WebCore/ScrollingThread.h>
+#import <WebCore/ScrollingTree.h>
 #import <WebCore/Settings.h>
 #import <wtf/MainThread.h>
 
@@ -87,6 +88,8 @@ TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea(WebPage* webPage, c
     LayerTreeContext layerTreeContext;
     layerTreeContext.contextID = m_layerHostingContext->contextID();
     m_webPage->send(Messages::DrawingAreaProxy::EnterAcceleratedCompositingMode(0, layerTreeContext));
+
+    updatePreferences();
 }
 
 TiledCoreAnimationDrawingArea::~TiledCoreAnimationDrawingArea()
@@ -109,6 +112,13 @@ void TiledCoreAnimationDrawingArea::scroll(const IntRect& scrollRect, const IntS
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(GraphicsLayer* graphicsLayer)
 {
     CALayer *rootCompositingLayer = graphicsLayer ? graphicsLayer->platformLayer() : nil;
+
+    // Since we'll always be in accelerated compositing mode, the only time that layer will be nil
+    // is when the WKView is removed from its containing window. In that case, the layer will already be
+    // removed from the layer tree hierarchy over in the UI process, so there's no reason to remove it locally.
+    // In addition, removing the layer here will cause flashes when switching between tabs.
+    if (!rootCompositingLayer)
+        return;
 
     if (m_layerTreeStateIsFrozen) {
         m_pendingRootCompositingLayer = rootCompositingLayer;
@@ -206,6 +216,26 @@ void TiledCoreAnimationDrawingArea::setPageOverlayNeedsDisplay(const IntRect& re
     ASSERT(m_pageOverlayLayer);
     m_pageOverlayLayer->setNeedsDisplayInRect(rect);
     scheduleCompositingLayerSync();
+}
+
+void TiledCoreAnimationDrawingArea::updatePreferences()
+{
+    bool showDebugBorders = m_webPage->corePage()->settings()->showDebugBorders();
+
+    if (showDebugBorders == !!m_debugInfoLayer)
+        return;
+
+    if (showDebugBorders) {
+        m_debugInfoLayer = [CALayer layer];
+        [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
+    } else {
+        [m_debugInfoLayer.get() removeFromSuperlayer];
+        m_debugInfoLayer = nullptr;
+    }
+
+#if ENABLE(THREADED_SCROLLING)
+    ScrollingThread::dispatch(bind(&ScrollingTree::setDebugRootLayer, m_webPage->corePage()->scrollingCoordinator()->scrollingTree(), m_debugInfoLayer));
+#endif
 }
 
 void TiledCoreAnimationDrawingArea::notifyAnimationStarted(const GraphicsLayer*, double)
@@ -316,6 +346,8 @@ void TiledCoreAnimationDrawingArea::setLayerHostingMode(uint32_t opaqueLayerHost
 
         m_layerHostingContext->setRootLayer(m_rootLayer.get());
 
+        m_webPage->setLayerHostingMode(layerHostingMode);
+
         // Finally, inform the UIProcess that the context has changed.
         LayerTreeContext layerTreeContext;
         layerTreeContext.contextID = m_layerHostingContext->contextID();
@@ -325,19 +357,19 @@ void TiledCoreAnimationDrawingArea::setLayerHostingMode(uint32_t opaqueLayerHost
 
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(CALayer *layer)
 {
+    ASSERT(layer);
     ASSERT(!m_layerTreeStateIsFrozen);
 
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
 
-    if (!layer)
-        m_rootLayer.get().sublayers = nil;
-    else {
-        m_rootLayer.get().sublayers = [NSArray arrayWithObject:layer];
+    m_rootLayer.get().sublayers = [NSArray arrayWithObject:layer];
 
-        if (m_pageOverlayLayer)
-            [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
-    }
+    if (m_pageOverlayLayer)
+        [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
+
+    if (m_debugInfoLayer)
+        [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
 
     [CATransaction commit];
 }

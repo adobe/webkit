@@ -34,8 +34,10 @@
 
 #include "cc/CCDamageTracker.h"
 
+#include "FilterOperations.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerTreeHostCommon.h"
+#include "cc/CCMathUtil.h"
 #include "cc/CCRenderSurface.h"
 
 namespace WebCore {
@@ -56,7 +58,24 @@ CCDamageTracker::~CCDamageTracker()
 {
 }
 
-void CCDamageTracker::updateDamageTrackingState(const Vector<CCLayerImpl*>& layerList, int targetSurfaceLayerID, bool targetSurfacePropertyChangedOnlyFromDescendant, const IntRect& targetSurfaceContentRect, CCLayerImpl* targetSurfaceMaskLayer)
+static inline void expandDamageRectWithFilters(FloatRect& damageRect, const FilterOperations& filters)
+{
+    int top, right, bottom, left;
+    filters.getOutsets(top, right, bottom, left);
+    damageRect.move(-left, -top);
+    damageRect.expand(left + right, top + bottom);
+}
+
+static inline void expandDamageRectInsideRectWithFilters(FloatRect& damageRect, const FloatRect& filterRect, const FilterOperations& filters)
+{
+    FloatRect expandedDamageRect = damageRect;
+    expandDamageRectWithFilters(expandedDamageRect, filters);
+    expandedDamageRect.intersect(filterRect);
+
+    damageRect.unite(expandedDamageRect);
+}
+
+void CCDamageTracker::updateDamageTrackingState(const Vector<CCLayerImpl*>& layerList, int targetSurfaceLayerID, bool targetSurfacePropertyChangedOnlyFromDescendant, const IntRect& targetSurfaceContentRect, CCLayerImpl* targetSurfaceMaskLayer, const FilterOperations& filters)
 {
     //
     // This function computes the "damage rect" of a target surface, and updates the state
@@ -136,6 +155,9 @@ void CCDamageTracker::updateDamageTrackingState(const Vector<CCLayerImpl*>& laye
         m_currentDamageRect = damageFromActiveLayers;
         m_currentDamageRect.uniteIfNonZero(damageFromSurfaceMask);
         m_currentDamageRect.uniteIfNonZero(damageFromLeftoverRects);
+
+        if (filters.hasFilterThatMovesPixels())
+            expandDamageRectWithFilters(m_currentDamageRect, filters);
     }
 
     // The next history map becomes the current map for the next frame.
@@ -162,6 +184,7 @@ FloatRect CCDamageTracker::trackDamageFromActiveLayers(const Vector<CCLayerImpl*
     FloatRect damageRect = FloatRect();
 
     for (unsigned layerIndex = 0; layerIndex < layerList.size(); ++layerIndex) {
+        // Visit layers in back-to-front order.
         CCLayerImpl* layer = layerList[layerIndex];
 
         if (CCLayerTreeHostCommon::renderSurfaceContributesToTarget<CCLayerImpl>(layer, targetSurfaceLayerID))
@@ -225,7 +248,7 @@ void CCDamageTracker::extendDamageForLayer(CCLayerImpl* layer, FloatRect& target
     bool layerIsNew = false;
     FloatRect oldLayerRect = removeRectFromCurrentFrame(layer->id(), layerIsNew);
 
-    FloatRect layerRectInTargetSpace = originTransform.mapRect(FloatRect(FloatPoint::zero(), layer->bounds()));
+    FloatRect layerRectInTargetSpace = CCMathUtil::mapClippedRect(originTransform, FloatRect(FloatPoint::zero(), layer->bounds()));
     saveRectForNextFrame(layer->id(), layerRectInTargetSpace);
 
     if (layerIsNew || layer->layerPropertyChanged()) {
@@ -238,7 +261,7 @@ void CCDamageTracker::extendDamageForLayer(CCLayerImpl* layer, FloatRect& target
     } else if (!layer->updateRect().isEmpty()) {
         // If the layer properties havent changed, then the the target surface is only
         // affected by the layer's update area, which could be empty.
-        FloatRect updateRectInTargetSpace = originTransform.mapRect(layer->updateRect());
+        FloatRect updateRectInTargetSpace = CCMathUtil::mapClippedRect(originTransform, layer->updateRect());
         targetDamageRect.uniteIfNonZero(updateRectInTargetSpace);
     }
 }
@@ -265,6 +288,11 @@ void CCDamageTracker::extendDamageForRenderSurface(CCLayerImpl* layer, FloatRect
     FloatRect surfaceRectInTargetSpace = renderSurface->drawableContentRect(); // already includes replica if it exists.
     saveRectForNextFrame(layer->id(), surfaceRectInTargetSpace);
 
+    // If the layer has a background filter, this may cause pixels in our surface to be expanded, so we will need to expand any damage
+    // that exists below this layer by that amount.
+    if (layer->backgroundFilters().hasFilterThatMovesPixels())
+        expandDamageRectInsideRectWithFilters(targetDamageRect, surfaceRectInTargetSpace, layer->backgroundFilters());
+
     FloatRect damageRectInLocalSpace;
     if (surfaceIsNew || renderSurface->surfacePropertyChanged()) {
         // The entire surface contributes damage.
@@ -280,12 +308,12 @@ void CCDamageTracker::extendDamageForRenderSurface(CCLayerImpl* layer, FloatRect
     // If there was damage, transform it to target space, and possibly contribute its reflection if needed.
     if (!damageRectInLocalSpace.isEmpty()) {
         const TransformationMatrix& originTransform = renderSurface->originTransform();
-        FloatRect damageRectInTargetSpace = originTransform.mapRect(damageRectInLocalSpace);
+        FloatRect damageRectInTargetSpace = CCMathUtil::mapClippedRect(originTransform, damageRectInLocalSpace);
         targetDamageRect.uniteIfNonZero(damageRectInTargetSpace);
 
         if (layer->replicaLayer()) {
             const TransformationMatrix& replicaOriginTransform = renderSurface->replicaOriginTransform();
-            targetDamageRect.uniteIfNonZero(replicaOriginTransform.mapRect(damageRectInLocalSpace));
+            targetDamageRect.uniteIfNonZero(CCMathUtil::mapClippedRect(replicaOriginTransform, damageRectInLocalSpace));
         }
     }
 
@@ -298,7 +326,7 @@ void CCDamageTracker::extendDamageForRenderSurface(CCLayerImpl* layer, FloatRect
 
         // Compute the replica's "originTransform" that maps from the replica's origin space to the target surface origin space.
         const TransformationMatrix& replicaOriginTransform = renderSurface->replicaOriginTransform();
-        FloatRect replicaMaskLayerRect = replicaOriginTransform.mapRect(FloatRect(FloatPoint::zero(), FloatSize(replicaMaskLayer->bounds().width(), replicaMaskLayer->bounds().height())));
+        FloatRect replicaMaskLayerRect = CCMathUtil::mapClippedRect(replicaOriginTransform, FloatRect(FloatPoint::zero(), FloatSize(replicaMaskLayer->bounds().width(), replicaMaskLayer->bounds().height())));
         saveRectForNextFrame(replicaMaskLayer->id(), replicaMaskLayerRect);
 
         // In the current implementation, a change in the replica mask damages the entire replica region.

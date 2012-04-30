@@ -75,10 +75,10 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::Str
             ExceptionCode ec = 0;
             Document* document = xmlHttpRequest->responseXML(ec);
             if (ec) {
-                V8Proxy::setDOMException(ec);
+                V8Proxy::setDOMException(ec, info.GetIsolate());
                 return v8::Undefined();
             }
-            return toV8(document);
+            return toV8(document, info.GetIsolate());
         }
 
     case XMLHttpRequest::ResponseTypeBlob:
@@ -87,10 +87,10 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::Str
             ExceptionCode ec = 0;
             Blob* blob = xmlHttpRequest->responseBlob(ec);
             if (ec) {
-                V8Proxy::setDOMException(ec);
+                V8Proxy::setDOMException(ec, info.GetIsolate());
                 return v8::Undefined();
             }
-            return toV8(blob);
+            return toV8(blob, info.GetIsolate());
         }
 #else
         return v8::Undefined();
@@ -101,10 +101,10 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::Str
             ExceptionCode ec = 0;
             ArrayBuffer* arrayBuffer = xmlHttpRequest->responseArrayBuffer(ec);
             if (ec) {
-                V8Proxy::setDOMException(ec);
+                V8Proxy::setDOMException(ec, info.GetIsolate());
                 return v8::Undefined();
             }
-            return toV8(arrayBuffer);
+            return toV8(arrayBuffer, info.GetIsolate());
         }
     }
 
@@ -121,7 +121,7 @@ v8::Handle<v8::Value> V8XMLHttpRequest::openCallback(const v8::Arguments& args)
     // open(method, url, async, user, passwd)
 
     if (args.Length() < 2)
-        return throwError("Not enough arguments", V8Proxy::SyntaxError);
+        return throwError("Not enough arguments", V8Proxy::TypeError);
 
     XMLHttpRequest* xmlHttpRequest = V8XMLHttpRequest::toNative(args.Holder());
 

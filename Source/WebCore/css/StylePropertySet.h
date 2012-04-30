@@ -21,8 +21,10 @@
 #ifndef StylePropertySet_h
 #define StylePropertySet_h
 
+#include "CSSParserMode.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSProperty.h"
+#include "CSSPropertyNames.h"
 #include <wtf/ListHashSet.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -30,23 +32,24 @@
 namespace WebCore {
 
 class CSSRule;
-class CSSPropertyLonghand;
 class CSSStyleDeclaration;
 class KURL;
 class PropertySetCSSStyleDeclaration;
 class StyledElement;
+class StylePropertyShorthand;
+class StyleSheetInternal;
 
 class StylePropertySet : public RefCounted<StylePropertySet> {
 public:
     ~StylePropertySet();
 
-    static PassRefPtr<StylePropertySet> create()
+    static PassRefPtr<StylePropertySet> create(CSSParserMode cssParserMode = CSSQuirksMode)
     {
-        return adoptRef(new StylePropertySet);
+        return adoptRef(new StylePropertySet(cssParserMode));
     }
-    static PassRefPtr<StylePropertySet> create(const CSSProperty* properties, int numProperties, bool useStrictParsing)
+    static PassRefPtr<StylePropertySet> create(const CSSProperty* properties, int numProperties, CSSParserMode cssParserMode)
     {
-        return adoptRef(new StylePropertySet(properties, numProperties, useStrictParsing));
+        return adoptRef(new StylePropertySet(properties, numProperties, cssParserMode));
     }
     static PassRefPtr<StylePropertySet> create(const Vector<CSSProperty>& properties)
     {
@@ -59,37 +62,37 @@ public:
 
     void shrinkToFit() { m_properties.shrinkToFit(); }
 
-    PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
-    String getPropertyValue(int propertyID) const;
-    bool propertyIsImportant(int propertyID) const;
-    int getPropertyShorthand(int propertyID) const;
-    bool isPropertyImplicit(int propertyID) const;
+    PassRefPtr<CSSValue> getPropertyCSSValue(CSSPropertyID) const;
+    String getPropertyValue(CSSPropertyID) const;
+    bool propertyIsImportant(CSSPropertyID) const;
+    CSSPropertyID getPropertyShorthand(CSSPropertyID) const;
+    bool isPropertyImplicit(CSSPropertyID) const;
 
     // These expand shorthand properties into multiple properties.
-    bool setProperty(int propertyID, const String& value, bool important = false, CSSStyleSheet* contextStyleSheet = 0);
-    void setProperty(int propertyID, PassRefPtr<CSSValue>, bool important = false);
+    bool setProperty(CSSPropertyID, const String& value, bool important = false, StyleSheetInternal* contextStyleSheet = 0);
+    void setProperty(CSSPropertyID, PassRefPtr<CSSValue>, bool important = false);
 
     // These do not. FIXME: This is too messy, we can do better.
-    bool setProperty(int propertyID, int value, bool important = false, CSSStyleSheet* contextStyleSheet = 0);
+    bool setProperty(CSSPropertyID, int identifier, bool important = false);
     void setProperty(const CSSProperty&, CSSProperty* slot = 0);
     
-    bool removeProperty(int propertyID, String* returnText = 0);
+    bool removeProperty(CSSPropertyID, String* returnText = 0);
 
-    void parseDeclaration(const String& styleDeclaration, CSSStyleSheet* contextStyleSheet);
+    void parseDeclaration(const String& styleDeclaration, StyleSheetInternal* contextStyleSheet);
 
     void addParsedProperties(const CSSProperty*, int numProperties);
     void addParsedProperty(const CSSProperty&);
 
     PassRefPtr<StylePropertySet> copyBlockProperties() const;
     void removeBlockProperties();
-    bool removePropertiesInSet(const int* set, unsigned length);
+    bool removePropertiesInSet(const CSSPropertyID* set, unsigned length);
 
     void merge(const StylePropertySet*, bool argOverridesOnConflict = true);
 
-    void setStrictParsing(bool b) { m_strictParsing = b; }
-    bool useStrictParsing() const { return m_strictParsing; }
+    void setCSSParserMode(CSSParserMode cssParserMode) { m_cssParserMode = cssParserMode; }
+    CSSParserMode cssParserMode() const { return static_cast<CSSParserMode>(m_cssParserMode); }
 
-    void addSubresourceStyleURLs(ListHashSet<KURL>&, CSSStyleSheet* contextStyleSheet);
+    void addSubresourceStyleURLs(ListHashSet<KURL>&, StyleSheetInternal* contextStyleSheet);
 
     PassRefPtr<StylePropertySet> copy() const;
     // Used by StyledElement::copyNonAttributeProperties().
@@ -98,44 +101,48 @@ public:
     void removeEquivalentProperties(const StylePropertySet*);
     void removeEquivalentProperties(const CSSStyleDeclaration*);
 
-    PassRefPtr<StylePropertySet> copyPropertiesInSet(const int* set, unsigned length) const;
+    PassRefPtr<StylePropertySet> copyPropertiesInSet(const CSSPropertyID* set, unsigned length) const;
     
     String asText() const;
     
-    void clearParentRule(CSSRule*);
     void clearParentElement(StyledElement*);
 
     CSSStyleDeclaration* ensureCSSStyleDeclaration() const;
-    CSSStyleDeclaration* ensureRuleCSSStyleDeclaration(const CSSRule* parentRule) const;
     CSSStyleDeclaration* ensureInlineCSSStyleDeclaration(const StyledElement* parentElement) const;
     
-    bool hasCSSOMWrapper() const { return m_hasCSSOMWrapper; }
+    // FIXME: Expand the concept of mutable/immutable StylePropertySet.
+    bool isMutable() const { return m_ownsCSSOMWrapper; }
+
+    static unsigned averageSizeInBytes();
 
 private:
-    StylePropertySet();
+    StylePropertySet(CSSParserMode);
     StylePropertySet(const Vector<CSSProperty>&);
-    StylePropertySet(const CSSProperty*, int numProperties, bool useStrictParsing);
+    StylePropertySet(const StylePropertySet&);
+    StylePropertySet(const CSSProperty*, int numProperties, CSSParserMode);
 
     void setNeedsStyleRecalc();
 
-    String getShorthandValue(const CSSPropertyLonghand&) const;
-    String getCommonValue(const CSSPropertyLonghand&) const;
-    String getLayeredShorthandValue(const CSSPropertyLonghand&) const;
-    String get4Values(const CSSPropertyLonghand&) const;
-    String borderSpacingValue(const CSSPropertyLonghand&) const;
+    String getShorthandValue(const StylePropertyShorthand&) const;
+    String getCommonValue(const StylePropertyShorthand&) const;
+    enum CommonValueMode { OmitUncommonValues, ReturnNullOnUncommonValues };
+    String borderPropertyValue(CommonValueMode) const;
+    String getLayeredShorthandValue(const StylePropertyShorthand&) const;
+    String get4Values(const StylePropertyShorthand&) const;
+    String borderSpacingValue(const StylePropertyShorthand&) const;
     String fontValue() const;
-    bool appendFontLonghandValueIfExplicit(int propertyID, StringBuilder& result) const;
+    bool appendFontLonghandValueIfExplicit(CSSPropertyID, StringBuilder& result) const;
 
-    bool removeShorthandProperty(int propertyID);
+    bool removeShorthandProperty(CSSPropertyID);
     bool propertyMatches(const CSSProperty*) const;
 
-    const CSSProperty* findPropertyWithId(int propertyID) const;
-    CSSProperty* findPropertyWithId(int propertyID);
+    const CSSProperty* findPropertyWithId(CSSPropertyID) const;
+    CSSProperty* findPropertyWithId(CSSPropertyID);
 
     Vector<CSSProperty, 4> m_properties;
 
-    bool m_strictParsing : 1;
-    mutable bool m_hasCSSOMWrapper : 1;
+    unsigned m_cssParserMode : 2;
+    mutable unsigned m_ownsCSSOMWrapper : 1;
     
     friend class PropertySetCSSStyleDeclaration;
 };

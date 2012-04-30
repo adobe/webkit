@@ -87,6 +87,12 @@ GraphicsLayerChromium::GraphicsLayerChromium(GraphicsLayerClient* client)
 
 GraphicsLayerChromium::~GraphicsLayerChromium()
 {
+    // Do cleanup while we can still safely call methods on the derived class.
+    willBeDestroyed();
+}
+
+void GraphicsLayerChromium::willBeDestroyed()
+{
     if (m_layer) {
         m_layer->clearDelegate();
         m_layer->clearRenderSurface();
@@ -104,6 +110,8 @@ GraphicsLayerChromium::~GraphicsLayerChromium()
         // Be sure to reset the delegate, just in case.
         m_transformLayer->setLayerAnimationDelegate(0);
     }
+
+    GraphicsLayer::willBeDestroyed();
 }
 
 void GraphicsLayerChromium::setName(const String& inName)
@@ -412,14 +420,17 @@ void GraphicsLayerChromium::removeAnimation(const String& animationName)
     primaryLayer()->removeAnimation(mapAnimationNameToId(animationName));
 }
 
-void GraphicsLayerChromium::suspendAnimations(double time)
+void GraphicsLayerChromium::suspendAnimations(double wallClockTime)
 {
-    primaryLayer()->suspendAnimations(time);
+    // |wallClockTime| is in the wrong time base. Need to convert here.
+    // FIXME: find a more reliable way to do this.
+    double monotonicTime = wallClockTime + monotonicallyIncreasingTime() - currentTime();
+    primaryLayer()->suspendAnimations(monotonicTime);
 }
 
 void GraphicsLayerChromium::resumeAnimations()
 {
-    primaryLayer()->resumeAnimations();
+    primaryLayer()->resumeAnimations(monotonicallyIncreasingTime());
 }
 
 void GraphicsLayerChromium::setContentsToMedia(PlatformLayer* layer)
@@ -747,6 +758,11 @@ void GraphicsLayerChromium::notifyAnimationStarted(double startTime)
 {
     if (m_client)
         m_client->notifyAnimationStarted(this, startTime);
+}
+
+void GraphicsLayerChromium::notifyAnimationFinished(double)
+{
+    // Do nothing.
 }
 
 } // namespace WebCore

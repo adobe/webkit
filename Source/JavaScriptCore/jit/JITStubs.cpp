@@ -48,7 +48,6 @@
 #include "JITExceptions.h"
 #include "JSActivation.h"
 #include "JSArray.h"
-#include "JSByteArray.h"
 #include "JSFunction.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSNotAnObject.h"
@@ -1370,8 +1369,14 @@ DEFINE_STUB_FUNCTION(void*, register_file_check)
     STUB_INIT_STACK_FRAME(stackFrame);
     CallFrame* callFrame = stackFrame.callFrame;
 
-    if (UNLIKELY(!stackFrame.registerFile->grow(&callFrame->registers()[callFrame->codeBlock()->m_numCalleeRegisters])))
-        return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createStackOverflowError(callFrame->callerFrame()));
+    if (UNLIKELY(!stackFrame.registerFile->grow(&callFrame->registers()[callFrame->codeBlock()->m_numCalleeRegisters]))) {
+        JSValue value;
+        {
+            TopCallFrameSetter tracer(callFrame->globalData(), callFrame->callerFrame());
+            value = createStackOverflowError(callFrame->callerFrame());
+        }
+        return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, value);
+    }
 
     return callFrame;
 }
@@ -1498,7 +1503,9 @@ DEFINE_STUB_FUNCTION(JSObject*, op_put_by_id_transition_realloc)
 
     ASSERT(baseValue.isObject());
     JSObject* base = asObject(baseValue);
-    base->allocatePropertyStorage(*stackFrame.globalData, oldSize, newSize);
+    JSGlobalData& globalData = *stackFrame.globalData;
+    PropertyStorage newStorage = base->growPropertyStorage(globalData, oldSize, newSize);
+    base->setPropertyStorage(globalData, newStorage, newStructure);
 
     return base;
 }
@@ -1517,6 +1524,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_id_method_check)
 
     CodeBlock* codeBlock = stackFrame.callFrame->codeBlock();
     MethodCallLinkInfo& methodCallLinkInfo = codeBlock->getMethodCallLinkInfo(STUB_RETURN_ADDRESS);
+    StructureStubInfo& stubInfo = codeBlock->getStubInfo(STUB_RETURN_ADDRESS);
 
     if (!methodCallLinkInfo.seenOnce()) {
         methodCallLinkInfo.setSeen();
@@ -1555,7 +1563,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_id_method_check)
 
         // Check to see if the function is on the object's prototype.  Patch up the code to optimize.
         if (slot.slotBase() == structure->prototypeForLookup(callFrame)) {
-            JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, callee, structure, slotBaseObject, STUB_RETURN_ADDRESS);
+            JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, stubInfo, callee, structure, slotBaseObject, STUB_RETURN_ADDRESS);
             return JSValue::encode(result);
         }
 
@@ -1566,7 +1574,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_id_method_check)
         // for now.  For now it performs a check on a special object on the global object only used for this
         // purpose.  The object is in no way exposed, and as such the check will always pass.
         if (slot.slotBase() == baseValue) {
-            JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, callee, structure, callFrame->scopeChain()->globalObject->methodCallDummy(), STUB_RETURN_ADDRESS);
+            JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, stubInfo, callee, structure, callFrame->scopeChain()->globalObject->methodCallDummy(), STUB_RETURN_ADDRESS);
             return JSValue::encode(result);
         }
     }
@@ -1590,6 +1598,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_id_method_check_update)
 
     CodeBlock* codeBlock = stackFrame.callFrame->codeBlock();
     MethodCallLinkInfo& methodCallLinkInfo = codeBlock->getMethodCallLinkInfo(STUB_RETURN_ADDRESS);
+    StructureStubInfo& stubInfo = codeBlock->getStubInfo(STUB_RETURN_ADDRESS);
 
     ASSERT(methodCallLinkInfo.seenOnce());
 
@@ -1650,7 +1659,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_id_method_check_update)
     
     // Check to see if the function is on the object's prototype. Patch up the code to optimize.
     if (slot.slotBase() == proto) {
-        JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, callee, structure, slotBaseObject, STUB_RETURN_ADDRESS);
+        JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, stubInfo, callee, structure, slotBaseObject, STUB_RETURN_ADDRESS);
         return JSValue::encode(result);
     }
     
@@ -1661,7 +1670,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_id_method_check_update)
     // useful. We could try to nop it out altogether, but that's a little messy, so lets do something simpler
     // for now. For now it performs a check on a special object on the global object only used for this
     // purpose. The object is in no way exposed, and as such the check will always pass.
-    JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, callee, structure, callFrame->scopeChain()->globalObject->methodCallDummy(), STUB_RETURN_ADDRESS);
+    JIT::patchMethodCallProto(callFrame->globalData(), codeBlock, methodCallLinkInfo, stubInfo, callee, structure, callFrame->scopeChain()->globalObject->methodCallDummy(), STUB_RETURN_ADDRESS);
     return JSValue::encode(result);
 }
 
@@ -2150,6 +2159,7 @@ DEFINE_STUB_FUNCTION(JSObject*, op_new_func)
 inline void* jitCompileFor(CallFrame* callFrame, CodeSpecializationKind kind)
 {
     JSFunction* function = jsCast<JSFunction*>(callFrame->callee());
+    callFrame->setCodeBlock(0);
     ASSERT(!function->isHostFunction());
     FunctionExecutable* executable = function->jsExecutable();
     ScopeChainNode* callDataScopeChain = function->scope();
@@ -2201,8 +2211,14 @@ DEFINE_STUB_FUNCTION(void*, op_call_arityCheck)
     CallFrame* callFrame = stackFrame.callFrame;
 
     CallFrame* newCallFrame = CommonSlowPaths::arityCheckFor(callFrame, stackFrame.registerFile, CodeForCall);
-    if (!newCallFrame)
-        return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createStackOverflowError(callFrame->callerFrame()));
+    if (!newCallFrame) {
+        JSValue value;
+        {
+            TopCallFrameSetter tracer(callFrame->globalData(), callFrame->callerFrame());
+            value = createStackOverflowError(callFrame->callerFrame());
+        }
+        return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, value);
+    }
 
     return newCallFrame;
 }
@@ -2214,8 +2230,14 @@ DEFINE_STUB_FUNCTION(void*, op_construct_arityCheck)
     CallFrame* callFrame = stackFrame.callFrame;
 
     CallFrame* newCallFrame = CommonSlowPaths::arityCheckFor(callFrame, stackFrame.registerFile, CodeForConstruct);
-    if (!newCallFrame)
-        return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createStackOverflowError(callFrame->callerFrame()));
+    if (!newCallFrame) {
+        JSValue value;
+        {
+            TopCallFrameSetter tracer(callFrame->globalData(), callFrame->callerFrame());
+            value = createStackOverflowError(callFrame->callerFrame());
+        }
+        return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, value);
+    }
 
     return newCallFrame;
 }
@@ -2224,6 +2246,7 @@ inline void* lazyLinkFor(CallFrame* callFrame, CodeSpecializationKind kind)
 {
     JSFunction* callee = jsCast<JSFunction*>(callFrame->callee());
     ExecutableBase* executable = callee->executable();
+    callFrame->setCodeBlock(0);
 
     MacroAssemblerCodePtr codePtr;
     CodeBlock* codeBlock = 0;
@@ -2233,9 +2256,10 @@ inline void* lazyLinkFor(CallFrame* callFrame, CodeSpecializationKind kind)
         codePtr = executable->generatedJITCodeFor(kind).addressForCall();
     else {
         FunctionExecutable* functionExecutable = static_cast<FunctionExecutable*>(executable);
-        JSObject* error = functionExecutable->compileFor(callFrame, callee->scope(), kind);
-        if (error)
+        if (JSObject* error = functionExecutable->compileFor(callFrame, callee->scope(), kind)) {
+            callFrame->globalData().exception = error;
             return 0;
+        }
         codeBlock = &functionExecutable->generatedBytecodeFor(kind);
         if (callFrame->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->numParameters())
             || callLinkInfo->callType == CallLinkInfo::CallVarargs)
@@ -2299,7 +2323,12 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_call_NotJSFunction)
     ASSERT(callType != CallTypeJS);
     if (callType != CallTypeHost) {
         ASSERT(callType == CallTypeNone);
-        return throwExceptionFromOpCall<EncodedJSValue>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createNotAFunctionError(callFrame->callerFrame(), callee));
+        JSValue value;
+        {
+            NativeCallFrameTracer tracer(&callFrame->globalData(), callFrame->callerFrame());
+            value = createNotAFunctionError(callFrame->callerFrame(), callee);
+        }
+        return throwExceptionFromOpCall<EncodedJSValue>(stackFrame, callFrame, STUB_RETURN_ADDRESS, value);
     }
 
     EncodedJSValue returnValue;
@@ -2405,7 +2434,12 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_construct_NotJSConstruct)
     ASSERT(constructType != ConstructTypeJS);
     if (constructType != ConstructTypeHost) {
         ASSERT(constructType == ConstructTypeNone);
-        return throwExceptionFromOpCall<EncodedJSValue>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createNotAConstructorError(callFrame->callerFrame(), callee));
+        JSValue value;
+        {
+            NativeCallFrameTracer tracer(&callFrame->globalData(), callFrame->callerFrame());
+            value = createNotAConstructorError(callFrame->callerFrame(), callee);
+        }
+        return throwExceptionFromOpCall<EncodedJSValue>(stackFrame, callFrame, STUB_RETURN_ADDRESS, value);
     }
 
     EncodedJSValue returnValue;
@@ -2443,11 +2477,6 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val)
             JSValue result = asString(baseValue)->getIndex(callFrame, i);
             CHECK_FOR_EXCEPTION();
             return JSValue::encode(result);
-        }
-        if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
-            // All fast byte array accesses are safe from exceptions so return immediately to avoid exception checks.
-            ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_get_by_val_byte_array));
-            return JSValue::encode(asByteArray(baseValue)->getIndex(callFrame, i));
         }
         JSValue result = baseValue.get(callFrame, i);
         CHECK_FOR_EXCEPTION();
@@ -2489,36 +2518,6 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val_string)
     return JSValue::encode(result);
 }
     
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val_byte_array)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-    
-    CallFrame* callFrame = stackFrame.callFrame;
-    
-    JSValue baseValue = stackFrame.args[0].jsValue();
-    JSValue subscript = stackFrame.args[1].jsValue();
-    
-    JSValue result;
-
-    if (LIKELY(subscript.isUInt32())) {
-        uint32_t i = subscript.asUInt32();
-        if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
-            // All fast byte array accesses are safe from exceptions so return immediately to avoid exception checks.
-            return JSValue::encode(asByteArray(baseValue)->getIndex(callFrame, i));
-        }
-
-        result = baseValue.get(callFrame, i);
-        if (!isJSByteArray(baseValue))
-            ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_get_by_val));
-    } else {
-        Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
-        result = baseValue.get(callFrame, property);
-    }
-    
-    CHECK_FOR_EXCEPTION_AT_END();
-    return JSValue::encode(result);
-}
-
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_sub)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
@@ -2554,21 +2553,6 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val)
                 jsArray->setIndex(*globalData, i, value);
             else
                 JSArray::putByIndex(jsArray, callFrame, i, value, callFrame->codeBlock()->isStrictMode());
-        } else if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
-            JSByteArray* jsByteArray = asByteArray(baseValue);
-            ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_put_by_val_byte_array));
-            // All fast byte array accesses are safe from exceptions so return immediately to avoid exception checks.
-            if (value.isInt32()) {
-                jsByteArray->setIndex(i, value.asInt32());
-                return;
-            } else {
-                if (value.isNumber()) {
-                    jsByteArray->setIndex(i, value.asNumber());
-                    return;
-                }
-            }
-
-            baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
         } else
             baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
     } else {
@@ -2579,47 +2563,6 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val)
         }
     }
 
-    CHECK_FOR_EXCEPTION_AT_END();
-}
-
-DEFINE_STUB_FUNCTION(void, op_put_by_val_byte_array)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-    
-    CallFrame* callFrame = stackFrame.callFrame;
-    
-    JSValue baseValue = stackFrame.args[0].jsValue();
-    JSValue subscript = stackFrame.args[1].jsValue();
-    JSValue value = stackFrame.args[2].jsValue();
-    
-    if (LIKELY(subscript.isUInt32())) {
-        uint32_t i = subscript.asUInt32();
-        if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
-            JSByteArray* jsByteArray = asByteArray(baseValue);
-            
-            // All fast byte array accesses are safe from exceptions so return immediately to avoid exception checks.
-            if (value.isInt32()) {
-                jsByteArray->setIndex(i, value.asInt32());
-                return;
-            } else {
-                if (value.isNumber()) {
-                    jsByteArray->setIndex(i, value.asNumber());
-                    return;
-                }
-            }
-        }
-
-        if (!isJSByteArray(baseValue))
-            ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_put_by_val));
-        baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
-    } else {
-        Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
-        if (!stackFrame.globalData->exception) { // Don't put to an object if toString threw an exception.
-            PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
-            baseValue.put(callFrame, property, value, slot);
-        }
-    }
-    
     CHECK_FOR_EXCEPTION_AT_END();
 }
 
@@ -2949,20 +2892,20 @@ DEFINE_STUB_FUNCTION(int, op_eq)
 
     if (cell1->isString()) {
         if (src2.isInt32())
-            return jsToNumber(static_cast<JSString*>(cell1)->value(stackFrame.callFrame)) == src2.asInt32();
+            return jsToNumber(jsCast<JSString*>(cell1)->value(stackFrame.callFrame)) == src2.asInt32();
             
         if (src2.isDouble())
-            return jsToNumber(static_cast<JSString*>(cell1)->value(stackFrame.callFrame)) == src2.asDouble();
+            return jsToNumber(jsCast<JSString*>(cell1)->value(stackFrame.callFrame)) == src2.asDouble();
 
         if (src2.isTrue())
-            return jsToNumber(static_cast<JSString*>(cell1)->value(stackFrame.callFrame)) == 1.0;
+            return jsToNumber(jsCast<JSString*>(cell1)->value(stackFrame.callFrame)) == 1.0;
 
         if (src2.isFalse())
-            return jsToNumber(static_cast<JSString*>(cell1)->value(stackFrame.callFrame)) == 0.0;
+            return jsToNumber(jsCast<JSString*>(cell1)->value(stackFrame.callFrame)) == 0.0;
 
         JSCell* cell2 = src2.asCell();
         if (cell2->isString())
-            return static_cast<JSString*>(cell1)->value(stackFrame.callFrame) == static_cast<JSString*>(cell2)->value(stackFrame.callFrame);
+            return jsCast<JSString*>(cell1)->value(stackFrame.callFrame) == jsCast<JSString*>(cell2)->value(stackFrame.callFrame);
 
         src2 = asObject(cell2)->toPrimitive(stackFrame.callFrame);
         CHECK_FOR_EXCEPTION();
@@ -3252,35 +3195,6 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_typeof)
     return JSValue::encode(jsTypeStringForValue(stackFrame.callFrame, stackFrame.args[0].jsValue()));
 }
 
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_is_undefined)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    JSValue v = stackFrame.args[0].jsValue();
-    return JSValue::encode(jsBoolean(v.isCell() ? v.asCell()->structure()->typeInfo().masqueradesAsUndefined() : v.isUndefined()));
-}
-
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_is_boolean)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    return JSValue::encode(jsBoolean(stackFrame.args[0].jsValue().isBoolean()));
-}
-
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_is_number)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    return JSValue::encode(jsBoolean(stackFrame.args[0].jsValue().isNumber()));
-}
-
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_is_string)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    return JSValue::encode(jsBoolean(isJSString(stackFrame.args[0].jsValue())));
-}
-
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_is_object)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
@@ -3558,24 +3472,24 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, to_object)
 
 MacroAssemblerCodeRef JITThunks::ctiStub(JSGlobalData* globalData, ThunkGenerator generator)
 {
-    std::pair<CTIStubMap::iterator, bool> entry = m_ctiStubMap.add(generator, MacroAssemblerCodeRef());
-    if (entry.second)
-        entry.first->second = generator(globalData);
-    return entry.first->second;
+    CTIStubMap::AddResult entry = m_ctiStubMap.add(generator, MacroAssemblerCodeRef());
+    if (entry.isNewEntry)
+        entry.iterator->second = generator(globalData);
+    return entry.iterator->second;
 }
 
 NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, NativeFunction constructor)
 {
-    std::pair<HostFunctionStubMap::iterator, bool> result = m_hostFunctionStubMap->add(function, PassWeak<NativeExecutable>());
-    if (!result.first->second)
-        result.first->second = PassWeak<NativeExecutable>(*globalData, NativeExecutable::create(*globalData, JIT::compileCTINativeCall(globalData, function), function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), constructor, NoIntrinsic));
-    return result.first->second.get();
+    HostFunctionStubMap::AddResult result = m_hostFunctionStubMap->add(function, PassWeak<NativeExecutable>());
+    if (!result.iterator->second)
+        result.iterator->second = PassWeak<NativeExecutable>(NativeExecutable::create(*globalData, JIT::compileCTINativeCall(globalData, function), function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), constructor, NoIntrinsic));
+    return result.iterator->second.get();
 }
 
 NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, ThunkGenerator generator, Intrinsic intrinsic)
 {
-    std::pair<HostFunctionStubMap::iterator, bool> entry = m_hostFunctionStubMap->add(function, PassWeak<NativeExecutable>());
-    if (!*entry.first->second) {
+    HostFunctionStubMap::AddResult entry = m_hostFunctionStubMap->add(function, PassWeak<NativeExecutable>());
+    if (!entry.iterator->second) {
         MacroAssemblerCodeRef code;
         if (generator) {
             if (globalData->canUseJIT())
@@ -3584,9 +3498,9 @@ NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFu
                 code = MacroAssemblerCodeRef();
         } else
             code = JIT::compileCTINativeCall(globalData, function);
-        entry.first->second = PassWeak<NativeExecutable>(*globalData, NativeExecutable::create(*globalData, code, function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), callHostFunctionAsConstructor, intrinsic));
+        entry.iterator->second = PassWeak<NativeExecutable>(NativeExecutable::create(*globalData, code, function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), callHostFunctionAsConstructor, intrinsic));
     }
-    return entry.first->second.get();
+    return entry.iterator->second.get();
 }
 
 void JITThunks::clearHostFunctionStubs()

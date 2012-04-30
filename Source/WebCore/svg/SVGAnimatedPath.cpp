@@ -1,5 +1,5 @@
 /*
- * Copyright (C) Research In Motion Limited 2011. All rights reserved.
+ * Copyright (C) Research In Motion Limited 2011, 2012. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,7 +23,8 @@
 #include "SVGAnimatedPath.h"
 
 #include "SVGAnimateElement.h"
-#include "SVGPathParserFactory.h"
+#include "SVGAnimatedPathSegListPropertyTearOff.h"
+#include "SVGPathUtilities.h"
 
 namespace WebCore {
 
@@ -34,87 +35,105 @@ SVGAnimatedPathAnimator::SVGAnimatedPathAnimator(SVGAnimationElement* animationE
 
 PassOwnPtr<SVGAnimatedType> SVGAnimatedPathAnimator::constructFromString(const String& string)
 {
-    bool result = false;
-    return constructFromString(string, result);
-}
-
-PassOwnPtr<SVGAnimatedType> SVGAnimatedPathAnimator::constructFromString(const String& string, bool& result)
-{
     OwnPtr<SVGPathByteStream> byteStream = SVGPathByteStream::create();
-    result = SVGPathParserFactory::self()->buildSVGPathByteStreamFromString(string, byteStream, UnalteredParsing);
+    buildSVGPathByteStreamFromString(string, byteStream.get(), UnalteredParsing);
     return SVGAnimatedType::createPath(byteStream.release());
 }
 
-void SVGAnimatedPathAnimator::calculateFromAndToValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& toString)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedPathAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
+    ASSERT(animatedTypes.size() == 1);
+    SVGAnimatedPathSegListPropertyTearOff* property = castAnimatedPropertyToActualType<SVGAnimatedPathSegListPropertyTearOff>(animatedTypes[0].properties[0].get());
+    const SVGPathSegList& baseValue = property->currentBaseValue();
 
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    AnimationMode animationMode = animationElement->animationMode();
+    // Build initial path byte stream.
+    OwnPtr<SVGPathByteStream> byteStream = SVGPathByteStream::create();
+    buildSVGPathByteStreamFromSVGPathSegList(baseValue, byteStream.get(), UnalteredParsing);
 
-    bool success = false;
-    to = constructFromString(toString, success);
+    Vector<RefPtr<SVGAnimatedPathSegListPropertyTearOff> > result;
 
-    // For to-animations the from number is calculated later.
-    if (!success || animationMode == ToAnimation) {
-        from = SVGAnimatedType::createPath(SVGPathByteStream::create());
-        return;
-    }
+    SVGElementAnimatedPropertyList::const_iterator end = animatedTypes.end();
+    for (SVGElementAnimatedPropertyList::const_iterator it = animatedTypes.begin(); it != end; ++it)
+        result.append(castAnimatedPropertyToActualType<SVGAnimatedPathSegListPropertyTearOff>(it->properties[0].get()));
 
-    from = constructFromString(fromString, success);
-    if (success)
-        return;
+    SVGElementInstance::InstanceUpdateBlocker blocker(property->contextElement());
 
-    from = SVGAnimatedType::createPath(SVGPathByteStream::create());
+    size_t resultSize = result.size();
+    for (size_t i = 0; i < resultSize; ++i)
+        result[i]->animationStarted(byteStream.get(), &baseValue);
+
+    return SVGAnimatedType::createPath(byteStream.release());
 }
 
-void SVGAnimatedPathAnimator::calculateFromAndByValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& by, const String& fromString, const String& byString)
+void SVGAnimatedPathAnimator::stopAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    // Fallback to from-to animation, since from-by animation does not make sense.
-    calculateFromAndToValues(from, by, fromString, byString);
+    stopAnimValAnimationForType<SVGAnimatedPathSegListPropertyTearOff>(animatedTypes);
 }
 
-void SVGAnimatedPathAnimator::calculateAnimatedValue(float percentage, unsigned, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+void SVGAnimatedPathAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
 {
-    ASSERT(m_animationElement);
-    ASSERT(m_contextElement);
+    ASSERT(animatedTypes.size() == 1);
+    ASSERT(type);
+    ASSERT(type->type() == m_type);
+    const SVGPathSegList& baseValue = castAnimatedPropertyToActualType<SVGAnimatedPathSegListPropertyTearOff>(animatedTypes[0].properties[0].get())->currentBaseValue();
+    buildSVGPathByteStreamFromSVGPathSegList(baseValue, type->path(), UnalteredParsing);
+}
 
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    AnimationMode animationMode = animationElement->animationMode();
+void SVGAnimatedPathAnimator::animValWillChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValWillChangeForType<SVGAnimatedPathSegListPropertyTearOff>(animatedTypes);
+}
 
+void SVGAnimatedPathAnimator::animValDidChange(const SVGElementAnimatedPropertyList& animatedTypes)
+{
+    animValDidChangeForType<SVGAnimatedPathSegListPropertyTearOff>(animatedTypes);
+}
+
+void SVGAnimatedPathAnimator::addAnimatedTypes(SVGAnimatedType* from, SVGAnimatedType* to)
+{
+    ASSERT(from->type() == AnimatedPath);
+    ASSERT(from->type() == to->type());
+
+    SVGPathByteStream* fromPath = from->path();
     SVGPathByteStream* toPath = to->path();
-    ASSERT(toPath);
+    unsigned fromPathSize = fromPath->size();
+    if (!fromPathSize || fromPathSize != toPath->size())
+        return;
+    addToSVGPathByteStream(toPath, fromPath);
+}
+
+void SVGAnimatedPathAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+{
+    ASSERT(m_animationElement);
+    ASSERT(m_contextElement);
 
     SVGPathByteStream* fromPath = from->path();
     ASSERT(fromPath);
 
+    SVGPathByteStream* toPath = to->path();
+    ASSERT(toPath);
+
     SVGPathByteStream* animatedPath = animated->path();
     ASSERT(animatedPath);
 
-    if (animationMode == ToAnimation)
-        fromPath->initializeFrom(animatedPath);
-
-    if (!percentage) {
-        animatedPath->initializeFrom(fromPath);
-        return;
-    }
-
-    if (percentage == 1) {
-        animatedPath->initializeFrom(toPath);
-        return;
-    }
-
-    OwnPtr<SVGPathByteStream> newAnimatedPath = adoptPtr(animatedPath);
-    bool success = SVGPathParserFactory::self()->buildAnimatedSVGPathByteStream(fromPath, toPath, newAnimatedPath, percentage);
-    animatedPath = newAnimatedPath.leakPtr();
-    if (success)
+    // Pass false to 'resizeAnimatedListIfNeeded' here, as the path animation is not a regular Vector<SVGXXX> type, but a SVGPathByteStream, that works differently.
+    if (!m_animationElement->adjustFromToListValues<SVGPathByteStream>(0, *fromPath, *toPath, *animatedPath, percentage, m_contextElement, false))
         return;
 
-    if ((animationMode == FromToAnimation && percentage > 0.5) || animationMode == ToAnimation)
-        animatedPath->initializeFrom(toPath);
-    else
-        animatedPath->initializeFrom(fromPath);
+    // Cache the current animated value before the buildAnimatedSVGPathByteStream() clears animatedPath.
+    OwnPtr<SVGPathByteStream> lastAnimatedPath;
+    if (!fromPath->size() || (m_animationElement->isAdditive() && m_animationElement->animationMode() != ToAnimation))
+        lastAnimatedPath = animatedPath->copy();
+
+    buildAnimatedSVGPathByteStream(fromPath, toPath, animatedPath, percentage);
+
+    // Handle additive='sum'.
+    if (lastAnimatedPath)
+        addToSVGPathByteStream(animatedPath, lastAnimatedPath.get());
+
+    // Handle accumulate='sum'.
+    if (m_animationElement->isAccumulated() && repeatCount)
+        addToSVGPathByteStream(animatedPath, toPath, repeatCount);
 }
    
 float SVGAnimatedPathAnimator::calculateDistance(const String&, const String&)

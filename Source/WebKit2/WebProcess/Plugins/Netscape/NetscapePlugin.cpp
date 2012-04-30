@@ -35,6 +35,8 @@
 #include <WebCore/HTTPHeaderMap.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/KURL.h>
+#include <runtime/JSObject.h>
+#include <runtime/ScopeChain.h>
 #include <utility>
 #include <wtf/text/CString.h>
 
@@ -66,12 +68,13 @@ NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
 #endif
     , m_isTransparent(false)
     , m_inNPPNew(false)
-    , m_loadManually(false)
+    , m_shouldUseManualLoader(false)
     , m_nextTimerID(0)
 #if PLATFORM(MAC)
     , m_drawingModel(static_cast<NPDrawingModel>(-1))
     , m_eventModel(static_cast<NPEventModel>(-1))
     , m_pluginReturnsNonretainedLayer(!m_pluginModule->pluginQuirks().contains(PluginQuirks::ReturnsRetainedCoreAnimationLayer))
+    , m_layerHostingMode(LayerHostingModeDefault)
     , m_currentMouseEvent(0)
     , m_pluginHasFocus(false)
     , m_windowHasFocus(false)
@@ -86,6 +89,9 @@ NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
 #elif PLUGIN_ARCHITECTURE(X11)
     , m_drawable(0)
     , m_pluginDisplay(0)
+#if PLATFORM(GTK)
+    , m_platformPluginWidget(0)
+#endif
 #endif
 {
     m_npp.ndata = this;
@@ -540,9 +546,9 @@ bool NetscapePlugin::allowPopups() const
 
 bool NetscapePlugin::initialize(const Parameters& parameters)
 {
-    uint16_t mode = parameters.loadManually ? NP_FULL : NP_EMBED;
+    uint16_t mode = parameters.isFullFramePlugin ? NP_FULL : NP_EMBED;
     
-    m_loadManually = parameters.loadManually;
+    m_shouldUseManualLoader = parameters.shouldUseManualLoader;
 
     CString mimeTypeCString = parameters.mimeType.utf8();
 
@@ -579,6 +585,8 @@ bool NetscapePlugin::initialize(const Parameters& parameters)
             }
         }
     }
+
+    m_layerHostingMode = parameters.layerHostingMode;
 #endif
 
     NetscapePlugin* previousNPPNewPlugin = currentNPPNewPlugin;
@@ -606,7 +614,7 @@ bool NetscapePlugin::initialize(const Parameters& parameters)
     }
 
     // Load the src URL if needed.
-    if (!parameters.loadManually && !parameters.url.isEmpty() && shouldLoadSrcURL())
+    if (!parameters.shouldUseManualLoader && !parameters.url.isEmpty() && shouldLoadSrcURL())
         loadURL("GET", parameters.url.string(), String(), HTTPHeaderMap(), Vector<uint8_t>(), false, 0);
     
     return true;
@@ -782,7 +790,7 @@ void NetscapePlugin::manualStreamDidReceiveResponse(const KURL& responseURL, uin
                                                     const String& mimeType, const String& headers, const String& /* suggestedFileName */)
 {
     ASSERT(m_isStarted);
-    ASSERT(m_loadManually);
+    ASSERT(m_shouldUseManualLoader);
     ASSERT(!m_manualStream);
     
     m_manualStream = NetscapePluginStream::create(this, 0, responseURL.string(), false, 0);
@@ -792,7 +800,7 @@ void NetscapePlugin::manualStreamDidReceiveResponse(const KURL& responseURL, uin
 void NetscapePlugin::manualStreamDidReceiveData(const char* bytes, int length)
 {
     ASSERT(m_isStarted);
-    ASSERT(m_loadManually);
+    ASSERT(m_shouldUseManualLoader);
     ASSERT(m_manualStream);
 
     m_manualStream->didReceiveData(bytes, length);
@@ -801,7 +809,7 @@ void NetscapePlugin::manualStreamDidReceiveData(const char* bytes, int length)
 void NetscapePlugin::manualStreamDidFinishLoading()
 {
     ASSERT(m_isStarted);
-    ASSERT(m_loadManually);
+    ASSERT(m_shouldUseManualLoader);
     ASSERT(m_manualStream);
 
     m_manualStream->didFinishLoading();
@@ -810,7 +818,7 @@ void NetscapePlugin::manualStreamDidFinishLoading()
 void NetscapePlugin::manualStreamDidFail(bool wasCancelled)
 {
     ASSERT(m_isStarted);
-    ASSERT(m_loadManually);
+    ASSERT(m_shouldUseManualLoader);
 
     if (!m_manualStream)
         return;

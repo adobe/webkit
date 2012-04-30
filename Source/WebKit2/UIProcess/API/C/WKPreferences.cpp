@@ -158,6 +158,16 @@ bool WKPreferencesGetJavaEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->javaEnabled();
 }
 
+void WKPreferencesSetJavaEnabledForLocalFiles(WKPreferencesRef preferencesRef, bool javaEnabledForLocalFiles)
+{
+    toImpl(preferencesRef)->setJavaEnabledForLocalFiles(javaEnabledForLocalFiles);
+}
+
+bool WKPreferencesGetJavaEnabledForLocalFiles(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->javaEnabledForLocalFiles();
+}
+
 void WKPreferencesSetJavaScriptCanOpenWindowsAutomatically(WKPreferencesRef preferencesRef, bool javaScriptCanOpenWindowsAutomatically)
 {
     toImpl(preferencesRef)->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
@@ -776,6 +786,16 @@ void WKPreferencesSetNotificationsEnabled(WKPreferencesRef preferencesRef, bool 
 bool WKPreferencesGetNotificationsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->notificationsEnabled();
+}
+
+void WKPreferencesSetShouldRespectImageOrientation(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setShouldRespectImageOrientation(enabled);
+}
+
+bool WKPreferencesGetShouldRespectImageOrientation(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->shouldRespectImageOrientation();
 }
 
 void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef)

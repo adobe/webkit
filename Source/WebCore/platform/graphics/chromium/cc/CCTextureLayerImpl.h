@@ -26,8 +26,6 @@
 #ifndef CCTextureLayerImpl_h
 #define CCTextureLayerImpl_h
 
-#include "ProgramBinding.h"
-#include "ShaderChromium.h"
 #include "cc/CCLayerImpl.h"
 
 namespace WebCore {
@@ -40,44 +38,27 @@ public:
     }
     virtual ~CCTextureLayerImpl();
 
-    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& usedCheckerboard);
+    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& hadMissingTiles) OVERRIDE;
 
-    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderRGBATexFlipAlpha> ProgramFlip;
-    typedef ProgramBinding<VertexShaderPosTexStretch, FragmentShaderRGBATexAlpha> ProgramStretch;
-    typedef ProgramBinding<VertexShaderPosTexStretch, FragmentShaderRGBATexFlipAlpha> ProgramStretchFlip;
-    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexRectAlpha> TexRectProgram;
-    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexRectFlipAlpha> TexRectProgramFlip;
+    virtual void didLoseContext() OVERRIDE;
 
-    virtual void willDraw(LayerRendererChromium*);
-    virtual void didLoseContext();
-
-    virtual void dumpLayerProperties(TextStream&, int indent) const;
+    virtual void dumpLayerProperties(TextStream&, int indent) const OVERRIDE;
 
     unsigned textureId() const { return m_textureId; }
     void setTextureId(unsigned id) { m_textureId = id; }
-    void setHasAlpha(bool hasAlpha) { m_hasAlpha = hasAlpha; }
     void setPremultipliedAlpha(bool premultipliedAlpha) { m_premultipliedAlpha = premultipliedAlpha; }
     void setFlipped(bool flipped) { m_flipped = flipped; }
     void setUVRect(const FloatRect& rect) { m_uvRect = rect; }
-    void setIOSurfaceProperties(const IntSize&, unsigned ioSurfaceId);
-
 
 private:
     explicit CCTextureLayerImpl(int);
 
-    virtual const char* layerTypeAsString() const { return "TextureLayer"; }
+    virtual const char* layerTypeAsString() const OVERRIDE { return "TextureLayer"; }
 
     unsigned m_textureId;
-    bool m_hasAlpha;
     bool m_premultipliedAlpha;
     bool m_flipped;
     FloatRect m_uvRect;
-
-    // Internals for IOSurface-backed textures.
-    unsigned m_ioSurfaceId;
-    IntSize m_ioSurfaceSize;
-    bool m_ioSurfaceChanged;
-    unsigned m_ioSurfaceTextureId;
 };
 
 }

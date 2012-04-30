@@ -87,11 +87,11 @@ MANAGER_TOPIC = 'managers'
 ANY_WORKER_TOPIC = 'workers'
 
 
-def get(worker_model, client, worker_class):
+def get(max_workers, client, worker_class):
     """Return a connection to a manager/worker message_broker
 
     Args:
-        worker_model - concurrency model to use (inline/processes)
+        max_workers - max # of workers to run concurrently.
         client - BrokerClient implementation to dispatch
             replies to.
         worker_class - type of workers to create. This class should override
@@ -99,14 +99,12 @@ def get(worker_model, client, worker_class):
     Returns:
         A handle to an object that will talk to a message broker configured
         for the normal manager/worker communication."""
-    if worker_model == 'inline':
+    if max_workers == 1:
         queue_class = Queue.Queue
         manager_class = _InlineManager
-    elif worker_model == 'processes':
+    else:
         queue_class = multiprocessing.Queue
         manager_class = _MultiProcessManager
-    else:
-        raise ValueError("unsupported value for --worker-model: %s" % worker_model)
 
     broker = _Broker(queue_class)
     return manager_class(broker, client, worker_class)
@@ -143,6 +141,15 @@ class _Broker(object):
                 Queue interface (put()/get()).
         """
         self._queue_maker = queue_maker
+        self._topics = {}
+
+    def __del__(self):
+        self.cleanup()
+
+    def cleanup(self):
+        for queue in self._topics.values():
+            if hasattr(queue, 'close'):
+                queue.close()
         self._topics = {}
 
     def add_topic(self, topic_name):
@@ -228,6 +235,10 @@ class _BrokerConnection(object):
         broker.add_topic(run_topic)
         broker.add_topic(post_topic)
 
+    def cleanup(self):
+        self._broker.cleanup()
+        self._broker = None
+
     def run_message_loop(self, delay_secs=None):
         self._broker.run_message_loop(self._run_topic, self._client, delay_secs)
 
@@ -274,7 +285,6 @@ class AbstractWorker(BrokerClient):
         """Callback for the worker to start executing. Typically does any
         remaining initialization and then calls broker_connection.run_message_loop()."""
         exception_msg = ""
-        _log.debug("%s starting" % self._name)
 
         try:
             self._worker_connection.run_message_loop()

@@ -35,22 +35,28 @@ function BuilderMaster(name, basePath)
     this.basePath = basePath;
 }
 
-BuilderMaster.prototype.getLogPath = function(builder, buildNumber)
+BuilderMaster.prototype.logPath = function(builder, buildNumber)
 {
-    return this.basePath + builder + '/builds/' + buildNumber;
+    return this.basePath + 'builders/' + builder + '/builds/' + buildNumber;
 };
 
-CHROMIUM_BUILDER_MASTER = new BuilderMaster('Chromium', 'http://build.chromium.org/p/chromium/builders/');
-CHROMIUMOS_BUILDER_MASTER = new BuilderMaster('ChromiumChromiumOS', 'http://build.chromium.org/p/chromium.chromiumos/builders/');
-CHROMIUM_GPU_BUILDER_MASTER = new BuilderMaster('ChromiumGPU', 'http://build.chromium.org/p/chromium.gpu/builders/');
-CHROMIUM_GPU_FYI_BUILDER_MASTER = new BuilderMaster('ChromiumGPUFYI', 'http://build.chromium.org/p/chromium.gpu.fyi/builders/');
-CHROMIUM_WEBKIT_BUILDER_MASTER = new BuilderMaster('ChromiumWebkit', 'http://build.chromium.org/p/chromium.webkit/builders/');
-WEBKIT_BUILDER_MASTER = new BuilderMaster('webkit.org', 'http://build.webkit.org/builders/');
+BuilderMaster.prototype.builderJsonPath = function()
+{
+    return this.basePath + 'json/builders';
+};
+
+CHROMIUM_BUILDER_MASTER = new BuilderMaster('Chromium', 'http://build.chromium.org/p/chromium/');
+CHROMIUMOS_BUILDER_MASTER = new BuilderMaster('ChromiumChromiumOS', 'http://build.chromium.org/p/chromium.chromiumos/');
+CHROMIUM_GPU_BUILDER_MASTER = new BuilderMaster('ChromiumGPU', 'http://build.chromium.org/p/chromium.gpu/');
+CHROMIUM_GPU_FYI_BUILDER_MASTER = new BuilderMaster('ChromiumGPUFYI', 'http://build.chromium.org/p/chromium.gpu.fyi/');
+CHROMIUM_WEBKIT_BUILDER_MASTER = new BuilderMaster('ChromiumWebkit', 'http://build.chromium.org/p/chromium.webkit/');
+WEBKIT_BUILDER_MASTER = new BuilderMaster('webkit.org', 'http://build.webkit.org/');
 
 var LEGACY_BUILDER_MASTERS_TO_GROUPS = {
     'Chromium': '@DEPS - chromium.org',
     'ChromiumChromiumOS': '@DEPS CrOS - chromium.org',
     'ChromiumGPU': '@DEPS - chromium.org',
+    'ChromiumGPUFYI': '@DEPS FYI - chromium.org',
     'ChromiumWebkit': '@ToT - chromium.org',
     'webkit.org': '@ToT - webkit.org'
 };
@@ -68,8 +74,6 @@ function BuilderGroup(isToTWebKit, builders)
         this.builders[builder] = builder.replace(/[ .()]/g, '_');
         if (flags & BuilderGroup.DEFAULT_BUILDER)
             this.defaultBuilder = builder;
-        if (flags & BuilderGroup.EXPECTATIONS_BUILDER)
-            this.expectationsBuilder = builder;
     }, this);
 }
 
@@ -78,17 +82,12 @@ BuilderGroup.prototype.setup = function()
     // FIXME: instead of copying these to globals, it would be better if
     // the rest of the code read things from the BuilderGroup instance directly
     g_defaultBuilderName = this.defaultBuilder;
-    g_expectationsBuilder = this.expectationsBuilder;
     g_builders = this.builders;
 };
 
 BuilderGroup.TOT_WEBKIT = true;
 BuilderGroup.DEPS_WEBKIT = false;
-
 BuilderGroup.DEFAULT_BUILDER = 1 << 1;
-// For expectations builder, list the fastest builder so that we always have the
-// most up to date expectations.
-BuilderGroup.EXPECTATIONS_BUILDER = 1 << 2;
 
 var BUILDER_TO_MASTER = {};
 function associateBuildersWithMaster(builders, master)
@@ -99,155 +98,156 @@ function associateBuildersWithMaster(builders, master)
     });
 }
 
-var CHROMIUM_LAYOUT_DEPS_BUILDERS = [
-    ['Webkit Win (deps)', BuilderGroup.DEFAULT_BUILDER],
-    ['Webkit Linux (deps)', BuilderGroup.EXPECTATIONS_BUILDER],
-    ['Webkit Mac10.6 (deps)'],
-];
-associateBuildersWithMaster(CHROMIUM_LAYOUT_DEPS_BUILDERS, CHROMIUM_WEBKIT_BUILDER_MASTER);
+function requestBuilderList(builderGroups, builderFilter, master, groupName, groupEnum)
+{
+    var onLoad = partial(onBuilderListLoad, builderGroups, builderFilter, master, groupName, groupEnum);
+    var xhr = new XMLHttpRequest();
+    var url = master.builderJsonPath();
+    xhr.open('GET', url, true);
+    xhr.onload = function() {
+        if (xhr.status == 200)
+            onLoad(JSON.parse(xhr.response));
+        else
+            onErrorLoadingBuilderList(url);
+    };
+    xhr.onerror = function() { onErrorLoadingBuilderList(url); };
+    xhr.send();
+}
 
-var CHROMIUM_LAYOUT_TOT_BUILDERS = [
-    ['Webkit Win', BuilderGroup.DEFAULT_BUILDER],
-    ['Webkit Vista'],
-    ['Webkit Win7'],
-    ['Webkit Win (dbg)(1)'],
-    ['Webkit Win (dbg)(2)'],
-    ['Webkit Linux', BuilderGroup.EXPECTATIONS_BUILDER],
-    ['Webkit Linux 32'],
-    ['Webkit Linux (dbg)'],
-    ['Webkit Mac10.5'],
-    ['Webkit Mac10.5 (dbg)(1)'],
-    ['Webkit Mac10.5 (dbg)(2)'],
-    ['Webkit Mac10.6'],
-    ['Webkit Mac10.6 (dbg)'],
-    ['Webkit Mac10.7'],
-];
-associateBuildersWithMaster(CHROMIUM_LAYOUT_TOT_BUILDERS, CHROMIUM_WEBKIT_BUILDER_MASTER);
+function isChromiumDepsGpuTestRunner(builder)
+{
+    return true;
+}
 
-var WEBKIT_TOT_BUILDERS = [
-    ['Chromium Win Release (Tests)', BuilderGroup.DEFAULT_BUILDER],
-    ['Chromium Linux Release (Tests)', BuilderGroup.EXPECTATIONS_BUILDER],
-    ['Chromium Mac Release (Tests)'],
-    ['SnowLeopard Intel Release (Tests)'],
-    ['SnowLeopard Intel Debug (Tests)'],
-    ['GTK Linux 32-bit Release'],
-    ['GTK Linux 32-bit Debug'],
-    ['GTK Linux 64-bit Debug'],
-    ['Qt Linux Release']
-];
-associateBuildersWithMaster(WEBKIT_TOT_BUILDERS, WEBKIT_BUILDER_MASTER);
+function isChromiumDepsFyiGpuTestRunner(builder)
+{
+    // FIXME: This is kind of wonky, but there's not really a better pattern.
+    return builder.indexOf('(') != -1;
+}
+
+function isChromiumTipOfTreeGpuTestRunner(builder)
+{
+    return builder.indexOf('GPU') != -1;
+}
+
+function isWebkitTestRunner(builder)
+{
+    if (builder.indexOf('Tests') != -1) {
+        // Apple Windows bots still run old-run-webkit-tests, so they don't upload data.
+        return builder.indexOf('Windows') == -1 || (builder.indexOf('Qt') != -1 && builder.indexOf('Chromium') != -1);
+    }
+    return builder.indexOf('GTK') != -1 || builder == 'Qt Linux Release';
+}
+
+function isChromiumWebkitTipOfTreeTestRunner(builder)
+{
+    return builder.indexOf('Webkit') != -1 && builder.indexOf('Builder') == -1 && builder.indexOf('(deps)') == -1;
+}
+
+function isChromiumWebkitDepsTestRunner(builder)
+{
+    return builder.indexOf('Webkit') != -1 && builder.indexOf('Builder') == -1 && builder.indexOf('(deps)') != -1;
+}
+
+function isChromiumDepsGTestRunner(builder)
+{
+    return builder.indexOf('Tests') != -1 && builder.indexOf('Chrome Frame') == -1;
+}
+
+function isChromiumDepsCrosGTestRunner(builder)
+{
+    return builder.indexOf('Tests') != -1;
+}
+
+function isChromiumTipOfTreeGTestRunner(builder)
+{
+    return !isChromiumTipOfTreeGpuTestRunner(builder) && builder.indexOf('Builder') == -1 && builder.indexOf('Perf') == -1 &&
+         builder.indexOf('Webkit') == -1 && builder.indexOf('Valgrind') == -1 && builder.indexOf('Chrome Frame') == -1;
+}
+
+function generateBuildersFromBuilderList(builderList, filter)
+{
+    return builderList.filter(filter).map(function(tester, index) {
+        var builder = [tester];
+        if (!index)
+            builder.push(BuilderGroup.DEFAULT_BUILDER);
+        return builder;
+    });
+}
+
+function onBuilderListLoad(builderGroups, builderFilter, master, groupName, groupEnum, json)
+{
+    var builders = generateBuildersFromBuilderList(Object.keys(json), builderFilter);
+    associateBuildersWithMaster(builders, master);
+    builderGroups[groupName] = new BuilderGroup(groupEnum, builders);
+    g_handleBuildersListLoaded();
+}
+
+function onErrorLoadingBuilderList(url)
+{
+    alert('Could not load list of builders from ' + url + '. Try reloading.');
+}
+
+function loadBuildersList(group, testType) {
+    if (testType == 'gpu_tests') {
+        switch(group) {
+        case '@DEPS - chromium.org':
+            requestBuilderList(CHROMIUM_GPU_TESTS_BUILDER_GROUPS, isChromiumDepsGpuTestRunner, CHROMIUM_GPU_BUILDER_MASTER, group, BuilderGroup.DEPS_WEBKIT);
+            break;
+
+        case '@DEPS FYI - chromium.org':
+            requestBuilderList(CHROMIUM_GPU_TESTS_BUILDER_GROUPS, isChromiumDepsFyiGpuTestRunner, CHROMIUM_GPU_FYI_BUILDER_MASTER, group, BuilderGroup.DEPS_WEBKIT);
+            break;
+
+        case '@ToT - chromium.org':
+            requestBuilderList(CHROMIUM_GPU_TESTS_BUILDER_GROUPS, isChromiumTipOfTreeGpuTestRunner, CHROMIUM_WEBKIT_BUILDER_MASTER, group, BuilderGroup.TOT_WEBKIT);
+            break;
+        }
+    } else if (testType == 'layout-tests') {
+        switch(group) {
+        case '@ToT - chromium.org':
+            requestBuilderList(LAYOUT_TESTS_BUILDER_GROUPS, isChromiumWebkitTipOfTreeTestRunner, CHROMIUM_WEBKIT_BUILDER_MASTER, group, BuilderGroup.TOT_WEBKIT);
+            break;
+
+        case '@ToT - webkit.org':
+            requestBuilderList(LAYOUT_TESTS_BUILDER_GROUPS, isWebkitTestRunner, WEBKIT_BUILDER_MASTER, group, BuilderGroup.TOT_WEBKIT);
+            break;
+
+        case '@DEPS - chromium.org':
+            requestBuilderList(LAYOUT_TESTS_BUILDER_GROUPS, isChromiumWebkitDepsTestRunner, CHROMIUM_WEBKIT_BUILDER_MASTER, group, BuilderGroup.DEPS_WEBKIT);
+            break;
+        }
+    } else {
+        switch(group) {
+        case '@DEPS - chromium.org':
+            requestBuilderList(CHROMIUM_GTESTS_BUILDER_GROUPS, isChromiumDepsGTestRunner, CHROMIUM_BUILDER_MASTER, group, BuilderGroup.DEPS_WEBKIT);
+            break;
+
+        case '@DEPS CrOS - chromium.org':
+            requestBuilderList(CHROMIUM_GTESTS_BUILDER_GROUPS, isChromiumDepsCrosGTestRunner, CHROMIUMOS_BUILDER_MASTER, group, BuilderGroup.DEPS_WEBKIT);
+            break;
+
+        case '@ToT - chromium.org':
+            requestBuilderList(CHROMIUM_GTESTS_BUILDER_GROUPS, isChromiumTipOfTreeGTestRunner, CHROMIUM_WEBKIT_BUILDER_MASTER, group, BuilderGroup.TOT_WEBKIT);
+            break;
+        }
+    }
+}
 
 var LAYOUT_TESTS_BUILDER_GROUPS = {
-    '@DEPS - chromium.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT, CHROMIUM_LAYOUT_DEPS_BUILDERS),
-    '@ToT - chromium.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT, CHROMIUM_LAYOUT_TOT_BUILDERS),
-    '@ToT - webkit.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT, WEBKIT_TOT_BUILDERS),
+    '@ToT - chromium.org': null,
+    '@ToT - webkit.org': null,
+    '@DEPS - chromium.org': null,
 };
-
-var CHROMIUM_GPU_GTESTS_DEPS_BUILDERS = [
-    ['Win7 Release (NVIDIA)', BuilderGroup.DEFAULT_BUILDER],
-    ['Win7 Debug (NVIDIA)'],
-    ['Mac Release (Intel)'],
-    ['Mac Debug (Intel)'],
-    ['Linux Release (NVIDIA)'],
-    ['Linux Debug (NVIDIA)'],
-];
-associateBuildersWithMaster(CHROMIUM_GPU_GTESTS_DEPS_BUILDERS, CHROMIUM_GPU_BUILDER_MASTER);
-
-var CHROMIUM_GPU_FYI_GTESTS_DEPS_BUILDERS = [
-    ['Win7 Release (ATI)', BuilderGroup.DEFAULT_BUILDER],
-    ['Win7 Release (Intel)'],
-    ['WinXP Release (NVIDIA)'],
-    ['WinXP Debug (NVIDIA)'],
-    ['Mac Release (ATI)'],
-    ['Linux Release (ATI)'],
-    ['Linux Release (Intel)'],
-];
-associateBuildersWithMaster(CHROMIUM_GPU_FYI_GTESTS_DEPS_BUILDERS, CHROMIUM_GPU_FYI_BUILDER_MASTER);
-
-var CHROMIUM_GPU_GTESTS_TOT_BUILDERS = [
-    ['GPU Win7 (dbg) (NVIDIA)', BuilderGroup.DEFAULT_BUILDER],
-    ['GPU Mac (dbg)'],
-    ['GPU Linux (dbg) (NVIDIA)'],
-];
-associateBuildersWithMaster(CHROMIUM_GPU_GTESTS_TOT_BUILDERS, CHROMIUM_WEBKIT_BUILDER_MASTER);
 
 var CHROMIUM_GPU_TESTS_BUILDER_GROUPS = {
-    '@DEPS - chromium.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT, CHROMIUM_GPU_GTESTS_DEPS_BUILDERS),
-    '@DEPS FYI - chromium.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT, CHROMIUM_GPU_FYI_GTESTS_DEPS_BUILDERS),
-    '@ToT - chromium.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT, CHROMIUM_GPU_GTESTS_TOT_BUILDERS)
+    '@DEPS - chromium.org': null,
+    '@DEPS FYI - chromium.org': null,
+    '@ToT - chromium.org': null,
 };
-
-var CHROMIUM_GTESTS_DEPS_BUILDERS = [
-    ['Win', BuilderGroup.DEFAULT_BUILDER],
-    ['Mac'],
-    ['Linux'],
-    ['Linux x64'],
-    ['XP Tests (1)'],
-    ['XP Tests (2)'],
-    ['XP Tests (3)'],
-    ['Vista Tests (1)'],
-    ['Vista Tests (2)'],
-    ['Vista Tests (3)'],
-    ['Win7 Tests (1)'],
-    ['Win7 Tests (2)'],
-    ['Win7 Tests (3)'],
-    ['Win7 Sync'],
-    ['XP Tests (dbg)(1)'],
-    ['XP Tests (dbg)(2)'],
-    ['XP Tests (dbg)(3)'],
-    ['XP Tests (dbg)(4)'],
-    ['XP Tests (dbg)(5)'],
-    ['XP Tests (dbg)(6)'],
-    ['Win7 Tests (dbg)(1)'],
-    ['Win7 Tests (dbg)(2)'],
-    ['Win7 Tests (dbg)(3)'],
-    ['Win7 Tests (dbg)(4)'],
-    ['Win7 Tests (dbg)(5)'],
-    ['Win7 Tests (dbg)(6)'],
-    ['Interactive Tests (dbg)'],
-    ['Win Aura'],
-    ['Mac10.5 Tests (1)'],
-    ['Mac10.5 Tests (2)'],
-    ['Mac10.5 Tests (3)'],
-    ['Mac10.6 Tests (1)'],
-    ['Mac10.6 Tests (2)'],
-    ['Mac10.6 Tests (3)'],
-    ['Mac10.6 Sync'],
-    ['Mac 10.5 Tests (dbg)(1)'],
-    ['Mac 10.5 Tests (dbg)(2)'],
-    ['Mac 10.5 Tests (dbg)(3)'],
-    ['Mac 10.5 Tests (dbg)(4)'],
-    ['Mac 10.6 Tests (dbg)(1)'],
-    ['Mac 10.6 Tests (dbg)(2)'],
-    ['Mac 10.6 Tests (dbg)(3)'],
-    ['Mac 10.6 Tests (dbg)(4)'],
-    ['Linux Tests x64'],
-    ['Linux Sync'],
-    ['Linux Tests (dbg)(1)'],
-    ['Linux Tests (dbg)(2)'],
-    ['Linux Tests (dbg)(shared)'],
-    ['Linux Tests (Aura dbg)'],
-];
-associateBuildersWithMaster(CHROMIUM_GTESTS_DEPS_BUILDERS, CHROMIUM_BUILDER_MASTER);
-
-var CHROMIUMOS_GTESTS_DEPS_BUILDERS = [
-    ['Linux ChromiumOS Tester (1)', BuilderGroup.DEFAULT_BUILDER],
-    ['Linux ChromiumOS Tester (2)'],
-    ['Linux ChromiumOS GTK'],
-    ['Linux ChromiumOS Tests (dbg)'],
-];
-associateBuildersWithMaster(CHROMIUMOS_GTESTS_DEPS_BUILDERS, CHROMIUMOS_BUILDER_MASTER);
-
-var CHROMIUM_GTESTS_TOT_BUILDERS = [
-    ['Win (dbg)', BuilderGroup.DEFAULT_BUILDER],
-    ['Mac10.6 Tests'],
-    ['Linux Tests'],
-];
-associateBuildersWithMaster(CHROMIUM_GTESTS_TOT_BUILDERS, CHROMIUM_WEBKIT_BUILDER_MASTER);
 
 var CHROMIUM_GTESTS_BUILDER_GROUPS = {
-    '@DEPS - chromium.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT, CHROMIUM_GTESTS_DEPS_BUILDERS),
-    '@DEPS CrOS - chromium.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT, CHROMIUMOS_GTESTS_DEPS_BUILDERS),
-    '@ToT - chromium.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT, CHROMIUM_GTESTS_TOT_BUILDERS),
+    '@DEPS - chromium.org': null,
+    '@DEPS CrOS - chromium.org': null,
+    '@ToT - chromium.org': null,
 };
-

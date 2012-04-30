@@ -18,11 +18,9 @@
     Boston, MA 02110-1301, USA.
 */
 
-#include <glib-object.h>
 #include "config.h"
+#include "WebKitDOMTestInterface.h"
 
-#include <wtf/GetPtr.h>
-#include <wtf/RefPtr.h>
 #include "DOMObjectCache.h"
 #include "ExceptionCode.h"
 #include "JSMainThreadExecState.h"
@@ -34,13 +32,15 @@
 #include "gobject/ConvertToUTF8String.h"
 #include "webkit/WebKitDOMNode.h"
 #include "webkit/WebKitDOMNodePrivate.h"
-#include "webkit/WebKitDOMTestInterface.h"
 #include "webkit/WebKitDOMTestInterfacePrivate.h"
 #include "webkit/WebKitDOMTestObj.h"
 #include "webkit/WebKitDOMTestObjPrivate.h"
 #include "webkitdefines.h"
 #include "webkitglobalsprivate.h"
 #include "webkitmarshal.h"
+#include <glib-object.h>
+#include <wtf/GetPtr.h>
+#include <wtf/RefPtr.h>
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
 
@@ -70,14 +70,11 @@ WebKitDOMTestInterface* wrapTestInterface(WebCore::TestInterface* coreObject)
 {
     g_return_val_if_fail(coreObject, 0);
 
-    /* We call ref() rather than using a C++ smart pointer because we can't store a C++ object
-     * in a C-allocated GObject structure.  See the finalize() code for the
-     * matching deref().
-     */
+    // We call ref() rather than using a C++ smart pointer because we can't store a C++ object
+    // in a C-allocated GObject structure. See the finalize() code for the matching deref().
     coreObject->ref();
 
-    return  WEBKIT_DOM_TEST_INTERFACE(g_object_new(WEBKIT_TYPE_DOM_TEST_INTERFACE,
-                                               "core-object", coreObject, NULL));
+    return WEBKIT_DOM_TEST_INTERFACE(g_object_new(WEBKIT_TYPE_DOM_TEST_INTERFACE, "core-object", coreObject, NULL));
 }
 
 } // namespace WebKit
@@ -88,85 +85,107 @@ G_DEFINE_TYPE(WebKitDOMTestInterface, webkit_dom_test_interface, WEBKIT_TYPE_DOM
 
 enum {
     PROP_0,
-#if ENABLE(Condition11) || ENABLE(Condition12)
     PROP_SUPPLEMENTAL_STR1,
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
-#if ENABLE(Condition11) || ENABLE(Condition12)
     PROP_SUPPLEMENTAL_STR2,
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
-#if ENABLE(Condition11) || ENABLE(Condition12)
     PROP_SUPPLEMENTAL_NODE,
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
 };
 
 static void webkit_dom_test_interface_finalize(GObject* object)
 {
 #if ENABLE(Condition1) || ENABLE(Condition2)
-    WebKitDOMObject* dom_object = WEBKIT_DOM_OBJECT(object);
+    WebKitDOMObject* domObject = WEBKIT_DOM_OBJECT(object);
     
-    if (dom_object->coreObject) {
-        WebCore::TestInterface* coreObject = static_cast<WebCore::TestInterface *>(dom_object->coreObject);
+    if (domObject->coreObject) {
+        WebCore::TestInterface* coreObject = static_cast<WebCore::TestInterface*>(domObject->coreObject);
 
         WebKit::DOMObjectCache::forget(coreObject);
         coreObject->deref();
 
-        dom_object->coreObject = NULL;
+        domObject->coreObject = 0;
     }
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 
     G_OBJECT_CLASS(webkit_dom_test_interface_parent_class)->finalize(object);
 }
 
-static void webkit_dom_test_interface_set_property(GObject* object, guint prop_id, const GValue* value, GParamSpec* pspec)
+static void webkit_dom_test_interface_set_property(GObject* object, guint propertyId, const GValue* value, GParamSpec* pspec)
 {
     WebCore::JSMainThreadNullState state;
     WebKitDOMTestInterface* self = WEBKIT_DOM_TEST_INTERFACE(object);
     WebCore::TestInterface* coreSelf = WebKit::core(self);
-    switch (prop_id) {
+    switch (propertyId) {
+    case PROP_SUPPLEMENTAL_STR2: {
+#if ENABLE(Condition1) || ENABLE(Condition2)
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    case PROP_SUPPLEMENTAL_STR2:
-    {
         WebCore::TestSupplemental::setSupplementalStr2(coreSelf, WTF::String::fromUTF8(g_value_get_string(value)));
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
+#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
+#endif /* ENABLE(Condition1) || ENABLE(Condition2) */
         break;
     }
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
     default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propertyId, pspec);
         break;
     }
 }
 
 
-static void webkit_dom_test_interface_get_property(GObject* object, guint prop_id, GValue* value, GParamSpec* pspec)
+static void webkit_dom_test_interface_get_property(GObject* object, guint propertyId, GValue* value, GParamSpec* pspec)
 {
     WebCore::JSMainThreadNullState state;
     WebKitDOMTestInterface* self = WEBKIT_DOM_TEST_INTERFACE(object);
     WebCore::TestInterface* coreSelf = WebKit::core(self);
-    switch (prop_id) {
+    switch (propertyId) {
+    case PROP_SUPPLEMENTAL_STR1: {
+#if ENABLE(Condition1) || ENABLE(Condition2)
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    case PROP_SUPPLEMENTAL_STR1:
-    {
         g_value_take_string(value, convertToUTF8String(WebCore::TestSupplemental::supplementalStr1(coreSelf)));
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
+#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
+#endif /* ENABLE(Condition1) || ENABLE(Condition2) */
         break;
     }
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
+    case PROP_SUPPLEMENTAL_STR2: {
+#if ENABLE(Condition1) || ENABLE(Condition2)
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    case PROP_SUPPLEMENTAL_STR2:
-    {
         g_value_take_string(value, convertToUTF8String(WebCore::TestSupplemental::supplementalStr2(coreSelf)));
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
+#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
+#endif /* ENABLE(Condition1) || ENABLE(Condition2) */
         break;
     }
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
+    case PROP_SUPPLEMENTAL_NODE: {
+#if ENABLE(Condition1) || ENABLE(Condition2)
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    case PROP_SUPPLEMENTAL_NODE:
-    {
         RefPtr<WebCore::Node> ptr = WebCore::TestSupplemental::supplementalNode(coreSelf);
         g_value_set_object(value, WebKit::kit(ptr.get()));
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
+#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
+#else
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
+        WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
+#endif /* ENABLE(Condition1) || ENABLE(Condition2) */
         break;
     }
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
     default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propertyId, pspec);
         break;
     }
 }
@@ -181,13 +200,12 @@ static void webkit_dom_test_interface_constructed(GObject* object)
 
 static void webkit_dom_test_interface_class_init(WebKitDOMTestInterfaceClass* requestClass)
 {
-    GObjectClass *gobjectClass = G_OBJECT_CLASS(requestClass);
+    GObjectClass* gobjectClass = G_OBJECT_CLASS(requestClass);
     gobjectClass->finalize = webkit_dom_test_interface_finalize;
     gobjectClass->set_property = webkit_dom_test_interface_set_property;
     gobjectClass->get_property = webkit_dom_test_interface_get_property;
     gobjectClass->constructed = webkit_dom_test_interface_constructed;
 
-#if ENABLE(Condition11) || ENABLE(Condition12)
     g_object_class_install_property(gobjectClass,
                                     PROP_SUPPLEMENTAL_STR1,
                                     g_param_spec_string("supplemental-str1", /* name */
@@ -195,8 +213,6 @@ static void webkit_dom_test_interface_class_init(WebKitDOMTestInterfaceClass* re
                                                            "read-only  gchar* TestInterface.supplemental-str1", /* longer - could do with some extra doc stuff here */
                                                            "", /* default */
                                                            WEBKIT_PARAM_READABLE));
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
-#if ENABLE(Condition11) || ENABLE(Condition12)
     g_object_class_install_property(gobjectClass,
                                     PROP_SUPPLEMENTAL_STR2,
                                     g_param_spec_string("supplemental-str2", /* name */
@@ -204,8 +220,6 @@ static void webkit_dom_test_interface_class_init(WebKitDOMTestInterfaceClass* re
                                                            "read-write  gchar* TestInterface.supplemental-str2", /* longer - could do with some extra doc stuff here */
                                                            "", /* default */
                                                            WEBKIT_PARAM_READWRITE));
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
-#if ENABLE(Condition11) || ENABLE(Condition12)
     g_object_class_install_property(gobjectClass,
                                     PROP_SUPPLEMENTAL_NODE,
                                     g_param_spec_object("supplemental-node", /* name */
@@ -213,7 +227,6 @@ static void webkit_dom_test_interface_class_init(WebKitDOMTestInterfaceClass* re
                                                            "read-write  WebKitDOMNode* TestInterface.supplemental-node", /* longer - could do with some extra doc stuff here */
                                                            WEBKIT_TYPE_DOM_NODE, /* gobject type */
                                                            WEBKIT_PARAM_READWRITE));
-#endif /* ENABLE(Condition11) || ENABLE(Condition12) */
 
 
 }
@@ -229,7 +242,7 @@ webkit_dom_test_interface_supplemental_method1(WebKitDOMTestInterface* self)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_if_fail(self);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
+    WebCore::TestInterface* item = WebKit::core(self);
     WebCore::TestSupplemental::supplementalMethod1(item);
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
@@ -242,38 +255,38 @@ webkit_dom_test_interface_supplemental_method1(WebKitDOMTestInterface* self)
 }
 
 WebKitDOMTestObj*
-webkit_dom_test_interface_supplemental_method2(WebKitDOMTestInterface* self, const gchar* str_arg, WebKitDOMTestObj* obj_arg, GError **error)
+webkit_dom_test_interface_supplemental_method2(WebKitDOMTestInterface* self, const gchar* strArg, WebKitDOMTestObj* objArg, GError** error)
 {
 #if ENABLE(Condition1) || ENABLE(Condition2)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_val_if_fail(self, 0);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
-    g_return_val_if_fail(str_arg, 0);
-    g_return_val_if_fail(obj_arg, 0);
-    WTF::String converted_str_arg = WTF::String::fromUTF8(str_arg);
-    WebCore::TestObj * converted_obj_arg = NULL;
-    if (obj_arg != NULL) {
-        converted_obj_arg = WebKit::core(obj_arg);
-        g_return_val_if_fail(converted_obj_arg, 0);
+    WebCore::TestInterface* item = WebKit::core(self);
+    g_return_val_if_fail(strArg, 0);
+    g_return_val_if_fail(objArg, 0);
+    WTF::String convertedStrArg = WTF::String::fromUTF8(strArg);
+    WebCore::TestObj* convertedObjArg = 0;
+    if (objArg) {
+        convertedObjArg = WebKit::core(objArg);
+        g_return_val_if_fail(convertedObjArg, 0);
     }
     WebCore::ExceptionCode ec = 0;
-    PassRefPtr<WebCore::TestObj> g_res = WTF::getPtr(WebCore::TestSupplemental::supplementalMethod2(item, converted_str_arg, converted_obj_arg, ec));
+    RefPtr<WebCore::TestObj> gobjectResult = WTF::getPtr(WebCore::TestSupplemental::supplementalMethod2(item, convertedStrArg, convertedObjArg, ec));
     if (ec) {
         WebCore::ExceptionCodeDescription ecdesc(ec);
         g_set_error_literal(error, g_quark_from_string("WEBKIT_DOM"), ecdesc.code, ecdesc.name);
     }
-    WebKitDOMTestObj* res = WebKit::kit(g_res.get());
-    return res;
+    WebKitDOMTestObj* result = WebKit::kit(gobjectResult.get());
+    return result;
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition11) || ENABLE(Condition12) */
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition1) || ENABLE(Condition2) */
 }
 
@@ -284,7 +297,7 @@ webkit_dom_test_interface_supplemental_method4(WebKitDOMTestInterface* self)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_if_fail(self);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
+    WebCore::TestInterface* item = WebKit::core(self);
     WebCore::TestSupplemental::supplementalMethod4(item);
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
@@ -303,18 +316,18 @@ webkit_dom_test_interface_get_supplemental_str1(WebKitDOMTestInterface* self)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_val_if_fail(self, 0);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
-    gchar* res = convertToUTF8String(WebCore::TestSupplemental::supplementalStr1(item));
-    return res;
+    WebCore::TestInterface* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(WebCore::TestSupplemental::supplementalStr1(item));
+    return result;
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition11) || ENABLE(Condition12) */
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition1) || ENABLE(Condition2) */
 }
 
@@ -325,18 +338,18 @@ webkit_dom_test_interface_get_supplemental_str2(WebKitDOMTestInterface* self)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_val_if_fail(self, 0);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
-    gchar* res = convertToUTF8String(WebCore::TestSupplemental::supplementalStr2(item));
-    return res;
+    WebCore::TestInterface* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(WebCore::TestSupplemental::supplementalStr2(item));
+    return result;
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition11) || ENABLE(Condition12) */
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition1) || ENABLE(Condition2) */
 }
 
@@ -347,10 +360,10 @@ webkit_dom_test_interface_set_supplemental_str2(WebKitDOMTestInterface* self, co
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_if_fail(self);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
+    WebCore::TestInterface* item = WebKit::core(self);
     g_return_if_fail(value);
-    WTF::String converted_value = WTF::String::fromUTF8(value);
-    WebCore::TestSupplemental::setSupplementalStr2(item, converted_value);
+    WTF::String convertedValue = WTF::String::fromUTF8(value);
+    WebCore::TestSupplemental::setSupplementalStr2(item, convertedValue);
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
@@ -368,19 +381,19 @@ webkit_dom_test_interface_get_supplemental_node(WebKitDOMTestInterface* self)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_val_if_fail(self, 0);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
-    PassRefPtr<WebCore::Node> g_res = WTF::getPtr(WebCore::TestSupplemental::supplementalNode(item));
-    WebKitDOMNode* res = WebKit::kit(g_res.get());
-    return res;
+    WebCore::TestInterface* item = WebKit::core(self);
+    RefPtr<WebCore::Node> gobjectResult = WTF::getPtr(WebCore::TestSupplemental::supplementalNode(item));
+    WebKitDOMNode* result = WebKit::kit(gobjectResult.get());
+    return result;
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition11) || ENABLE(Condition12) */
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition1")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition2")
-    return NULL;
+    return 0;
 #endif /* ENABLE(Condition1) || ENABLE(Condition2) */
 }
 
@@ -391,14 +404,14 @@ webkit_dom_test_interface_set_supplemental_node(WebKitDOMTestInterface* self, We
 #if ENABLE(Condition11) || ENABLE(Condition12)
     g_return_if_fail(self);
     WebCore::JSMainThreadNullState state;
-    WebCore::TestInterface * item = WebKit::core(self);
+    WebCore::TestInterface* item = WebKit::core(self);
     g_return_if_fail(value);
-    WebCore::Node * converted_value = NULL;
-    if (value != NULL) {
-        converted_value = WebKit::core(value);
-        g_return_if_fail(converted_value);
+    WebCore::Node* convertedValue = 0;
+    if (value) {
+        convertedValue = WebKit::core(value);
+        g_return_if_fail(convertedValue);
     }
-    WebCore::TestSupplemental::setSupplementalNode(item, converted_value);
+    WebCore::TestSupplemental::setSupplementalNode(item, convertedValue);
 #else
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition11")
     WEBKIT_WARN_FEATURE_NOT_PRESENT("Condition12")

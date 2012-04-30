@@ -60,6 +60,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/platform/graphics/filters/arm \
     $$SOURCE_DIR/platform/graphics/opengl \
     $$SOURCE_DIR/platform/graphics/qt \
+    $$SOURCE_DIR/platform/graphics/surfaces \
     $$SOURCE_DIR/platform/graphics/texmap \
     $$SOURCE_DIR/platform/graphics/transforms \
     $$SOURCE_DIR/platform/image-decoders \
@@ -112,7 +113,12 @@ INCLUDEPATH += $$WEBCORE_GENERATED_SOURCES_DIR
 
 contains(DEFINES, ENABLE_XSLT=1) {
     contains(DEFINES, WTF_USE_LIBXML2=1) {
-        PKGCONFIG += libxslt
+        mac {
+            INCLUDEPATH += /usr/include/libxml2
+            LIBS += -lxml2 -lxslt
+        } else {
+            PKGCONFIG += libxslt
+        }
     } else {
         QT *= xmlpatterns
     }
@@ -131,6 +137,7 @@ contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
             !embedded {
                 CONFIG += x11
                 LIBS += -lXrender
+                DEFINES += MOZ_X11
             }
             DEFINES += XP_UNIX
             DEFINES += ENABLE_NETSCAPE_PLUGIN_METADATA_CACHE=1
@@ -194,6 +201,7 @@ contains(CONFIG, texmap) {
         DEFINES += WTF_USE_TEXTURE_MAPPER_GL=1
         contains(QT_CONFIG, opengles2): LIBS += -lEGL
     }
+    mac: LIBS += -framework IOSurface -framework CoreFoundation
 }
 
 contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1)|contains(DEFINES, ENABLE_WEBGL=1) {

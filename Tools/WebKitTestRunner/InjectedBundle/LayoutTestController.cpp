@@ -32,6 +32,7 @@
 #include "PlatformWebView.h"
 #include "StringFunctions.h"
 #include "TestController.h"
+#include <WebCore/PageVisibilityState.h>
 #include <WebKit2/WKBundleBackForwardList.h>
 #include <WebKit2/WKBundleFrame.h>
 #include <WebKit2/WKBundleFramePrivate.h>
@@ -108,6 +109,7 @@ LayoutTestController::LayoutTestController()
     , m_policyDelegateEnabled(false)
     , m_policyDelegatePermissive(false)
     , m_globalFlag(false)
+    , m_customFullScreenBehavior(false)
 {
     platformInitialize();
 }
@@ -131,7 +133,8 @@ void LayoutTestController::display()
 
 void LayoutTestController::dumpAsText(bool dumpPixels)
 {
-    m_whatToDump = MainFrameText;
+    if (m_whatToDump < MainFrameText)
+        m_whatToDump = MainFrameText;
     m_dumpPixels = dumpPixels;
 }
 
@@ -459,23 +462,31 @@ void LayoutTestController::makeWindowObject(JSContextRef context, JSObjectRef wi
 
 void LayoutTestController::showWebInspector()
 {
+#if ENABLE(INSPECTOR)
     WKBundleInspectorShow(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()));
+#endif // ENABLE(INSPECTOR)
 }
 
 void LayoutTestController::closeWebInspector()
 {
+#if ENABLE(INSPECTOR)
     WKBundleInspectorClose(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()));
+#endif // ENABLE(INSPECTOR)
 }
 
 void LayoutTestController::evaluateInWebInspector(long callID, JSStringRef script)
 {
+#if ENABLE(INSPECTOR)
     WKRetainPtr<WKStringRef> scriptWK = toWK(script);
     WKBundleInspectorEvaluateScriptForTest(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), callID, scriptWK.get());
+#endif // ENABLE(INSPECTOR)
 }
 
 void LayoutTestController::setJavaScriptProfilingEnabled(bool enabled)
 {
+#if ENABLE(INSPECTOR)
     WKBundleInspectorSetJavaScriptProfilingEnabled(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), enabled);
+#endif // ENABLE(INSPECTOR)
 }
 
 typedef WTF::HashMap<unsigned, WKRetainPtr<WKBundleScriptWorldRef> > WorldMap;
@@ -504,7 +515,7 @@ void LayoutTestController::evaluateScriptInIsolatedWorld(JSContextRef context, u
     if (!worldID)
         world.adopt(WKBundleScriptWorldCreateWorld());
     else {
-        WKRetainPtr<WKBundleScriptWorldRef>& worldSlot = worldMap().add(worldID, 0).first->second;
+        WKRetainPtr<WKBundleScriptWorldRef>& worldSlot = worldMap().add(worldID, 0).iterator->second;
         if (!worldSlot)
             worldSlot.adopt(WKBundleScriptWorldCreateWorld());
         world = worldSlot;
@@ -534,6 +545,24 @@ void LayoutTestController::setTextDirection(JSStringRef direction)
 void LayoutTestController::setShouldStayOnPageAfterHandlingBeforeUnload(bool shouldStayOnPage)
 {
     InjectedBundle::shared().postNewBeforeUnloadReturnValue(!shouldStayOnPage);
+}
+
+void LayoutTestController::setPageVisibility(JSStringRef state)
+{
+    WKStringRef visibilityStateKey = toWK(state).get();
+    WebCore::PageVisibilityState visibilityState = WebCore::PageVisibilityStateVisible;
+
+    if (WKStringIsEqualToUTF8CString(visibilityStateKey, "hidden"))
+        visibilityState = WebCore::PageVisibilityStateHidden;
+    else if (WKStringIsEqualToUTF8CString(visibilityStateKey, "prerender"))
+        visibilityState = WebCore::PageVisibilityStatePrerender;
+
+    WKBundleSetPageVisibilityState(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), visibilityState, /* isInitialState */ false);
+}
+
+void LayoutTestController::resetPageVisibility()
+{
+    WKBundleSetPageVisibilityState(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), WebCore::PageVisibilityStateVisible, /* isInitialState */ true);
 }
 
 void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)

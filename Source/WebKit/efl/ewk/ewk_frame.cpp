@@ -24,7 +24,6 @@
 #include "config.h"
 #include "ewk_frame.h"
 
-#include "Assertions.h"
 #include "DocumentLoader.h"
 #include "DocumentMarkerController.h"
 #include "EventHandler.h"
@@ -46,7 +45,6 @@
 #include "PlatformTouchEvent.h"
 #include "PlatformWheelEvent.h"
 #include "ProgressTracker.h"
-#include "RefPtr.h"
 #include "ResourceRequest.h"
 #include "ScriptValue.h"
 #include "SharedBuffer.h"
@@ -57,6 +55,8 @@
 #include <Eina.h>
 #include <Evas.h>
 #include <eina_safety_checks.h>
+#include <wtf/Assertions.h>
+#include <wtf/RefPtr.h>
 #include <wtf/text/CString.h>
 
 static const char EWK_FRAME_TYPE_STR[] = "EWK_Frame";
@@ -283,6 +283,16 @@ Evas_Object* ewk_frame_view_get(const Evas_Object* ewkFrame)
 {
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, 0);
     return smartData->view;
+}
+
+Ewk_Security_Origin* ewk_frame_security_origin_get(const Evas_Object *ewkFrame)
+{
+    EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, 0);
+    EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, 0);
+    EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame->document(), 0);
+    EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame->document()->securityOrigin(), 0);
+
+    return ewk_security_origin_new(smartData->frame->document()->securityOrigin());
 }
 
 Eina_Iterator* ewk_frame_children_iterator_new(Evas_Object* ewkFrame)
@@ -1203,19 +1213,32 @@ void ewk_frame_core_gone(Evas_Object* ewkFrame)
 
 /**
  * @internal
+ * Reports cancellation of a client redirect.
+ *
+ * @param ewkFrame Frame.
+ *
+ * Emits signal: "redirect,cancelled"
+ */
+void ewk_frame_redirect_cancelled(Evas_Object* ewkFrame)
+{
+    evas_object_smart_callback_call(ewkFrame, "redirect,cancelled", 0);
+}
+
+/**
+ * @internal
  * Reports a resource will be requested. User may override behavior of webkit by
  * changing values in @param request.
  *
  * @param ewkFrame Frame.
- * @param request Request details that user may override. Whenever values on
- * this struct changes, it must be properly malloc'd as it will be freed
- * afterwards.
+ * @param messages Messages containing the request details that user may override and a
+ * possible redirect reponse. Whenever values on this struct changes, it must be properly
+ * malloc'd as it will be freed afterwards.
  *
  * Emits signal: "resource,request,willsend"
  */
-void ewk_frame_request_will_send(Evas_Object* ewkFrame, Ewk_Frame_Resource_Request* request)
+void ewk_frame_request_will_send(Evas_Object* ewkFrame, Ewk_Frame_Resource_Messages* messages)
 {
-    evas_object_smart_callback_call(ewkFrame, "resource,request,willsend", request);
+    evas_object_smart_callback_call(ewkFrame, "resource,request,willsend", messages);
 }
 
 /**
@@ -1230,6 +1253,20 @@ void ewk_frame_request_will_send(Evas_Object* ewkFrame, Ewk_Frame_Resource_Reque
 void ewk_frame_request_assign_identifier(Evas_Object* ewkFrame, const Ewk_Frame_Resource_Request* request)
 {
     evas_object_smart_callback_call(ewkFrame, "resource,request,new", (void*)request);
+}
+
+/**
+ * @internal
+ * Reports that a response to a resource request was received.
+ *
+ * @param ewkFrame Frame.
+ * @param request Response details. No changes are allowed to fields.
+ *
+ * Emits signal: "resource,response,received"
+ */
+void ewk_frame_response_received(Evas_Object* ewkFrame, Ewk_Frame_Resource_Response* response)
+{
+    evas_object_smart_callback_call(ewkFrame, "resource,response,received", response);
 }
 
 /**
@@ -1261,6 +1298,17 @@ void ewk_frame_view_state_save(Evas_Object* ewkFrame, WebCore::HistoryItem* item
 
 /**
  * @internal
+ * Reports the frame committed load.
+ *
+ * Emits signal: "load,committed" with no parameters.
+ */
+void ewk_frame_load_committed(Evas_Object* ewkFrame)
+{
+    evas_object_smart_callback_call(ewkFrame, "load,committed", 0);
+}
+
+/**
+ * @internal
  * Reports the frame started loading something.
  *
  * Emits signal: "load,started" with no parameters.
@@ -1271,7 +1319,7 @@ void ewk_frame_load_started(Evas_Object* ewkFrame)
     DBG("ewkFrame=%p", ewkFrame);
     evas_object_smart_callback_call(ewkFrame, "load,started", 0);
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData);
-    ewk_view_load_started(smartData->view);
+    ewk_view_load_started(smartData->view, ewkFrame);
 
     mainFrame = ewk_view_frame_main_get(smartData->view);
     if (mainFrame == ewkFrame)
@@ -1358,12 +1406,36 @@ void ewk_frame_load_finished(Evas_Object* ewkFrame, const char* errorDomain, int
         buffer.is_cancellation = isCancellation;
         buffer.description = errorDescription;
         buffer.failing_url = failingUrl;
+        buffer.resource_identifier = 0;
         buffer.frame = ewkFrame;
         error = &buffer;
     }
     evas_object_smart_callback_call(ewkFrame, "load,finished", error);
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData);
     ewk_view_load_finished(smartData->view, error);
+}
+
+/**
+ * @internal
+ * Reports resource load finished.
+ *
+ * Emits signal: "load,resource,finished" with the resource
+ * request identifier.
+ */
+void ewk_frame_load_resource_finished(Evas_Object* ewkFrame, unsigned long identifier)
+{
+    evas_object_smart_callback_call(ewkFrame, "load,resource,finished", &identifier);
+}
+
+/**
+ * @internal
+ * Reports resource load failure, with error information.
+ *
+ * Emits signal: "load,resource,failed" with the error information.
+ */
+void ewk_frame_load_resource_failed(Evas_Object* ewkFrame, Ewk_Frame_Load_Error* error)
+{
+    evas_object_smart_callback_call(ewkFrame, "load,resource,failed", error);
 }
 
 /**
@@ -1387,6 +1459,7 @@ void ewk_frame_load_error(Evas_Object* ewkFrame, const char* errorDomain, int er
     error.domain = errorDomain;
     error.description = errorDescription;
     error.failing_url = failingUrl;
+    error.resource_identifier = 0;
     error.frame = ewkFrame;
     evas_object_smart_callback_call(ewkFrame, "load,error", &error);
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData);
@@ -1762,6 +1835,20 @@ void ewk_frame_mixed_content_run_set(Evas_Object* ewkFrame, bool hasRun)
         ewk_view_mixed_content_run_set(smartData->view, true);
         evas_object_smart_callback_call(ewkFrame, "mixedcontent,run", 0);
     }
+}
+
+/**
+ * @internal
+ * Reports that reflected XSS is encountered in the page and suppressed.
+ *
+ * @param xssInfo Information received from the XSSAuditor when XSS is 
+ * encountered in the page. 
+ *
+ * Emits signal: "xss,detected" with pointer to Ewk_Frame_Xss_Notification.
+ */
+void ewk_frame_xss_detected(Evas_Object* ewkFrame, const Ewk_Frame_Xss_Notification* xssInfo)
+{
+    evas_object_smart_callback_call(ewkFrame, "xss,detected", (void*)xssInfo);
 }
 
 namespace EWKPrivate {

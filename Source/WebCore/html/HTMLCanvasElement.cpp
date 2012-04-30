@@ -45,7 +45,6 @@
 #include "MIMETypeRegistry.h"
 #include "Page.h"
 #include "RenderHTMLCanvas.h"
-#include "RenderLayer.h"
 #include "Settings.h"
 #include <math.h>
 #include <stdio.h>
@@ -85,7 +84,8 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     , m_rendererIsCanvas(false)
     , m_ignoreReset(false)
 #if ENABLE(HIGH_DPI_CANVAS)
-      // FIXME: Make this the default once https://bugs.webkit.org/show_bug.cgi?id=73645 has been fixed.
+      // NOTE: High-DPI canvas requires the platform-specific ImageBuffer implementation to respect
+      // the resolutionScale parameter.
     , m_deviceScaleFactor(document->frame() ? document->frame()->page()->deviceScaleFactor() : 1)
 #else
     , m_deviceScaleFactor(1)
@@ -279,8 +279,8 @@ void HTMLCanvasElement::reset()
             if (oldSize != size()) {
                 toRenderHTMLCanvas(renderer)->canvasSizeChanged();
 #if USE(ACCELERATED_COMPOSITING)
-                if (renderBox() && renderBox()->hasLayer() && renderBox()->layer()->hasAcceleratedCompositing())
-                    renderBox()->layer()->contentChanged(RenderLayer::CanvasChanged);
+                if (renderBox() && renderBox()->hasAcceleratedCompositing())
+                    renderBox()->contentChanged(CanvasChanged);
 #endif
             }
             if (hadImageBuffer)
@@ -305,7 +305,7 @@ bool HTMLCanvasElement::paintsIntoCanvasBuffer() const
     if (!m_context->isAccelerated())
         return true;
 
-    if (renderBox() && renderBox()->hasLayer() && renderBox()->layer()->hasAcceleratedCompositing())
+    if (renderBox() && renderBox()->hasAcceleratedCompositing())
         return false;
 #endif
     return true;
@@ -330,7 +330,7 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const LayoutRect& r, boo
         ImageBuffer* imageBuffer = buffer();
         if (imageBuffer) {
             if (m_presentedImage)
-                context->drawImage(m_presentedImage.get(), ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, useLowQualityScale);
+                context->drawImage(m_presentedImage.get(), ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, DoNotRespectImageOrientation, useLowQualityScale);
             else
                 context->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, useLowQualityScale);
         }
@@ -463,9 +463,9 @@ SecurityOrigin* HTMLCanvasElement::securityOrigin() const
     return document()->securityOrigin();
 }
 
-CSSStyleSelector* HTMLCanvasElement::styleSelector()
+StyleResolver* HTMLCanvasElement::styleResolver()
 {
-    return document()->styleSelector();
+    return document()->styleResolver();
 }
 
 bool HTMLCanvasElement::shouldAccelerate(const IntSize& size) const
@@ -543,10 +543,9 @@ void HTMLCanvasElement::createImageBuffer() const
         Unaccelerated;
 #endif
     DeferralMode deferralMode = shouldDefer() ? Deferred : NonDeferred;
-    m_imageBuffer = ImageBuffer::create(bufferSize, 1, ColorSpaceDeviceRGB, renderingMode, deferralMode);
+    m_imageBuffer = ImageBuffer::create(size(), m_deviceScaleFactor, ColorSpaceDeviceRGB, renderingMode, deferralMode);
     if (!m_imageBuffer)
         return;
-    m_imageBuffer->context()->scale(FloatSize(bufferSize.width() / logicalSize.width(), bufferSize.height() / logicalSize.height()));
     m_imageBuffer->context()->setShadowsIgnoreTransforms(true);
     m_imageBuffer->context()->setImageInterpolationQuality(DefaultInterpolationQuality);
     m_imageBuffer->context()->setStrokeThickness(1);

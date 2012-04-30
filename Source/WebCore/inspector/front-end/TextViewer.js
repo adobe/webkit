@@ -39,10 +39,10 @@ WebInspector.TextViewer = function(textModel, platform, url, delegate)
     this.registerRequiredCSS("textViewer.css");
 
     this._textModel = textModel;
-    this._textModel.changeListener = this._textChanged.bind(this);
+    this._textModel.addEventListener(WebInspector.TextEditorModel.Events.TextChanged, this._textChanged, this);
     this._textModel.resetUndoStack();
     this._delegate = delegate;
-
+    this._url = url;
     this.element.className = "text-editor monospace";
 
     var enterTextChangeMode = this._enterInternalTextChangeMode.bind(this);
@@ -98,9 +98,9 @@ WebInspector.TextViewer.prototype = {
         return this._textModel;
     },
 
-    focus: function()
+    defaultFocusedElement: function()
     {
-        this._mainPanel.element.focus();
+        return this._mainPanel.defaultFocusedElement();
     },
 
     revealLine: function(lineNumber)
@@ -176,13 +176,12 @@ WebInspector.TextViewer.prototype = {
         this._updatePanelOffsets();
     },
 
-    // WebInspector.TextModel listener
-    _textChanged: function(oldRange, newRange, oldText, newText)
+    _textChanged: function(event)
     {
         if (!this._internalTextChangeMode)
             this._textModel.resetUndoStack();
-        this._mainPanel.textChanged(oldRange, newRange);
-        this._gutterPanel.textChanged(oldRange, newRange);
+        this._mainPanel.textChanged(event.data.oldRange, event.data.newRange);
+        this._gutterPanel.textChanged(event.data.oldRange, event.data.newRange);
         this._updatePanelOffsets();
     },
 
@@ -278,7 +277,7 @@ WebInspector.TextViewer.prototype = {
         var shortcutKey = WebInspector.KeyboardShortcut.makeKeyFromEvent(e);
         var handler = this._shortcuts[shortcutKey];
         if (handler && handler())
-            e.consume();
+            e.consume(true);
     },
 
     _contextMenu: function(event)
@@ -291,9 +290,10 @@ WebInspector.TextViewer.prototype = {
             target = this._mainPanel._enclosingLineRowOrSelf(event.target);
             this._delegate.populateTextAreaContextMenu(contextMenu, target && target.lineNumber);
         }
-        var fileName = this._delegate.suggestedFileName();
-        if (fileName)
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Save as..." : "Save As..."), InspectorFrontendHost.saveAs.bind(InspectorFrontendHost, fileName, this._textModel.text));
+        if (this._url) {
+            contextMenu.appendItem(WebInspector.UIString("Save"), WebInspector.save.bind(WebInspector, this._url, this._textModel.text, false));
+            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Save as..." : "Save As..."), WebInspector.save.bind(WebInspector, this._url, this._textModel.text, true));
+        }
 
         contextMenu.show(event);
     },
@@ -304,6 +304,8 @@ WebInspector.TextViewer.prototype = {
             return false;
 
         this._delegate.commitEditing();
+        if (this._url && WebInspector.isURLSaved(this._url))
+            WebInspector.save(this._url, this._textModel.text, false);
         return true;
     },
 
@@ -338,9 +340,7 @@ WebInspector.TextViewerDelegate.prototype = {
 
     populateLineGutterContextMenu: function(contextMenu, lineNumber) { },
 
-    populateTextAreaContextMenu: function(contextMenu, lineNumber) { },
-
-    suggestedFileName: function() { }
+    populateTextAreaContextMenu: function(contextMenu, lineNumber) { }
 }
 
 /**
@@ -690,6 +690,9 @@ WebInspector.TextEditorGutterPanel.prototype = {
                 // Do not move decorations before the start position.
                 if (lineNumber < oldRange.startLine)
                     continue;
+                // Decorations follow the first character of line.
+                if (lineNumber === oldRange.startLine && oldRange.startColumn)
+                    continue;
 
                 var lineDecorationsCopy = this._decorations[lineNumber].slice();
                 for (var i = 0; i < lineDecorationsCopy.length; ++i) {
@@ -904,6 +907,7 @@ WebInspector.TextEditorMainPanel = function(textModel, url, syncScrollListener, 
     this.element.appendChild(this._container);
 
     this.element.addEventListener("scroll", this._scroll.bind(this), false);
+    this.element.addEventListener("focus", this._handleElementFocus.bind(this), false);
 
     // In WebKit the DOMNodeRemoved event is fired AFTER the node is removed, thus it should be
     // attached to all DOM nodes that we want to track. Instead, we attach the DOMNodeRemoved
@@ -947,6 +951,19 @@ WebInspector.TextEditorMainPanel.prototype = {
     get readOnly()
     {
         return this._readOnly;
+    },
+
+    _handleElementFocus: function()
+    {
+        if (!this._readOnly)
+            this._container.focus();
+    },
+
+    defaultFocusedElement: function()
+    {
+        if (this._readOnly)
+            return this.element;
+        return this._container;
     },
 
     _updateSelectionOnStartEditing: function()
@@ -1086,7 +1103,7 @@ WebInspector.TextEditorMainPanel.prototype = {
 
         // Restore location post-repaint.
         if (range)
-            this._setCaretLocation(range.endLine, range.endColumn, true);
+            this._restoreSelection(range, true);
 
         return true;
     },
@@ -1106,19 +1123,20 @@ WebInspector.TextEditorMainPanel.prototype = {
         this._enterTextChangeMode();
 
         var newRange;
+        var rangeWasEmpty = range.isEmpty();
         if (shiftKey)
             newRange = this._unindentLines(range);
         else {
-            if (range.isEmpty()) {
-                newRange = this._setText(range, WebInspector.settings.textEditorIndent.get());
-                newRange.startColumn = newRange.endColumn;
-            } else
+            if (rangeWasEmpty)
+                newRange = this._editRange(range, WebInspector.settings.textEditorIndent.get());
+            else
                 newRange = this._indentLines(range);
-
         }
 
         this._exitTextChangeMode(range, newRange);
         this.endUpdates();
+        if (rangeWasEmpty)
+            newRange.startColumn = newRange.endColumn;
         this._restoreSelection(newRange, true);
         return true;
     },
@@ -1143,7 +1161,7 @@ WebInspector.TextEditorMainPanel.prototype = {
             indentEndLine--;
 
         for (var lineNumber = range.startLine; lineNumber <= indentEndLine; lineNumber++)
-            this._textModel.setText(new WebInspector.TextRange(lineNumber, 0, lineNumber, 0), indent);
+            this._textModel.editRange(new WebInspector.TextRange(lineNumber, 0, lineNumber, 0), indent);
 
         this._lastEditedRange = newRange;
 
@@ -1176,7 +1194,7 @@ WebInspector.TextEditorMainPanel.prototype = {
             else
                 continue;
 
-            this._textModel.setText(new WebInspector.TextRange(lineNumber, 0, lineNumber, lineIndentLength), "");
+            this._textModel.editRange(new WebInspector.TextRange(lineNumber, 0, lineNumber, lineIndentLength), "");
 
             if (lineNumber === range.startLine)
                 newRange.startColumn = Math.max(0, newRange.startColumn - lineIndentLength);
@@ -1226,11 +1244,11 @@ WebInspector.TextEditorMainPanel.prototype = {
             // {
             //     |
             // }
-            newRange = this._setText(range, lineBreak + indent + lineBreak + currentIndent);
+            newRange = this._editRange(range, lineBreak + indent + lineBreak + currentIndent);
             newRange.endLine--;
             newRange.endColumn += textEditorIndent.length;
         } else
-            newRange = this._setText(range, lineBreak + indent);
+            newRange = this._editRange(range, lineBreak + indent);
 
         this._exitTextChangeMode(range, newRange);
         this.endUpdates();
@@ -1493,7 +1511,7 @@ WebInspector.TextEditorMainPanel.prototype = {
                 lineRow.appendChild(lineRow.decorationsElement);
         } finally {
             if (this._rangeToMark && this._rangeToMark.startLine === lineNumber)
-                this._markedRangeElement = highlightSearchResult(lineRow, this._rangeToMark.startColumn, this._rangeToMark.endColumn - this._rangeToMark.startColumn);
+                this._markedRangeElement = WebInspector.highlightSearchResult(lineRow, this._rangeToMark.startColumn, this._rangeToMark.endColumn - this._rangeToMark.startColumn);
             this.endDomUpdates();
         }
     },
@@ -1847,7 +1865,7 @@ WebInspector.TextEditorMainPanel.prototype = {
 
         delete this._dirtyLines;
 
-        var newRange = this._setText(oldRange, newContent);
+        var newRange = this._editRange(oldRange, newContent);
 
         this._paintScheduledLines(true);
         this._restoreSelection(selection);
@@ -1864,12 +1882,12 @@ WebInspector.TextEditorMainPanel.prototype = {
         this.endDomUpdates();
     },
 
-    _setText: function(range, text)
+    _editRange: function(range, text)
     {
         if (this._lastEditedRange && (!text || text.indexOf("\n") !== -1 || this._lastEditedRange.endLine !== range.startLine || this._lastEditedRange.endColumn !== range.startColumn))
             this._textModel.markUndoableState();
 
-        var newRange = this._textModel.setText(range, text);
+        var newRange = this._textModel.editRange(range, text);
         this._lastEditedRange = newRange;
 
         return newRange;

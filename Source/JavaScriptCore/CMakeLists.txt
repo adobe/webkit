@@ -85,17 +85,21 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGThunks.cpp
     dfg/DFGVirtualRegisterAllocationPhase.cpp
 
+    heap/BlockAllocator.cpp
     heap/CopiedSpace.cpp
+    heap/ConservativeRoots.cpp
     heap/DFGCodeBlocks.cpp
-    heap/Heap.cpp
-    heap/HandleHeap.cpp
+    heap/HandleSet.cpp
     heap/HandleStack.cpp
+    heap/Heap.cpp
     heap/MachineStackMarker.cpp
     heap/MarkedAllocator.cpp
     heap/MarkedBlock.cpp
     heap/MarkedSpace.cpp
-    heap/ConservativeRoots.cpp
     heap/MarkStack.cpp
+    heap/WeakSet.cpp
+    heap/WeakHandleOwner.cpp
+    heap/WeakBlock.cpp
 
     debugger/Debugger.cpp
     debugger/DebuggerActivation.cpp
@@ -163,7 +167,6 @@ SET(JavaScriptCore_SOURCES
     runtime/JSActivation.cpp
     runtime/JSAPIValueWrapper.cpp
     runtime/JSArray.cpp
-    runtime/JSByteArray.cpp
     runtime/JSCell.cpp
     runtime/JSDateMath.cpp
     runtime/JSFunction.cpp
@@ -179,6 +182,7 @@ SET(JavaScriptCore_SOURCES
     runtime/JSPropertyNameIterator.cpp
     runtime/JSStaticScopeObject.cpp
     runtime/JSString.cpp
+    runtime/JSStringJoiner.cpp
     runtime/JSValue.cpp
     runtime/JSVariableObject.cpp
     runtime/JSWrapperObject.cpp
@@ -219,6 +223,7 @@ SET(JavaScriptCore_SOURCES
     tools/CodeProfile.cpp
     tools/CodeProfiling.cpp
 
+    yarr/YarrCanonicalizeUCS2.cpp
     yarr/YarrPattern.cpp
     yarr/YarrInterpreter.cpp
     yarr/YarrJIT.cpp
@@ -304,6 +309,7 @@ INCLUDE_DIRECTORIES(${JavaScriptCore_INCLUDE_DIRECTORIES})
 ADD_DEFINITIONS(-DBUILDING_JavaScriptCore)
 ADD_LIBRARY(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARY_TYPE} ${JavaScriptCore_HEADERS} ${JavaScriptCore_SOURCES})
 TARGET_LINK_LIBRARIES(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARIES})
+SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")
 SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
 
 IF (JavaScriptCore_LINK_FLAGS)

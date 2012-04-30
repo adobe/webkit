@@ -4,16 +4,15 @@ On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE
 
 
 indexedDB = self.indexedDB || self.webkitIndexedDB || self.mozIndexedDB || self.msIndexedDB || self.OIndexedDB;
-PASS Boolean(indexedDB && IDBCursor && IDBDatabase && IDBDatabaseError && IDBDatabaseException && IDBFactory && IDBIndex && IDBKeyRange && IDBObjectStore && IDBRequest && IDBTransaction) is true
 
-indexedDB.open(name, description)
+indexedDB.open(name)
 db = event.target.result
 request = db.setVersion('1')
 Deleted all object stores.
 objectStore = db.createObjectStore('foo', { keyPath: 'id', autoIncrement: true });
 index = objectStore.createIndex('first', 'first');
-PASS index.get(); threw exception TypeError: Not enough arguments.
-PASS index.getKey(); threw exception TypeError: Not enough arguments.
+PASS index.get(); threw exception TypeError: Type error.
+PASS index.getKey(); threw exception TypeError: Type error.
 PASS successfullyParsed is true
 
 TEST COMPLETE

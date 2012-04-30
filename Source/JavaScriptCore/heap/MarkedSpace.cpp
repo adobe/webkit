@@ -31,9 +31,7 @@ namespace JSC {
 class Structure;
 
 MarkedSpace::MarkedSpace(Heap* heap)
-    : m_waterMark(0)
-    , m_nurseryWaterMark(0)
-    , m_heap(heap)
+    : m_heap(heap)
 {
     for (size_t cellSize = preciseStep; cellSize <= preciseCutoff; cellSize += preciseStep) {
         allocatorFor(cellSize).init(heap, this, cellSize, false);
@@ -48,9 +46,6 @@ MarkedSpace::MarkedSpace(Heap* heap)
 
 void MarkedSpace::resetAllocators()
 {
-    m_waterMark = 0;
-    m_nurseryWaterMark = 0;
-
     for (size_t cellSize = preciseStep; cellSize <= preciseCutoff; cellSize += preciseStep) {
         allocatorFor(cellSize).reset();
         destructorAllocatorFor(cellSize).reset();
@@ -84,9 +79,8 @@ void MarkedSpace::freeBlocks(MarkedBlock* head)
         
         m_blocks.remove(block);
         block->sweep();
-        MutexLocker locker(m_heap->m_freeBlockLock);
-        m_heap->m_freeBlocks.append(block);
-        m_heap->m_numberOfFreeBlocks++;
+
+        m_heap->blockAllocator().deallocate(block);
     }
 }
 

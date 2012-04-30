@@ -778,14 +778,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSByteArray.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\JSByteArray.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\runtime\JSCell.cpp"
 				>
 			</File>
@@ -897,6 +889,14 @@
 				RelativePath="..\..\runtime\JSString.h"
 				>
 			</File>
+                        <File
+                                RelativePath="..\..\runtime\JSStringJoiner.cpp"
+                                >
+                        </File>
+                        <File
+                                RelativePath="..\..\runtime\JSStringJoiner.h"
+                                >
+                        </File>
 			<File
 				RelativePath="..\..\runtime\JSType.h"
 				>
@@ -1734,6 +1734,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\yarr\YarrCanonicalizeUCS2.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\yarr\YarrCanonicalizeUCS2.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\yarr\YarrInterpreter.cpp"
 				>
 			</File>
@@ -2114,11 +2122,43 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\HandleHeap.cpp"
+				RelativePath="..\..\heap\HandleSet.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\HandleHeap.h"
+				RelativePath="..\..\heap\HandleSet.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakBlock.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakBlock.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakSet.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakSet.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakSetInlines.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakImpl.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakHandleOwner.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\WeakHandleOwner.h"
 				>
 			</File>
 			<File
@@ -2127,6 +2167,14 @@
 			</File>
 			<File
 				RelativePath="..\..\heap\HandleStack.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\BlockAllocator.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\BlockAllocator.h"
 				>
 			</File>
 			<File

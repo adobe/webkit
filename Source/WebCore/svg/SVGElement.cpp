@@ -28,7 +28,6 @@
 
 #include "Attribute.h"
 #include "CSSCursorImageValue.h"
-#include "CSSStyleSelector.h"
 #include "DOMImplementation.h"
 #include "Document.h"
 #include "Event.h"
@@ -51,6 +50,7 @@
 #include "SVGURIReference.h"
 #include "SVGUseElement.h"
 #include "ScriptEventListener.h"
+#include "StyleResolver.h"
 #include "XMLNames.h"
 
 namespace WebCore {
@@ -61,6 +61,7 @@ SVGElement::SVGElement(const QualifiedName& tagName, Document* document, Constru
     : StyledElement(tagName, document, constructionType)
 {
     setHasCustomStyleForRenderer();
+    setHasCustomWillOrDidRecalcStyle();
 }
 
 PassRefPtr<SVGElement> SVGElement::create(const QualifiedName& tagName, Document* document)
@@ -89,6 +90,17 @@ SVGElement::~SVGElement()
     }
     document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(this);
     document()->accessSVGExtensions()->removeAllElementReferencesForTarget(this);
+}
+
+bool SVGElement::willRecalcStyle(StyleChange change)
+{
+    if (!hasRareSVGData() || styleChangeType() == SyntheticStyleChange)
+        return true;
+    // If the style changes because of a regular property change (not induced by SMIL animations themselves)
+    // reset the "computed style without SMIL style properties", so the base value change gets reflected.
+    if (change > NoChange || needsStyleRecalc())
+        rareSVGData()->setNeedsOverrideComputedStyleUpdate();
+    return true;
 }
 
 SVGElementRareData* SVGElement::rareSVGData() const
@@ -169,11 +181,14 @@ void SVGElement::setXmlbase(const String& value, ExceptionCode&)
     setAttribute(XMLNames::baseAttr, value);
 }
 
-void SVGElement::removedFromDocument()
+void SVGElement::removedFrom(Node* rootParent)
 {
-    document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(this);
-    document()->accessSVGExtensions()->removeAllElementReferencesForTarget(this);
-    StyledElement::removedFromDocument();
+    if (rootParent->inDocument()) {
+        document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(this);
+        document()->accessSVGExtensions()->removeAllElementReferencesForTarget(this);
+    }
+
+    StyledElement::removedFrom(rootParent);
 }
 
 SVGSVGElement* SVGElement::ownerSVGElement() const
@@ -478,7 +493,7 @@ void SVGElement::synchronizeSystemLanguage(void* contextElement)
 PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
 {
     if (!correspondingElement())
-        return document()->styleSelector()->styleForElement(static_cast<Element*>(this), 0, true);
+        return document()->styleResolver()->styleForElement(this);
 
     RenderStyle* style = 0;
     if (Element* parent = parentOrHostElement()) {
@@ -486,7 +501,7 @@ PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
             style = renderer->style();
     }
 
-    return document()->styleSelector()->styleForElement(correspondingElement(), style, false /*allowSharing*/);
+    return document()->styleResolver()->styleForElement(correspondingElement(), style, DisallowStyleSharing);
 }
 
 StylePropertySet* SVGElement::animatedSMILStyleProperties() const
@@ -499,6 +514,26 @@ StylePropertySet* SVGElement::animatedSMILStyleProperties() const
 StylePropertySet* SVGElement::ensureAnimatedSMILStyleProperties()
 {
     return ensureRareSVGData()->ensureAnimatedSMILStyleProperties();
+}
+
+void SVGElement::setUseOverrideComputedStyle(bool value)
+{
+    if (hasRareSVGData())
+        rareSVGData()->setUseOverrideComputedStyle(value);
+}
+
+RenderStyle* SVGElement::computedStyle(PseudoId pseudoElementSpecifier)
+{
+    if (!hasRareSVGData() || !rareSVGData()->useOverrideComputedStyle())
+        return Element::computedStyle(pseudoElementSpecifier);
+
+    RenderStyle* parentStyle = 0;
+    if (Element* parent = parentOrHostElement()) {
+        if (RenderObject* renderer = parent->renderer())
+            parentStyle = renderer->style();
+    }
+
+    return rareSVGData()->overrideComputedStyle(this, parentStyle);
 }
 
 #ifndef NDEBUG

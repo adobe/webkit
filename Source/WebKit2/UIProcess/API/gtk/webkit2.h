@@ -25,6 +25,7 @@
 
 #include <webkit2/WebKitBackForwardList.h>
 #include <webkit2/WebKitBackForwardListItem.h>
+#include <webkit2/WebKitCookieManager.h>
 #include <webkit2/WebKitDefines.h>
 #include <webkit2/WebKitDownload.h>
 #include <webkit2/WebKitEditingCommands.h>
@@ -39,6 +40,7 @@
 #include <webkit2/WebKitURIRequest.h>
 #include <webkit2/WebKitURIResponse.h>
 #include <webkit2/WebKitWebContext.h>
+#include <webkit2/WebKitWebResource.h>
 #include <webkit2/WebKitWebViewBase.h>
 #include <webkit2/WebKitWebView.h>
 #include <webkit2/WebKitWindowProperties.h>

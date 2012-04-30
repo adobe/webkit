@@ -43,7 +43,6 @@ fast/repaint/body-background-image.html
 
 # This port doesn't support Notifications.
 fast/notifications
-http/tests/notifications
 
 # Skipped while Eric Carlson works on a fix.
 # https://bugs.webkit.org/show_bug.cgi?id=28221
@@ -209,6 +208,9 @@ fast/events/drag-image-filename.html
 # Hits an assert in FrameLoader.cpp. https://bugs.webkit.org/show_bug.cgi?id=31387
 http/tests/multipart/policy-ignore-crash.php
 
+# Datalist is not yet enabled.
+fast/forms/datalist
+
 # Color input is not yet enabled.
 fast/forms/color
 
@@ -234,7 +236,6 @@ fast/speech
 fast/events/constructors/speech-recognition-event-constructor.html
 
 # Media Stream API is not yet enabled.
-fast/dom/MediaStream
 fast/mediastream
 
 # Needs to be fixed at image decoder layer for Safari.
@@ -275,6 +276,11 @@ inspector/debugger/dom-breakpoints.html
 inspector/debugger/event-listener-breakpoints.html
 inspector/debugger/step-through-event-listeners.html
 inspector/debugger/xhr-breakpoints.html
+
+# JSC doesn't support heap profiling
+# https://bugs.webkit.org/show_bug.cgi?id=50485
+inspector/profiler/heap-snapshot-inspect-dom-wrapper.html
+inspector/profiler/heap-snapshot-comparison-dom-groups-change.html
 
 # Skipping newly added tests while I'm finding out what is wrong.
 # https://bugs.webkit.org/show_bug.cgi?id=59706
@@ -351,6 +357,7 @@ compositing/webgl/webgl-nonpremultiplied-blend.html
 editing/pasteboard/data-transfer-items.html
 editing/pasteboard/data-transfer-items-image-png.html
 editing/pasteboard/data-transfer-items-drag-drop-file.html
+editing/pasteboard/data-transfer-items-drag-drop-entry.html
 editing/pasteboard/data-transfer-items-drag-drop-string.html
 fast/events/clipboard-dataTransferItemList.html
 fast/events/drag-dataTransferItemList.html
@@ -431,6 +438,11 @@ fast/css-grid-layout
 
 # <style scoped> is not yet enabled. http://webkit.org/b/49142
 fast/css/style-scoped
+# CSS Regions tests for region styling and scoped styles
+fast/regions/style-scoped-in-flow-override-container-style.html
+fast/regions/style-scoped-in-flow-override-region-styling-multiple-regions.html
+fast/regions/style-scoped-in-flow-override-region-styling.html
+fast/regions/style-scoped-in-flow.html
 
 # ENABLE(SHADOW_DOM) is disabled.
 fast/dom/shadow
@@ -447,6 +459,9 @@ compositing/rtl/rtl-iframe-fixed-overflow.html
 compositing/rtl/rtl-iframe-fixed.html
 compositing/rtl/rtl-iframe-relative.html
 
+# https://bugs.webkit.org/show_bug.cgi?id=82554
+compositing/rtl/rtl-fixed-overflow-scrolled.html
+
 # For now, Web Audio API is disabled
 webaudio/
 
@@ -462,6 +477,10 @@ http/tests/security/text-track-crossorigin.html
 # Tests for MediaSource API. Feature is not yet functional.
 # https://bugs.webkit.org/show_bug.cgi?id=64731
 http/tests/media/media-source/
+
+# Encrypted Media Extensions are not enabled.
+media/encrypted-media/
+fast/events/constructors/media-key-event-constructor.html
 
 # REGRESSION (r91547): scrollbars/scrollbar-drag-thumb-with-large-content.html failing on SnowLeopard Intel Release (Tests)
 # https://bugs.webkit.org/show_bug.cgi?id=65434
@@ -576,6 +595,9 @@ canvas/philip/tests/2d.shadow.image.transparent.2.html
 # Needs BatteryClient implementation.
 batterystatus/
 
+#Network Information is not supported yet. http://webkit.org/b/73528
+networkinformation
+
 # https://bugs.webkit.org/show_bug.cgi?id=43022
 tables/mozilla_expected_failures/bugs/bug85016.html
 
@@ -592,7 +614,6 @@ canvas/philip/tests/2d.path.arc.scale.1.html
 
 # Media tests that time out unexpectedly
 # https://bugs.webkit.org/show_bug.cgi?id=81604
-http/tests/media/video-buffering-repaints-controls.html
 http/tests/media/video-useragent.html
 media/audio-garbage-collect.html
  
@@ -618,5 +639,156 @@ fast/repaint/scroll-inside-table-cell.html
 fast/repaint/scroll-relative-table-inside-table-cell.html
 fast/table/cell-pref-width-invalidation.html
 
+# https://bugs.webkit.org/show_bug.cgi?id=82628
+svg/hittest/svg-ellipse-non-scale-stroke.xhtml
+
 # The inner <input> should now grow to take the full cell's height.
 fast/table/colspanMinWidth-vertical.html
+
+# Has failed since its introduction in r105826. Skipped everywhere but chromium.
+fast/events/dropzone-005.html
+
+# Spelling tests that are flakey. https://bugs.webkit.org/show_bug.cgi?id=82555
+editing/spelling/spellcheck-async-mutation.html
+platform/mac/editing/spelling/move-cursor-to-beginning-of-autocorrected-word.html
+platform/mac/editing/spelling/move-cursor-to-autocorrected-word.html
+platform/mac/editing/spelling/forward-delete-into-autocorrected-word.html
+platform/mac/editing/spelling/editing-word-with-marker-1.html
+platform/mac/editing/spelling/delete-into-autocorrected-word.html
+platform/mac/editing/spelling/click-autocorrected-word.html
+platform/mac/editing/spelling/autocorrection-contraction.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82665
+http/tests/webarchive/test-css-url-encoding-shift-jis.html
+http/tests/webarchive/test-css-url-encoding-utf-8.html
+http/tests/webarchive/test-css-url-encoding.html
+webarchive/test-css-url-resources-in-stylesheets.html
+webarchive/test-css-url-resources-inline-styles.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82668
+plugins/mouse-events.html
+plugins/mouse-move-over-plugin-in-frame.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82671
+http/tests/inspector/console-cross-origin-iframe-logging.html
+http/tests/inspector/inspect-element.html
+http/tests/inspector/resource-har-conversion.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82672
+http/tests/xmlhttprequest/range-test.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82675
+http/tests/local/link-stylesheet-load-order.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82744
+fast/css/font-face-data-uri.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82746
+fast/block/float/float-in-float-hit-testing.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82747
+fast/events/scroll-div-with-prevent-default-in-subframe.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82748
+fast/frames/flattening/frameset-flattening-advanced.html
+fast/frames/flattening/frameset-flattening-simple.html
+fast/frames/flattening/frameset-flattening-subframesets.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82749
+http/tests/cookies/simple-cookies-expired.html
+http/tests/cookies/simple-cookies-max-age.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82750
+http/tests/navigation/javascriptlink-frames.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82751
+http/tests/security/cross-frame-access-put.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82752
+plugins/netscape-dom-access-and-reload.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82761
+fast/forms/search-event-delay.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82762
+fast/animation/request-animation-frame-during-modal.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82763
+fast/forms/placeholder-set-attribute.html
+fast/forms/search-placeholder-value-changed.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82805
+fast/canvas/webgl/framebuffer-object-attachment.html
+fast/canvas/webgl/object-deletion-behaviour.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82815
+svg/custom/animate-disallowed-use-element.svg
+svg/dom/animated-tearoff-equality.xhtml
+
+# https://bugs.webkit.org/show_bug.cgi?id=82817
+storage/domstorage/localstorage/storagetracker/storage-tracker-1-prepare.html
+storage/domstorage/localstorage/storagetracker/storage-tracker-2-create.html
+storage/domstorage/localstorage/storagetracker/storage-tracker-6-create.html
+storage/domstorage/localstorage/storagetracker/storage-tracker-7-usage.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82923
+inspector/styles/override-screen-size.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82932
+inspector/profiler/cpu-profiler-profiling.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82934
+storage/domstorage/localstorage/storagetracker/storage-tracker-3-delete-all.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82943
+inspector/debugger/copy-stack-trace.html
+inspector/debugger/callstack-placards-discarded.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82972
+plugins/keyboard-events.html
+plugins/layout-in-beforeload-listener-affects-plugin-loading.html
+plugins/mouse-events-fixedpos.html
+plugins/multiple-plugins.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82976
+media/W3C/video/networkState/networkState_during_progress.html
+media/video-poster-blocked-by-willsendrequest.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82978
+inspector/styles/svg-style.xhtml
+
+# https://bugs.webkit.org/show_bug.cgi?id=82979
+fast/canvas/2d.text.draw.fill.maxWidth.gradient.html
+canvas/philip/tests/2d.text.draw.align.center.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82980
+http/tests/navigation/back-twice-without-commit.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82981
+http/tests/misc/favicon-loads-with-icon-loading-override.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82982
+fast/dom/jsDevicePixelRatio.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=82886
+inspector/styles/override-screen-size.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=83239
+fast/animation/request-animation-frame-during-modal.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=77754
+# https://bugs.webkit.org/show_bug.cgi?id=83489
+# window.resizeTo() does not seem to work as expected in Mac DRT. The outerWidth changes after a resizeTo()
+# but not the innerWidth. The test passes on Qt, GTK and Chromium.
+fast/css/align-positioned-object-on-resize.html
+fast/media/media-query-list-08.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=83618
+fast/dom/inline-event-attributes-release.html
+
+# https://bugs.webkit.org/show_bug.cgi?id=84102
+fast/profiler/stop-profiling-after-setTimeout.html
+fast/profiler/dead-time.html
+
+# Requires rebaseline after bug 83978
+tables/mozilla_expected_failures/collapsing_borders/bug41262-5.html

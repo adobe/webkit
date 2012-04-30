@@ -26,13 +26,15 @@
 #include "config.h"
 #include "platform/WebLayer.h"
 
-#include "platform/WebFloatPoint.h"
 #include "Color.h"
 #include "LayerChromium.h"
 #include "SkMatrix44.h"
 #include "TransformationMatrix.h"
 #include "WebLayerImpl.h"
-#include "platform/WebSize.h"
+#include <public/WebFilterOperations.h>
+#include <public/WebFloatPoint.h>
+#include <public/WebFloatRect.h>
+#include <public/WebSize.h>
 
 using namespace WebCore;
 
@@ -92,6 +94,16 @@ void WebLayer::assign(const WebLayer& other)
 bool WebLayer::equals(const WebLayer& n) const
 {
     return (m_private.get() == n.m_private.get());
+}
+
+void WebLayer::invalidateRect(const WebFloatRect& dirtyRect)
+{
+    m_private->setNeedsDisplayRect(dirtyRect);
+}
+
+void WebLayer::invalidate()
+{
+    m_private->setNeedsDisplay();
 }
 
 WebLayer WebLayer::rootLayer() const
@@ -239,6 +251,16 @@ void WebLayer::setDebugBorderColor(const WebColor& color)
 void WebLayer::setDebugBorderWidth(float width)
 {
     m_private->setDebugBorderWidth(width);
+}
+
+void WebLayer::setFilters(const WebFilterOperations& filters)
+{
+    m_private->setFilters(filters.toFilterOperations());
+}
+
+void WebLayer::setBackgroundFilters(const WebFilterOperations& filters)
+{
+    m_private->setBackgroundFilters(filters.toFilterOperations());
 }
 
 WebLayer::WebLayer(const PassRefPtr<LayerChromium>& node)

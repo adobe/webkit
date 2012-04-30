@@ -24,6 +24,7 @@
 #include "WebKitBackForwardListPrivate.h"
 #include "WebKitEnumTypes.h"
 #include "WebKitError.h"
+#include "WebKitFullscreenClient.h"
 #include "WebKitHitTestResultPrivate.h"
 #include "WebKitJavascriptResultPrivate.h"
 #include "WebKitLoaderClient.h"
@@ -31,10 +32,12 @@
 #include "WebKitPolicyClient.h"
 #include "WebKitPrintOperationPrivate.h"
 #include "WebKitPrivate.h"
+#include "WebKitResourceLoadClient.h"
 #include "WebKitScriptDialogPrivate.h"
 #include "WebKitSettingsPrivate.h"
 #include "WebKitUIClient.h"
 #include "WebKitWebContextPrivate.h"
+#include "WebKitWebResourcePrivate.h"
 #include "WebKitWebViewBasePrivate.h"
 #include "WebKitWebViewPrivate.h"
 #include "WebKitWindowPropertiesPrivate.h"
@@ -66,6 +69,11 @@ enum {
 
     PRINT_REQUESTED,
 
+    RESOURCE_LOAD_STARTED,
+
+    ENTER_FULLSCREEN,
+    LEAVE_FULLSCREEN,
+
     LAST_SIGNAL
 };
 
@@ -86,6 +94,9 @@ typedef enum {
     DidReplaceContent
 } ReplaceContentStatus;
 
+typedef HashMap<uint64_t, GRefPtr<WebKitWebResource> > LoadingResourcesMap;
+typedef HashMap<String, GRefPtr<WebKitWebResource> > ResourcesMap;
+
 struct _WebKitWebViewPrivate {
     WebKitWebContext* context;
     CString title;
@@ -103,6 +114,10 @@ struct _WebKitWebViewPrivate {
 
     GRefPtr<WebKitFindController> findController;
     JSGlobalContextRef javascriptGlobalContext;
+
+    GRefPtr<WebKitWebResource> mainResource;
+    LoadingResourcesMap loadingResourcesMap;
+    ResourcesMap subresourcesMap;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
@@ -205,6 +220,8 @@ static void webkitWebViewConstructed(GObject* object)
     attachLoaderClientToView(webView);
     attachUIClientToView(webView);
     attachPolicyClientToPage(webView);
+    attachResourceLoadClientToView(webView);
+    attachFullScreenClientToView(webView);
 
     WebPageProxy* page = webkitWebViewBaseGetPage(webViewBase);
     priv->backForwardList = adoptGRef(webkitBackForwardListCreate(WKPageGetBackForwardList(toAPI(page))));
@@ -672,6 +689,74 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
                      webkit_marshal_BOOLEAN__OBJECT,
                      G_TYPE_BOOLEAN, 1,
                      WEBKIT_TYPE_PRINT_OPERATION);
+
+    /**
+     * WebKitWebView::resource-load-started:
+     * @web_view: the #WebKitWebView on which the signal is emitted
+     * @resource: a #WebKitWebResource
+     * @request: a #WebKitURIRequest
+     *
+     * Emitted when a new resource is going to be loaded. The @request parameter
+     * contains the #WebKitURIRequest that will be sent to the server.
+     * You can monitor the load operation by connecting to the different signals
+     * of @resource.
+     */
+    signals[RESOURCE_LOAD_STARTED] =
+        g_signal_new("resource-load-started",
+                     G_TYPE_FROM_CLASS(webViewClass),
+                     G_SIGNAL_RUN_LAST,
+                     G_STRUCT_OFFSET(WebKitWebViewClass, resource_load_started),
+                     0, 0,
+                     webkit_marshal_VOID__OBJECT_OBJECT,
+                     G_TYPE_NONE, 2,
+                     WEBKIT_TYPE_WEB_RESOURCE,
+                     WEBKIT_TYPE_URI_REQUEST);
+
+    /**
+     * WebKitWebView::enter-fullscreen:
+     * @web_view: the #WebKitWebView on which the signal is emitted.
+     *
+     * Emitted when JavaScript code calls
+     * <function>element.webkitRequestFullScreen</function>. If the
+     * signal is not handled the #WebKitWebView will proceed to full screen
+     * its top level window. This signal can be used by client code to
+     * request permission to the user prior doing the full screen
+     * transition and eventually prepare the top-level window
+     * (e.g. hide some widgets that would otherwise be part of the
+     * full screen window).
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *    %FALSE to continue emission of the event.
+     */
+    signals[ENTER_FULLSCREEN] =
+        g_signal_new("enter-fullscreen",
+                     G_TYPE_FROM_CLASS(webViewClass),
+                     G_SIGNAL_RUN_LAST,
+                     G_STRUCT_OFFSET(WebKitWebViewClass, enter_fullscreen),
+                     g_signal_accumulator_true_handled, 0,
+                     webkit_marshal_BOOLEAN__VOID,
+                     G_TYPE_BOOLEAN, 0);
+
+    /**
+     * WebKitWebView::leave-fullscreen:
+     * @web_view: the #WebKitWebView on which the signal is emitted.
+     *
+     * Emitted when the #WebKitWebView is about to restore its top level
+     * window out of its full screen state. This signal can be used by
+     * client code to restore widgets hidden during the
+     * #WebKitWebView::enter-fullscreen stage for instance.
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *    %FALSE to continue emission of the event.
+     */
+    signals[LEAVE_FULLSCREEN] =
+        g_signal_new("leave-fullscreen",
+                     G_TYPE_FROM_CLASS(webViewClass),
+                     G_SIGNAL_RUN_LAST,
+                     G_STRUCT_OFFSET(WebKitWebViewClass, leave_fullscreen),
+                     g_signal_accumulator_true_handled, 0,
+                     webkit_marshal_BOOLEAN__VOID,
+                     G_TYPE_BOOLEAN, 0);
 }
 
 static bool updateReplaceContentStatus(WebKitWebView* webView, WebKitLoadEvent loadEvent)
@@ -695,6 +780,12 @@ static bool updateReplaceContentStatus(WebKitWebView* webView, WebKitLoadEvent l
 
 void webkitWebViewLoadChanged(WebKitWebView* webView, WebKitLoadEvent loadEvent)
 {
+    if (loadEvent == WEBKIT_LOAD_STARTED) {
+        webView->priv->loadingResourcesMap.clear();
+        webView->priv->mainResource = 0;
+    } else if (loadEvent == WEBKIT_LOAD_COMMITTED)
+        webView->priv->subresourcesMap.clear();
+
     if (updateReplaceContentStatus(webView, loadEvent))
         return;
 
@@ -826,6 +917,71 @@ void webkitWebViewPrintFrame(WebKitWebView* webView, WKFrameRef wkFrame)
     if (response == WEBKIT_PRINT_OPERATION_RESPONSE_CANCEL)
         return;
     g_signal_connect(printOperation.leakRef(), "finished", G_CALLBACK(g_object_unref), 0);
+}
+
+static inline bool webkitWebViewIsReplacingContentOrDidReplaceContent(WebKitWebView* webView)
+{
+    return (webView->priv->replaceContentStatus == ReplacingContent || webView->priv->replaceContentStatus == DidReplaceContent);
+}
+
+void webkitWebViewResourceLoadStarted(WebKitWebView* webView, WKFrameRef wkFrame, uint64_t resourceIdentifier, WebKitURIRequest* request, bool isMainResource)
+{
+    if (webkitWebViewIsReplacingContentOrDidReplaceContent(webView))
+        return;
+
+    WebKitWebViewPrivate* priv = webView->priv;
+    WebKitWebResource* resource = webkitWebResourceCreate(wkFrame, request, isMainResource);
+    if (WKFrameIsMainFrame(wkFrame) && isMainResource)
+        priv->mainResource = resource;
+    priv->loadingResourcesMap.set(resourceIdentifier, adoptGRef(resource));
+    g_signal_emit(webView, signals[RESOURCE_LOAD_STARTED], 0, resource, request);
+}
+
+WebKitWebResource* webkitWebViewGetLoadingWebResource(WebKitWebView* webView, uint64_t resourceIdentifier)
+{
+    if (webkitWebViewIsReplacingContentOrDidReplaceContent(webView))
+        return 0;
+
+    GRefPtr<WebKitWebResource> resource = webView->priv->loadingResourcesMap.get(resourceIdentifier);
+    ASSERT(resource.get());
+    return resource.get();
+}
+
+void webkitWebViewRemoveLoadingWebResource(WebKitWebView* webView, uint64_t resourceIdentifier)
+{
+    if (webkitWebViewIsReplacingContentOrDidReplaceContent(webView))
+        return;
+
+    WebKitWebViewPrivate* priv = webView->priv;
+    ASSERT(priv->loadingResourcesMap.contains(resourceIdentifier));
+    priv->loadingResourcesMap.remove(resourceIdentifier);
+}
+
+WebKitWebResource* webkitWebViewResourceLoadFinished(WebKitWebView* webView, uint64_t resourceIdentifier)
+{
+    if (webkitWebViewIsReplacingContentOrDidReplaceContent(webView))
+        return 0;
+
+    WebKitWebViewPrivate* priv = webView->priv;
+    WebKitWebResource* resource = webkitWebViewGetLoadingWebResource(webView, resourceIdentifier);
+    if (resource != priv->mainResource)
+        priv->subresourcesMap.set(String::fromUTF8(webkit_web_resource_get_uri(resource)), resource);
+    webkitWebViewRemoveLoadingWebResource(webView, resourceIdentifier);
+    return resource;
+}
+
+bool webkitWebViewEnterFullScreen(WebKitWebView* webView)
+{
+    gboolean returnValue;
+    g_signal_emit(webView, signals[ENTER_FULLSCREEN], 0, &returnValue);
+    return !returnValue;
+}
+
+bool webkitWebViewLeaveFullScreen(WebKitWebView* webView)
+{
+    gboolean returnValue;
+    g_signal_emit(webView, signals[LEAVE_FULLSCREEN], 0, &returnValue);
+    return !returnValue;
 }
 
 /**
@@ -1608,4 +1764,43 @@ WebKitJavascriptResult* webkit_web_view_run_javascript_finish(WebKitWebView* web
 
     WebKitJavascriptResult* scriptResult = static_cast<WebKitJavascriptResult*>(g_simple_async_result_get_op_res_gpointer(simpleResult));
     return scriptResult ? webkit_javascript_result_ref(scriptResult) : 0;
+}
+
+/**
+ * webkit_web_view_get_main_resource:
+ * @web_view: a #WebKitWebView
+ *
+ * Return the main resource of @web_view.
+ * See also webkit_web_view_get_subresources():
+ *
+ * Returns: (transfer none): the main #WebKitWebResource of the view
+ *    or %NULL if nothing has been loaded.
+ */
+WebKitWebResource* webkit_web_view_get_main_resource(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    return webView->priv->mainResource.get();
+}
+
+/**
+ * webkit_web_view_get_subresources:
+ * @web_view: a #WebKitWebView
+ *
+ * Return the list of subresources of @web_view.
+ * See also webkit_web_view_get_main_resource().
+ *
+ * Returns: (element-type WebKitWebResource) (transfer container): a list of #WebKitWebResource.
+ */
+GList* webkit_web_view_get_subresources(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    GList* subresources = 0;
+    WebKitWebViewPrivate* priv = webView->priv;
+    ResourcesMap::const_iterator end = priv->subresourcesMap.end();
+    for (ResourcesMap::const_iterator it = priv->subresourcesMap.begin(); it != end; ++it)
+        subresources = g_list_prepend(subresources, it->second.get());
+
+    return g_list_reverse(subresources);
 }

@@ -29,6 +29,7 @@
 #if USE(CG)
 #include "ImageSourceCG.h"
 
+#include "ImageOrientation.h"
 #include "IntPoint.h"
 #include "IntSize.h"
 #include "MIMETypeRegistry.h"
@@ -108,15 +109,25 @@ void ImageSource::clear(bool destroyAllFrames, size_t, SharedBuffer* data, bool 
         setData(data, allDataReceived);
 }
 
-static CFDictionaryRef imageSourceOptions(ImageSource::ShouldSkipMetaData skipMetaData)
+static CFDictionaryRef imageSourceOptions(ImageSource::ShouldSkipMetadata skipMetadata)
 {
     static CFDictionaryRef options;
 
     if (!options) {
         const unsigned numOptions = 3;
-        const CFBooleanRef imageSourceSkipMetaData = (skipMetaData == ImageSource::SkipMetaData) ? kCFBooleanTrue : kCFBooleanFalse;
+
+#if defined(BUILDING_ON_LION) || defined(BUILDING_ON_SNOW_LEOPARD)
+        // Lion and Snow Leopard only return Orientation when kCGImageSourceSkipMetaData is false,
+        // and incorrectly return cached metadata if an image is queried once with kCGImageSourceSkipMetaData true
+        // and then subsequently with kCGImageSourceSkipMetaData false.
+        // <rdar://problem/11148192>
+        UNUSED_PARAM(skipMetadata);
+        const CFBooleanRef imageSourceSkipMetadata = kCFBooleanFalse;
+#else
+        const CFBooleanRef imageSourceSkipMetadata = (skipMetadata == ImageSource::SkipMetadata) ? kCFBooleanTrue : kCFBooleanFalse;
+#endif
         const void* keys[numOptions] = { kCGImageSourceShouldCache, kCGImageSourceShouldPreferRGB32, kCGImageSourceSkipMetaData };
-        const void* values[numOptions] = { kCFBooleanTrue, kCFBooleanTrue, imageSourceSkipMetaData };
+        const void* values[numOptions] = { kCFBooleanTrue, kCFBooleanTrue, imageSourceSkipMetadata };
         options = CFDictionaryCreate(NULL, keys, values, numOptions, 
             &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     }
@@ -174,7 +185,7 @@ bool ImageSource::isSizeAvailable()
 
     // Ragnaros yells: TOO SOON! You have awakened me TOO SOON, Executus!
     if (imageSourceStatus >= kCGImageStatusIncomplete) {
-        RetainPtr<CFDictionaryRef> image0Properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, 0, imageSourceOptions(SkipMetaData)));
+        RetainPtr<CFDictionaryRef> image0Properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, 0, imageSourceOptions(SkipMetadata)));
         if (image0Properties) {
             CFNumberRef widthNumber = (CFNumberRef)CFDictionaryGetValue(image0Properties.get(), kCGImagePropertyPixelWidth);
             CFNumberRef heightNumber = (CFNumberRef)CFDictionaryGetValue(image0Properties.get(), kCGImagePropertyPixelHeight);
@@ -185,31 +196,50 @@ bool ImageSource::isSizeAvailable()
     return result;
 }
 
-IntSize ImageSource::frameSizeAtIndex(size_t index) const
+IntSize ImageSource::frameSizeAtIndex(size_t index, RespectImageOrientationEnum shouldRespectOrientation) const
 {
-    IntSize result;
-    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, index, imageSourceOptions(SkipMetaData)));
-    if (properties) {
-        int w = 0, h = 0;
-        CFNumberRef num = (CFNumberRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyPixelWidth);
-        if (num)
-            CFNumberGetValue(num, kCFNumberIntType, &w);
-        num = (CFNumberRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyPixelHeight);
-        if (num)
-            CFNumberGetValue(num, kCFNumberIntType, &h);
-        result = IntSize(w, h);
-    }
-    return result;
+    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, index, imageSourceOptions(SkipMetadata)));
+
+    if (!properties)
+        return IntSize();
+
+    int w = 0, h = 0;
+    CFNumberRef num = (CFNumberRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyPixelWidth);
+    if (num)
+        CFNumberGetValue(num, kCFNumberIntType, &w);
+    num = (CFNumberRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyPixelHeight);
+    if (num)
+        CFNumberGetValue(num, kCFNumberIntType, &h);
+
+    if ((shouldRespectOrientation == RespectImageOrientation) && orientationAtIndex(index).usesWidthAsHeight())
+        return IntSize(h, w);
+
+    return IntSize(w, h);
 }
 
-IntSize ImageSource::size() const
+ImageOrientation ImageSource::orientationAtIndex(size_t index) const
 {
-    return frameSizeAtIndex(0);
+    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, index, imageSourceOptions(SkipMetadata)));
+    if (!properties)
+        return DefaultImageOrientation;
+
+    CFNumberRef orientationProperty = (CFNumberRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyOrientation);
+    if (!orientationProperty)
+        return DefaultImageOrientation;
+
+    int exifValue;
+    CFNumberGetValue(orientationProperty, kCFNumberIntType, &exifValue);
+    return ImageOrientation::fromEXIFValue(exifValue);
+}
+
+IntSize ImageSource::size(RespectImageOrientationEnum shouldRespectOrientation) const
+{
+    return frameSizeAtIndex(0, shouldRespectOrientation);
 }
 
 bool ImageSource::getHotSpot(IntPoint& hotSpot) const
 {
-    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, 0, imageSourceOptions(SkipMetaData)));
+    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, 0, imageSourceOptions(SkipMetadata)));
     if (!properties)
         return false;
 
@@ -246,7 +276,7 @@ int ImageSource::repetitionCount()
     if (!initialized())
         return result;
 
-    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyProperties(m_decoder, imageSourceOptions(SkipMetaData)));
+    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyProperties(m_decoder, imageSourceOptions(SkipMetadata)));
     if (properties) {
         CFDictionaryRef gifProperties = (CFDictionaryRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyGIFDictionary);
         if (gifProperties) {
@@ -274,7 +304,7 @@ CGImageRef ImageSource::createFrameAtIndex(size_t index)
     if (!initialized())
         return 0;
 
-    RetainPtr<CGImageRef> image(AdoptCF, CGImageSourceCreateImageAtIndex(m_decoder, index, imageSourceOptions(SkipMetaData)));
+    RetainPtr<CGImageRef> image(AdoptCF, CGImageSourceCreateImageAtIndex(m_decoder, index, imageSourceOptions(SkipMetadata)));
     CFStringRef imageUTI = CGImageSourceGetType(m_decoder);
     static const CFStringRef xbmUTI = CFSTR("public.xbitmap-image");
     if (!imageUTI || !CFEqual(imageUTI, xbmUTI))
@@ -315,7 +345,7 @@ float ImageSource::frameDurationAtIndex(size_t index)
         return 0;
 
     float duration = 0;
-    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, index, imageSourceOptions(SkipMetaData)));
+    RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, index, imageSourceOptions(SkipMetadata)));
     if (properties) {
         CFDictionaryRef typeProperties = (CFDictionaryRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyGIFDictionary);
         if (typeProperties) {

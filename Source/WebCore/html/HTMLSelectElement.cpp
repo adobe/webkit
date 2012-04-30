@@ -276,8 +276,11 @@ void HTMLSelectElement::parseAttribute(Attribute* attr)
         // This is important since the style rules for this attribute can determine the appearance property.
         int size = attr->value().toInt();
         String attrSize = String::number(size);
-        if (attrSize != attr->value())
-            attr->setValue(attrSize);
+        if (attrSize != attr->value()) {
+            // FIXME: This is horribly factored.
+            if (Attribute* sizeAttribute = getAttributeItem(sizeAttr))
+                sizeAttribute->setValue(attrSize);
+        }
         size = max(size, 1);
 
         // Ensure that we've determined selectedness of the items at least once prior to changing the size.
@@ -1472,13 +1475,14 @@ void HTMLSelectElement::typeAheadFind(KeyboardEvent* event)
     }
 }
 
-void HTMLSelectElement::insertedIntoTree(bool deep)
+Node::InsertionNotificationRequest HTMLSelectElement::insertedInto(Node* insertionPoint)
 {
     // When the element is created during document parsing, it won't have any
     // items yet - but for innerHTML and related methods, this method is called
     // after the whole subtree is constructed.
     recalcListItems();
-    HTMLFormControlElementWithState::insertedIntoTree(deep);
+    HTMLFormControlElementWithState::insertedInto(insertionPoint);
+    return InsertionDone;
 }
 
 void HTMLSelectElement::accessKeySetSelectedIndex(int index)

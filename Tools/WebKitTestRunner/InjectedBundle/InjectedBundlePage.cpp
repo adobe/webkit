@@ -235,6 +235,11 @@ InjectedBundlePage::InjectedBundlePage(WKBundlePageRef page)
         0, // didLayoutForFrame
         0, // didNewFirstVisuallyNonEmptyLayoutForFrame
         didDetectXSSForFrame,
+        0, // shouldGoToBackForwardListItem
+        0, // didCreateGlobalObjectForFrame
+        0, // willDisconnectDOMWindowExtensionFromGlobalObject
+        0, // didReconnectDOMWindowExtensionToGlobalObject
+        0, // willDestroyGlobalObjectForDOMWindowExtension
     };
     WKBundlePageSetPageLoaderClient(m_page, &loaderClient);
 
@@ -1209,16 +1214,22 @@ void InjectedBundlePage::enterFullScreenForElement(WKBundlePageRef pageRef, WKBu
 {
     if (InjectedBundle::shared().layoutTestController()->shouldDumpFullScreenCallbacks())
         InjectedBundle::shared().stringBuilder()->append("enterFullScreenForElement()\n");
-    WKBundlePageWillEnterFullScreen(pageRef);
-    WKBundlePageDidEnterFullScreen(pageRef);
+
+    if (!InjectedBundle::shared().layoutTestController()->hasCustomFullScreenBehavior()) {
+        WKBundlePageWillEnterFullScreen(pageRef);
+        WKBundlePageDidEnterFullScreen(pageRef);
+    }
 }
 
 void InjectedBundlePage::exitFullScreenForElement(WKBundlePageRef pageRef, WKBundleNodeHandleRef elementRef)
 {
     if (InjectedBundle::shared().layoutTestController()->shouldDumpFullScreenCallbacks())
         InjectedBundle::shared().stringBuilder()->append("exitFullScreenForElement()\n");
-    WKBundlePageWillExitFullScreen(pageRef);
-    WKBundlePageDidExitFullScreen(pageRef);
+
+    if (!InjectedBundle::shared().layoutTestController()->hasCustomFullScreenBehavior()) {
+        WKBundlePageWillExitFullScreen(pageRef);
+        WKBundlePageDidExitFullScreen(pageRef);
+    }
 }
 
 void InjectedBundlePage::beganEnterFullScreen(WKBundlePageRef, WKRect, WKRect)

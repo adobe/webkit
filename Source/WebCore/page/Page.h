@@ -49,12 +49,15 @@ namespace JSC {
 
 namespace WebCore {
 
+    class AlternativeTextClient;
     class BackForwardController;
     class BackForwardList;
     class Chrome;
     class ChromeClient;
+#if ENABLE(CONTEXT_MENUS)
     class ContextMenuClient;
     class ContextMenuController;
+#endif
     class Document;
     class DragCaretController;
     class DragClient;
@@ -63,8 +66,6 @@ namespace WebCore {
     class FocusController;
     class Frame;
     class FrameSelection;
-    class GeolocationClient;
-    class GeolocationController;
     class HaltablePlugin;
     class HistoryItem;
     class InspectorClient;
@@ -103,12 +104,14 @@ namespace WebCore {
             PageClients();
             ~PageClients();
 
+            AlternativeTextClient* alternativeTextClient;
             ChromeClient* chromeClient;
+#if ENABLE(CONTEXT_MENUS)
             ContextMenuClient* contextMenuClient;
+#endif
             EditorClient* editorClient;
             DragClient* dragClient;
             InspectorClient* inspectorClient;
-            GeolocationClient* geolocationClient;
             RefPtr<BackForwardList> backForwardClient;
         };
 
@@ -166,9 +169,6 @@ namespace WebCore {
 #endif
 #if ENABLE(INSPECTOR)
         InspectorController* inspectorController() const { return m_inspectorController.get(); }
-#endif
-#if ENABLE(GEOLOCATION)
-        GeolocationController* geolocationController() const { return m_geolocationController.get(); }
 #endif
 #if ENABLE(POINTER_LOCK)
         PointerLockController* pointerLockController() const { return m_pointerLockController.get(); }
@@ -273,6 +273,7 @@ namespace WebCore {
         
         void suspendScriptedAnimations();
         void resumeScriptedAnimations();
+        bool scriptedAnimationsSuspended() const { return m_scriptedAnimationsSuspended; }
         
         void userStyleSheetLocationChanged();
         const String& userStyleSheet() const;
@@ -331,6 +332,12 @@ namespace WebCore {
 
         void suspendActiveDOMObjectsAndAnimations();
         void resumeActiveDOMObjectsAndAnimations();
+#ifndef NDEBUG
+        void setIsPainting(bool painting) { m_isPainting = painting; }
+        bool isPainting() const { return m_isPainting; }
+#endif
+
+        AlternativeTextClient* alternativeTextClient() const { return m_alternativeTextClient; }
 
     private:
         void initGroup();
@@ -358,9 +365,6 @@ namespace WebCore {
 #endif
 #if ENABLE(INSPECTOR)
         OwnPtr<InspectorController> m_inspectorController;
-#endif
-#if ENABLE(GEOLOCATION)
-        OwnPtr<GeolocationController> m_geolocationController;
 #endif
 #if ENABLE(POINTER_LOCK)
         OwnPtr<PointerLockController> m_pointerLockController;
@@ -431,6 +435,12 @@ namespace WebCore {
         Region m_relevantPaintedRegion;
         Region m_relevantUnpaintedRegion;
         bool m_isCountingRelevantRepaintedObjects;
+#ifndef NDEBUG
+        bool m_isPainting;
+#endif
+        AlternativeTextClient* m_alternativeTextClient;
+
+        bool m_scriptedAnimationsSuspended;
     };
 
 } // namespace WebCore

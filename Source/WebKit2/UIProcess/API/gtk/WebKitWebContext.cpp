@@ -21,6 +21,7 @@
 #include "WebKitWebContext.h"
 
 #include "WebContext.h"
+#include "WebKitCookieManagerPrivate.h"
 #include "WebKitDownloadClient.h"
 #include "WebKitDownloadPrivate.h"
 #include "WebKitPrivate.h"
@@ -39,6 +40,8 @@ enum {
 
 struct _WebKitWebContextPrivate {
     WKRetainPtr<WKContextRef> context;
+
+    GRefPtr<WebKitCookieManager> cookieManager;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
@@ -84,12 +87,11 @@ static void webkit_web_context_class_init(WebKitWebContextClass* webContextClass
 
 static gpointer createDefaultWebContext(gpointer)
 {
-    WebKitWebContext* webContext = WEBKIT_WEB_CONTEXT(g_object_new(WEBKIT_TYPE_WEB_CONTEXT, NULL));
+    static GRefPtr<WebKitWebContext> webContext = adoptGRef(WEBKIT_WEB_CONTEXT(g_object_new(WEBKIT_TYPE_WEB_CONTEXT, NULL)));
     webContext->priv->context = WKContextGetSharedProcessContext();
     WKContextSetCacheModel(webContext->priv->context.get(), kWKCacheModelPrimaryWebBrowser);
-    attachDownloadClientToContext(webContext);
-
-    return webContext;
+    attachDownloadClientToContext(webContext.get());
+    return webContext.get();
 }
 
 /**
@@ -213,6 +215,25 @@ WebKitDownload* webkit_web_context_download_uri(WebKitWebContext* context, const
     WebKitDownload* download = webkitDownloadCreate(wkDownload.get());
     downloadsMap().set(wkDownload.get(), download);
     return download;
+}
+
+/**
+ * webkit_web_context_get_cookie_manager:
+ * @context: a #WebKitWebContext
+ *
+ * Get the #WebKitCookieManager of @context.
+ *
+ * Returns: (transfer none): the #WebKitCookieManager of @context.
+ */
+WebKitCookieManager* webkit_web_context_get_cookie_manager(WebKitWebContext* context)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
+
+    WebKitWebContextPrivate* priv = context->priv;
+    if (!priv->cookieManager)
+        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(WKContextGetCookieManager(priv->context.get())));
+
+    return priv->cookieManager.get();
 }
 
 WebKitDownload* webkitWebContextGetOrCreateDownload(WKDownloadRef wkDownload)

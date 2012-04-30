@@ -34,12 +34,14 @@
 #if ENABLE(WEB_SOCKETS)
 
 #include "WebSocketHandshake.h"
+#include "WebSocket.h"
 
 #include "Base64.h"
 #include "Cookie.h"
 #include "CookieJar.h"
 #include "Document.h"
 #include "HTTPHeaderMap.h"
+#include "HTTPParsers.h"
 #include "KURL.h"
 #include "Logging.h"
 #include "ScriptCallStack.h"
@@ -84,11 +86,11 @@ static String hostName(const KURL& url, bool secure)
     return builder.toString();
 }
 
-static const size_t maxConsoleMessageSize = 128;
-static String trimConsoleMessage(const char* p, size_t len)
+static const size_t maxInputSampleSize = 128;
+static String trimInputSample(const char* p, size_t len)
 {
-    String s = String(p, std::min<size_t>(len, maxConsoleMessageSize));
-    if (len > maxConsoleMessageSize)
+    String s = String(p, std::min<size_t>(len, maxInputSampleSize));
+    if (len > maxInputSampleSize)
         s.append(horizontalEllipsis);
     return s;
 }
@@ -169,7 +171,7 @@ static String generateSecWebSocketKey()
     return base64Encode(reinterpret_cast<char*>(key), nonceSize);
 }
 
-static String getExpectedWebSocketAccept(const String& secWebSocketKey)
+String WebSocketHandshake::getExpectedWebSocketAccept(const String& secWebSocketKey)
 {
     static const char* const webSocketKeyGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     static const size_t sha1HashSize = 20; // FIXME: This should be defined in SHA1.h.
@@ -315,44 +317,44 @@ CString WebSocketHandshake::clientHandshakeMessage() const
     return msg;
 }
 
-WebSocketHandshakeRequest WebSocketHandshake::clientHandshakeRequest() const
+PassRefPtr<WebSocketHandshakeRequest> WebSocketHandshake::clientHandshakeRequest() const
 {
     // Keep the following consistent with clientHandshakeMessage().
     // FIXME: do we need to store m_secWebSocketKey1, m_secWebSocketKey2 and
     // m_key3 in WebSocketHandshakeRequest?
-    WebSocketHandshakeRequest request("GET", m_url);
+    RefPtr<WebSocketHandshakeRequest> request = WebSocketHandshakeRequest::create("GET", m_url);
     if (m_useHixie76Protocol)
-        request.addHeaderField("Upgrade", "WebSocket");
+        request->addHeaderField("Upgrade", "WebSocket");
     else
-        request.addHeaderField("Upgrade", "websocket");
-    request.addHeaderField("Connection", "Upgrade");
-    request.addHeaderField("Host", hostName(m_url, m_secure));
-    request.addHeaderField("Origin", clientOrigin());
+        request->addHeaderField("Upgrade", "websocket");
+    request->addHeaderField("Connection", "Upgrade");
+    request->addHeaderField("Host", hostName(m_url, m_secure));
+    request->addHeaderField("Origin", clientOrigin());
     if (!m_clientProtocol.isEmpty())
-        request.addHeaderField("Sec-WebSocket-Protocol:", m_clientProtocol);
+        request->addHeaderField("Sec-WebSocket-Protocol", m_clientProtocol);
 
     KURL url = httpURLForAuthenticationAndCookies();
     if (m_context->isDocument()) {
         Document* document = static_cast<Document*>(m_context);
         String cookie = cookieRequestHeaderFieldValue(document, url);
         if (!cookie.isEmpty())
-            request.addHeaderField("Cookie", cookie);
+            request->addHeaderField("Cookie", cookie);
         // Set "Cookie2: <cookie>" if cookies 2 exists for url?
     }
 
     if (m_useHixie76Protocol) {
-        request.addHeaderField("Sec-WebSocket-Key1", m_hixie76SecWebSocketKey1);
-        request.addHeaderField("Sec-WebSocket-Key2", m_hixie76SecWebSocketKey2);
-        request.setKey3(m_hixie76Key3);
+        request->addHeaderField("Sec-WebSocket-Key1", m_hixie76SecWebSocketKey1);
+        request->addHeaderField("Sec-WebSocket-Key2", m_hixie76SecWebSocketKey2);
+        request->setKey3(m_hixie76Key3);
     } else {
-        request.addHeaderField("Sec-WebSocket-Key", m_secWebSocketKey);
-        request.addHeaderField("Sec-WebSocket-Version", "13");
+        request->addHeaderField("Sec-WebSocket-Key", m_secWebSocketKey);
+        request->addHeaderField("Sec-WebSocket-Version", "13");
         const String extensionValue = m_extensionDispatcher.createHeaderValue();
         if (extensionValue.length())
-            request.addHeaderField("Sec-WebSocket-Extensions", extensionValue);
+            request->addHeaderField("Sec-WebSocket-Extensions", extensionValue);
     }
 
-    return request;
+    return request.release();
 }
 
 void WebSocketHandshake::reset()
@@ -548,7 +550,7 @@ int WebSocketHandshake::readStatusLine(const char* header, size_t headerLength, 
     }
 
     if (!space1 || !space2) {
-        m_failureReason = "No response code found: " + trimConsoleMessage(header, lineLength - 2);
+        m_failureReason = "No response code found: " + trimInputSample(header, lineLength - 2);
         return lineLength;
     }
 
@@ -573,90 +575,46 @@ const char* WebSocketHandshake::readHTTPHeaders(const char* start, const char* e
 {
     m_response.clearHeaderFields();
 
-    Vector<char> name;
-    Vector<char> value;
+    AtomicString name;
+    String value;
     bool sawSecWebSocketAcceptHeaderField = false;
-    for (const char* p = start; p < end; p++) {
-        name.clear();
-        value.clear();
-
-        for (; p < end; p++) {
-            switch (*p) {
-            case '\r':
-                if (name.isEmpty()) {
-                    if (p + 1 < end && *(p + 1) == '\n')
-                        return p + 2;
-                    m_failureReason = "CR doesn't follow LF at " + trimConsoleMessage(p, end - p);
-                    return 0;
-                }
-                m_failureReason = "Unexpected CR in name at " + trimConsoleMessage(name.data(), name.size());
-                return 0;
-            case '\n':
-                m_failureReason = "Unexpected LF in name at " + trimConsoleMessage(name.data(), name.size());
-                return 0;
-            case ':':
-                break;
-            default:
-                name.append(*p);
-                continue;
-            }
-            if (*p == ':') {
-                ++p;
-                break;
-            }
-        }
-
-        for (; p < end && *p == 0x20; p++) { }
-
-        for (; p < end; p++) {
-            switch (*p) {
-            case '\r':
-                break;
-            case '\n':
-                m_failureReason = "Unexpected LF in value at " + trimConsoleMessage(value.data(), value.size());
-                return 0;
-            default:
-                value.append(*p);
-            }
-            if (*p == '\r') {
-                ++p;
-                break;
-            }
-        }
-        if (p >= end || *p != '\n') {
-            m_failureReason = "CR doesn't follow LF after value at " + trimConsoleMessage(p, end - p);
+    bool sawSecWebSocketProtocolHeaderField = false;
+    const char* p = start;
+    for (; p < end; p++) {
+        size_t consumedLength = parseHTTPHeader(p, end - p, m_failureReason, name, value);
+        if (!consumedLength)
             return 0;
-        }
-        AtomicString nameStr = AtomicString::fromUTF8(name.data(), name.size());
-        String valueStr = String::fromUTF8(value.data(), value.size());
-        if (nameStr.isNull()) {
-            m_failureReason = "Invalid UTF-8 sequence in header name";
-            return 0;
-        }
-        if (valueStr.isNull()) {
-            m_failureReason = "Invalid UTF-8 sequence in header value";
-            return 0;
-        }
-        LOG(Network, "name=%s value=%s", nameStr.string().utf8().data(), valueStr.utf8().data());
+        p += consumedLength;
+
+        // Stop once we consumed an empty line.
+        if (name.isEmpty())
+            break;
+
         // Sec-WebSocket-Extensions may be split. We parse and check the
         // header value every time the header appears.
-        if (equalIgnoringCase("sec-websocket-extensions", nameStr)) {
-            if (!m_extensionDispatcher.processHeaderValue(valueStr)) {
+        if (equalIgnoringCase("sec-websocket-extensions", name)) {
+            if (!m_extensionDispatcher.processHeaderValue(value)) {
                 m_failureReason = m_extensionDispatcher.failureReason();
                 return 0;
             }
-        } else if (equalIgnoringCase("Sec-WebSocket-Accept", nameStr)) {
+        } else if (equalIgnoringCase("Sec-WebSocket-Accept", name)) {
             if (sawSecWebSocketAcceptHeaderField) {
                 m_failureReason = "The Sec-WebSocket-Accept header MUST NOT appear more than once in an HTTP response";
                 return 0;
             }
-            m_response.addHeaderField(nameStr, valueStr);
+            m_response.addHeaderField(name, value);
             sawSecWebSocketAcceptHeaderField = true;
+        } else if (equalIgnoringCase("Sec-WebSocket-Protocol", name)) {
+            if (sawSecWebSocketProtocolHeaderField) {
+                m_failureReason = "The Sec-WebSocket-Protocol header MUST NOT appear more than once in an HTTP response";
+                return 0;
+            }
+            m_response.addHeaderField(name, value);
+            sawSecWebSocketProtocolHeaderField = true;
         } else
-            m_response.addHeaderField(nameStr, valueStr);
+            m_response.addHeaderField(name, value);
     }
-    ASSERT_NOT_REACHED();
-    return 0;
+    return p;
 }
 
 bool WebSocketHandshake::checkResponseHeaders()
@@ -718,6 +676,18 @@ bool WebSocketHandshake::checkResponseHeaders()
         if (serverWebSocketAccept != m_expectedAccept) {
             m_failureReason = "Error during WebSocket handshake: Sec-WebSocket-Accept mismatch";
             return false;
+        }
+        if (!serverWebSocketProtocol.isNull()) {
+            if (m_clientProtocol.isEmpty()) {
+                m_failureReason = "Error during WebSocket handshake: Sec-WebSocket-Protocol mismatch";
+                return false;
+            }
+            Vector<String> result;
+            m_clientProtocol.split(String(WebSocket::subProtocolSeperator()), result);
+            if (!result.contains(serverWebSocketProtocol)) {
+                m_failureReason = "Error during WebSocket handshake: Sec-WebSocket-Protocol mismatch";
+                return false;
+            }
         }
     }
     return true;

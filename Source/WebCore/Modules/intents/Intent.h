@@ -31,6 +31,10 @@
 
 #if ENABLE(WEB_INTENTS)
 
+#include "Dictionary.h"
+#include "KURL.h"
+#include "MessagePort.h"
+#include "MessagePortChannel.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -39,27 +43,37 @@
 
 namespace WebCore {
 
+class ScriptState;
 class SerializedScriptValue;
 
 typedef int ExceptionCode;
 
 class Intent : public RefCounted<Intent> {
 public:
-    static PassRefPtr<Intent> create(const String& action, const String& type, PassRefPtr<SerializedScriptValue> data, ExceptionCode&);
+    static PassRefPtr<Intent> create(const String& action, const String& type, PassRefPtr<SerializedScriptValue> data, const MessagePortArray& ports, ExceptionCode&);
+    static PassRefPtr<Intent> create(ScriptState*, const Dictionary&, ExceptionCode&);
 
-    const String& action() const;
-    const String& type() const;
-    SerializedScriptValue* data() const;
+    const String& action() const { return m_action; }
+    const String& type() const { return m_type; }
+    SerializedScriptValue* data() const { return m_data.get(); }
 
-    int identifier() const;
-    void setIdentifier(int);
+    MessagePortChannelArray* messagePorts() const { return m_ports.get(); }
+    const KURL& service() const { return m_service; }
+    const WTF::HashMap<String, String>& extras() const { return m_extras; }
+
+protected:
+    Intent(const String& action, const String& type,
+           PassRefPtr<SerializedScriptValue> data, PassOwnPtr<MessagePortChannelArray> ports,
+           const WTF::HashMap<String, String>& extras, const KURL& service);
 
 private:
-    Intent(const String& action, const String& type, PassRefPtr<SerializedScriptValue> data);
 
     String m_action;
     String m_type;
     RefPtr<SerializedScriptValue> m_data;
+    OwnPtr<MessagePortChannelArray> m_ports;
+    KURL m_service;
+    WTF::HashMap<String, String> m_extras;
 };
 
 } // namespace WebCore

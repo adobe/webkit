@@ -68,6 +68,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/image-decoders/png \
 	-I$(srcdir)/Source/WebCore/platform/leveldb \
 	-I$(srcdir)/Source/WebCore/platform/mediastream \
+	-I$(srcdir)/Source/WebCore/platform/mediastream/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/mock \
 	-I$(srcdir)/Source/WebCore/platform/network \
 	-I$(srcdir)/Source/WebCore/platform/sql \
@@ -287,12 +288,12 @@ endif # END ENABLE_TOUCH_ICON_LOADING
 # ----
 # Color Input API support
 # ----
-if ENABLE_INPUT_COLOR
-FEATURE_DEFINES += ENABLE_INPUT_COLOR=1
-webcore_cppflags += -DENABLE_INPUT_COLOR=1
+if ENABLE_INPUT_TYPE_COLOR
+FEATURE_DEFINES += ENABLE_INPUT_TYPE_COLOR=1
+webcore_cppflags += -DENABLE_INPUT_TYPE_COLOR=1
 else
-webcore_cppflags += -DENABLE_INPUT_COLOR=0
-endif # END ENABLE_INPUT_COLOR
+webcore_cppflags += -DENABLE_INPUT_TYPE_COLOR=0
+endif # END ENABLE_INPUT_TYPE_COLOR
 
 # ----
 # Speech Input API support
@@ -638,6 +639,14 @@ if ENABLE_DEVICE_ORIENTATION
 FEATURE_DEFINES += ENABLE_DEVICE_ORIENTATION=1
 webcore_cppflags += -DENABLE_DEVICE_ORIENTATION=1
 endif  # END ENABLE_DEVICE_ORIENTATION
+
+# ---
+# Web Timing support
+# ---
+if ENABLE_WEB_TIMING
+FEATURE_DEFINES += ENABLE_WEB_TIMING=1
+webcore_cppflags += -DENABLE_WEB_TIMING=1
+endif  # END ENABLE_WEB_TIMING
 
 DerivedSources/WebCore/CSSPropertyNames.cpp: DerivedSources/WebCore/CSSPropertyNames.h
 DerivedSources/WebCore/CSSPropertyNames.h: $(WEBCORE_CSS_PROPERTY_NAMES) $(WebCore)/css/makeprop.pl
@@ -1062,10 +1071,10 @@ ${GENSOURCES_INSPECTOR}/inspector.html: $(WebCore)/inspector/front-end/*.html \
 		$(WebCore)/English.lproj/localizedStrings.js
 	$(AM_V_GEN)
 	$(AM_V_at)mkdir -p ${GENSOURCES_INSPECTOR}/UglifyJS
-	$(AM_V_at)mkdir -p ${GENSOURCES_INSPECTOR}/images
+	$(AM_V_at)mkdir -p ${GENSOURCES_INSPECTOR}/Images
 	$(AM_V_at)cp ${dist_webinspector_DATA} ${GENSOURCES_INSPECTOR}
 	$(AM_V_at)cp ${dist_webinspectoruglifyjs_DATA} ${GENSOURCES_INSPECTOR}/UglifyJS
-	$(AM_V_at)cp ${dist_webinspectorimages_DATA} ${GENSOURCES_INSPECTOR}/images
+	$(AM_V_at)cp ${dist_webinspectorimages_DATA} ${GENSOURCES_INSPECTOR}/Images
 
 webresourcesdir = ${datadir}/webkitgtk-@WEBKITGTK_API_VERSION@/images
 dist_webresources_DATA = \

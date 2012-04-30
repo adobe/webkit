@@ -78,12 +78,13 @@ public:
 
     // FIXME: These three functions should not be part of this client.
     void processDidBecomeUnresponsive(WebPageProxy*);
+    void interactionOccurredWhileProcessUnresponsive(WebPageProxy*);
     void processDidBecomeResponsive(WebPageProxy*);
     void processDidCrash(WebPageProxy*);
 
     void didChangeBackForwardList(WebPageProxy*, WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject> >* removedItems);
     bool shouldGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*);
-    void willGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*);
+    void willGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*, APIObject*);
 
     void didFailToInitializePlugin(WebPageProxy*, const String& mimeType);
 };

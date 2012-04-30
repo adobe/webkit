@@ -67,6 +67,7 @@ class ResourceResponse;
 class SharedBuffer;
 
 #if ENABLE(WEB_SOCKETS)
+struct WebSocketFrame;
 class WebSocketHandshakeRequest;
 class WebSocketHandshakeResponse;
 #endif
@@ -110,13 +111,16 @@ public:
     void didRecalculateStyle();
     void didScheduleStyleRecalculation(Document*);
 
-    PassRefPtr<InspectorObject> buildInitiatorObject(Document*);
+    PassRefPtr<TypeBuilder::Network::Initiator> buildInitiatorObject(Document*);
 
 #if ENABLE(WEB_SOCKETS)
     void didCreateWebSocket(unsigned long identifier, const KURL& requestURL);
     void willSendWebSocketHandshakeRequest(unsigned long identifier, const WebSocketHandshakeRequest&);
     void didReceiveWebSocketHandshakeResponse(unsigned long identifier, const WebSocketHandshakeResponse&);
     void didCloseWebSocket(unsigned long identifier);
+    void didReceiveWebSocketFrame(unsigned long identifier, const WebSocketFrame&);
+    void didSendWebSocketFrame(unsigned long identifier, const WebSocketFrame&);
+    void didReceiveWebSocketFrameError(unsigned long identifier, const String&);
 #endif
 
     // called from Internals for layout test purposes.
@@ -150,7 +154,7 @@ private:
     bool m_loadingXHRSynchronously;
 
     // FIXME: InspectorResourceAgent should now be aware of style recalculation.
-    RefPtr<InspectorObject> m_styleRecalculationInitiator;
+    RefPtr<TypeBuilder::Network::Initiator> m_styleRecalculationInitiator;
     bool m_isRecalculatingStyle;
 };
 

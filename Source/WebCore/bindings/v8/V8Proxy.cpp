@@ -217,7 +217,7 @@ bool V8Proxy::handleOutOfMemory()
     return true;
 }
 
-void V8Proxy::evaluateInIsolatedWorld(int worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup)
+void V8Proxy::evaluateInIsolatedWorld(int worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup, WTF::Vector<v8::Local<v8::Value> >* results)
 {
     // FIXME: This will need to get reorganized once we have a windowShell for the isolated world.
     if (!windowShell()->initContextIfNeeded())
@@ -239,15 +239,8 @@ void V8Proxy::evaluateInIsolatedWorld(int worldID, const Vector<ScriptSourceCode
 
             // FIXME: We should change this to using window shells to match JSC.
             m_isolatedWorlds.set(worldID, isolatedContext);
-
-            // Setup context id for JS debugger.
-            if (!setInjectedScriptContextDebugId(isolatedContext->context())) {
-                m_isolatedWorlds.take(worldID);
-                delete isolatedContext;
-                return;
-            }
         }
-        
+
         IsolatedWorldSecurityOriginMap::iterator securityOriginIter = m_isolatedWorldSecurityOrigins.find(worldID);
         if (securityOriginIter != m_isolatedWorldSecurityOrigins.end())
             isolatedContext->setSecurityOrigin(securityOriginIter->second);
@@ -261,11 +254,17 @@ void V8Proxy::evaluateInIsolatedWorld(int worldID, const Vector<ScriptSourceCode
 
     v8::Local<v8::Context> context = v8::Local<v8::Context>::New(isolatedContext->context());
     v8::Context::Scope context_scope(context);
-    for (size_t i = 0; i < sources.size(); ++i)
-      evaluate(sources[i], 0);
+
+    if (results) {
+        for (size_t i = 0; i < sources.size(); ++i)
+            results->append(evaluate(sources[i], 0));
+    } else {
+        for (size_t i = 0; i < sources.size(); ++i)
+            evaluate(sources[i], 0);
+    }
 
     if (worldID == 0)
-      isolatedContext->destroy();
+        isolatedContext->destroy();
 }
 
 void V8Proxy::setIsolatedWorldSecurityOrigin(int worldID, PassRefPtr<SecurityOrigin> prpSecurityOriginIn)
@@ -276,25 +275,6 @@ void V8Proxy::setIsolatedWorldSecurityOrigin(int worldID, PassRefPtr<SecurityOri
     IsolatedWorldMap::iterator iter = m_isolatedWorlds.find(worldID);
     if (iter != m_isolatedWorlds.end())
         iter->second->setSecurityOrigin(securityOrigin);
-}
-
-bool V8Proxy::setInjectedScriptContextDebugId(v8::Handle<v8::Context> targetContext)
-{
-    // Setup context id for JS debugger.
-    v8::Context::Scope contextScope(targetContext);
-    v8::Handle<v8::Context> context = windowShell()->context();
-    if (context.IsEmpty())
-        return false;
-    int debugId = contextDebugId(context);
-
-    char buffer[32];
-    if (debugId == -1)
-        snprintf(buffer, sizeof(buffer), "injected");
-    else
-        snprintf(buffer, sizeof(buffer), "injected,%d", debugId);
-    targetContext->SetData(v8::String::New(buffer));
-
-    return true;
 }
 
 PassOwnPtr<v8::ScriptData> V8Proxy::precompileScript(v8::Handle<v8::String> code, CachedScript* cachedScript)
@@ -536,6 +516,14 @@ V8Proxy* V8Proxy::retrieve(ScriptExecutionContext* context)
     return retrieve(static_cast<Document*>(context)->frame());
 }
 
+V8BindingPerContextData* V8Proxy::retrievePerContextData(Frame* frame)
+{
+    V8IsolatedContext* isolatedContext;
+    if (UNLIKELY(!!(isolatedContext = V8IsolatedContext::getEntered())))
+        return isolatedContext->perContextData();
+    return V8Proxy::retrieve(frame)->windowShell()->perContextData();
+}
+
 void V8Proxy::resetIsolatedWorlds()
 {
     for (IsolatedWorldMap::iterator iter = m_isolatedWorlds.begin();
@@ -560,10 +548,10 @@ void V8Proxy::clearForNavigation()
 
 #define TRY_TO_CREATE_EXCEPTION(interfaceName) \
     case interfaceName##Type: \
-        exception = toV8(interfaceName::create(description)); \
+        exception = toV8(interfaceName::create(description), isolate); \
         break;
 
-void V8Proxy::setDOMException(int ec)
+void V8Proxy::setDOMException(int ec, v8::Isolate* isolate)
 {
     if (ec <= 0)
         return;
@@ -581,19 +569,19 @@ void V8Proxy::setDOMException(int ec)
 
 #undef TRY_TO_CREATE_EXCEPTION
 
-v8::Handle<v8::Value> V8Proxy::throwError(ErrorType type, const char* message)
+v8::Handle<v8::Value> V8Proxy::throwError(ErrorType type, const char* message, v8::Isolate* isolate)
 {
     switch (type) {
     case RangeError:
-        return v8::ThrowException(v8::Exception::RangeError(v8String(message)));
+        return v8::ThrowException(v8::Exception::RangeError(v8String(message, isolate)));
     case ReferenceError:
-        return v8::ThrowException(v8::Exception::ReferenceError(v8String(message)));
+        return v8::ThrowException(v8::Exception::ReferenceError(v8String(message, isolate)));
     case SyntaxError:
-        return v8::ThrowException(v8::Exception::SyntaxError(v8String(message)));
+        return v8::ThrowException(v8::Exception::SyntaxError(v8String(message, isolate)));
     case TypeError:
-        return v8::ThrowException(v8::Exception::TypeError(v8String(message)));
+        return v8::ThrowException(v8::Exception::TypeError(v8String(message, isolate)));
     case GeneralError:
-        return v8::ThrowException(v8::Exception::Error(v8String(message)));
+        return v8::ThrowException(v8::Exception::Error(v8String(message, isolate)));
     default:
         ASSERT_NOT_REACHED();
         return notHandledByInterceptor();
@@ -605,9 +593,9 @@ v8::Handle<v8::Value> V8Proxy::throwTypeError()
     return throwError(TypeError, "Type error");
 }
 
-v8::Handle<v8::Value> V8Proxy::throwSyntaxError()
+v8::Handle<v8::Value> V8Proxy::throwNotEnoughArgumentsError()
 {
-    return throwError(SyntaxError, "Syntax error");
+    return throwError(TypeError, "Not enough arguments");
 }
 
 v8::Local<v8::Context> V8Proxy::context(Frame* frame)
@@ -640,6 +628,20 @@ v8::Local<v8::Context> V8Proxy::mainWorldContext()
 {
     windowShell()->initContextIfNeeded();
     return v8::Local<v8::Context>::New(windowShell()->context());
+}
+
+bool V8Proxy::matchesCurrentContext()
+{
+    v8::Handle<v8::Context> context;
+    if (V8IsolatedContext* isolatedContext = V8IsolatedContext::getEntered()) {
+        context = isolatedContext->sharedContext()->get();
+        if (m_frame != V8Proxy::retrieveFrame(context))
+            return false;
+    } else {
+        windowShell()->initContextIfNeeded();
+        context = windowShell()->context();
+    }
+    return context == context->GetCurrent();
 }
 
 v8::Local<v8::Context> V8Proxy::mainWorldContext(Frame* frame)

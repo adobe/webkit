@@ -77,10 +77,15 @@ namespace WebCore {
 struct PopupMenuClient;
 struct ContextMenu;
 struct ContextMenuItem;
+#if ENABLE(INPUT_TYPE_COLOR)
+struct Color;
+struct ColorChooserClient;
+#endif
 #if USE(ACCELERATED_COMPOSITING)
 class GraphicsContext3D;
 class GraphicsLayer;
 #endif
+class SecurityOrigin;
 }
 
 struct Ewk_Window_Object_Cleared_Event {
@@ -94,7 +99,7 @@ namespace EWKPrivate {
 WebCore::Frame *coreFrame(const Evas_Object *ewkFrame);
 WebCore::Page *corePage(const Evas_Object *ewkView);
 WebCore::HistoryItem *coreHistoryItem(const Ewk_History_Item *ewkHistoryItem);
-WebCore::PlatformPageClient corePageClient(Evas_Object* ewkView);
+PlatformPageClient corePageClient(Evas_Object* ewkView);
 
 Evas_Object* kitFrame(const WebCore::Frame* coreFrame);
 
@@ -105,7 +110,7 @@ void ewk_view_input_method_state_set(Evas_Object* ewkView, bool active);
 void ewk_view_title_set(Evas_Object* ewkView, const char* title);
 void ewk_view_uri_changed(Evas_Object* ewkView);
 void ewk_view_load_document_finished(Evas_Object* ewkView, Evas_Object* frame);
-void ewk_view_load_started(Evas_Object* ewkView);
+void ewk_view_load_started(Evas_Object* ewkView, Evas_Object* ewkFrame);
 void ewk_view_load_provisional(Evas_Object* ewkView);
 void ewk_view_frame_main_load_started(Evas_Object* ewkView);
 void ewk_view_frame_main_cleared(Evas_Object* ewkView);
@@ -114,6 +119,7 @@ void ewk_view_load_finished(Evas_Object* ewkView, const Ewk_Frame_Load_Error* er
 void ewk_view_load_error(Evas_Object* ewkView, const Ewk_Frame_Load_Error* error);
 void ewk_view_load_progress_changed(Evas_Object* ewkView);
 void ewk_view_load_show(Evas_Object* ewkView);
+void ewk_view_onload_event(Evas_Object* ewkView, Evas_Object* frame);
 void ewk_view_restore_state(Evas_Object* ewkView, Evas_Object* frame);
 Evas_Object* ewk_view_window_create(Evas_Object* ewkView, bool javascript, const WebCore::WindowFeatures* coreFeatures);
 void ewk_view_window_close(Evas_Object* ewkView);
@@ -153,6 +159,11 @@ WebCore::Page* ewk_view_core_page_get(const Evas_Object* ewkView);
 WTF::PassRefPtr<WebCore::Frame> ewk_view_frame_create(Evas_Object* ewkView, Evas_Object* frame, const WTF::String& name, WebCore::HTMLFrameOwnerElement* ownerElement, const WebCore::KURL& url, const WTF::String& referrer);
 
 WTF::PassRefPtr<WebCore::Widget> ewk_view_plugin_create(Evas_Object* ewkView, Evas_Object* frame, const WebCore::IntSize& pluginSize, WebCore::HTMLPlugInElement* element, const WebCore::KURL& url, const WTF::Vector<WTF::String>& paramNames, const WTF::Vector<WTF::String>& paramValues, const WTF::String& mimeType, bool loadManually);
+
+#if ENABLE(INPUT_TYPE_COLOR)
+void ewk_view_color_chooser_new(Evas_Object* ewkView, WebCore::ColorChooserClient* client, const WebCore::Color& initialColor);
+void ewk_view_color_chooser_changed(Evas_Object* ewkView, const WebCore::Color& newColor);
+#endif
 
 void ewk_view_popup_new(Evas_Object* ewkView, WebCore::PopupMenuClient* client, int selected, const WebCore::IntRect& rect);
 void ewk_view_viewport_attributes_set(Evas_Object* ewkView, const WebCore::ViewportArguments& arguments);
@@ -202,17 +213,22 @@ void ewk_frame_view_set(Evas_Object* ewkFrame, Evas_Object* newParent);
 
 void ewk_frame_core_gone(Evas_Object* ewkFrame);
 
+void ewk_frame_load_committed(Evas_Object* ewkFrame);
 void ewk_frame_load_started(Evas_Object* ewkFrame);
 void ewk_frame_load_provisional(Evas_Object* ewkFrame);
 void ewk_frame_load_firstlayout_finished(Evas_Object* ewkFrame);
 void ewk_frame_load_firstlayout_nonempty_finished(Evas_Object* ewkFrame);
 void ewk_frame_load_document_finished(Evas_Object* ewkFrame);
 void ewk_frame_load_finished(Evas_Object* ewkFrame, const char* errorDomain, int errorCode, bool isCancellation, const char* errorDescription, const char* failingUrl);
+void ewk_frame_load_resource_finished(Evas_Object* ewkFrame, unsigned long identifier);
+void ewk_frame_load_resource_failed(Evas_Object* ewkFrame, Ewk_Frame_Load_Error* error);
 void ewk_frame_load_error(Evas_Object* ewkFrame, const char* errorDomain, int errorCode, bool isCancellation, const char* errorDescription, const char* failingUrl);
 void ewk_frame_load_progress_changed(Evas_Object* ewkFrame);
 
-void ewk_frame_request_will_send(Evas_Object* ewkFrame, Ewk_Frame_Resource_Request* request);
+void ewk_frame_redirect_cancelled(Evas_Object* ewkFrame);
+void ewk_frame_request_will_send(Evas_Object* ewkFrame, Ewk_Frame_Resource_Messages* messages);
 void ewk_frame_request_assign_identifier(Evas_Object* ewkFrame, const Ewk_Frame_Resource_Request* request);
+void ewk_frame_response_received(Evas_Object* ewkFrame, Ewk_Frame_Resource_Response* response);
 void ewk_frame_view_state_save(Evas_Object* ewkFrame, WebCore::HistoryItem* item);
 
 void ewk_frame_did_perform_first_navigation(Evas_Object* ewkFrame);
@@ -241,6 +257,9 @@ void ewk_frame_mixed_content_displayed_set(Evas_Object* ewkFrame, bool hasDispla
 void ewk_frame_mixed_content_run_set(Evas_Object* ewkFrame, bool hasRun);
 void ewk_view_mixed_content_displayed_set(Evas_Object* ewkView, bool hasDisplayed);
 void ewk_view_mixed_content_run_set(Evas_Object* ewkView, bool hasRun);
+void ewk_frame_xss_detected(Evas_Object* ewkFrame, const Ewk_Frame_Xss_Notification* xssInfo);
+
+Ewk_Security_Origin* ewk_security_origin_new(WebCore::SecurityOrigin* origin);
 
 #if USE(ACCELERATED_COMPOSITING)
 bool ewk_view_accelerated_compositing_object_create(Evas_Object* ewkView, Evas_Native_Surface* nativeSurface, const WebCore::IntRect& rect);

@@ -32,6 +32,7 @@
 #include "FloatRect.h"
 #include "Gradient.h"
 #include "Image.h"
+#include "ImageOrientation.h"
 #include "Path.h"
 #include "Pattern.h"
 #include <wtf/Noncopyable.h>
@@ -260,8 +261,8 @@ namespace WebCore {
         void applyStrokePattern();
         void applyFillPattern();
         void drawPath(const Path&);
-        
-        void drawNativeImage(NativeImagePtr, const FloatSize& selfSize, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver);
+
+        void drawNativeImage(NativeImagePtr, const FloatSize& selfSize, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, ImageOrientation = DefaultImageOrientation);
 
         // Allow font smoothing (LCD antialiasing). Not part of the graphics state.
         void setAllowsFontSmoothing(bool);
@@ -288,6 +289,9 @@ namespace WebCore {
         void fillPath(const Path&);
         void strokePath(const Path&);
 
+        void fillEllipse(const FloatRect&);
+        void strokeEllipse(const FloatRect&);
+
         // Arc drawing (used by border-radius in CSS) just supports stroking at the moment.
         void strokeArc(const IntRect&, int startAngle, int angleSpan);
 
@@ -303,12 +307,12 @@ namespace WebCore {
 
         void strokeRect(const FloatRect&, float lineWidth);
 
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint&, CompositeOperator = CompositeSourceOver);
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntRect&, CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false);
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver);
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false);
+        void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
+        void drawImage(Image*, ColorSpace styleColorSpace, const IntRect&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
+        void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
+        void drawImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
         void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect = FloatRect(0, 0, -1, -1),
-                       CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false);
+                       CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
         void drawTiledImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntPoint& srcPoint, const IntSize& tileSize,
                        CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false);
         void drawTiledImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect,
@@ -352,12 +356,13 @@ namespace WebCore {
         FloatRect roundToDevicePixels(const FloatRect&, RoundingMode = RoundAllSides);
 
         void drawLineForText(const FloatPoint&, float width, bool printing);
-        enum TextCheckingLineStyle {
-            TextCheckingSpellingLineStyle,
-            TextCheckingGrammarLineStyle,
-            TextCheckingReplacementLineStyle
+        enum DocumentMarkerLineStyle {
+            DocumentMarkerSpellingLineStyle,
+            DocumentMarkerGrammarLineStyle,
+            DocumentMarkerAutocorrectionReplacementLineStyle,
+            DocumentMarkerDictationAlternativesLineStyle
         };
-        void drawLineForTextChecking(const FloatPoint&, float width, TextCheckingLineStyle);
+        void drawLineForDocumentMarker(const FloatPoint&, float width, DocumentMarkerLineStyle);
 
         bool paintingDisabled() const;
         void setPaintingDisabled(bool);
@@ -423,7 +428,7 @@ namespace WebCore {
         // This function applies the device scale factor to the context, making the context capable of
         // acting as a base-level context for a HiDPI environment.
         void applyDeviceScaleFactor(float);
-        void platformApplyDeviceScaleFactor();
+        void platformApplyDeviceScaleFactor(float);
 
 #if OS(WINCE) && !PLATFORM(QT)
         void setBitmap(PassRefPtr<SharedBitmap>);
@@ -546,6 +551,12 @@ namespace WebCore {
         void beginPlatformTransparencyLayer(float opacity);
         void endPlatformTransparencyLayer();
         static bool supportsTransparencyLayers();
+
+        void fillEllipseAsPath(const FloatRect&);
+        void strokeEllipseAsPath(const FloatRect&);
+
+        void platformFillEllipse(const FloatRect&);
+        void platformStrokeEllipse(const FloatRect&);
 
         GraphicsContextPlatformPrivate* m_data;
 

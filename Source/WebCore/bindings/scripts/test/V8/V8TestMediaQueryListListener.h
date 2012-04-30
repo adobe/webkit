@@ -40,31 +40,31 @@ public:
     {
         return reinterpret_cast<TestMediaQueryListListener*>(object->GetPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
-    inline static v8::Handle<v8::Object> wrap(TestMediaQueryListListener*);
+    inline static v8::Handle<v8::Object> wrap(TestMediaQueryListListener*, v8::Isolate* = 0);
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
 private:
-    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestMediaQueryListListener>);
+    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestMediaQueryListListener>, v8::Isolate*);
 };
 
-v8::Handle<v8::Object> V8TestMediaQueryListListener::wrap(TestMediaQueryListListener* impl)
+v8::Handle<v8::Object> V8TestMediaQueryListListener::wrap(TestMediaQueryListListener* impl, v8::Isolate* isolate)
 {
         v8::Handle<v8::Object> wrapper = getDOMObjectMap().get(impl);
         if (!wrapper.IsEmpty())
             return wrapper;
-    return V8TestMediaQueryListListener::wrapSlow(impl);
+    return V8TestMediaQueryListListener::wrapSlow(impl, isolate);
 }
 
-inline v8::Handle<v8::Value> toV8(TestMediaQueryListListener* impl)
+inline v8::Handle<v8::Value> toV8(TestMediaQueryListListener* impl, v8::Isolate* isolate = 0)
 {
     if (!impl)
         return v8::Null();
-    return V8TestMediaQueryListListener::wrap(impl);
+    return V8TestMediaQueryListListener::wrap(impl, isolate);
 }
-inline v8::Handle<v8::Value> toV8(PassRefPtr< TestMediaQueryListListener > impl)
+inline v8::Handle<v8::Value> toV8(PassRefPtr< TestMediaQueryListListener > impl, v8::Isolate* isolate = 0)
 {
-    return toV8(impl.get());
+    return toV8(impl.get(), isolate);
 }
 
 }

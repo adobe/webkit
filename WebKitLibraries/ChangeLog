@@ -1,3 +1,66 @@
+2012-04-27  Gavin Peters  <gavinp@chromium.org>
+
+        Add new ENABLE_LINK_PRERENDER define to control the Prerendering API
+        https://bugs.webkit.org/show_bug.cgi?id=84871
+
+        Reviewed by Adam Barth.
+
+        Prerendering is currently covered by the ENABLE_LINK_PREFETCH macro, but the new Prerendering
+        API separates it from prefetching.  Having separate include guards lets ports enable prefetching,
+        a relatively easy change, without needing to build the infrastructure for prerendering, which
+        is considerably more complicated.
+
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-04-10  Adam Barth  <abarth@webkit.org>
+
+        Limit -apple- and -khtml- to ENABLE(DASHBOARD_SUPPORT)
+        https://bugs.webkit.org/show_bug.cgi?id=83256
+
+        Reviewed by Eric Seidel.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2012-04-09  Beth Dakin  <bdakin@apple.com>
+
+        <rdar://problem/11214796>
+
+        New WKSI will hopefully fix a common crash seen by the bots in libRIP.A.dylib: 
+        symmetric_convolve
+
+        Reviewed by Simon Fraser.
+
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
+2012-04-06  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/10912476> HiDPI: Have canvas use a hidpi backing store, but downsample upon access
+
+        Reviewed by Sam Weinig.
+
+        * win/tools/vsprops/FeatureDefines.vsprops: Added ENABLE_HIGH_DPI_CANVAS.
+
+2012-04-03  Keishi Hattori  <keishi@webkit.org>
+
+        Disable ENABLE_DATALIST for now
+        https://bugs.webkit.org/show_bug.cgi?id=82871
+
+        Reviewed by Kent Tamura.
+
+        * win/tools/vsprops/FeatureDefines.vsprops: Disabled ENABLE_DATALIST.
+
+2012-03-30  Keishi Hattori  <keishi@webkit.org>
+
+        Change ENABLE_INPUT_COLOR to ENABLE_INPUT_TYPE_COLOR and enable it for chromium
+        https://bugs.webkit.org/show_bug.cgi?id=80972
+
+        Reviewed by Kent Tamura.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
 2012-03-20  Steve Falkenburg  <sfalken@apple.com>
 
         Disable LTCG on Windows to avoid out of process space errors while linking

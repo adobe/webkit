@@ -47,7 +47,6 @@ namespace WebKit {
 
 WebSettingsImpl::WebSettingsImpl(Settings* settings)
     : m_settings(settings)
-    , m_compositeToTextureEnabled(false)
     , m_showFPSCounter(false)
     , m_showPlatformLayerTree(false)
     , m_viewportEnabled(false)
@@ -360,11 +359,6 @@ void WebSettingsImpl::setMockScrollbarsEnabled(bool enabled)
     m_settings->setMockScrollbarsEnabled(enabled);
 }
 
-void WebSettingsImpl::setCompositeToTextureEnabled(bool enabled)
-{
-    m_compositeToTextureEnabled = enabled;
-}
-
 void WebSettingsImpl::setAcceleratedCompositingFor3DTransformsEnabled(bool enabled)
 {
     m_settings->setAcceleratedCompositingFor3DTransformsEnabled(enabled);
@@ -500,6 +494,15 @@ void WebSettingsImpl::setEnableScrollAnimator(bool enabled)
     m_settings->setEnableScrollAnimator(enabled);
 #else
     UNUSED_PARAM(enabled);
+#endif
+}
+
+bool WebSettingsImpl::scrollAnimatorEnabled() const
+{
+#if ENABLE(SMOOTH_SCROLLING)
+    return m_settings->scrollAnimatorEnabled();
+#else
+    return false;
 #endif
 }
 

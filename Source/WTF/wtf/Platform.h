@@ -447,12 +447,6 @@
 #if defined(TARGET_IPHONE_SIMULATOR) && TARGET_IPHONE_SIMULATOR
 #define WTF_PLATFORM_IOS 1
 #define WTF_PLATFORM_IOS_SIMULATOR 1
-#else
-#define WTF_PLATFORM_IOS_SIMULATOR 0
-#endif
-
-#if !defined(WTF_PLATFORM_IOS)
-#define WTF_PLATFORM_IOS 0
 #endif
 
 /* Graphics engines */
@@ -478,7 +472,6 @@
 #define WTF_USE_ICCJPEG 1
 #elif OS(ANDROID)
 #define WTF_USE_SKIA 1
-#define WTF_USE_GLES2_RENDERING 0
 #else
 #define WTF_USE_SKIA 1
 #define WTF_USE_CHROMIUM_NET 1
@@ -486,7 +479,6 @@
 #endif
 
 #if PLATFORM(BLACKBERRY)
-#define ENABLE_DRAG_SUPPORT 0
 #define USE_SYSTEM_MALLOC 1
 #define WTF_USE_MERSENNE_TWISTER_19937 1
 #define WTF_USE_SKIA 1
@@ -498,7 +490,6 @@
 
 
 #if OS(WINCE)
-#include <ce_time.h>
 #define WTF_USE_MERSENNE_TWISTER_19937 1
 #endif
 
@@ -577,7 +568,6 @@
 
 #if PLATFORM(QT) && OS(DARWIN)
 #define WTF_USE_CF 1
-#define HAVE_DISPATCH_H 1
 #endif
 
 #if OS(DARWIN) && !PLATFORM(GTK) && !PLATFORM(QT)
@@ -587,8 +577,6 @@
 #if PLATFORM(IOS)
 #define ENABLE_CONTEXT_MENUS 0
 #define ENABLE_DRAG_SUPPORT 0
-#define ENABLE_DATA_TRANSFER_ITEMS 0
-#define ENABLE_FTPDIR 1
 #define ENABLE_GEOLOCATION 1
 #define ENABLE_ICONDATABASE 0
 #define ENABLE_INSPECTOR 1
@@ -600,7 +588,6 @@
 #define HAVE_NETWORK_CFDATA_ARRAY_CALLBACK 1
 #define HAVE_PTHREAD_RWLOCK 1
 #define HAVE_READLINE 1
-#define HAVE_RUNLOOP_TIMER 0
 #define WTF_USE_CF 1
 #define WTF_USE_CFNETWORK 1
 #define WTF_USE_PTHREADS 1
@@ -620,7 +607,6 @@
 
 #if PLATFORM(WIN) && !OS(WINCE)
 #define WTF_USE_CF 1
-#define WTF_USE_PTHREADS 0
 #endif
 
 #if PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(CHROMIUM) && !PLATFORM(WIN_CAIRO)
@@ -672,6 +658,11 @@
 
 #if OS(UNIX)
 #define HAVE_SIGNAL_H 1
+#define WTF_USE_OS_RANDOMNESS 1
+#endif
+
+#if (OS(FREEBSD) || OS(OPENBSD)) && !defined(__GLIBC__)
+#define HAVE_PTHREAD_NP_H 1
 #endif
 
 #if !defined(HAVE_VASPRINTF)
@@ -727,14 +718,13 @@
 
 #elif OS(WINDOWS)
 
-#if OS(WINCE)
-#define HAVE_ERRNO_H 0
-#else
+#if !OS(WINCE)
 #define HAVE_SYS_TIMEB_H 1
 #define HAVE_ALIGNED_MALLOC 1
 #define HAVE_ISDEBUGGERPRESENT 1
 #endif
 #define HAVE_VIRTUALALLOC 1
+#define WTF_USE_OS_RANDOMNESS 1
 
 #elif OS(QNX)
 
@@ -751,7 +741,6 @@
 #elif OS(ANDROID)
 
 #define HAVE_ERRNO_H 1
-#define HAVE_LANGINFO_H 0
 #define HAVE_NMAP 1
 #define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
@@ -782,12 +771,6 @@
 #endif
 #endif
 
-/* fastMalloc match validation allows for runtime verification that
-   new is matched by delete, fastMalloc is matched by fastFree, etc. */
-#if !defined(ENABLE_FAST_MALLOC_MATCH_VALIDATION)
-#define ENABLE_FAST_MALLOC_MATCH_VALIDATION 0
-#endif
-
 #if !defined(ENABLE_ICONDATABASE)
 #define ENABLE_ICONDATABASE 1
 #endif
@@ -812,44 +795,12 @@
 #define ENABLE_DRAG_SUPPORT 1
 #endif
 
-#if !defined(ENABLE_DATA_TRANSFER_ITEMS)
-#define ENABLE_DATA_TRANSFER_ITEMS 0
-#endif
-
-#if !defined(ENABLE_DASHBOARD_SUPPORT)
-#define ENABLE_DASHBOARD_SUPPORT 0
-#endif
-
 #if !defined(ENABLE_INSPECTOR)
 #define ENABLE_INSPECTOR 1
 #endif
 
-#if !defined(ENABLE_JAVA_BRIDGE)
-#define ENABLE_JAVA_BRIDGE 0
-#endif
-
 #if !defined(ENABLE_NETSCAPE_PLUGIN_API)
 #define ENABLE_NETSCAPE_PLUGIN_API 1
-#endif
-
-#if !defined(ENABLE_NETSCAPE_PLUGIN_METADATA_CACHE)
-#define ENABLE_NETSCAPE_PLUGIN_METADATA_CACHE 0
-#endif
-
-#if !defined(ENABLE_PURGEABLE_MEMORY)
-#define ENABLE_PURGEABLE_MEMORY 0
-#endif
-
-#if !defined(WTF_USE_PLUGIN_HOST_PROCESS)
-#define WTF_USE_PLUGIN_HOST_PROCESS 0
-#endif
-
-#if !defined(ENABLE_ORIENTATION_EVENTS)
-#define ENABLE_ORIENTATION_EVENTS 0
-#endif
-
-#if !defined(ENABLE_OPCODE_STATS)
-#define ENABLE_OPCODE_STATS 0
 #endif
 
 #if !defined(ENABLE_GLOBAL_FASTMALLOC_NEW)
@@ -869,32 +820,8 @@
 #define ENABLE_SAMPLING_THREAD 1
 #endif
 
-#if !defined(ENABLE_GEOLOCATION)
-#define ENABLE_GEOLOCATION 0
-#endif
-
-#if !defined(ENABLE_VIEWPORT)
-#define ENABLE_VIEWPORT 0
-#endif
-
-#if !defined(ENABLE_NOTIFICATIONS)
-#define ENABLE_NOTIFICATIONS 0
-#endif
-
-#if PLATFORM(IOS)
-#define ENABLE_TEXT_CARET 0
-#endif
-
-#if !defined(ENABLE_TEXT_CARET)
+#if !defined(ENABLE_TEXT_CARET) && !PLATFORM(IOS)
 #define ENABLE_TEXT_CARET 1
-#endif
-
-#if !defined(ENABLE_FULLSCREEN_API)
-#define ENABLE_FULLSCREEN_API 0
-#endif
-
-#if !defined(ENABLE_POINTER_LOCK)
-#define ENABLE_POINTER_LOCK 0
 #endif
 
 #if !defined(WTF_USE_JSVALUE64) && !defined(WTF_USE_JSVALUE32_64)
@@ -910,10 +837,6 @@
 #endif
 #endif /* !defined(WTF_USE_JSVALUE64) && !defined(WTF_USE_JSVALUE32_64) */
 
-#if !defined(ENABLE_REPAINT_THROTTLING)
-#define ENABLE_REPAINT_THROTTLING 0
-#endif
-
 /* Disable the JIT on versions of GCC prior to 4.1 */
 #if !defined(ENABLE_JIT) && COMPILER(GCC) && !GCC_VERSION_AT_LEAST(4, 1, 0)
 #define ENABLE_JIT 0
@@ -922,6 +845,10 @@
 /* JIT is not implemented for Windows 64-bit */
 #if !defined(ENABLE_JIT) && OS(WINDOWS) && CPU(X86_64)
 #define ENABLE_JIT 0
+#endif
+
+#if !defined(ENABLE_JIT) && CPU(SH4) && PLATFORM(QT)
+#define ENABLE_JIT 1
 #endif
 
 /* The JIT is enabled by default on all x86, x86-64, ARM & MIPS platforms. */
@@ -980,10 +907,6 @@
 #error You have to have at least one execution model enabled to build JSC
 #endif
 
-#if CPU(SH4) && PLATFORM(QT)
-#define ENABLE_JIT 1
-#endif
-
 /* Configure the JIT */
 #if CPU(X86) && COMPILER(MSVC)
 #define JSC_HOST_CALL __fastcall
@@ -1005,10 +928,7 @@
 #define ENABLE_REGEXP_TRACING 0
 
 /* Yet Another Regex Runtime - turned on by default for JIT enabled ports. */
-#if PLATFORM(CHROMIUM)
-#define ENABLE_YARR_JIT 0
-
-#elif ENABLE(JIT) && !defined(ENABLE_YARR_JIT)
+#if !defined(ENABLE_YARR_JIT) && ENABLE(JIT) && !PLATFORM(CHROMIUM)
 #define ENABLE_YARR_JIT 1
 
 /* Setting this flag compares JIT results with interpreter results. */
@@ -1031,14 +951,6 @@
 
 #if !defined(ENABLE_PAN_SCROLLING) && OS(WINDOWS)
 #define ENABLE_PAN_SCROLLING 1
-#endif
-
-#if !defined(ENABLE_SMOOTH_SCROLLING)
-#define ENABLE_SMOOTH_SCROLLING 0
-#endif
-
-#if !defined(ENABLE_WEB_ARCHIVE)
-#define ENABLE_WEB_ARCHIVE 0
 #endif
 
 /* Use the QXmlStreamReader implementation for XMLDocumentParser */
@@ -1070,12 +982,6 @@
 #define ENABLE_CSS_IMAGE_SET 1
 #endif
 
-#if !defined(ENABLE_CSS_SHADERS)
-#if PLATFORM(MAC) || PLATFORM(IOS)
-#define ENABLE_CSS_SHADERS 1
-#endif
-#endif
-
 /* Compositing on the UI-process in WebKit2 */
 #if PLATFORM(QT)
 #define WTF_USE_UI_SIDE_COMPOSITING 1
@@ -1097,7 +1003,7 @@
 #define WTF_PLATFORM_CFNETWORK Error USE_macro_should_be_used_with_CFNETWORK
 
 /* FIXME: Eventually we should enable this for all platforms and get rid of the define. */
-#if PLATFORM(IOS) || PLATFORM(MAC) || PLATFORM(WIN) || PLATFORM(QT)
+#if PLATFORM(IOS) || PLATFORM(MAC) || PLATFORM(WIN) || PLATFORM(QT) || PLATFORM(GTK)
 #define WTF_USE_PLATFORM_STRATEGIES 1
 #endif
 
@@ -1108,9 +1014,6 @@
 #if PLATFORM(MAC) && HAVE(ACCESSIBILITY)
 #define WTF_USE_ACCESSIBILITY_CONTEXT_MENUS 1
 #endif
-
-/* Geolocation request policy. pre-emptive policy is to acquire user permission before acquiring location. */
-#define WTF_USE_PREEMPT_GEOLOCATION_PERMISSION 1
 
 #if CPU(ARM_THUMB2)
 #define ENABLE_BRANCH_COMPACTION 1
@@ -1132,10 +1035,8 @@
    since most ports try to support sub-project independence, adding new headers
    to WTF causes many ports to break, and so this way we can address the build
    breakages one port at a time. */
-#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(WX)
+#if !defined(WTF_USE_EXPORT_MACROS) && (PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(WX))
 #define WTF_USE_EXPORT_MACROS 1
-#else
-#define WTF_USE_EXPORT_MACROS 0
 #endif
 
 #if (PLATFORM(QT) && !OS(DARWIN)) || PLATFORM(GTK) || PLATFORM(EFL)
@@ -1146,14 +1047,12 @@
 #define ENABLE_COMPARE_AND_SWAP 1
 #endif
 
-#if !defined(ENABLE_PARALLEL_GC) && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(QT)) && ENABLE(COMPARE_AND_SWAP)
+#if !defined(ENABLE_PARALLEL_GC) && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(QT) || PLATFORM(BLACKBERRY)) && ENABLE(COMPARE_AND_SWAP)
 #define ENABLE_PARALLEL_GC 1
 #endif
 
-#ifndef NDEBUG
-#ifndef ENABLE_GC_VALIDATION
+#if !defined(ENABLE_GC_VALIDATION) && !defined(NDEBUG)
 #define ENABLE_GC_VALIDATION 1
-#endif
 #endif
 
 #if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
@@ -1180,25 +1079,17 @@
 #define WTF_USE_COREAUDIO 1
 #endif
 
-#if PLATFORM(CHROMIUM)
-#if !defined(WTF_USE_V8)
+#if !defined(WTF_USE_V8) && PLATFORM(CHROMIUM)
 #define WTF_USE_V8 1
 #endif
-#endif /* PLATFORM(CHROMIUM) */
 
-#if !defined(WTF_USE_V8)
-#define WTF_USE_V8 0
-#endif /* !defined(WTF_USE_V8) */
-
-/* Using V8 implies not using JSC and vice versa */
-#define WTF_USE_JSC !WTF_USE_V8
+/* Not using V8 implies using JSC and vice versa */
+#if !USE(V8)
+#define WTF_USE_JSC 1
+#endif
 
 #if ENABLE(NOTIFICATIONS) && PLATFORM(MAC)
 #define ENABLE_TEXT_NOTIFICATIONS_ONLY 1
-#endif
-
-#if !defined(WTF_USE_WTFURL)
-#define WTF_USE_WTFURL 0
 #endif
 
 #if !defined(WTF_USE_ZLIB) && !PLATFORM(QT)

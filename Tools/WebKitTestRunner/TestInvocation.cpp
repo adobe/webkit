@@ -96,7 +96,6 @@ TestInvocation::TestInvocation(const std::string& pathOrURL)
     : m_url(AdoptWK, createWKURL(pathOrURL.c_str()))
     , m_pathOrURL(pathOrURL)
     , m_dumpPixels(false)
-    , m_skipPixelTestOption(false)
     , m_gotInitialResponse(false)
     , m_gotFinalMessage(false)
     , m_gotRepaint(false)
@@ -110,8 +109,6 @@ TestInvocation::~TestInvocation()
 
 void TestInvocation::setIsPixelTest(const std::string& expectedPixelHash)
 {
-    if (m_skipPixelTestOption && !expectedPixelHash.length())
-        return;
     m_dumpPixels = true;
     m_expectedPixelHash = expectedPixelHash;
 }
@@ -163,8 +160,10 @@ void TestInvocation::invoke()
         return;
     }
 
+#if ENABLE(INSPECTOR)
     if (shouldOpenWebInspector(m_pathOrURL.c_str()))
         WKInspectorShow(WKPageGetInspector(TestController::shared().mainWebView()->page()));
+#endif // ENABLE(INSPECTOR)        
 
     WKPageLoadURL(TestController::shared().mainWebView()->page(), m_url.get());
 
@@ -174,7 +173,9 @@ void TestInvocation::invoke()
     else if (m_error)
         dump("FAIL\n");
 
+#if ENABLE(INSPECTOR)
     WKInspectorClose(WKPageGetInspector(TestController::shared().mainWebView()->page()));
+#endif // ENABLE(INSPECTOR)
 }
 
 void TestInvocation::dump(const char* stringToDump, bool singleEOF)

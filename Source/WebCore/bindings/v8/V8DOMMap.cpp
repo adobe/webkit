@@ -50,47 +50,33 @@ DOMDataStoreHandle::~DOMDataStoreHandle()
     V8BindingPerIsolateData::current()->unregisterDOMDataStore(m_store.get());
 }
 
-static inline DOMDataStore& getDOMDataStore()
-{
-    return DOMData::getCurrentStore();
-}
-
 void enableFasterDOMStoreAccess()
 {
 }
 
-DOMNodeMapping& getDOMNodeMap()
+DOMNodeMapping& getDOMNodeMap(v8::Isolate* isolate)
 {
-    return getDOMDataStore().domNodeMap();
+    return DOMData::getCurrentStore(isolate).domNodeMap();
 }
 
-DOMNodeMapping& getActiveDOMNodeMap()
+DOMNodeMapping& getActiveDOMNodeMap(v8::Isolate* isolate)
 {
-    return getDOMDataStore().activeDomNodeMap();
+    return DOMData::getCurrentStore(isolate).activeDomNodeMap();
 }
 
-DOMWrapperMap<void>& getDOMObjectMap()
+DOMWrapperMap<void>& getDOMObjectMap(v8::Isolate* isolate)
 {
-    return getDOMDataStore().domObjectMap();
+    return DOMData::getCurrentStore(isolate).domObjectMap();
 }
 
-DOMWrapperMap<void>& getActiveDOMObjectMap()
+DOMWrapperMap<void>& getActiveDOMObjectMap(v8::Isolate* isolate)
 {
-    return getDOMDataStore().activeDomObjectMap();
+    return DOMData::getCurrentStore(isolate).activeDomObjectMap();
 }
-
-#if ENABLE(SVG)
-
-DOMWrapperMap<SVGElementInstance>& getDOMSVGElementInstanceMap()
-{
-    return getDOMDataStore().domSvgElementInstanceMap();
-}
-
-#endif // ENABLE(SVG)
 
 void removeAllDOMObjects()
 {
-    DOMDataStore& store = getDOMDataStore();
+    DOMDataStore& store = DOMData::getCurrentStore();
 
     v8::HandleScope scope;
 
@@ -101,11 +87,6 @@ void removeAllDOMObjects()
 
         // Remove all active DOM nodes.
         DOMData::removeObjectsFromWrapperMap<Node>(&store, store.activeDomNodeMap());
-
-#if ENABLE(SVG)
-        // Remove all SVG element instances in the wrapper map.
-        DOMData::removeObjectsFromWrapperMap<SVGElementInstance>(&store, store.domSvgElementInstanceMap());
-#endif
     }
 
     // Remove all DOM objects in the wrapper map.
@@ -162,21 +143,5 @@ void visitActiveDOMObjects(DOMWrapperMap<void>::Visitor* visitor)
         store->activeDomObjectMap().visit(store, visitor);
     }
 }
-
-#if ENABLE(SVG)
-
-void visitDOMSVGElementInstances(DOMWrapperMap<SVGElementInstance>::Visitor* visitor)
-{
-    v8::HandleScope scope;
-
-    DOMDataList& list = DOMDataStore::allStores();
-    for (size_t i = 0; i < list.size(); ++i) {
-        DOMDataStore* store = list[i];
-
-        store->domSvgElementInstanceMap().visit(store, visitor);
-    }
-}
-
-#endif
 
 } // namespace WebCore

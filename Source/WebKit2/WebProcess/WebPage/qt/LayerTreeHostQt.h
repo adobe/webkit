@@ -23,6 +23,7 @@
 #include "LayerTreeContext.h"
 #include "LayerTreeHost.h"
 #include "Timer.h"
+#include "UpdateAtlas.h"
 #include "WebGraphicsLayer.h"
 #include <WebCore/GraphicsLayerClient.h>
 #include <wtf/OwnPtr.h>
@@ -56,6 +57,8 @@ public:
     virtual void didInstallPageOverlay();
     virtual void didUninstallPageOverlay();
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&);
+    virtual void setPageOverlayOpacity(float);
+    virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return false; }
 
     virtual void pauseRendering() { m_isSuspended = true; }
     virtual void resumeRendering() { m_isSuspended = false; scheduleLayerFlush(); }
@@ -63,17 +66,21 @@ public:
     virtual int64_t adoptImageBackingStore(WebCore::Image*);
     virtual void releaseImageBackingStore(int64_t);
 
-    virtual void createTile(WebLayerID, int tileID, const UpdateInfo&);
-    virtual void updateTile(WebLayerID, int tileID, const UpdateInfo&);
+    virtual void createTile(WebLayerID, int tileID, const SurfaceUpdateInfo&, const WebCore::IntRect&);
+    virtual void updateTile(WebLayerID, int tileID, const SurfaceUpdateInfo&, const WebCore::IntRect&);
     virtual void removeTile(WebLayerID, int tileID);
     virtual WebCore::IntRect visibleContentsRect() const;
     virtual void renderNextFrame();
     virtual void purgeBackingStores();
     virtual bool layerTreeTileUpdatesAllowed() const;
     virtual void setVisibleContentsRect(const WebCore::IntRect&, float scale, const WebCore::FloatPoint&);
-    virtual void didSyncCompositingStateForLayer(const WebLayerInfo&);
+    virtual void syncLayerState(WebLayerID, const WebLayerInfo&);
+    virtual void syncLayerChildren(WebLayerID, const Vector<WebLayerID>&);
     virtual void attachLayer(WebCore::WebGraphicsLayer*);
     virtual void detachLayer(WebCore::WebGraphicsLayer*);
+    virtual void syncFixedLayers();
+
+    virtual PassOwnPtr<WebCore::GraphicsContext> beginContentUpdate(const WebCore::IntSize&, ShareableBitmap::Flags, ShareableSurface::Handle&, WebCore::IntPoint&);
 
 protected:
     explicit LayerTreeHostQt(WebPage*);
@@ -94,6 +101,8 @@ private:
     void performScheduledLayerFlush();
     void sendLayersToUI();
 
+    UpdateAtlas& getAtlas(ShareableBitmap::Flags);
+
     OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
 
     // The layer which contains all non-composited content.
@@ -104,6 +113,7 @@ private:
 
     HashSet<WebCore::WebGraphicsLayer*> m_registeredLayers;
     HashMap<int64_t, int> m_directlyCompositedImageRefCounts;
+    Vector<UpdateAtlas> m_updateAtlases;
 
     bool m_notifyAfterScheduledLayerFlush;
     bool m_isValid;
@@ -112,6 +122,7 @@ private:
     bool m_isSuspended;
     WebCore::IntRect m_visibleContentsRect;
     float m_contentsScale;
+    bool m_shouldSendScrollPositionUpdate;
 
     LayerTreeContext m_layerTreeContext;
     bool m_shouldSyncFrame;

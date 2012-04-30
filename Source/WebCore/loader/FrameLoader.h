@@ -94,7 +94,6 @@ public:
     IconController* icon() const { return &m_icon; }
 
     void prepareForHistoryNavigation();
-    void prepareForLoadStart();
     void setupForReplace();
 
     // FIXME: These are all functions which start loads. We have too many.
@@ -132,7 +131,6 @@ public:
     void cancelAndClear();
     void clear(bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
 
-    bool isLoadingMainResource() const { return m_isLoadingMainResource; }
     bool isLoading() const;
     bool frameHasLoaded() const;
 
@@ -150,27 +148,25 @@ public:
 
     const ResourceRequest& originalRequest() const;
     const ResourceRequest& initialRequest() const;
-    void receivedMainResourceError(const ResourceError&, bool isComplete);
+    void receivedMainResourceError(const ResourceError&);
 
     bool willLoadMediaElementURL(KURL&);
 
     void handleFallbackContent();
-
-    void finishedLoading();
 
     ResourceError cancelledError(const ResourceRequest&) const;
 
     bool isHostedByObjectElement() const;
     bool isLoadingMainFrame() const;
 
-    void finishedLoadingDocument(DocumentLoader*);
     bool isReplacing() const;
     void setReplacing();
-    void mainReceivedCompleteError(DocumentLoader*, const ResourceError&);
     bool subframeIsLoading() const;
     void willChangeTitle(DocumentLoader*);
     void didChangeTitle(DocumentLoader*);
     void didChangeIcons(IconType);
+
+    bool shouldTreatURLAsSrcdocDocument(const KURL&) const;
 
     FrameLoadType loadType() const;
 
@@ -203,7 +199,6 @@ public:
 
     // Callbacks from DocumentWriter
     void didBeginDocument(bool dispatchWindowObjectAvailable);
-    void didEndDocument();
     void willSetEncoding();
 
     void handledOnloadEvents();
@@ -248,8 +243,7 @@ public:
 
     FrameLoaderStateMachine* stateMachine() const { return &m_stateMachine; }
 
-    bool shouldAllowNavigation(Frame* targetFrame) const;
-    Frame* findFrameForNavigation(const AtomicString& name);
+    Frame* findFrameForNavigation(const AtomicString& name, Document* activeDocument = 0);
 
     void applyUserAgent(ResourceRequest&);
 
@@ -287,10 +281,6 @@ public:
 
     NetworkingContext* networkingContext() const;
 
-#if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    Archive* archive() const { return m_archive.get(); }
-#endif
-
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
@@ -312,6 +302,8 @@ private:
     void transitionToCommitted(PassRefPtr<CachedPage>);
     void frameLoadCompleted();
 
+    SubstituteData defaultSubstituteDataForURL(const KURL&);
+
     static void callContinueLoadAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
     static void callContinueLoadAfterNewWindowPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
     static void callContinueFragmentScrollAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
@@ -322,7 +314,8 @@ private:
     void continueLoadAfterNewWindowPolicy(const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
     void continueFragmentScrollAfterNavigationPolicy(const ResourceRequest&, bool shouldContinue);
 
-    bool shouldScrollToAnchor(bool isFormSubmission, const String& httpMethod, FrameLoadType, const KURL&);
+    bool shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType, const KURL&);
+    void scrollToFragmentWithParentBoundary(const KURL&);
 
     void checkLoadCompleteForThisFrame();
 
@@ -361,6 +354,7 @@ private:
 
     void loadInSameDocument(const KURL&, SerializedScriptValue* stateObject, bool isNewNavigation);
 
+    void prepareForLoadStart();
     void provisionalLoadStarted();
 
     bool didOpenURL();
@@ -370,6 +364,8 @@ private:
     void startCheckCompleteTimer();
 
     bool shouldTreatURLAsSameAsCurrent(const KURL&) const;
+
+    void dispatchGlobalObjectAvailableInAllWorlds();
 
     Frame* m_frame;
     FrameLoaderClient* m_client;
@@ -406,7 +402,6 @@ private:
     bool m_wasUnloadEventEmitted;
     PageDismissalType m_pageDismissalEventBeingDispatched;
     bool m_isComplete;
-    bool m_isLoadingMainResource;
 
     RefPtr<SerializedScriptValue> m_pendingStateObject;
 
@@ -430,10 +425,6 @@ private:
     SandboxFlags m_forcedSandboxFlags;
 
     RefPtr<FrameNetworkingContext> m_networkingContext;
-
-#if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    RefPtr<Archive> m_archive;
-#endif
 
     KURL m_previousUrl;
     RefPtr<HistoryItem> m_requestedHistoryItem;

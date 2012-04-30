@@ -44,7 +44,7 @@ namespace WebCore {
 
 WrapperTypeInfo V8Float64Array::info = { V8Float64Array::GetTemplate, V8Float64Array::derefObject, 0, &V8ArrayBufferView::info };
 
-namespace Float64ArrayInternal {
+namespace Float64ArrayV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
@@ -52,13 +52,13 @@ static v8::Handle<v8::Value> fooCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.Float64Array.foo");
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
     Float64Array* imp = V8Float64Array::toNative(args.Holder());
     EXCEPTION_BLOCK(Float32Array*, array, V8Float32Array::HasInstance(MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined)) ? V8Float32Array::toNative(v8::Handle<v8::Object>::Cast(MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined))) : 0);
-    return toV8(imp->foo(array));
+    return toV8(imp->foo(array), args.GetIsolate());
 }
 
-} // namespace Float64ArrayInternal
+} // namespace Float64ArrayV8Internal
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::Persistent<v8::FunctionTemplate> desc)
 {
@@ -80,7 +80,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::
     const int fooArgc = 1;
     v8::Handle<v8::FunctionTemplate> fooArgv[fooArgc] = { V8Float32Array::GetRawTemplate() };
     v8::Handle<v8::Signature> fooSignature = v8::Signature::New(desc, fooArgc, fooArgv);
-    proto->Set(v8::String::New("foo"), v8::FunctionTemplate::New(Float64ArrayInternal::fooCallback, v8::Handle<v8::Value>(), fooSignature));
+    proto->Set(v8::String::New("foo"), v8::FunctionTemplate::New(Float64ArrayV8Internal::fooCallback, v8::Handle<v8::Value>(), fooSignature));
 
     // Custom toString template
     desc->Set(getToStringName(), getToStringTemplate());
@@ -120,7 +120,7 @@ bool V8Float64Array::HasInstance(v8::Handle<v8::Value> value)
 }
 
 
-v8::Handle<v8::Object> V8Float64Array::wrapSlow(PassRefPtr<Float64Array> impl)
+v8::Handle<v8::Object> V8Float64Array::wrapSlow(PassRefPtr<Float64Array> impl, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
     V8Proxy* proxy = 0;
@@ -132,7 +132,7 @@ v8::Handle<v8::Object> V8Float64Array::wrapSlow(PassRefPtr<Float64Array> impl)
 
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();
-    getDOMObjectMap().set(impl.leakRef(), wrapperHandle);
+    V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapperHandle);
     return wrapper;
 }
 

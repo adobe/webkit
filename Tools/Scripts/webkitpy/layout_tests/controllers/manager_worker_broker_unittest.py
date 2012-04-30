@@ -46,12 +46,13 @@ stopping_queue = None
 
 WORKER_NAME = 'TestWorker'
 
-def make_broker(manager, worker_model, start_queue=None, stop_queue=None):
+
+def make_broker(manager, max_workers, start_queue=None, stop_queue=None):
     global starting_queue
     global stopping_queue
     starting_queue = start_queue
     stopping_queue = stop_queue
-    return manager_worker_broker.get(worker_model, manager, _TestWorker)
+    return manager_worker_broker.get(max_workers, manager, _TestWorker)
 
 
 class _TestWorker(manager_worker_broker.AbstractWorker):
@@ -87,16 +88,13 @@ class _TestWorker(manager_worker_broker.AbstractWorker):
 
 class FunctionTests(unittest.TestCase):
     def test_get__inline(self):
-        self.assertTrue(make_broker(self, 'inline') is not None)
+        self.assertTrue(make_broker(self, 1) is not None)
 
     def test_get__processes(self):
         # This test sometimes fails on Windows. See <http://webkit.org/b/55087>.
         if sys.platform in ('cygwin', 'win32'):
             return
-        self.assertTrue(make_broker(self, 'processes') is not None)
-
-    def test_get__unknown(self):
-        self.assertRaises(ValueError, make_broker, self, 'unknown')
+        self.assertTrue(make_broker(self, 2) is not None)
 
 
 class _TestsMixin(object):
@@ -125,10 +123,10 @@ class _TestsMixin(object):
         self._broker = None
         self._done = False
         self._exception = None
-        self._worker_model = None
+        self._max_workers = None
 
     def make_broker(self, starting_queue=None, stopping_queue=None):
-        self._broker = make_broker(self, self._worker_model, starting_queue,
+        self._broker = make_broker(self, self._max_workers, starting_queue,
                                    stopping_queue)
 
     def test_name(self):
@@ -138,14 +136,16 @@ class _TestsMixin(object):
         worker.cancel()
         worker.join(0.1)
         self.assertFalse(worker.is_alive())
+        self._broker.cleanup()
 
     def test_cancel(self):
         self.make_broker()
         worker = self._broker.start_worker()
-        worker.cancel()
         self._broker.post_message('test', 1, 'hello, world')
+        worker.cancel()
         worker.join(0.1)
         self.assertFalse(worker.is_alive())
+        self._broker.cleanup()
 
     def test_done(self):
         self.make_broker()
@@ -158,6 +158,7 @@ class _TestsMixin(object):
         self.assertTrue(self.is_done())
         self.assertEqual(self._an_int, 2)
         self.assertEqual(self._a_str, 'hi, everybody')
+        self._broker.cleanup()
 
     def test_unknown_message(self):
         self.make_broker()
@@ -172,12 +173,13 @@ class _TestsMixin(object):
         finally:
             worker.join(0.5)
         self.assertFalse(worker.is_alive())
+        self._broker.cleanup()
 
 
 class InlineBrokerTests(_TestsMixin, unittest.TestCase):
     def setUp(self):
         _TestsMixin.setUp(self)
-        self._worker_model = 'inline'
+        self._max_workers = 1
 
     def test_inline_arguments(self):
         self.make_broker()
@@ -195,7 +197,7 @@ if sys.platform not in ('cygwin', 'win32'):
     class MultiProcessBrokerTests(_TestsMixin, unittest.TestCase):
         def setUp(self):
             _TestsMixin.setUp(self)
-            self._worker_model = 'processes'
+            self._max_workers = 2
 
 
 class InterfaceTest(unittest.TestCase):

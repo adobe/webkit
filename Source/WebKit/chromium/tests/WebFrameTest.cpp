@@ -42,6 +42,7 @@
 #include "WebSearchableFormData.h"
 #include "WebSecurityPolicy.h"
 #include "WebSettings.h"
+#include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "v8.h"
 #include <gtest/gtest.h>
@@ -151,6 +152,40 @@ TEST_F(WebFrameTest, ChromePageNoJavascript)
     EXPECT_EQ(std::string::npos, content.find("Clobbered"));
 }
 
+#if ENABLE(VIEWPORT)
+
+class FixedLayoutTestWebViewClient : public WebViewClient {
+ public:
+    virtual WebRect windowRect() OVERRIDE { return m_windowRect; }
+    virtual WebScreenInfo screenInfo() OVERRIDE { return m_screenInfo; }
+
+    WebRect m_windowRect;
+    WebScreenInfo m_screenInfo;
+};
+
+TEST_F(WebFrameTest, DeviceScaleFactorUsesDefaultWithoutViewportTag)
+{
+    registerMockedHttpURLLoad("no_viewport_tag.html");
+
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.horizontalDPI = 160;
+    client.m_windowRect = WebRect(0, 0, viewportWidth, viewportHeight);
+
+    WebView* webView = static_cast<WebView*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "no_viewport_tag.html", true, 0, &client));
+
+    webView->resize(WebSize(viewportWidth, viewportHeight));
+    webView->settings()->setViewportEnabled(true);
+    webView->settings()->setDefaultDeviceScaleFactor(2);
+    webView->enableFixedLayoutMode(true);
+    webView->layout();
+
+    EXPECT_EQ(2, webView->deviceScaleFactor());
+}
+#endif
+
 #if ENABLE(GESTURE_EVENTS)
 TEST_F(WebFrameTest, FAILS_DivAutoZoomParamsTest)
 {
@@ -238,7 +273,12 @@ public:
     {
         // Return a dummy error so the DocumentLoader doesn't assert when
         // the reload cancels it.
-        return WebURLError(WebCore::ResourceError("", 1, "", "cancelled"));
+        WebURLError webURLError;
+        webURLError.domain = "";
+        webURLError.reason = 1;
+        webURLError.isCancellation = true;
+        webURLError.unreachableURL = WebURL();
+        return webURLError;
     }
 };
 

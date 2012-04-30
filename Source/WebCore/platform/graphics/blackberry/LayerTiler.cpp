@@ -202,7 +202,7 @@ void LayerTiler::updateTextureContentsIfNeeded(double scale)
                     if (isSolidColor)
                         addTextureJob(TextureJob::setContentsToColor(color, *it));
                     else
-                        addTextureJob(TextureJob::updateContents(bitmap, tileRect));
+                        addTextureJob(TextureJob::updateContents(bitmap, tileRect, m_layer->isOpaque()));
                 }
 
                 finishedJobs.add(*it);
@@ -297,7 +297,7 @@ void LayerTiler::updateTextureContentsIfNeeded(double scale)
                 if (isSolidColor)
                     addTextureJob(TextureJob::setContentsToColor(color, index));
                 else
-                    addTextureJob(TextureJob::updateContents(bitmap, tileRect));
+                    addTextureJob(TextureJob::updateContents(bitmap, tileRect, m_layer->isOpaque()));
             }
         }
     }
@@ -428,18 +428,18 @@ void LayerTiler::processTextureJob(const TextureJob& job, TileJobsMap& tileJobsM
 void LayerTiler::addTileJob(const TileIndex& index, const TextureJob& job, TileJobsMap& tileJobsMap)
 {
     // HashMap::add always returns a valid iterator even the key already exists.
-    pair<TileJobsMap::iterator, bool> result = tileJobsMap.add(index, &job);
+    TileJobsMap::AddResult result = tileJobsMap.add(index, &job);
 
     // Successfully added the new job.
-    if (result.second)
+    if (result.isNewEntry)
         return;
 
     // In this case we leave the previous job.
-    if (job.m_type == TextureJob::DirtyContents && result.first->second->m_type == TextureJob::DiscardContents)
+    if (job.m_type == TextureJob::DirtyContents && result.iterator->second->m_type == TextureJob::DiscardContents)
         return;
 
     // Override the previous job.
-    result.first->second = &job;
+    result.iterator->second = &job;
 }
 
 void LayerTiler::performTileJob(LayerTile* tile, const TextureJob& job, const IntRect& tileRect)
@@ -452,7 +452,7 @@ void LayerTiler::performTileJob(LayerTile* tile, const TextureJob& job, const In
         tile->setContents(job.m_contents, tileRect, indexOfTile(tileRect.location()), job.m_isOpaque);
         return;
     case TextureJob::UpdateContents:
-        tile->updateContents(job.m_contents, job.m_dirtyRect, tileRect);
+        tile->updateContents(job.m_contents, job.m_dirtyRect, tileRect, job.m_isOpaque);
         return;
     case TextureJob::DiscardContents:
         tile->discardContents();

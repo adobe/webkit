@@ -41,17 +41,12 @@
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
-#if ENABLE(CSS_SHADERS)
-#include "CustomFilterProgramClient.h"
-#endif
-
 namespace WebCore {
 
 typedef Vector<RefPtr<FilterEffect> > FilterEffectList;
 class CachedShader;
 class CustomFilterProgram;
 class Document;
-class FilterEffectObserver;
 class GraphicsContext;
 class RenderLayer;
 
@@ -67,26 +62,26 @@ public:
     bool haveFilterEffect() const { return m_haveFilterEffect; }
     bool hasStartedFilterEffect() const { return m_savedGraphicsContext; }
 
-    GraphicsContext* beginFilterEffect(RenderLayer*, GraphicsContext* oldContext, const LayoutRect& filterRect);
+    bool prepareFilterEffect(RenderLayer*, const LayoutRect& filterBoxRect, const LayoutRect& dirtyRect, const LayoutRect& layerRepaintRect);
+    GraphicsContext* beginFilterEffect(GraphicsContext* oldContext);
     GraphicsContext* applyFilterEffect();
 
+    const LayoutRect& repaintRect() const { return m_repaintRect; }
 private:
     GraphicsContext* m_savedGraphicsContext;
     RenderLayer* m_renderLayer;
     LayoutPoint m_paintOffset;
+    LayoutRect m_repaintRect;
     bool m_haveFilterEffect;
 };
 
 class FilterEffectRenderer : public Filter
-#if ENABLE(CSS_SHADERS)
-    , public CustomFilterProgramClient
-#endif
 {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<FilterEffectRenderer> create(FilterEffectObserver* observer)
+    static PassRefPtr<FilterEffectRenderer> create()
     {
-        return adoptRef(new FilterEffectRenderer(observer));
+        return adoptRef(new FilterEffectRenderer());
     }
 
     virtual void setSourceImageRect(const FloatRect& sourceImageRect)
@@ -104,21 +99,21 @@ public:
     GraphicsContext* inputContext();
     ImageBuffer* output() const { return lastEffect()->asImageBuffer(); }
 
-    void build(Document*, const FilterOperations&);
-    void updateBackingStore(const FloatRect& filterRect);
-    void prepare();
+    bool build(Document*, const FilterOperations&);
+    bool updateBackingStoreRect(const FloatRect& filterRect);
+    void allocateBackingStoreIfNeeded();
+    void clearIntermediateResults();
     void apply();
     
     IntRect outputRect() const { return lastEffect()->hasResult() ? lastEffect()->requestedRegionOfInputImageData(IntRect(m_filterRegion)) : IntRect(); }
 
-private:
-#if ENABLE(CSS_SHADERS)
-    // Implementation of the CustomFilterProgramClient interface.
-    virtual void notifyCustomFilterProgramLoaded(CustomFilterProgram*);
-    
-    void removeCustomFilterClients();
-#endif
+    bool hasFilterThatMovesPixels() const { return m_hasFilterThatMovesPixels; }
+    LayoutRect computeSourceImageRectForDirtyRect(const LayoutRect& filterBoxRect, const LayoutRect& dirtyRect);
 
+#if ENABLE(CSS_SHADERS)
+    bool hasCustomShaderFilter() const { return m_hasCustomShaderFilter; }
+#endif
+private:
     void setMaxEffectRects(const FloatRect& effectRect)
     {
         for (size_t i = 0; i < m_effects.size(); ++i) {
@@ -133,7 +128,7 @@ private:
         return 0;
     }
 
-    FilterEffectRenderer(FilterEffectObserver*);
+    FilterEffectRenderer();
     virtual ~FilterEffectRenderer();
     
     FloatRect m_sourceDrawingRegion;
@@ -141,14 +136,17 @@ private:
     
     FilterEffectList m_effects;
     RefPtr<SourceGraphic> m_sourceGraphic;
-    FilterEffectObserver* m_observer; // No need for a strong references here. It owns us.
     
-#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-    typedef Vector<RefPtr<CustomFilterProgram> > CustomFilterProgramList;
-    CustomFilterProgramList m_cachedCustomFilterPrograms;
-#endif
+    int m_topOutset;
+    int m_rightOutset;
+    int m_bottomOutset;
+    int m_leftOutset;
     
     bool m_graphicsBufferAttached;
+    bool m_hasFilterThatMovesPixels;
+#if ENABLE(CSS_SHADERS)
+    bool m_hasCustomShaderFilter;
+#endif
 };
 
 } // namespace WebCore

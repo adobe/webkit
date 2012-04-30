@@ -31,9 +31,9 @@
 #include "config.h"
 #include "CSSCalculationValue.h"
 
-#include "CSSStyleSelector.h"
 #include "CSSValueList.h"
 #include "Length.h"
+#include "StyleResolver.h"
 
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -123,7 +123,7 @@ public:
             return adoptPtr(new CalcExpressionNumber(m_value->computeLength<float>(style, rootStyle, zoom)));
         case CalcPercent:
         case CalcPercentLength:
-            return adoptPtr(new CalcExpressionLength(CSSStyleSelector::convertToFloatLength(m_value.get(), style, rootStyle, zoom)));
+            return adoptPtr(new CalcExpressionLength(StyleResolver::convertToFloatLength(m_value.get(), style, rootStyle, zoom)));
         // Only types that could be part of a Length expression can be converted
         // to a CalcExpressionNode. CalcPercentNumber makes no sense as a Length.
         case CalcPercentNumber:

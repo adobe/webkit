@@ -29,6 +29,7 @@
 #include "NPRuntimeUtilities.h"
 #include "Plugin.h"
 #include "ShareableBitmap.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebEvent.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
@@ -289,7 +290,7 @@ PluginView::~PluginView()
         m_plugin->destroyPlugin();
         m_isBeingDestroyed = false;
 #if PLATFORM(MAC)
-        setComplexTextInputState(PluginComplexTextInputDisabled);
+        pluginFocusOrWindowFocusChanged(false);
 #endif
     }
 
@@ -432,6 +433,19 @@ bool PluginView::sendComplexTextInput(uint64_t pluginComplexTextInputIdentifier,
 
     m_plugin->sendComplexTextInput(textInput);
     return true;
+}
+
+void PluginView::setLayerHostingMode(LayerHostingMode layerHostingMode)
+{
+    if (!m_plugin)
+        return;
+
+    if (!m_isInitialized) {
+        m_parameters.layerHostingMode = layerHostingMode;
+        return;
+    }
+
+    m_plugin->setLayerHostingMode(layerHostingMode);
 }
 
 #endif
@@ -1237,5 +1251,19 @@ void PluginView::didFailLoad(WebFrame* webFrame, bool wasCancelled)
     
     m_plugin->frameDidFail(request->requestID(), wasCancelled);
 }
+
+#if PLUGIN_ARCHITECTURE(X11)
+uint64_t PluginView::createPluginContainer()
+{
+    uint64_t windowID = 0;
+    m_webPage->sendSync(Messages::WebPageProxy::CreatePluginContainer(), Messages::WebPageProxy::CreatePluginContainer::Reply(windowID));
+    return windowID;
+}
+
+void PluginView::windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID)
+{
+    m_webPage->send(Messages::WebPageProxy::WindowedPluginGeometryDidChange(frameRect, clipRect, windowID));
+}
+#endif
 
 } // namespace WebKit

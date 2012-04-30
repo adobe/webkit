@@ -42,7 +42,6 @@ inline bool setInlineCachedWrapper(DOMWrapperWorld* world, Node* node, JSDOMWrap
 {
     if (!world->isNormal())
         return false;
-    ASSERT(!node->wrapper());
     node->setWrapper(*world->globalData(), wrapper, wrapperOwner(world, node), wrapperContext(world, node));
     return true;
 }
@@ -51,8 +50,7 @@ inline bool clearInlineCachedWrapper(DOMWrapperWorld* world, Node* node, JSDOMWr
 {
     if (!world->isNormal())
         return false;
-    ASSERT_UNUSED(wrapper, node->wrapper() == wrapper);
-    node->clearWrapper();
+    node->clearWrapper(wrapper);
     return true;
 }
 
@@ -63,7 +61,7 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, 
     if (!node)
         return JSC::jsNull();
 
-    JSNode* wrapper = static_cast<JSNode*>(getCachedWrapper(currentWorld(exec), node));
+    JSNode* wrapper = JSC::jsCast<JSNode*>(getCachedWrapper(currentWorld(exec), node));
     if (wrapper)
         return wrapper;
 

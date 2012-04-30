@@ -42,29 +42,28 @@ public:
 
     virtual ~TiledLayerChromium();
 
-    virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
-    virtual void setIsMask(bool);
+    virtual void setIsMask(bool) OVERRIDE;
 
-    virtual void pushPropertiesTo(CCLayerImpl*);
+    virtual void pushPropertiesTo(CCLayerImpl*) OVERRIDE;
 
-    virtual bool drawsContent() const;
-    virtual bool needsContentsScale() const;
+    virtual bool drawsContent() const OVERRIDE;
+    virtual bool needsContentsScale() const OVERRIDE;
 
-    virtual IntSize contentBounds() const;
+    virtual IntSize contentBounds() const OVERRIDE;
 
-    virtual void setNeedsDisplayRect(const FloatRect&);
+    virtual void setNeedsDisplayRect(const FloatRect&) OVERRIDE;
 
-    virtual void setIsNonCompositedContent(bool);
+    virtual void setIsNonCompositedContent(bool) OVERRIDE;
 
-    virtual void setLayerTreeHost(CCLayerTreeHost*);
+    virtual void setLayerTreeHost(CCLayerTreeHost*) OVERRIDE;
 
     // Reserves all existing and valid tile textures to protect them from being
     // recycled by the texture manager.
     void protectTileTextures(const IntRect& layerRect);
 
-    virtual void reserveTextures();
+    virtual void reserveTextures() OVERRIDE;
 
-    virtual Region opaqueContentsRegion() const;
+    virtual Region visibleContentOpaqueRegion() const OVERRIDE;
 
 protected:
     TiledLayerChromium();
@@ -89,10 +88,10 @@ protected:
     void resetUpdateState();
 
     // Prepare data needed to update textures that intersect with layerRect.
-    void prepareToUpdate(const IntRect& layerRect, const CCOcclusionTracker*);
+    void updateLayerRect(CCTextureUpdater&, const IntRect& layerRect, const CCOcclusionTracker*);
 
     // Same as above, but this will try to paint additional surrounding content if idle.
-    void prepareToUpdateIdle(const IntRect& layerRect, const CCOcclusionTracker*);
+    void idleUpdateLayerRect(CCTextureUpdater&, const IntRect& layerRect, const CCOcclusionTracker*);
 
     // After preparing an update, returns true if more pre-painting is needed.
     bool needsIdlePaint(const IntRect& layerRect);
@@ -101,12 +100,13 @@ protected:
 
     bool skipsDraw() const { return m_skipsDraw; }
 
-    virtual void protectVisibleTileTextures();
+    virtual void protectVisibleTileTextures() OVERRIDE;
 
+    // Virtual for testing
     virtual TextureManager* textureManager() const;
 
 private:
-    virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl();
+    virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl() OVERRIDE;
 
     void createTilerIfNeeded();
     void setTilingOption(TilingOption);
@@ -114,22 +114,18 @@ private:
     bool tileOnlyNeedsPartialUpdate(UpdatableTile*);
     bool tileNeedsBufferedUpdate(UpdatableTile*);
 
-    void prepareToUpdateTiles(bool idle, int left, int top, int right, int bottom, const CCOcclusionTracker*);
+    void updateTiles(bool idle, int left, int top, int right, int bottom, CCTextureUpdater&, const CCOcclusionTracker*);
 
     UpdatableTile* tileAt(int, int) const;
     UpdatableTile* createTile(int, int);
-
-    // Temporary state held between prepareToUpdate() and updateCompositorResources().
-    IntRect m_requestedUpdateTilesRect;
-
-    // State held between prepareToUpdate() and pushPropertiesTo(). This represents the area
-    // of the layer that is actually re-painted by WebKit.
-    IntRect m_paintRect;
 
     GC3Denum m_textureFormat;
     bool m_skipsDraw;
     bool m_skipsIdlePaint;
     LayerTextureUpdater::SampledTexelFormat m_sampledTexelFormat;
+
+    // Tracks if we've done any painting on this update cycle.
+    bool m_didPaint;
 
     TilingOption m_tilingOption;
     OwnPtr<CCLayerTilingData> m_tiler;

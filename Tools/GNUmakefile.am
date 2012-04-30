@@ -12,6 +12,8 @@ Programs_GtkLauncher_CPPFLAGS = \
 	$(javascriptcore_cppflags)
 
 Programs_GtkLauncher_SOURCES = \
+	Tools/GtkLauncher/LauncherInspectorWindow.c \
+	Tools/GtkLauncher/LauncherInspectorWindow.h \
 	Tools/GtkLauncher/main.c
 
 Programs_GtkLauncher_CFLAGS = \
@@ -45,7 +47,6 @@ libWebCoreInternals_la_SOURCES = \
 	Source/WebCore/testing/Internals.h \
 	Source/WebCore/testing/InternalSettings.cpp \
 	Source/WebCore/testing/InternalSettings.h \
-	Source/WebCore/testing/js/JSInternalsCustom.cpp \
 	Source/WebCore/testing/js/WebCoreTestSupport.cpp \
 	Source/WebCore/testing/js/WebCoreTestSupport.h
 
@@ -198,6 +199,11 @@ TestNetscapePlugin_libtestnetscapeplugin_la_CPPFLAGS = \
 # For the Gtk port we want to use XP_UNIX both on X11 and Mac
 if !TARGET_WIN32
 TestNetscapePlugin_libtestnetscapeplugin_la_CPPFLAGS += -DXP_UNIX
+endif
+
+# Add MOZ_X11 only for X11 targets
+if TARGET_X11
+TestNetscapePlugin_libtestnetscapeplugin_la_CPPFLAGS += -DMOZ_X11
 endif
 
 TestNetscapePlugin_libtestnetscapeplugin_la_SOURCES = \

@@ -54,6 +54,8 @@ private:
     // DrawingAreaProxy
     virtual void sizeDidChange();
     virtual void deviceScaleFactorDidChange();
+    virtual void layerHostingModeDidChange() OVERRIDE;
+
     virtual void visibilityDidChange();
     virtual void setBackingStoreIsDiscardable(bool);
     virtual void waitForBackingStoreUpdateOnNextPaint();
@@ -79,8 +81,6 @@ private:
 
 #if USE(UI_SIDE_COMPOSITING)
     virtual void setVisibleContentsRect(const WebCore::IntRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectory);
-    virtual void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float opacity, const WebCore::FloatRect&);
-    virtual void paintLayerTree(BackingStore::PlatformGraphicsContext);
     void didReceiveLayerTreeHostProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 #endif
 #else

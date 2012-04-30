@@ -69,7 +69,7 @@ static v8::Handle<v8::Value> v8HTMLImageElementConstructorCallback(const v8::Arg
     // FIXME: The correct way to do this would be to make HTMLImageElement derive from
     // ActiveDOMObject and use its interface to keep its wrapper alive. Then we would
     // remove this code and the special case in isObservableThroughDOM.
-    toV8(document);
+    toV8(document, args.GetIsolate());
 
     int width;
     int height;
@@ -86,8 +86,7 @@ static v8::Handle<v8::Value> v8HTMLImageElementConstructorCallback(const v8::Arg
 
     RefPtr<HTMLImageElement> image = HTMLImageElement::createForJSConstructor(document, optionalWidth, optionalHeight);
     V8DOMWrapper::setDOMWrapper(args.Holder(), &V8HTMLImageElementConstructor::info, image.get());
-    image->ref();
-    V8DOMWrapper::setJSWrapperForDOMNode(image.get(), v8::Persistent<v8::Object>::New(args.Holder()));
+    V8DOMWrapper::setJSWrapperForDOMNode(image.release(), v8::Persistent<v8::Object>::New(args.Holder()));
     return args.Holder();
 }
 

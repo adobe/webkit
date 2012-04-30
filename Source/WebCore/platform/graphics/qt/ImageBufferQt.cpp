@@ -94,9 +94,10 @@ QImage ImageBufferData::toQImage() const
     return image;
 }
 
-ImageBuffer::ImageBuffer(const IntSize& size, ColorSpace, RenderingMode, DeferralMode, bool& success)
+ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, ColorSpace, RenderingMode, DeferralMode, bool& success)
     : m_data(size)
     , m_size(size)
+    , m_logicalSize(size)
 {
     success = m_data.m_painter && m_data.m_painter->isActive();
     if (!success)
@@ -130,9 +131,9 @@ void ImageBuffer::draw(GraphicsContext* destContext, ColorSpace styleColorSpace,
     if (destContext == context()) {
         // We're drawing into our own buffer.  In order for this to work, we need to copy the source buffer first.
         RefPtr<Image> copy = copyImage(CopyBackingStore);
-        destContext->drawImage(copy.get(), ColorSpaceDeviceRGB, destRect, srcRect, op, useLowQualityScale);
+        destContext->drawImage(copy.get(), ColorSpaceDeviceRGB, destRect, srcRect, op, DoNotRespectImageOrientation, useLowQualityScale);
     } else
-        destContext->drawImage(m_data.m_image.get(), styleColorSpace, destRect, srcRect, op, useLowQualityScale);
+        destContext->drawImage(m_data.m_image.get(), styleColorSpace, destRect, srcRect, op, DoNotRespectImageOrientation, useLowQualityScale);
 }
 
 void ImageBuffer::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
@@ -188,17 +189,17 @@ void ImageBuffer::platformTransformColorSpace(const Vector<int>& lookUpTable)
 }
 
 template <Multiply multiplied>
-PassRefPtr<ByteArray> getImageData(const IntRect& rect, const ImageBufferData& imageData, const IntSize& size)
+PassRefPtr<Uint8ClampedArray> getImageData(const IntRect& rect, const ImageBufferData& imageData, const IntSize& size)
 {
     float area = 4.0f * rect.width() * rect.height();
     if (area > static_cast<float>(std::numeric_limits<int>::max()))
         return 0;
 
-    RefPtr<ByteArray> result = ByteArray::create(rect.width() * rect.height() * 4);
+    RefPtr<Uint8ClampedArray> result = Uint8ClampedArray::createUninitialized(rect.width() * rect.height() * 4);
     unsigned char* data = result->data();
 
     if (rect.x() < 0 || rect.y() < 0 || rect.maxX() > size.width() || rect.maxY() > size.height())
-        memset(data, 0, result->length());
+        result->zeroFill();
 
     int originx = rect.x();
     int destx = 0;
@@ -270,12 +271,12 @@ PassRefPtr<ByteArray> getImageData(const IntRect& rect, const ImageBufferData& i
     return result.release();
 }
 
-PassRefPtr<ByteArray> ImageBuffer::getUnmultipliedImageData(const IntRect& rect) const
+PassRefPtr<Uint8ClampedArray> ImageBuffer::getUnmultipliedImageData(const IntRect& rect, CoordinateSystem) const
 {
     return getImageData<Unmultiplied>(rect, m_data, m_size);
 }
 
-PassRefPtr<ByteArray> ImageBuffer::getPremultipliedImageData(const IntRect& rect) const
+PassRefPtr<Uint8ClampedArray> ImageBuffer::getPremultipliedImageData(const IntRect& rect, CoordinateSystem) const
 {
     return getImageData<Premultiplied>(rect, m_data, m_size);
 }
@@ -296,7 +297,7 @@ static inline unsigned int premultiplyABGRtoARGB(unsigned int x)
     return x;
 }
 
-void ImageBuffer::putByteArray(Multiply multiplied, ByteArray* source, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint)
+void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint, CoordinateSystem)
 {
     ASSERT(sourceRect.width() > 0);
     ASSERT(sourceRect.height() > 0);
@@ -376,34 +377,31 @@ void ImageBuffer::putByteArray(Multiply multiplied, ByteArray* source, const Int
         m_data.m_painter->restore();
 }
 
-// We get a mimeType here but QImageWriter does not support mimetypes but
-// only formats (png, gif, jpeg..., xpm). So assume we get image/ as image
-// mimetypes and then remove the image/ to get the Qt format.
-String ImageBuffer::toDataURL(const String& mimeType, const double* quality) const
+static bool encodeImage(const QPixmap& pixmap, const String& format, const double* quality, QByteArray& data)
+{
+    int compressionQuality = 100;
+    if (quality && *quality >= 0.0 && *quality <= 1.0)
+        compressionQuality = static_cast<int>(*quality * 100 + 0.5);
+
+    QBuffer buffer(&data);
+    buffer.open(QBuffer::WriteOnly);
+    bool success = pixmap.save(&buffer, format.utf8().data(), compressionQuality);
+    buffer.close();
+
+    return success;
+}
+
+String ImageBuffer::toDataURL(const String& mimeType, const double* quality, CoordinateSystem) const
 {
     ASSERT(MIMETypeRegistry::isSupportedImageMIMETypeForEncoding(mimeType));
 
-    if (!mimeType.startsWith("image/"))
-        return "data:,";
+    // QImageWriter does not support mimetypes. It does support Qt image formats (png,
+    // gif, jpeg..., xpm) so skip the image/ to get the Qt image format used to encode
+    // the m_pixmap image.
 
-    // prepare our target
     QByteArray data;
-    QBuffer buffer(&data);
-    buffer.open(QBuffer::WriteOnly);
-
-    if (quality && *quality >= 0.0 && *quality <= 1.0) {
-        if (!m_data.m_pixmap.save(&buffer, mimeType.substring(sizeof "image").utf8().data(), *quality * 100 + 0.5)) {
-            buffer.close();
-            return "data:,";
-        }
-    } else {
-        if (!m_data.m_pixmap.save(&buffer, mimeType.substring(sizeof "image").utf8().data(), 100)) {
-            buffer.close();
-            return "data:,";
-        }
-    }
-
-    buffer.close();
+    if (!encodeImage(m_data.m_pixmap, mimeType.substring(sizeof "image"), quality, data))
+        return "data:,";
 
     return "data:" + mimeType + ";base64," + data.toBase64().data();
 }

@@ -455,7 +455,7 @@ void WebViewHost::requestCheckingOfText(const WebString& text, WebTextCheckingCo
 {
     if (text.isEmpty()) {
         if (completion)
-            completion->didFinishCheckingText(Vector<WebTextCheckingResult>());
+            completion->didCancelCheckingText();
         return;
     }
 
@@ -757,9 +757,16 @@ void WebViewHost::scheduleComposite()
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
+void WebViewHost::serviceAnimation()
+{
+    if (webView()->settings()->scrollAnimatorEnabled())
+        webView()->animate(0.0);
+    scheduleComposite();
+}
+
 void WebViewHost::scheduleAnimation()
 {
-    postDelayedTask(new HostMethodTask(this, &WebViewHost::scheduleComposite), 0);
+    postDelayedTask(new HostMethodTask(this, &WebViewHost::serviceAnimation), 0);
 }
 #endif
 
@@ -1320,7 +1327,21 @@ void WebViewHost::dispatchIntent(WebFrame* source, const WebIntentRequest& reque
     printf("Received Web Intent: action=%s type=%s\n",
            request.intent().action().utf8().data(),
            request.intent().type().utf8().data());
+    WebMessagePortChannelArray* ports = request.intent().messagePortChannelsRelease();
     m_currentRequest = request;
+    if (ports) {
+        printf("Have %d ports\n", static_cast<int>(ports->size()));
+        for (size_t i = 0; i < ports->size(); ++i)
+            (*ports)[i]->destroy();
+        delete ports;
+    }
+    if (!request.intent().service().isEmpty())
+        printf("Explicit intent service: %s\n", request.intent().service().spec().data());
+    WebVector<WebString> extras = request.intent().extrasNames();
+    for (size_t i = 0; i < extras.size(); ++i) {
+        printf("Extras[%s] = %s\n", extras[i].utf8().data(),
+               request.intent().extrasValue(extras[i]).utf8().data());
+    }
 }
 
 // Public functions -----------------------------------------------------------
@@ -1655,12 +1676,18 @@ void WebViewHost::setAddressBarURL(const WebURL&)
 
 void WebViewHost::enterFullScreenNow()
 {
+    if (layoutTestController()->hasCustomFullScreenBehavior())
+        return;
+
     webView()->willEnterFullScreen();
     webView()->didEnterFullScreen();
 }
 
 void WebViewHost::exitFullScreenNow()
 {
+    if (layoutTestController()->hasCustomFullScreenBehavior())
+        return;
+
     webView()->willExitFullScreen();
     webView()->didExitFullScreen();
 }

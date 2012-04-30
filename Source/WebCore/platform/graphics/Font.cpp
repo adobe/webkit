@@ -27,9 +27,6 @@
 #include "FloatRect.h"
 #include "FontCache.h"
 #include "FontTranscoder.h"
-#if PLATFORM(QT) && HAVE(QRAWFONT)
-#include "GraphicsContext.h"
-#endif
 #include "IntPoint.h"
 #include "GlyphBuffer.h"
 #include "TextRun.h"
@@ -151,11 +148,6 @@ void Font::drawText(GraphicsContext* context, const TextRun& run, const FloatPoi
 
     CodePath codePathToUse = codePath(run);
 
-#if PLATFORM(QT) && HAVE(QRAWFONT)
-    if (context->textDrawingMode() & TextModeStroke)
-        codePathToUse = Complex;
-#endif
-
     if (codePathToUse != Complex)
         return drawSimpleText(context, run, point, from, to);
 
@@ -274,17 +266,27 @@ Font::CodePath Font::codePath(const TextRun& run) const
 
     if (m_fontDescription.featureSettings() && m_fontDescription.featureSettings()->size() > 0)
         return Complex;
+    
+    if (run.length() > 1 && typesettingFeatures())
+        return Complex;
 
-    CodePath result = Simple;
+    if (!run.characterScanForCodePath())
+        return Simple;
 
-    // Start from 0 since drawing and highlighting also measure the characters before run->from
+    // Start from 0 since drawing and highlighting also measure the characters before run->from.
+    return characterRangeCodePath(run.characters(), run.length());
+}
+
+Font::CodePath Font::characterRangeCodePath(const UChar* characters, unsigned len)
+{
     // FIXME: Should use a UnicodeSet in ports where ICU is used. Note that we 
     // can't simply use UnicodeCharacter Property/class because some characters
     // are not 'combining', but still need to go to the complex path.
     // Alternatively, we may as well consider binary search over a sorted
     // list of ranges.
-    for (int i = 0; i < run.length(); i++) {
-        const UChar c = run[i];
+    CodePath result = Simple;
+    for (unsigned i = 0; i < len; i++) {
+        const UChar c = characters[i];
         if (c < 0x2E5) // U+02E5 through U+02E9 (Modifier Letters : Tone letters)  
             continue;
         if (c <= 0x2E9) 
@@ -391,10 +393,10 @@ Font::CodePath Font::codePath(const TextRun& run) const
         if (c <= 0xDBFF) {
             // High surrogate
 
-            if (i == run.length() - 1)
+            if (i == len - 1)
                 continue;
 
-            UChar next = run[++i];
+            UChar next = characters[++i];
             if (!U16_IS_TRAIL(next))
                 continue;
 
@@ -426,10 +428,6 @@ Font::CodePath Font::codePath(const TextRun& run) const
         if (c <= 0xFE2F)
             return Complex;
     }
-
-    if (run.length() > 1 && typesettingFeatures())
-        return Complex;
-
     return result;
 }
 

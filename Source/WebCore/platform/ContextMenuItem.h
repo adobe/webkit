@@ -27,6 +27,8 @@
 #ifndef ContextMenuItem_h
 #define ContextMenuItem_h
 
+#if ENABLE(CONTEXT_MENUS)
+
 #include "PlatformMenuDescription.h"
 #include "PlatformString.h"
 #include <wtf/OwnPtr.h>
@@ -42,6 +44,7 @@ typedef struct _GtkAction GtkAction;
 #elif PLATFORM(WX)
 class wxMenuItem;
 #endif
+#endif // ENABLE(CONTEXT_MENUS)
 
 namespace WebCore {
 
@@ -173,6 +176,7 @@ namespace WebCore {
         SubmenuType
     };
 
+#if ENABLE(CONTEXT_MENUS)
 #if PLATFORM(MAC)
     typedef NSMenuItem* PlatformMenuItemDescription;
 #elif PLATFORM(QT)
@@ -301,6 +305,7 @@ namespace WebCore {
 #endif // USE(CROSS_PLATFORM_CONTEXT_MENUS)
     };
 
+#endif // ENABLE(CONTEXT_MENUS)
 }
 
 #endif // ContextMenuItem_h

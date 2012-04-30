@@ -122,8 +122,8 @@ namespace JSC {
         {
             accessType = access_get_by_id_self_list;
 
-            u.getByIdProtoList.structureList = structureList;
-            u.getByIdProtoList.listSize = listSize;
+            u.getByIdSelfList.structureList = structureList;
+            u.getByIdSelfList.listSize = listSize;
         }
 
         void initGetByIdProtoList(PolymorphicAccessStructureList* structureList, int listSize)
@@ -163,8 +163,8 @@ namespace JSC {
         
         void reset()
         {
-            accessType = access_unset;
             deref();
+            accessType = access_unset;
             stubRoutine = MacroAssemblerCodeRef();
         }
 
@@ -186,27 +186,60 @@ namespace JSC {
 
         int8_t accessType;
         int8_t seen;
-        
+
 #if ENABLE(DFG_JIT)
         CodeOrigin codeOrigin;
-        int8_t registersFlushed;
-        int8_t baseGPR;
-#if USE(JSVALUE32_64)
-        int8_t valueTagGPR;
-#endif
-        int8_t valueGPR;
-        int8_t scratchGPR;
-        int16_t deltaCallToDone;
-        int16_t deltaCallToStructCheck;
-        int16_t deltaCallToSlowCase;
-        int16_t deltaCheckImmToCall;
-#if USE(JSVALUE64)
-        int16_t deltaCallToLoadOrStore;
-#else
-        int16_t deltaCallToTagLoadOrStore;
-        int16_t deltaCallToPayloadLoadOrStore;
-#endif
 #endif // ENABLE(DFG_JIT)
+
+        union {
+            struct {
+                int8_t registersFlushed;
+                int8_t baseGPR;
+#if USE(JSVALUE32_64)
+                int8_t valueTagGPR;
+#endif
+                int8_t valueGPR;
+                int8_t scratchGPR;
+                int16_t deltaCallToDone;
+                int16_t deltaCallToStructCheck;
+                int16_t deltaCallToSlowCase;
+                int16_t deltaCheckImmToCall;
+#if USE(JSVALUE64)
+                int16_t deltaCallToLoadOrStore;
+#else
+                int16_t deltaCallToTagLoadOrStore;
+                int16_t deltaCallToPayloadLoadOrStore;
+#endif
+            } dfg;
+            struct {
+                union {
+                    struct {
+                        int16_t structureToCompare;
+                        int16_t structureCheck;
+#if USE(JSVALUE64)
+                        int16_t displacementLabel;
+#else
+                        int16_t displacementLabel1;
+                        int16_t displacementLabel2;
+#endif
+                        int16_t putResult;
+                        int16_t coldPathBegin;
+                    } get;
+                    struct {
+                        int16_t structureToCompare;
+#if USE(JSVALUE64)
+                        int16_t displacementLabel;
+#else
+                        int16_t displacementLabel1;
+                        int16_t displacementLabel2;
+#endif
+                    } put;
+                } u;
+                int16_t methodCheckProtoObj;
+                int16_t methodCheckProtoStructureToCompare;
+                int16_t methodCheckPutFunction;
+            } baseline;
+        } patch;
 
         union {
             struct {

@@ -55,13 +55,15 @@ bool RuntimeEnabledFeatures::isTouchEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceMotionEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceOrientationEnabled = true;
 bool RuntimeEnabledFeatures::isSpeechInputEnabled = true;
+bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = false;
 
 #if ENABLE(SCRIPTED_SPEECH)
 bool RuntimeEnabledFeatures::isScriptedSpeechEnabled = false;
 #endif
 
 #if ENABLE(MEDIA_STREAM)
-bool RuntimeEnabledFeatures::isMediaStreamEnabled = true;
+bool RuntimeEnabledFeatures::isMediaStreamEnabled = false;
+bool RuntimeEnabledFeatures::isPeerConnectionEnabled = true;
 #endif
 
 #if ENABLE(GAMEPAD)
@@ -177,11 +179,15 @@ bool RuntimeEnabledFeatures::isMediaSourceEnabled = false;
 #endif
 
 #if ENABLE(VIDEO_TRACK)
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL)
     bool RuntimeEnabledFeatures::isVideoTrackEnabled = true;
 #else
     bool RuntimeEnabledFeatures::isVideoTrackEnabled = false;
 #endif
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA)
+bool RuntimeEnabledFeatures::isEncryptedMediaEnabled = false;
 #endif
 
 #if ENABLE(SHADOW_DOM)
@@ -191,4 +197,9 @@ bool RuntimeEnabledFeatures::isShadowDOMEnabled = false;
 #if ENABLE(STYLE_SCOPED)
 bool RuntimeEnabledFeatures::isStyleScopedEnabled = false;
 #endif
+
+#if ENABLE(INPUT_TYPE_DATE)
+bool RuntimeEnabledFeatures::isInputTypeDateEnabled = true;
+#endif
+
 } // namespace WebCore

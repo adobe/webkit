@@ -544,6 +544,8 @@ XMLDocumentParser::XMLDocumentParser(Document* document, FrameView* frameView)
     , m_view(frameView)
     , m_context(0)
     , m_pendingCallbacks(PendingCallbacks::create())
+    , m_depthTriggeringEntityExpansion(-1)
+    , m_isParsingEntityDeclaration(false)
     , m_currentNode(document)
     , m_sawError(false)
     , m_sawCSS(false)
@@ -566,6 +568,8 @@ XMLDocumentParser::XMLDocumentParser(DocumentFragment* fragment, Element* parent
     , m_view(0)
     , m_context(0)
     , m_pendingCallbacks(PendingCallbacks::create())
+    , m_depthTriggeringEntityExpansion(-1)
+    , m_isParsingEntityDeclaration(false)
     , m_currentNode(fragment)
     , m_sawError(false)
     , m_sawCSS(false)
@@ -731,6 +735,19 @@ static inline void handleElementAttributes(Element* newElement, const xmlChar** 
     }
 }
 
+// This is a hack around https://bugzilla.gnome.org/show_bug.cgi?id=502960
+// Otherwise libxml doesn't include namespace for parsed entities, breaking entity
+// expansion for all entities containing elements.
+static inline bool hackAroundLibXMLEntityParsingBug()
+{
+#if LIBXML_VERSION >= 20704
+    // This bug has been fixed in libxml 2.7.4.
+    return false;
+#else
+    return true;
+#endif
+}
+
 void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlChar* xmlPrefix, const xmlChar* xmlURI, int nb_namespaces,
                                   const xmlChar** libxmlNamespaces, int nb_attributes, int nb_defaulted, const xmlChar** libxmlAttributes)
 {
@@ -755,6 +772,11 @@ void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlCha
         else
             uri = m_defaultNamespaceURI;
     }
+
+    // If libxml entity parsing is broken, transfer the currentNodes' namespaceURI to the new node,
+    // if we're currently expanding elements which originate from an entity declaration.
+    if (hackAroundLibXMLEntityParsingBug() && depthTriggeringEntityExpansion() != -1 && context()->depth > depthTriggeringEntityExpansion() && uri.isNull() && prefix.isNull())
+        uri = m_currentNode->namespaceURI();
 
     bool isFirstElement = !m_sawFirstElement;
     m_sawFirstElement = true;
@@ -816,6 +838,10 @@ void XMLDocumentParser::endElementNs()
 
     RefPtr<ContainerNode> n = m_currentNode;
     n->finishParsingChildren();
+
+    // Once we reach the depth again where entity expansion started, stop executing the work-around.
+    if (hackAroundLibXMLEntityParsingBug() && context()->depth <= depthTriggeringEntityExpansion())
+        setDepthTriggeringEntityExpansion(-1);
 
     if (m_scriptingPermission == FragmentScriptingNotAllowed && n->isElementNode() && toScriptElement(static_cast<Element*>(n.get()))) {
         popCurrentNode();
@@ -984,15 +1010,28 @@ void XMLDocumentParser::comment(const xmlChar* s)
         newNode->attach();
 }
 
+enum StandaloneInfo {
+    StandaloneUnspecified = -2,
+    NoXMlDeclaration,
+    StandaloneNo,
+    StandaloneYes
+};
+
 void XMLDocumentParser::startDocument(const xmlChar* version, const xmlChar* encoding, int standalone)
 {
-    ExceptionCode ec = 0;
+    StandaloneInfo standaloneInfo = (StandaloneInfo)standalone;
+    if (standaloneInfo == NoXMlDeclaration) {
+        document()->setHasXMLDeclaration(false);
+        return;
+    }
 
     if (version)
-        document()->setXMLVersion(toString(version), ec);
-    document()->setXMLStandalone(standalone == 1, ec); // possible values are 0, 1, and -1
+        document()->setXMLVersion(toString(version), ASSERT_NO_EXCEPTION);
+    if (standalone != StandaloneUnspecified)
+        document()->setXMLStandalone(standaloneInfo == StandaloneYes, ASSERT_NO_EXCEPTION);
     if (encoding)
         document()->setXMLEncoding(toString(encoding));
+    document()->setHasXMLDeclaration(true);
 }
 
 void XMLDocumentParser::endDocument()
@@ -1142,9 +1181,34 @@ static xmlEntityPtr getXHTMLEntity(const xmlChar* name)
     return entity;
 }
 
+static void entityDeclarationHandler(void* closure, const xmlChar* name, int type, const xmlChar* publicId, const xmlChar* systemId, xmlChar* content)
+{
+    // Prevent the next call to getEntityHandler() to record the entity expansion depth.
+    // We're parsing the entity declaration, so there's no need to record anything.
+    // We only need to record the depth, if we're actually expanding the entity, when it's referenced.
+    if (hackAroundLibXMLEntityParsingBug())
+        getParser(closure)->setIsParsingEntityDeclaration(true);
+    xmlSAX2EntityDecl(closure, name, type, publicId, systemId, content);
+}
+
 static xmlEntityPtr getEntityHandler(void* closure, const xmlChar* name)
 {
     xmlParserCtxtPtr ctxt = static_cast<xmlParserCtxtPtr>(closure);
+
+    XMLDocumentParser* parser = getParser(closure);
+    if (hackAroundLibXMLEntityParsingBug()) {
+        if (parser->isParsingEntityDeclaration()) {
+            // We're parsing the entity declarations (not an entity reference), no need to do anything special.
+            parser->setIsParsingEntityDeclaration(false);
+            ASSERT(parser->depthTriggeringEntityExpansion() == -1);
+        } else {
+            // The entity will be used and eventually expanded. Record the current parser depth
+            // so the next call to startElementNs() knows that the new element originates from
+            // an entity declaration.
+            parser->setDepthTriggeringEntityExpansion(ctxt->depth);
+        }
+    }
+
     xmlEntityPtr ent = xmlGetPredefinedEntity(name);
     if (ent) {
         ent->etype = XML_INTERNAL_PREDEFINED_ENTITY;
@@ -1152,7 +1216,7 @@ static xmlEntityPtr getEntityHandler(void* closure, const xmlChar* name)
     }
 
     ent = xmlGetDocEntity(ctxt->myDoc, name);
-    if (!ent && getParser(closure)->isXHTMLDocument()) {
+    if (!ent && parser->isXHTMLDocument()) {
         ent = getXHTMLEntity(name);
         if (ent)
             ent->etype = XML_INTERNAL_GENERAL_ENTITY;
@@ -1222,7 +1286,7 @@ void XMLDocumentParser::initializeParserContext(const CString& chunk)
     sax.internalSubset = internalSubsetHandler;
     sax.externalSubset = externalSubsetHandler;
     sax.ignorableWhitespace = ignorableWhitespaceHandler;
-    sax.entityDecl = xmlSAX2EntityDecl;
+    sax.entityDecl = entityDeclarationHandler;
     sax.initialized = XML_SAX2_MAGIC;
     DocumentParser::startParsing();
     m_sawError = false;
@@ -1264,7 +1328,7 @@ void XMLDocumentParser::doEnd()
         document()->setTransformSource(adoptPtr(new TransformSource(doc)));
 
         document()->setParsing(false); // Make the document think it's done, so it will apply XSL stylesheets.
-        document()->styleSelectorChanged(RecalcStyleImmediately);
+        document()->styleResolverChanged(RecalcStyleImmediately);
         document()->setParsing(true);
 
         DocumentParser::stopParsing();

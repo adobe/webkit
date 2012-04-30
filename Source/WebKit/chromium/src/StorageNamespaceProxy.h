@@ -39,12 +39,13 @@ public:
     virtual ~StorageNamespaceProxy();
     virtual PassRefPtr<StorageArea> storageArea(PassRefPtr<SecurityOrigin>);
     virtual PassRefPtr<StorageNamespace> copy();
+
     virtual void close();
-    
     virtual void clearOriginForDeletion(SecurityOrigin*);
     virtual void clearAllOriginsForDeletion();
-    
     virtual void sync();
+
+    bool isSameNamespace(const WebKit::WebStorageNamespace&);
 
 private:
     OwnPtr<WebKit::WebStorageNamespace> m_storageNamespace;

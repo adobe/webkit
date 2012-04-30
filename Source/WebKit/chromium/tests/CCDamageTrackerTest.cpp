@@ -30,6 +30,7 @@
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerSorter.h"
 #include "cc/CCLayerTreeHostCommon.h"
+#include "cc/CCMathUtil.h"
 #include "cc/CCSingleThreadProxy.h"
 #include <gtest/gtest.h>
 
@@ -70,7 +71,7 @@ void emulateDrawingOneFrame(CCLayerImpl* root)
     // Iterate back-to-front, so that damage correctly propagates from descendant surfaces to ancestors.
     for (int i = renderSurfaceLayerList.size() - 1; i >= 0; --i) {
         CCRenderSurface* targetSurface = renderSurfaceLayerList[i]->renderSurface();
-        targetSurface->damageTracker()->updateDamageTrackingState(targetSurface->layerList(), targetSurface->owningLayerId(), targetSurface->surfacePropertyChangedOnlyFromDescendant(), targetSurface->contentRect(), renderSurfaceLayerList[i]->maskLayer());
+        targetSurface->damageTracker()->updateDamageTrackingState(targetSurface->layerList(), targetSurface->owningLayerId(), targetSurface->surfacePropertyChangedOnlyFromDescendant(), targetSurface->contentRect(), renderSurfaceLayerList[i]->maskLayer(), renderSurfaceLayerList[i]->filters());
     }
 
     root->resetAllChangeTrackingForSubtree();
@@ -315,6 +316,146 @@ TEST_F(CCDamageTrackerTest, verifyDamageForTransformedLayer)
     EXPECT_FLOAT_RECT_EQ(expectedRect, rootDamageRect);
 }
 
+TEST_F(CCDamageTrackerTest, verifyDamageForPerspectiveClippedLayer)
+{
+    // If a layer has a perspective transform that causes w < 0, then not clipping the
+    // layer can cause an invalid damage rect. This test checks that the w < 0 case is
+    // tracked properly.
+    //
+    // The transform is constructed so that if w < 0 clipping is not performed, the
+    // incorrect rect will be very small, specifically: position (-3.153448, -2.750628) and size 8.548689 x 5.661383.
+    // Instead, the correctly transformed rect should actually be very huge (i.e. in theory, infinite)
+
+    OwnPtr<CCLayerImpl> root = createAndSetUpTestTreeWithOneSurface();
+    CCLayerImpl* child = root->children()[0].get();
+
+    TransformationMatrix transform;
+    transform.applyPerspective(1);
+    transform.translate3d(-150, -50, 0);
+    transform.rotate3d(0, 45, 0);
+    transform.translate3d(-50, -50, 0);
+
+    // Set up the child
+    child->setPosition(FloatPoint(0, 0));
+    child->setBounds(IntSize(100, 100));
+    child->setTransform(transform);
+    emulateDrawingOneFrame(root.get());
+
+    // Sanity check that the child layer's bounds would actually get clipped by w < 0,
+    // otherwise this test is not actually testing the intended scenario.
+    FloatQuad testQuad(FloatRect(FloatPoint::zero(), FloatSize(100, 100)));
+    bool clipped = false;
+    CCMathUtil::mapQuad(transform, testQuad, clipped);
+    EXPECT_TRUE(clipped);
+
+    // Damage the child without moving it.
+    child->setOpacity(0.5);
+    emulateDrawingOneFrame(root.get());
+
+    // The expected damage should cover the entire root surface (500x500), but we don't
+    // care whether the damage rect was clamped or is larger than the surface for this test.
+    FloatRect rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
+    EXPECT_GE(rootDamageRect.width(), 500);
+    EXPECT_GE(rootDamageRect.height(), 500);
+}
+
+TEST_F(CCDamageTrackerTest, verifyDamageForBlurredSurface)
+{
+    OwnPtr<CCLayerImpl> root = createAndSetUpTestTreeWithOneSurface();
+    CCLayerImpl* child = root->children()[0].get();
+
+    FilterOperations filters;
+    filters.operations().append(BlurFilterOperation::create(Length(5, WebCore::Fixed), FilterOperation::BLUR));
+    int outsetTop, outsetRight, outsetBottom, outsetLeft;
+    filters.getOutsets(outsetTop, outsetRight, outsetBottom, outsetLeft);
+    root->setFilters(filters);
+
+    // Setting the filter will damage the whole surface.
+    emulateDrawingOneFrame(root.get());
+
+    // Setting the update rect should cause the corresponding damage to the surface, blurred based on the size of the blur filter.
+    child->setUpdateRect(FloatRect(10, 11, 12, 13));
+    emulateDrawingOneFrame(root.get());
+
+    // Damage position on the surface should be: position of updateRect (10, 11) relative to the child (100, 100), but expanded by the blur outsets.
+    FloatRect rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
+    FloatRect expectedDamageRect = FloatRect(110, 111, 12, 13);
+    expectedDamageRect.move(-outsetLeft, -outsetTop);
+    expectedDamageRect.expand(outsetLeft + outsetRight, outsetTop + outsetBottom);
+    EXPECT_FLOAT_RECT_EQ(expectedDamageRect, rootDamageRect);
+}
+
+TEST_F(CCDamageTrackerTest, verifyDamageForBackgroundBlurredChild)
+{
+    OwnPtr<CCLayerImpl> root = createAndSetUpTestTreeWithTwoSurfaces();
+    CCLayerImpl* child1 = root->children()[0].get();
+    CCLayerImpl* child2 = root->children()[1].get();
+
+    FilterOperations filters;
+    filters.operations().append(BlurFilterOperation::create(Length(2, WebCore::Fixed), FilterOperation::BLUR));
+    int outsetTop, outsetRight, outsetBottom, outsetLeft;
+    filters.getOutsets(outsetTop, outsetRight, outsetBottom, outsetLeft);
+    child1->setBackgroundFilters(filters);
+
+    // Setting the filter will damage the whole surface.
+    emulateDrawingOneFrame(root.get());
+
+    // CASE 1: Setting the update rect should cause the corresponding damage to
+    // the surface, blurred based on the size of the child's background blur
+    // filter.
+    root->setUpdateRect(FloatRect(297, 297, 2, 2));
+
+    emulateDrawingOneFrame(root.get());
+
+    FloatRect rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
+    // Damage position on the surface should be a composition of the damage on the root and on child2.
+    // Damage on the root should be: position of updateRect (297, 297), but expanded by the blur outsets.
+    FloatRect expectedDamageRect = FloatRect(297, 297, 2, 2);
+    expectedDamageRect.move(-outsetLeft, -outsetTop);
+    expectedDamageRect.expand(outsetLeft + outsetRight, outsetTop + outsetBottom);
+    EXPECT_FLOAT_RECT_EQ(expectedDamageRect, rootDamageRect);
+
+    // CASE 2: Setting the update rect should cause the corresponding damage to
+    // the surface, blurred based on the size of the child's background blur
+    // filter. Since the damage extends to the right/bottom outside of the
+    // blurred layer, only the left/top should end up expanded.
+    root->setUpdateRect(FloatRect(297, 297, 30, 30));
+
+    emulateDrawingOneFrame(root.get());
+
+    rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
+    // Damage position on the surface should be a composition of the damage on the root and on child2.
+    // Damage on the root should be: position of updateRect (297, 297), but expanded on the left/top
+    // by the blur outsets.
+    expectedDamageRect = FloatRect(297, 297, 30, 30);
+    expectedDamageRect.move(-outsetLeft, -outsetTop);
+    expectedDamageRect.expand(outsetLeft, outsetTop);
+    EXPECT_FLOAT_RECT_EQ(expectedDamageRect, rootDamageRect);
+
+    // CASE 3: Setting this update rect outside the contentBounds of the blurred
+    // child1 will not cause it to be expanded.
+    root->setUpdateRect(FloatRect(30, 30, 2, 2));
+
+    emulateDrawingOneFrame(root.get());
+
+    rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
+    // Damage on the root should be: position of updateRect (30, 30), not
+    // expanded.
+    expectedDamageRect = FloatRect(30, 30, 2, 2);
+    EXPECT_FLOAT_RECT_EQ(expectedDamageRect, rootDamageRect);
+
+    // CASE 4: Setting the update rect on child2, which is above child1, will
+    // not get blurred by child1, so it does not need to get expanded.
+    child2->setUpdateRect(FloatRect(0, 0, 1, 1));
+
+    emulateDrawingOneFrame(root.get());
+
+    rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
+    // Damage on child2 should be: position of updateRect offset by the child's position (11, 11), and not expanded by anything.
+    expectedDamageRect = FloatRect(11, 11, 1, 1);
+    EXPECT_FLOAT_RECT_EQ(expectedDamageRect, rootDamageRect);
+}
+
 TEST_F(CCDamageTrackerTest, verifyDamageForAddingAndRemovingLayer)
 {
     OwnPtr<CCLayerImpl> root = createAndSetUpTestTreeWithOneSurface();
@@ -432,8 +573,8 @@ TEST_F(CCDamageTrackerTest, verifyDamageForNestedSurfaces)
     // CASE 2: Same as previous case, but with additional damage elsewhere that should be properly unioned.
     // - child1 surface damage in root surface space: FloatRect(300, 300, 6, 8);
     // - child2 damage in root surface space: FloatRect(11, 11, 18, 18);
-    grandChild1->setOpacity(0.7);
-    child2->setOpacity(0.7);
+    grandChild1->setOpacity(0.7f);
+    child2->setOpacity(0.7f);
     emulateDrawingOneFrame(root.get());
     childDamageRect = child1->renderSurface()->damageTracker()->currentDamageRect();
     rootDamageRect = root->renderSurface()->damageTracker()->currentDamageRect();
@@ -776,7 +917,7 @@ TEST_F(CCDamageTrackerTest, verifyDamageForReplicaMask)
     ASSERT_TRUE(grandChild1->renderSurface());
 
     // CASE 1: a property change on the mask should damage only the reflected region on the target surface.
-    replicaMaskLayer->setOpacity(0.6);
+    replicaMaskLayer->setOpacity(0.6f);
     emulateDrawingOneFrame(root.get());
 
     FloatRect grandChildDamageRect = grandChild1->renderSurface()->damageTracker()->currentDamageRect();
@@ -804,12 +945,8 @@ TEST_F(CCDamageTrackerTest, verifyDamageForReplicaMaskWithAnchor)
     CCLayerImpl* grandChild1 = child1->children()[0].get();
 
     // Verify that the correct replicaOriginTransform is used for the replicaMask; the
-    // incorrect old code did not actually correctly account for the anchor for the
-    // replica.
-    //
-    // Create a reflection about the left edge, but the anchor point is shifted all the
-    // way to the right. this case the reflection should be directly on top (but
-    // horizontally flipped) of grandChild1.
+    // incorrect old code incorrectly accounted for the anchor for the replica. A
+    // non-zero anchor point should not affect the replica reflection.
 
     grandChild1->setAnchorPoint(FloatPoint(1.0, 0.0)); // This is the anchor being tested.
 
@@ -840,7 +977,7 @@ TEST_F(CCDamageTrackerTest, verifyDamageForReplicaMaskWithAnchor)
     ASSERT_TRUE(grandChild1->renderSurface());
 
     // A property change on the replicaMask should damage the reflected region on the target surface.
-    replicaMaskLayer->setOpacity(0.6);
+    replicaMaskLayer->setOpacity(0.6f);
     emulateDrawingOneFrame(root.get());
 
     FloatRect childDamageRect = child1->renderSurface()->damageTracker()->currentDamageRect();
@@ -881,7 +1018,7 @@ TEST_F(CCDamageTrackerTest, verifyDamageForEmptyLayerList)
     ASSERT_TRUE(root->renderSurface() == root->targetRenderSurface());
     CCRenderSurface* targetSurface = root->renderSurface();
     targetSurface->clearLayerList();
-    targetSurface->damageTracker()->updateDamageTrackingState(targetSurface->layerList(), targetSurface->owningLayerId(), false, IntRect(), 0);
+    targetSurface->damageTracker()->updateDamageTrackingState(targetSurface->layerList(), targetSurface->owningLayerId(), false, IntRect(), 0, FilterOperations());
 
     FloatRect damageRect = targetSurface->damageTracker()->currentDamageRect();
     EXPECT_TRUE(damageRect.isEmpty());

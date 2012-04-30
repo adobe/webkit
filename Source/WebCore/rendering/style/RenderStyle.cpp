@@ -26,7 +26,6 @@
 #include "ContentData.h"
 #include "CursorList.h"
 #include "CSSPropertyNames.h"
-#include "CSSStyleSelector.h"
 #include "CSSWrapShapes.h"
 #include "FontSelector.h"
 #include "QuotesData.h"
@@ -35,6 +34,7 @@
 #include "ScaleTransformOperation.h"
 #include "ShadowData.h"
 #include "StyleImage.h"
+#include "StyleResolver.h"
 #if ENABLE(TOUCH_EVENTS)
 #include "RenderTheme.h"
 #endif
@@ -223,7 +223,7 @@ bool RenderStyle::operator==(const RenderStyle& o) const
 
 bool RenderStyle::isStyleAvailable() const
 {
-    return this != CSSStyleSelector::styleNotYetAvailable();
+    return this != StyleResolver::styleNotYetAvailable();
 }
 
 static inline int pseudoBit(PseudoId pseudo)
@@ -420,12 +420,6 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
 #endif
         }
 
-#if ENABLE(CSS_FILTERS)
-        if (rareNonInheritedData->m_filter.get() != other->rareNonInheritedData->m_filter.get()
-            && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
-            return StyleDifferenceLayout;
-        }
-#endif
 #if ENABLE(CSS_GRID_LAYOUT)
         if (rareNonInheritedData->m_grid.get() != other->rareNonInheritedData->m_grid.get()
             && rareNonInheritedData->m_gridItem.get() != other->rareNonInheritedData->m_gridItem.get())
@@ -606,6 +600,18 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         return StyleDifferenceRepaintLayer;
 #endif
     }
+
+#if ENABLE(CSS_FILTERS)
+    if (rareNonInheritedData->m_filter.get() != other->rareNonInheritedData->m_filter.get()
+        && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
+#if USE(ACCELERATED_COMPOSITING)
+        changedContextSensitiveProperties |= ContextSensitivePropertyFilter;
+        // Don't return; keep looking for another change.
+#else
+        return StyleDifferenceRepaintLayer;
+#endif
+    }
+#endif
 
     if (rareNonInheritedData->m_mask != other->rareNonInheritedData->m_mask
         || rareNonInheritedData->m_maskBoxImage != other->rareNonInheritedData->m_maskBoxImage)
@@ -878,17 +884,17 @@ void RenderStyle::setBoxShadow(PassOwnPtr<ShadowData> shadowData, bool add)
     rareData->m_boxShadow = shadowData;
 }
 
-static RoundedRect::Radii calcRadiiFor(const BorderData& border, LayoutSize size)
+static RoundedRect::Radii calcRadiiFor(const BorderData& border, IntSize size, RenderView* renderView)
 {
     return RoundedRect::Radii(
-        IntSize(valueForLength(border.topLeft().width(), size.width()), 
-                valueForLength(border.topLeft().height(), size.height())),
-        IntSize(valueForLength(border.topRight().width(), size.width()),
-                valueForLength(border.topRight().height(), size.height())),
-        IntSize(valueForLength(border.bottomLeft().width(), size.width()), 
-                valueForLength(border.bottomLeft().height(), size.height())),
-        IntSize(valueForLength(border.bottomRight().width(), size.width()), 
-                valueForLength(border.bottomRight().height(), size.height())));
+        IntSize(valueForLength(border.topLeft().width(), size.width(), renderView), 
+                valueForLength(border.topLeft().height(), size.height(), renderView)),
+        IntSize(valueForLength(border.topRight().width(), size.width(), renderView),
+                valueForLength(border.topRight().height(), size.height(), renderView)),
+        IntSize(valueForLength(border.bottomLeft().width(), size.width(), renderView), 
+                valueForLength(border.bottomLeft().height(), size.height(), renderView)),
+        IntSize(valueForLength(border.bottomRight().width(), size.width(), renderView), 
+                valueForLength(border.bottomRight().height(), size.height(), renderView)));
 }
 
 static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radii& radii)
@@ -923,12 +929,13 @@ static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radi
     return factor;
 }
 
-RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
+RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, RenderView* renderView, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
-    RoundedRect roundedRect(pixelSnappedIntRect(borderRect));
+    IntRect snappedBorderRect(pixelSnappedIntRect(borderRect));
+    RoundedRect roundedRect(snappedBorderRect);
     if (hasBorderRadius()) {
-        RoundedRect::Radii radii = calcRadiiFor(surround->border, borderRect.size());
-        radii.scale(calcConstraintScaleFor(borderRect, radii));
+        RoundedRect::Radii radii = calcRadiiFor(surround->border, snappedBorderRect.size(), renderView);
+        radii.scale(calcConstraintScaleFor(snappedBorderRect, radii));
         roundedRect.includeLogicalEdges(radii, isHorizontalWritingMode(), includeLogicalLeftEdge, includeLogicalRightEdge);
     }
     return roundedRect;
@@ -1131,12 +1138,12 @@ AnimationList* RenderStyle::accessTransitions()
     return rareNonInheritedData->m_transitions.get();
 }
 
-const Animation* RenderStyle::transitionForProperty(int property) const
+const Animation* RenderStyle::transitionForProperty(CSSPropertyID property) const
 {
     if (transitions()) {
         for (size_t i = 0; i < transitions()->size(); ++i) {
             const Animation* p = transitions()->animation(i);
-            if (p->property() == cAnimateAll || p->property() == property) {
+            if (p->animationMode() == Animation::AnimateAll || p->property() == property) {
                 return p;
             }
         }
@@ -1166,10 +1173,10 @@ void RenderStyle::getShadowExtent(const ShadowData* shadow, LayoutUnit &top, Lay
             continue;
         int blurAndSpread = shadow->blur() + shadow->spread();
 
-        top = min(top, shadow->y() - blurAndSpread);
-        right = max(right, shadow->x() + blurAndSpread);
-        bottom = max(bottom, shadow->y() + blurAndSpread);
-        left = min(left, shadow->x() - blurAndSpread);
+        top = min<LayoutUnit>(top, shadow->y() - blurAndSpread);
+        right = max<LayoutUnit>(right, shadow->x() + blurAndSpread);
+        bottom = max<LayoutUnit>(bottom, shadow->y() + blurAndSpread);
+        left = min<LayoutUnit>(left, shadow->x() - blurAndSpread);
     }
 }
 
@@ -1183,8 +1190,8 @@ void RenderStyle::getShadowHorizontalExtent(const ShadowData* shadow, LayoutUnit
             continue;
         int blurAndSpread = shadow->blur() + shadow->spread();
 
-        left = min(left, shadow->x() - blurAndSpread);
-        right = max(right, shadow->x() + blurAndSpread);
+        left = min<LayoutUnit>(left, shadow->x() - blurAndSpread);
+        right = max<LayoutUnit>(right, shadow->x() + blurAndSpread);
     }
 }
 
@@ -1198,8 +1205,8 @@ void RenderStyle::getShadowVerticalExtent(const ShadowData* shadow, LayoutUnit &
             continue;
         int blurAndSpread = shadow->blur() + shadow->spread();
 
-        top = min(top, shadow->y() - blurAndSpread);
-        bottom = max(bottom, shadow->y() + blurAndSpread);
+        top = min<LayoutUnit>(top, shadow->y() - blurAndSpread);
+        bottom = max<LayoutUnit>(bottom, shadow->y() + blurAndSpread);
     }
 }
 

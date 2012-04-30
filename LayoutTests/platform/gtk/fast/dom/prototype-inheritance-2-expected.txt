@@ -75,6 +75,9 @@ PASS DOMApplicationCachePrototype from inner.document.forms.testForm.0.ownerDocu
 PASS DOMImplementation from inner.document.forms.testForm.0.ownerDocument.implementation
 PASS DOMImplementationConstructor from inner.document.forms.testForm.0.ownerDocument.implementation.constructor
 PASS DOMImplementationPrototype from inner.document.forms.testForm.0.ownerDocument.implementation.__proto__
+PASS DOMStringList from inner.document.location.ancestorOrigins
+PASS DOMStringListConstructor from inner.document.location.ancestorOrigins.constructor
+PASS DOMStringListPrototype from inner.document.location.ancestorOrigins.__proto__
 PASS DOMStringMap from inner.document.forms.testForm.0.dataset
 PASS DOMStringMapConstructor from inner.document.forms.testForm.0.dataset.constructor
 PASS DOMStringMapPrototype from inner.document.forms.testForm.0.dataset.__proto__
@@ -167,8 +170,8 @@ PASS LocationPrototype from inner.document.location.__proto__
 PASS MediaList from inner.document.forms.testForm.0.ownerDocument.styleSheets.0.media
 PASS MediaListConstructor from inner.document.forms.testForm.0.ownerDocument.styleSheets.0.media.constructor
 PASS MediaListPrototype from inner.document.forms.testForm.0.ownerDocument.styleSheets.0.media.__proto__
-PASS MemoryInfo from inner.document.forms.testForm.0.ownerDocument.defaultView.console.memory
-PASS MemoryInfoPrototype from inner.document.forms.testForm.0.ownerDocument.defaultView.console.memory.__proto__
+PASS MemoryInfo from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.memory
+PASS MemoryInfoPrototype from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.memory.__proto__
 PASS MimeType from inner.document.forms.testForm.0.ownerDocument.defaultView.clientInformation.mimeTypes.0
 PASS MimeTypeArray from inner.document.forms.testForm.0.ownerDocument.defaultView.clientInformation.mimeTypes
 PASS MimeTypeArrayConstructor from inner.document.forms.testForm.0.ownerDocument.defaultView.clientInformation.mimeTypes.constructor
@@ -184,6 +187,12 @@ PASS NodeListConstructor from inner.document.forms.testForm.constructor
 PASS NodeListPrototype from inner.document.forms.testForm.__proto__
 PASS NodePrototype from inner.document.forms.testForm.0.attributes.0.__proto__.__proto__
 PASS Object from inner.document.location.__proto__.__proto__
+PASS Performance from inner.document.forms.testForm.0.ownerDocument.defaultView.performance
+PASS PerformanceNavigation from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.navigation
+PASS PerformanceNavigationPrototype from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.navigation.__proto__
+PASS PerformancePrototype from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.__proto__
+PASS PerformanceTiming from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.timing
+PASS PerformanceTimingPrototype from inner.document.forms.testForm.0.ownerDocument.defaultView.performance.timing.__proto__
 PASS Plugin from inner.document.forms.testForm.0.ownerDocument.defaultView.clientInformation.mimeTypes.0.enabledPlugin
 PASS PluginArray from inner.document.forms.testForm.0.ownerDocument.defaultView.clientInformation.plugins
 PASS PluginArrayConstructor from inner.document.forms.testForm.0.ownerDocument.defaultView.clientInformation.plugins.constructor
@@ -217,6 +226,9 @@ PASS TextConstructor from inner.document.forms.testForm.0.attributes.0.lastChild
 PASS TextPrototype from inner.document.forms.testForm.0.attributes.0.lastChild.__proto__
 PASS TextTrack from inner.document.forms.testForm.0.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.track
 PASS TextTrackConstructor from inner.document.forms.testForm.0.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.track.constructor
+PASS TextTrackList from inner.document.forms.testForm.0.previousElementSibling.textTracks
+PASS TextTrackListConstructor from inner.document.forms.testForm.0.previousElementSibling.textTracks.constructor
+PASS TextTrackListPrototype from inner.document.forms.testForm.0.previousElementSibling.textTracks.__proto__
 PASS TextTrackPrototype from inner.document.forms.testForm.0.previousElementSibling.previousElementSibling.previousElementSibling.previousElementSibling.track.__proto__
 PASS TimeRanges from inner.document.forms.testForm.0.previousElementSibling.played
 PASS TimeRangesConstructor from inner.document.forms.testForm.0.previousElementSibling.played.constructor
@@ -241,7 +253,6 @@ Never found CharacterData
 Never found Clipboard
 Never found DOMParser
 Never found DOMSettableTokenList
-Never found DOMStringList
 Never found DeprecatedPeerConnection
 Never found Document
 Never found DocumentFragment
@@ -449,12 +460,12 @@ Never found SVGVKernElement
 Never found SVGViewElement
 Never found Selection
 Never found SessionDescription
+Never found ShadowRoot
 Never found SharedWorker
 Never found StyleSheet
 Never found TextMetrics
 Never found TextTrackCue
 Never found TextTrackCueList
-Never found TextTrackList
 Never found URL
 Never found WebKitCSSMatrix
 Never found WebKitCSSRegionRule

@@ -26,6 +26,7 @@ class QInputEvent;
 class QGraphicsSceneMouseEvent;
 class QWheelEvent;
 class QGraphicsSceneWheelEvent;
+class QTouchEvent;
 QT_END_NAMESPACE
 
 namespace WebCore {
@@ -33,9 +34,14 @@ namespace WebCore {
 class PlatformMouseEvent;
 class PlatformWheelEvent;
 
+
 PlatformMouseEvent convertMouseEvent(QInputEvent*, int clickCount);
 PlatformMouseEvent convertMouseEvent(QGraphicsSceneMouseEvent*, int clickCount);
 PlatformWheelEvent convertWheelEvent(QWheelEvent*);
 PlatformWheelEvent convertWheelEvent(QGraphicsSceneWheelEvent*);
 
+#if ENABLE(TOUCH_EVENTS)
+class PlatformTouchEvent;
+PlatformTouchEvent convertTouchEvent(QTouchEvent*);
+#endif
 }

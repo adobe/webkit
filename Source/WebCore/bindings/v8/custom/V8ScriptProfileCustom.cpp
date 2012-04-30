@@ -32,6 +32,7 @@
 #if ENABLE(JAVASCRIPT_DEBUGGER)
 #include "V8ScriptProfile.h"
 
+#include "SafeAllocation.h"
 #include "ScriptProfile.h"
 #include "V8Binding.h"
 #include "V8Proxy.h"
@@ -40,7 +41,7 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> toV8(ScriptProfile* impl)
+v8::Handle<v8::Value> toV8(ScriptProfile* impl, v8::Isolate* isolate)
 {
     if (!impl)
         return v8::Null();

@@ -51,13 +51,13 @@
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "Image.h"
+#include "ImageOrientation.h"
 #include "MoveSelectionCommand.h"
 #include "Node.h"
 #include "Page.h"
 #include "PlatformKeyboardEvent.h"
 #include "RenderFileUploadControl.h"
 #include "RenderImage.h"
-#include "RenderLayer.h"
 #include "RenderView.h"
 #include "ReplaceSelectionCommand.h"
 #include "ResourceRequest.h"
@@ -212,7 +212,7 @@ bool DragController::performDrag(DragData* dragData)
             preventedDefault = mainFrame->eventHandler()->performDragAndDrop(createMouseEvent(dragData), clipboard.get());
             clipboard->setAccessPolicy(ClipboardNumb); // Invalidate clipboard here for security
         }
-        if (m_isHandlingDrag || preventedDefault) {
+        if (preventedDefault) {
             m_documentUnderMouse = 0;
             return true;
         }
@@ -285,7 +285,7 @@ static Element* elementUnderMouse(Document* documentUnderMouse, const IntPoint& 
 
     HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active);
     HitTestResult result(point);
-    documentUnderMouse->renderView()->layer()->hitTest(request, result);
+    documentUnderMouse->renderView()->hitTest(request, result);
 
     Node* n = result.innerNode();
     while (n && !n->isElementNode())
@@ -422,7 +422,6 @@ bool DragController::dispatchTextInputEventFor(Frame* innerFrame, DragData* drag
 bool DragController::concludeEditDrag(DragData* dragData)
 {
     ASSERT(dragData);
-    ASSERT(!m_isHandlingDrag);
 
     RefPtr<HTMLInputElement> fileInput = m_fileInputElementUnderMouse;
     if (m_fileInputElementUnderMouse) {
@@ -470,7 +469,6 @@ bool DragController::concludeEditDrag(DragData* dragData)
             return false;
 
         fileInput->receiveDroppedFiles(filenames);
-        m_client->willPerformDragDestinationAction(DragDestinationActionUpload, dragData);
         return true;
     }
 
@@ -852,7 +850,7 @@ void DragController::doImageDrag(Element* element, const IntPoint& dragOrigin, c
 
     Image* image = getImage(element);
     if (image && image->size().height() * image->size().width() <= MaxOriginalImageArea
-        && (dragImage = createDragImageFromImage(image))) {
+        && (dragImage = createDragImageFromImage(image, element->renderer() ? element->renderer()->shouldRespectImageOrientation() : DoNotRespectImageOrientation))) {
         IntSize originalSize = rect.size();
         origin = rect.location();
 

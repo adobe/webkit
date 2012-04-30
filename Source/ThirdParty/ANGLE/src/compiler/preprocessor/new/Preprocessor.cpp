@@ -15,13 +15,19 @@
 namespace pp
 {
 
-Preprocessor::Preprocessor() : mContext(new Context)
+Preprocessor::Preprocessor() : mContext(NULL)
 {
 }
 
 Preprocessor::~Preprocessor()
 {
     delete mContext;
+}
+
+bool Preprocessor::init()
+{
+    mContext = new Context;
+    return mContext->init();
 }
 
 bool Preprocessor::process(int count,

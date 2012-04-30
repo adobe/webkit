@@ -58,13 +58,14 @@ void SVGPreserveAspectRatio::setMeetOrSlice(unsigned short meetOrSlice, Exceptio
     m_meetOrSlice = static_cast<SVGMeetOrSliceType>(meetOrSlice);
 }
 
-SVGPreserveAspectRatio SVGPreserveAspectRatio::parsePreserveAspectRatio(const UChar*& currParam, const UChar* end, bool validate, bool& result)
+void SVGPreserveAspectRatio::parse(const String& value)
 {
-    SVGPreserveAspectRatio aspectRatio;
-    aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_NONE;
-    aspectRatio.m_meetOrSlice = SVG_MEETORSLICE_MEET;
-    result = false;
+    const UChar* begin = value.characters();
+    parse(begin, begin + value.length(), true);
+}
 
+bool SVGPreserveAspectRatio::parse(const UChar*& currParam, const UChar* end, bool validate)
+{
     // FIXME: Rewrite this parser, without gotos!
     if (!skipOptionalSVGSpaces(currParam, end))
         goto bailOut;
@@ -72,7 +73,11 @@ SVGPreserveAspectRatio SVGPreserveAspectRatio::parsePreserveAspectRatio(const UC
     if (*currParam == 'd') {
         if (!skipString(currParam, end, "defer"))
             goto bailOut;
+
         // FIXME: We just ignore the "defer" here.
+        if (currParam == end)
+            return true;
+
         if (!skipOptionalSVGSpaces(currParam, end))
             goto bailOut;
     }
@@ -80,6 +85,7 @@ SVGPreserveAspectRatio SVGPreserveAspectRatio::parsePreserveAspectRatio(const UC
     if (*currParam == 'n') {
         if (!skipString(currParam, end, "none"))
             goto bailOut;
+        m_align = SVG_PRESERVEASPECTRATIO_NONE;
         skipOptionalSVGSpaces(currParam, end);
     } else if (*currParam == 'x') {
         if ((end - currParam) < 8)
@@ -90,25 +96,25 @@ SVGPreserveAspectRatio SVGPreserveAspectRatio::parsePreserveAspectRatio(const UC
             if (currParam[3] == 'n') {
                 if (currParam[6] == 'i') {
                     if (currParam[7] == 'n')
-                        aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMINYMIN;
+                        m_align = SVG_PRESERVEASPECTRATIO_XMINYMIN;
                     else if (currParam[7] == 'd')
-                        aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMINYMID;
+                        m_align = SVG_PRESERVEASPECTRATIO_XMINYMID;
                     else
                         goto bailOut;
                 } else if (currParam[6] == 'a' && currParam[7] == 'x')
-                     aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMINYMAX;
+                     m_align = SVG_PRESERVEASPECTRATIO_XMINYMAX;
                 else
                      goto bailOut;
              } else if (currParam[3] == 'd') {
                 if (currParam[6] == 'i') {
                     if (currParam[7] == 'n')
-                        aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMIDYMIN;
+                        m_align = SVG_PRESERVEASPECTRATIO_XMIDYMIN;
                     else if (currParam[7] == 'd')
-                        aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMIDYMID;
+                        m_align = SVG_PRESERVEASPECTRATIO_XMIDYMID;
                     else
                         goto bailOut;
                 } else if (currParam[6] == 'a' && currParam[7] == 'x')
-                    aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMIDYMAX;
+                    m_align = SVG_PRESERVEASPECTRATIO_XMIDYMAX;
                 else
                     goto bailOut;
             } else
@@ -116,13 +122,13 @@ SVGPreserveAspectRatio SVGPreserveAspectRatio::parsePreserveAspectRatio(const UC
         } else if (currParam[2] == 'a' && currParam[3] == 'x') {
             if (currParam[6] == 'i') {
                 if (currParam[7] == 'n')
-                    aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMAXYMIN;
+                    m_align = SVG_PRESERVEASPECTRATIO_XMAXYMIN;
                 else if (currParam[7] == 'd')
-                    aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMAXYMID;
+                    m_align = SVG_PRESERVEASPECTRATIO_XMAXYMID;
                 else
                     goto bailOut;
             } else if (currParam[6] == 'a' && currParam[7] == 'x')
-                aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_XMAXYMAX;
+                m_align = SVG_PRESERVEASPECTRATIO_XMAXYMAX;
             else
                 goto bailOut;
         } else
@@ -141,20 +147,18 @@ SVGPreserveAspectRatio SVGPreserveAspectRatio::parsePreserveAspectRatio(const UC
             if (!skipString(currParam, end, "slice"))
                 goto bailOut;
             skipOptionalSVGSpaces(currParam, end);
-            if (aspectRatio.m_align != SVG_PRESERVEASPECTRATIO_NONE)
-                aspectRatio.m_meetOrSlice = SVG_MEETORSLICE_SLICE;    
+            if (m_align != SVG_PRESERVEASPECTRATIO_NONE)
+                m_meetOrSlice = SVG_MEETORSLICE_SLICE;
         }
     }
 
     if (end != currParam && validate) {
 bailOut:
-        // FIXME: Should the two values be set to UNKNOWN instead?
-        aspectRatio.m_align = SVG_PRESERVEASPECTRATIO_NONE;
-        aspectRatio.m_meetOrSlice = SVG_MEETORSLICE_MEET;
-    } else
-        result = true;
-
-    return aspectRatio;
+        m_align = SVG_PRESERVEASPECTRATIO_XMIDYMID;
+        m_meetOrSlice = SVG_MEETORSLICE_MEET;
+        return false;
+    }
+    return true;
 }
 
 void SVGPreserveAspectRatio::transformRect(FloatRect& destRect, FloatRect& srcRect)

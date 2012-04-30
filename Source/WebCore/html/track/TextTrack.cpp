@@ -139,12 +139,15 @@ void TextTrack::setMode(unsigned short mode, ExceptionCode& ec)
     if (m_mode == static_cast<Mode>(mode))
         return;
 
-    // If the new value is 2
+    // If mode changes to disabled, remove this track's cues from the client
+    // because they will no longer be accessible from the cues() function.
+    if (mode == TextTrack::DISABLED && m_client && m_cues)
+         m_client->textTrackRemoveCues(this, m_cues.get());
+
     //  ... Note: If the mode had been showing by default, this will change it to showing, 
     // even though the value of mode would appear not to change.
     m_mode = static_cast<Mode>(mode);
-    if (m_mode == TextTrack::SHOWING)
-        setShowingByDefault(false);
+    setShowingByDefault(false);
 
     if (m_client)
         m_client->textTrackModeChanged(this);

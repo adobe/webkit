@@ -130,7 +130,13 @@ void WebProcess::platformClearResourceCaches(ResourceCachesToClear cachesToClear
 {
     if (cachesToClear == InMemoryResourceCachesOnly)
         return;
-    [[NSURLCache sharedURLCache] removeAllCachedResponses];
+
+    if (!m_clearResourceCachesDispatchGroup)
+        m_clearResourceCachesDispatchGroup = dispatch_group_create();
+
+    dispatch_group_async(m_clearResourceCachesDispatchGroup, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [[NSURLCache sharedURLCache] removeAllCachedResponses];
+    });
 }
 
 #if ENABLE(WEB_PROCESS_SANDBOX)
@@ -175,7 +181,7 @@ static void initializeSandbox(const WebProcessCreationParameters& parameters)
 {
 #if ENABLE(WEB_PROCESS_SANDBOX)
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"DisableSandbox"]) {
-        fprintf(stderr, "Bypassing sandbox due to DisableSandbox user default.\n");
+        WTFLogAlways("Bypassing sandbox due to DisableSandbox user default.\n");
         return;
     }
 
@@ -185,7 +191,7 @@ static void initializeSandbox(const WebProcessCreationParameters& parameters)
     setenv("DIRHELPER_USER_DIR_SUFFIX", fileSystemRepresentation(systemDirectorySuffix).data(), 0);
     char temporaryDirectory[PATH_MAX];
     if (!confstr(_CS_DARWIN_USER_TEMP_DIR, temporaryDirectory, sizeof(temporaryDirectory))) {
-        fprintf(stderr, "WebProcess: couldn't retrieve private temporary directory path: %d\n", errno);
+        WTFLogAlways("WebProcess: couldn't retrieve private temporary directory path: %d\n", errno);
         exit(EX_NOPERM);
     }
     setenv("TMPDIR", temporaryDirectory, 1);
@@ -215,9 +221,9 @@ static void initializeSandbox(const WebProcessCreationParameters& parameters)
 
     char* errorBuf;
     if (sandbox_init_with_parameters(profilePath, SANDBOX_NAMED_EXTERNAL, sandboxParameters.data(), &errorBuf)) {
-        fprintf(stderr, "WebProcess: couldn't initialize sandbox profile [%s]\n", profilePath);
+        WTFLogAlways("WebProcess: couldn't initialize sandbox profile [%s] error '%s'\n", profilePath, errorBuf);
         for (size_t i = 0; sandboxParameters[i]; i += 2)
-            fprintf(stderr, "%s=%s\n", sandboxParameters[i], sandboxParameters[i + 1]);
+            WTFLogAlways("%s=%s\n", sandboxParameters[i], sandboxParameters[i + 1]);
         exit(EX_NOPERM);
     }
 
@@ -227,7 +233,7 @@ static void initializeSandbox(const WebProcessCreationParameters& parameters)
     // This will override LSFileQuarantineEnabled from Info.plist unless sandbox quarantine is globally disabled.
     OSStatus error = WKEnableSandboxStyleFileQuarantine();
     if (error) {
-        fprintf(stderr, "WebProcess: couldn't enable sandbox style file quarantine: %ld\n", (long)error);
+        WTFLogAlways("WebProcess: couldn't enable sandbox style file quarantine: %ld\n", (long)error);
         exit(EX_NOPERM);
     }
 #endif
@@ -284,6 +290,11 @@ void WebProcess::initializeShim()
 
 void WebProcess::platformTerminate()
 {
+    if (m_clearResourceCachesDispatchGroup) {
+        dispatch_group_wait(m_clearResourceCachesDispatchGroup, DISPATCH_TIME_FOREVER);
+        dispatch_release(m_clearResourceCachesDispatchGroup);
+        m_clearResourceCachesDispatchGroup = 0;
+    }
 }
 
 void WebProcess::secItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecItemResponseData& response)

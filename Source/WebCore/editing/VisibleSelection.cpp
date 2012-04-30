@@ -30,6 +30,7 @@
 #include "Element.h"
 #include "htmlediting.h"
 #include "TextIterator.h"
+#include "TreeScopeAdjuster.h"
 #include "VisiblePosition.h"
 #include "visible_units.h"
 #include "Range.h"
@@ -461,22 +462,18 @@ void VisibleSelection::adjustSelectionToAvoidCrossingShadowBoundaries()
     if (m_base.isNull() || m_start.isNull() || m_end.isNull())
         return;
 
-    Node* startRootNode = m_start.anchorNode()->nonBoundaryShadowTreeRootNode();
-    Node* endRootNode = m_end.anchorNode()->nonBoundaryShadowTreeRootNode();
-
-    if (!startRootNode && !endRootNode)
-        return;
-
-    if (startRootNode == endRootNode)
+    if (m_start.anchorNode()->treeScope() == m_end.anchorNode()->treeScope())
         return;
 
     if (m_baseIsFirst) {
-        m_extent = startRootNode ? lastPositionInNode(startRootNode) : positionBeforeNode(endRootNode->shadowAncestorNode());
+        m_extent = TreeScopeAdjuster(m_start.anchorNode()->treeScope()).adjustPositionBefore(m_end);
         m_end = m_extent;
     } else {
-        m_extent = endRootNode ? firstPositionInNode(endRootNode) : positionAfterNode(startRootNode->shadowAncestorNode());
+        m_extent = TreeScopeAdjuster(m_end.anchorNode()->treeScope()).adjustPositionAfter(m_start);
         m_start = m_extent;
     }
+
+    ASSERT(m_start.anchorNode()->treeScope() == m_end.anchorNode()->treeScope());
 }
 
 void VisibleSelection::adjustSelectionToAvoidCrossingEditingBoundaries()

@@ -24,67 +24,41 @@
  */
 
 #include "config.h"
-#include "platform/WebExternalTextureLayer.h"
+#include <public/WebExternalTextureLayer.h>
 
-#include "platform/WebFloatRect.h"
-#include "WebExternalTextureLayerImpl.h"
+#include "TextureLayerChromium.h"
+#include <public/WebFloatRect.h>
+#include <public/WebSize.h>
+
+using namespace WebCore;
 
 namespace WebKit {
 
 WebExternalTextureLayer WebExternalTextureLayer::create()
 {
-    return WebExternalTextureLayer(WebExternalTextureLayerImpl::create());
+    RefPtr<TextureLayerChromium> layer = TextureLayerChromium::create(0);
+    layer->setIsDrawable(true);
+    return WebExternalTextureLayer(layer.release());
 }
 
 void WebExternalTextureLayer::setTextureId(unsigned id)
 {
-    unwrap<WebExternalTextureLayerImpl>()->setTextureId(id);
-}
-
-unsigned WebExternalTextureLayer::textureId() const
-{
-    return constUnwrap<WebExternalTextureLayerImpl>()->textureId();
+    unwrap<TextureLayerChromium>()->setTextureId(id);
 }
 
 void WebExternalTextureLayer::setFlipped(bool flipped)
 {
-    unwrap<WebExternalTextureLayerImpl>()->setFlipped(flipped);
-}
-
-bool WebExternalTextureLayer::flipped() const
-{
-    return constUnwrap<WebExternalTextureLayerImpl>()->flipped();
+    unwrap<TextureLayerChromium>()->setFlipped(flipped);
 }
 
 void WebExternalTextureLayer::setUVRect(const WebFloatRect& rect)
 {
-    unwrap<WebExternalTextureLayerImpl>()->setUVRect(rect);
+    unwrap<TextureLayerChromium>()->setUVRect(rect);
 }
 
-WebFloatRect WebExternalTextureLayer::uvRect() const
+WebExternalTextureLayer::WebExternalTextureLayer(PassRefPtr<TextureLayerChromium> layer)
+    : WebLayer(layer)
 {
-    return WebFloatRect(constUnwrap<WebExternalTextureLayerImpl>()->uvRect());
-}
-
-void WebExternalTextureLayer::invalidateRect(const WebFloatRect& updateRect)
-{
-    unwrap<WebExternalTextureLayerImpl>()->setNeedsDisplayRect(updateRect);
-}
-
-WebExternalTextureLayer::WebExternalTextureLayer(const PassRefPtr<WebExternalTextureLayerImpl>& node)
-    : WebLayer(node)
-{
-}
-
-WebExternalTextureLayer& WebExternalTextureLayer::operator=(const PassRefPtr<WebExternalTextureLayerImpl>& node)
-{
-    m_private = node;
-    return *this;
-}
-
-WebExternalTextureLayer::operator PassRefPtr<WebExternalTextureLayerImpl>() const
-{
-    return static_cast<WebExternalTextureLayerImpl*>(m_private.get());
 }
 
 } // namespace WebKit

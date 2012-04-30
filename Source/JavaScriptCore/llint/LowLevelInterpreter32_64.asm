@@ -200,6 +200,19 @@ macro loadConstantOrVariable(index, tag, payload)
 .done:
 end
 
+macro loadConstantOrVariableTag(index, tag)
+    bigteq index, FirstConstantRegisterIndex, .constant
+    loadi TagOffset[cfr, index, 8], tag
+    jmp .done
+.constant:
+    loadp CodeBlock[cfr], tag
+    loadp CodeBlock::m_constantRegisters + VectorBufferOffset[tag], tag
+    # There is a bit of evil here: if the index contains a value >= FirstConstantRegisterIndex,
+    # then value << 3 will be equal to (value - FirstConstantRegisterIndex) << 3.
+    loadp TagOffset[tag, index, 8], tag
+.done:
+end
+
 # Index and payload may be the same register. Index may be clobbered.
 macro loadConstantOrVariable2Reg(index, tag, payload)
     bigteq index, FirstConstantRegisterIndex, .constant
@@ -860,6 +873,62 @@ _llint_op_instanceof:
 .opInstanceofSlow:
     callSlowPath(_llint_slow_path_instanceof)
     dispatch(5)
+
+
+_llint_op_is_undefined:
+    traceExecution()
+    loadi 8[PC], t1
+    loadi 4[PC], t0
+    loadConstantOrVariable(t1, t2, t3)
+    storei BooleanTag, TagOffset[cfr, t0, 8]
+    bieq t2, CellTag, .opIsUndefinedCell
+    cieq t2, UndefinedTag, t3
+    storei t3, PayloadOffset[cfr, t0, 8]
+    dispatch(3)
+.opIsUndefinedCell:
+    loadp JSCell::m_structure[t3], t1
+    tbnz Structure::m_typeInfo + TypeInfo::m_flags[t1], MasqueradesAsUndefined, t1
+    storei t1, PayloadOffset[cfr, t0, 8]
+    dispatch(3)
+
+
+_llint_op_is_boolean:
+    traceExecution()
+    loadi 8[PC], t1
+    loadi 4[PC], t2
+    loadConstantOrVariableTag(t1, t0)
+    cieq t0, BooleanTag, t0
+    storei BooleanTag, TagOffset[cfr, t2, 8]
+    storei t0, PayloadOffset[cfr, t2, 8]
+    dispatch(3)
+
+
+_llint_op_is_number:
+    traceExecution()
+    loadi 8[PC], t1
+    loadi 4[PC], t2
+    loadConstantOrVariableTag(t1, t0)
+    storei BooleanTag, TagOffset[cfr, t2, 8]
+    addi 1, t0
+    cib t0, LowestTag + 1, t1
+    storei t1, PayloadOffset[cfr, t2, 8]
+    dispatch(3)
+
+
+_llint_op_is_string:
+    traceExecution()
+    loadi 8[PC], t1
+    loadi 4[PC], t2
+    loadConstantOrVariable(t1, t0, t3)
+    storei BooleanTag, TagOffset[cfr, t2, 8]
+    bineq t0, CellTag, .opIsStringNotCell
+    loadp JSCell::m_structure[t3], t0
+    cbeq Structure::m_typeInfo + TypeInfo::m_type[t0], StringType, t1
+    storei t1, PayloadOffset[cfr, t2, 8]
+    dispatch(3)
+.opIsStringNotCell:
+    storep 0, PayloadOffset[cfr, t2, 8]
+    dispatch(3)
 
 
 macro resolveGlobal(size, slow)
@@ -1571,21 +1640,6 @@ _llint_op_catch:
     dispatch(2)
 
 
-_llint_op_jsr:
-    traceExecution()
-    loadi 4[PC], t0
-    addi 3 * 4, PC, t1
-    storei t1, [cfr, t0, 8]
-    dispatchBranch(8[PC])
-
-
-_llint_op_sret:
-    traceExecution()
-    loadi 4[PC], t0
-    loadp [cfr, t0, 8], PC
-    dispatch(0)
-
-
 _llint_op_end:
     traceExecution()
     checkSwitchToJITForEpilogue()
@@ -1619,6 +1673,8 @@ macro nativeCallTrampoline(executableOffsetToFunction)
     storei CellTag, ScopeChain + TagOffset[cfr]
     storei t1, ScopeChain + PayloadOffset[cfr]
     if X86
+        loadp JITStackFrame::globalData + 4[sp], t0 # Additional offset for return address
+        storep cfr, JSGlobalData::topCallFrame[t0]
         peek 0, t1
         storep t1, ReturnPC[cfr]
         move cfr, t2  # t2 = ecx
@@ -1630,6 +1686,8 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         addp 16 - 4, sp
         loadp JITStackFrame::globalData + 4[sp], t3
     elsif ARMv7
+        loadp JITStackFrame::globalData[sp], t0
+        storep cfr, JSGlobalData::topCallFrame[t0]
         move t0, t2
         preserveReturnAddressAfterCall(t3)
         storep t3, ReturnPC[cfr]
@@ -1647,6 +1705,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
     ret
 .exception:
     preserveReturnAddressAfterCall(t1) # This is really only needed on X86
+    loadi ArgumentCount + TagOffset[cfr], PC
     callSlowPath(_llint_throw_from_native_call)
     jmp _llint_throw_from_slow_path_trampoline
 end

@@ -37,6 +37,7 @@
 #include "DOMImplementation.h"
 #include "HTMLImageElement.h"
 #include "HTMLNames.h"
+#include "MemoryUsageSupport.h"
 #include "MessagePort.h"
 #include "PlatformSupport.h"
 #include "RetainedDOMInfo.h"
@@ -291,7 +292,7 @@ typedef Vector<GrouperItem> GrouperList;
 // element of the tree to which it belongs.
 static GroupId calculateGroupId(Node* node)
 {
-    if (node->inDocument() || (node->hasTagName(HTMLNames::imgTag) && !static_cast<HTMLImageElement*>(node)->haveFiredLoadEvent()))
+    if (node->inDocument() || (node->hasTagName(HTMLNames::imgTag) && static_cast<HTMLImageElement*>(node)->hasPendingLoadEvent()))
         return GroupId(node->document());
 
     Node* root = node;
@@ -468,7 +469,7 @@ namespace {
 int getMemoryUsageInMB()
 {
 #if PLATFORM(CHROMIUM)
-    return PlatformSupport::memoryUsageMB();
+    return MemoryUsageSupport::memoryUsageMB();
 #else
     return 0;
 #endif
@@ -477,7 +478,7 @@ int getMemoryUsageInMB()
 int getActualMemoryUsageInMB()
 {
 #if PLATFORM(CHROMIUM)
-    return PlatformSupport::actualMemoryUsageMB();
+    return MemoryUsageSupport::actualMemoryUsageMB();
 #else
     return 0;
 #endif
@@ -513,9 +514,9 @@ void V8GCController::gcEpilogue()
 void V8GCController::checkMemoryUsage()
 {
 #if PLATFORM(CHROMIUM) || PLATFORM(QT)
-    const int lowMemoryUsageMB = PlatformSupport::lowMemoryUsageMB();
-    const int highMemoryUsageMB = PlatformSupport::highMemoryUsageMB();
-    const int highUsageDeltaMB = PlatformSupport::highUsageDeltaMB();
+    const int lowMemoryUsageMB = MemoryUsageSupport::lowMemoryUsageMB();
+    const int highMemoryUsageMB = MemoryUsageSupport::highMemoryUsageMB();
+    const int highUsageDeltaMB = MemoryUsageSupport::highUsageDeltaMB();
     int memoryUsageMB = getMemoryUsageInMB();
     if ((memoryUsageMB > lowMemoryUsageMB && memoryUsageMB > 2 * workingSetEstimateMB) || (memoryUsageMB > highMemoryUsageMB && memoryUsageMB > workingSetEstimateMB + highUsageDeltaMB))
         v8::V8::LowMemoryNotification();

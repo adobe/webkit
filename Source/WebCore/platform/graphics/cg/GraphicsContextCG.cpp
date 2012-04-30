@@ -32,6 +32,7 @@
 #include "FloatConversion.h"
 #include "GraphicsContextPlatformPrivateCG.h"
 #include "ImageBuffer.h"
+#include "ImageOrientation.h"
 #include "KURL.h"
 #include "Path.h"
 #include "Pattern.h"
@@ -65,9 +66,9 @@
 
 #endif
 
-// Undocumented CGContextSetCTM function, available at least since 10.4.
 extern "C" {
     CG_EXTERN void CGContextSetCTM(CGContextRef, CGAffineTransform);
+    CG_EXTERN CGAffineTransform CGContextGetBaseCTM(CGContextRef);
 };
 
 using namespace std;
@@ -170,11 +171,12 @@ void GraphicsContext::restorePlatformState()
     m_data->m_userToDeviceTransformKnownToBeIdentity = false;
 }
 
-void GraphicsContext::drawNativeImage(NativeImagePtr imagePtr, const FloatSize& imageSize, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op)
+void GraphicsContext::drawNativeImage(NativeImagePtr imagePtr, const FloatSize& imageSize, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, ImageOrientation orientation)
 {
     RetainPtr<CGImageRef> image(imagePtr);
 
-    float currHeight = CGImageGetHeight(image.get());
+    float currHeight = orientation.usesWidthAsHeight() ? CGImageGetWidth(image.get()) : CGImageGetHeight(image.get());
+
     if (currHeight <= srcRect.y())
         return;
 
@@ -231,8 +233,18 @@ void GraphicsContext::drawNativeImage(NativeImagePtr imagePtr, const FloatSize& 
     setPlatformCompositeOperation(op);
 
     // Flip the coords.
+    CGContextTranslateCTM(context, adjustedDestRect.x(), adjustedDestRect.maxY());
     CGContextScaleCTM(context, 1, -1);
-    adjustedDestRect.setY(-adjustedDestRect.maxY());
+    adjustedDestRect.setLocation(FloatPoint());
+
+    if (orientation != DefaultImageOrientation) {
+        CGContextConcatCTM(context, orientation.transformFromDefault(adjustedDestRect.size()));
+        if (orientation.usesWidthAsHeight()) {
+            // The destination rect will have it's width and height already reversed for the orientation of
+            // the image, as it was needed for page layout, so we need to reverse it back here.
+            adjustedDestRect = FloatRect(adjustedDestRect.x(), adjustedDestRect.y(), adjustedDestRect.height(), adjustedDestRect.width());
+        }
+    }
     
     // Adjust the color space.
     image = Image::imageWithColorSpace(image.get(), styleColorSpace);
@@ -1301,12 +1313,12 @@ FloatRect GraphicsContext::roundToDevicePixels(const FloatRect& rect, RoundingMo
     // we get the affine transform matrix and extract the scale.
 
     if (m_data->m_userToDeviceTransformKnownToBeIdentity)
-        return rect;
+        return roundedIntRect(rect);
 
     CGAffineTransform deviceMatrix = CGContextGetUserSpaceToDeviceSpaceTransform(platformContext());
     if (CGAffineTransformIsIdentity(deviceMatrix)) {
         m_data->m_userToDeviceTransformKnownToBeIdentity = true;
-        return rect;
+        return roundedIntRect(rect);
     }
 
     float deviceScaleX = sqrtf(deviceMatrix.a * deviceMatrix.a + deviceMatrix.b * deviceMatrix.b);
@@ -1670,12 +1682,42 @@ void GraphicsContext::setPlatformCompositeOperation(CompositeOperator mode)
     CGContextSetBlendMode(platformContext(), target);
 }
 
-void GraphicsContext::platformApplyDeviceScaleFactor()
+void GraphicsContext::platformApplyDeviceScaleFactor(float deviceScaleFactor)
 {
     // CoreGraphics expects the base CTM of a HiDPI context to have the scale factor applied to it.
     // Failing to change the base level CTM will cause certain CG features, such as focus rings,
     // to draw with a scale factor of 1 rather than the actual scale factor.
-    wkSetBaseCTM(platformContext(), getCTM());
+    wkSetBaseCTM(platformContext(), CGAffineTransformScale(CGContextGetBaseCTM(platformContext()), deviceScaleFactor, deviceScaleFactor));
+}
+
+void GraphicsContext::platformFillEllipse(const FloatRect& ellipse)
+{
+    if (paintingDisabled())
+        return;
+
+    // CGContextFillEllipseInRect only supports solid colors.
+    if (m_state.fillGradient || m_state.fillPattern) {
+        fillEllipseAsPath(ellipse);
+        return;
+    }
+
+    CGContextRef context = platformContext();
+    CGContextFillEllipseInRect(context, ellipse);
+}
+
+void GraphicsContext::platformStrokeEllipse(const FloatRect& ellipse)
+{
+    if (paintingDisabled())
+        return;
+
+    // CGContextStrokeEllipseInRect only supports solid colors.
+    if (m_state.strokeGradient || m_state.strokePattern) {
+        strokeEllipseAsPath(ellipse);
+        return;
+    }
+
+    CGContextRef context = platformContext();
+    CGContextStrokeEllipseInRect(context, ellipse);
 }
 
 }

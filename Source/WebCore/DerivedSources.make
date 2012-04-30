@@ -36,6 +36,7 @@ VPATH = \
     $(WebCore)/Modules/webaudio \
     $(WebCore)/Modules/webdatabase \
     $(WebCore)/Modules/websockets \
+    $(WebCore)/Resources \
     $(WebCore)/bindings/generic \
     $(WebCore)/bindings/js \
     $(WebCore)/bindings/objc \
@@ -94,7 +95,6 @@ BINDING_IDLS = \
     $(WebCore)/Modules/indexeddb/IDBAny.idl \
     $(WebCore)/Modules/indexeddb/IDBCursor.idl \
     $(WebCore)/Modules/indexeddb/IDBDatabase.idl \
-    $(WebCore)/Modules/indexeddb/IDBDatabaseError.idl \
     $(WebCore)/Modules/indexeddb/IDBDatabaseException.idl \
     $(WebCore)/Modules/indexeddb/IDBFactory.idl \
     $(WebCore)/Modules/indexeddb/IDBIndex.idl \
@@ -126,13 +126,13 @@ BINDING_IDLS = \
     $(WebCore)/Modules/webaudio/DOMWindowWebAudio.idl \
     $(WebCore)/Modules/webaudio/DelayNode.idl \
     $(WebCore)/Modules/webaudio/DynamicsCompressorNode.idl \
-    $(WebCore)/Modules/webaudio/HighPass2FilterNode.idl \
     $(WebCore)/Modules/webaudio/JavaScriptAudioNode.idl \
-    $(WebCore)/Modules/webaudio/LowPass2FilterNode.idl \
     $(WebCore)/Modules/webaudio/MediaElementAudioSourceNode.idl \
+    $(WebCore)/Modules/webaudio/Oscillator.idl \
     $(WebCore)/Modules/webaudio/OfflineAudioCompletionEvent.idl \
     $(WebCore)/Modules/webaudio/RealtimeAnalyserNode.idl \
     $(WebCore)/Modules/webaudio/WaveShaperNode.idl \
+    $(WebCore)/Modules/webaudio/WaveTable.idl \
     $(WebCore)/Modules/webdatabase/DOMWindowWebDatabase.idl \
     $(WebCore)/Modules/webdatabase/Database.idl \
     $(WebCore)/Modules/webdatabase/DatabaseCallback.idl \
@@ -371,6 +371,7 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/WebGLRenderbuffer.idl \
     $(WebCore)/html/canvas/WebGLRenderingContext.idl \
     $(WebCore)/html/canvas/WebGLShader.idl \
+    $(WebCore)/html/canvas/WebGLShaderPrecisionFormat.idl \
     $(WebCore)/html/canvas/WebGLTexture.idl \
     $(WebCore)/html/canvas/WebGLUniformLocation.idl \
     $(WebCore)/html/canvas/WebGLVertexArrayObjectOES.idl \
@@ -648,6 +649,12 @@ ifeq ($(OS),MACOS)
 FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
 HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
 
+ifeq ($(TARGET_GCC_VERSION),LLVM_COMPILER)
+	TEXT_PREPROCESSOR_FLAGS=-E -P -x c -traditional
+else
+	TEXT_PREPROCESSOR_FLAGS=-E -P -x c -std=c89
+endif
+
 ifeq ($(shell $(CC) -x c++ -E -P -dM $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" /dev/null | grep ENABLE_DASHBOARD_SUPPORT | cut -d' ' -f3), 1)
     ENABLE_DASHBOARD_SUPPORT = 1
 else
@@ -659,6 +666,12 @@ ifeq ($(shell $(CC) -x c++ -E -P -dM $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include
 else
     ENABLE_ORIENTATION_EVENTS = 0
 endif
+
+all: DefaultFonts.plist
+
+DefaultFonts.plist : DefaultFonts.plist.in
+	@echo Pre-processing DefaultFonts.plist...
+	$(CC) $(TEXT_PREPROCESSOR_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" $< > $@
 
 else
 
@@ -730,11 +743,21 @@ ColorData.cpp : platform/ColorData.gperf $(WebCore)/make-hash-tools.pl
 
 # --------
 
+# Path to bison
+
+ifeq ($(OS),MACOS)
+BISON=$(shell xcrun -find bison)
+else
+BISON=bison
+endif
+
+# --------
+
 # CSS grammar
 # NOTE: Older versions of bison do not inject an inclusion guard, so we add one.
 
 CSSGrammar.cpp : css/CSSGrammar.y
-	bison -d -p cssyy $< -o $@
+	$(BISON) -d -p cssyy $< -o $@
 	touch CSSGrammar.cpp.h
 	touch CSSGrammar.hpp
 	echo '#ifndef CSSGrammar_h' > CSSGrammar.h
@@ -749,7 +772,7 @@ CSSGrammar.cpp : css/CSSGrammar.y
 # NOTE: Older versions of bison do not inject an inclusion guard, so we add one.
 
 XPathGrammar.cpp : xml/XPathGrammar.y $(PROJECT_FILE)
-	bison -d -p xpathyy $< -o $@
+	$(BISON) -d -p xpathyy $< -o $@
 	touch XPathGrammar.cpp.h
 	touch XPathGrammar.hpp
 	echo '#ifndef XPathGrammar_h' > XPathGrammar.h

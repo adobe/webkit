@@ -44,6 +44,12 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
 )
 ENDIF()
 
+IF (ENABLE_VIDEO_TRACK)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/html/track"
+  )
+ENDIF ()
+
 IF (WTF_USE_FREETYPE)
   LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/freetype"
@@ -57,6 +63,15 @@ IF (WTF_USE_PANGO)
   )
   LIST(APPEND WebKit_LIBRARIES
     ${Pango_LIBRARIES}
+  )
+ENDIF ()
+
+IF (ENABLE_NETWORK_INFO)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/Modules/networkinfo"
+  )
+  LIST(APPEND WebKit_SOURCES
+    efl/WebCoreSupport/NetworkInfoClientEfl.cpp
   )
 ENDIF ()
 
@@ -92,6 +107,7 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_js.cpp
     efl/ewk/ewk_main.cpp
     efl/ewk/ewk_network.cpp
+    efl/ewk/ewk_security_origin.cpp
     efl/ewk/ewk_security_policy.cpp
     efl/ewk/ewk_settings.cpp
     efl/ewk/ewk_tiled_backing_store.cpp
@@ -243,6 +259,7 @@ SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_logging.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_main.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_network.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_security_origin.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_security_policy.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_settings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_view.h

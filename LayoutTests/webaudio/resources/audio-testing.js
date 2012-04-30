@@ -115,6 +115,47 @@ function createImpulseBuffer(context, sampleFrameLength) {
     return audioBuffer;
 }
 
+// Create a buffer of the given length with a linear ramp having values 0 <= x < 1.
+function createLinearRampBuffer(context, sampleFrameLength) {
+    var audioBuffer = context.createBuffer(1, sampleFrameLength, context.sampleRate);
+    var n = audioBuffer.length;
+    var dataL = audioBuffer.getChannelData(0);
+
+    for (var i = 0; i < n; ++i)
+        dataL[i] = i / n;
+
+    return audioBuffer;
+}
+
+// Create a buffer of the given length having a constant value.
+function createConstantBuffer(context, sampleFrameLength, constantValue) {
+    var audioBuffer = context.createBuffer(1, sampleFrameLength, context.sampleRate);
+    var n = audioBuffer.length;
+    var dataL = audioBuffer.getChannelData(0);
+
+    for (var i = 0; i < n; ++i)
+        dataL[i] = constantValue;
+
+    return audioBuffer;
+}
+
+// Create a stereo impulse in a buffer of length sampleFrameLength
+function createStereoImpulseBuffer(context, sampleFrameLength) {
+    var audioBuffer = context.createBuffer(2, sampleFrameLength, context.sampleRate);
+    var n = audioBuffer.length;
+    var dataL = audioBuffer.getChannelData(0);
+    var dataR = audioBuffer.getChannelData(1);
+
+    for (var k = 0; k < n; ++k) {
+        dataL[k] = 0;
+        dataR[k] = 0;
+    }
+    dataL[0] = 1;
+    dataR[0] = 1;
+
+    return audioBuffer;
+}
+
 // Convert time (in seconds) to sample frames.
 function timeToSampleFrame(time, sampleRate) {
     return Math.floor(0.5 + time * sampleRate);

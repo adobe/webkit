@@ -126,11 +126,13 @@ public:
     virtual void onSizeChanged();
     virtual void onPlayNotified();
     virtual void onPauseNotified();
+    virtual void onWaitMetadataNotified(bool hasFinished, int timeWaited);
 #if USE(ACCELERATED_COMPOSITING)
     virtual void onBuffering(bool);
 #endif
 
     virtual bool isFullscreen() const;
+    virtual bool isTabVisible() const;
     virtual int showErrorDialog(BlackBerry::Platform::MMRPlayer::Error);
     virtual BlackBerry::Platform::Graphics::Window* platformWindow();
 
@@ -161,6 +163,9 @@ private:
     void userDrivenSeekTimerFired(Timer<MediaPlayerPrivate>*);
     Timer<MediaPlayerPrivate> m_userDrivenSeekTimer;
     float m_lastSeekTime;
+    void waitMetadataTimerFired(Timer<MediaPlayerPrivate>*);
+    Timer<MediaPlayerPrivate> m_waitMetadataTimer;
+    int m_waitMetadataPopDialogCounter;
 };
 
 } // namespace WebCore

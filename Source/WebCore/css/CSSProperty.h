@@ -21,6 +21,7 @@
 #ifndef CSSProperty_h
 #define CSSProperty_h
 
+#include "CSSPropertyNames.h"
 #include "CSSValue.h"
 #include "RenderStyleConstants.h"
 #include "TextDirection.h"
@@ -31,7 +32,7 @@ namespace WebCore {
 
 class CSSProperty {
 public:
-    CSSProperty(unsigned propID, PassRefPtr<CSSValue> value, bool important = false, int shorthandID = 0, bool implicit = false)
+    CSSProperty(CSSPropertyID propID, PassRefPtr<CSSValue> value, bool important = false, CSSPropertyID shorthandID = CSSPropertyInvalid, bool implicit = false)
         : m_id(propID)
         , m_shorthandID(shorthandID)
         , m_important(important)
@@ -41,8 +42,8 @@ public:
     {
     }
 
-    int id() const { return m_id; }
-    int shorthandID() const { return m_shorthandID; }
+    CSSPropertyID id() const { return static_cast<CSSPropertyID>(m_id); }
+    CSSPropertyID shorthandID() const { return static_cast<CSSPropertyID>(m_shorthandID); }
 
     bool isImportant() const { return m_important; }
     bool isImplicit() const { return m_implicit; }
@@ -52,15 +53,18 @@ public:
 
     String cssText() const;
 
-    static int resolveDirectionAwareProperty(int propertyID, TextDirection, WritingMode);
-    static bool isInheritedProperty(unsigned propertyID);
+    void wrapValueInCommaSeparatedList();
 
+    static CSSPropertyID resolveDirectionAwareProperty(CSSPropertyID, TextDirection, WritingMode);
+    static bool isInheritedProperty(CSSPropertyID);
+
+private:
     // Make sure the following fits in 4 bytes. Really.
     unsigned m_id : 14;
     unsigned m_shorthandID : 14; // If this property was set as part of a shorthand, gives the shorthand.
-    bool m_important : 1;
-    bool m_implicit : 1; // Whether or not the property was set implicitly as the result of a shorthand.
-    bool m_inherited : 1;
+    unsigned m_important : 1;
+    unsigned m_implicit : 1; // Whether or not the property was set implicitly as the result of a shorthand.
+    unsigned m_inherited : 1;
 
     RefPtr<CSSValue> m_value;
 };

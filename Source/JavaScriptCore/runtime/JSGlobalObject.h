@@ -86,8 +86,6 @@ namespace JSC {
 
     protected:
 
-        RefPtr<JSGlobalData> m_globalData;
-
         size_t m_registerArraySize;
         Register m_globalCallFrame[RegisterFile::CallFrameHeaderSize];
 
@@ -302,7 +300,7 @@ namespace JSC {
 
         void resetPrototype(JSGlobalData&, JSValue prototype);
 
-        JSGlobalData& globalData() const { return *m_globalData.get(); }
+        JSGlobalData& globalData() const { return *Heap::heap(this)->globalData(); }
 
         static Structure* createStructure(JSGlobalData& globalData, JSValue prototype)
         {
@@ -358,7 +356,7 @@ namespace JSC {
     inline JSGlobalObject* asGlobalObject(JSValue value)
     {
         ASSERT(asObject(value)->isGlobalObject());
-        return static_cast<JSGlobalObject*>(asObject(value));
+        return jsCast<JSGlobalObject*>(asObject(value));
     }
 
     inline void JSGlobalObject::setRegisters(WriteBarrier<Unknown>* registers, PassOwnArrayPtr<WriteBarrier<Unknown> > registerArray, size_t count)

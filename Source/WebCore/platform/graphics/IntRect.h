@@ -111,6 +111,8 @@ public:
     int pixelSnappedMaxY() const { return y() + height(); }
     int pixelSnappedWidth() const { return m_size.width(); }
     int pixelSnappedHeight() const { return m_size.height(); }
+    IntPoint pixelSnappedLocation() const { return location(); }
+    IntSize pixelSnappedSize() const { return size(); }
 
     void setX(int x) { m_location.setX(x); }
     void setY(int y) { m_location.setY(y); }
@@ -268,6 +270,13 @@ inline bool operator==(const IntRect& a, const IntRect& b)
 inline bool operator!=(const IntRect& a, const IntRect& b)
 {
     return a.location() != b.location() || a.size() != b.size();
+}
+
+// FIXME: This method is here only to ease the transition to sub-pixel layout. It should
+// be removed when we close http://webkit.org/b/60318
+inline IntRect enclosingIntRect(const IntRect& rect)
+{
+    return rect;
 }
 
 #if USE(CG) || USE(SKIA_ON_MAC_CHROMIUM)

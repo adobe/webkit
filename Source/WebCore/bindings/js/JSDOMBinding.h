@@ -104,7 +104,7 @@ enum ParameterDefaultPolicy {
         // FIXME: Callers to this function should be using the global object
         // from which the object is being created, instead of assuming the lexical one.
         // e.g. subframe.document.body should use the subframe's global object, not the lexical one.
-        return static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject());
+        return JSC::jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject());
     }
 
     template<class WrapperClass> inline JSC::Structure* getDOMStructure(JSC::ExecState* exec, JSDOMGlobalObject* globalObject)
@@ -122,7 +122,7 @@ enum ParameterDefaultPolicy {
 
     template<class WrapperClass> inline JSC::JSObject* getDOMPrototype(JSC::ExecState* exec, JSC::JSGlobalObject* globalObject)
     {
-        return static_cast<JSC::JSObject*>(asObject(getDOMStructure<WrapperClass>(exec, static_cast<JSDOMGlobalObject*>(globalObject))->storedPrototype()));
+        return JSC::jsCast<JSC::JSObject*>(asObject(getDOMStructure<WrapperClass>(exec, JSC::jsCast<JSDOMGlobalObject*>(globalObject))->storedPrototype()));
     }
 
     // Overload these functions to provide a fast path for wrapper access.
@@ -141,16 +141,16 @@ enum ParameterDefaultPolicy {
     {
         if (setInlineCachedWrapper(world, domObject, wrapper))
             return;
-        JSC::PassWeak<JSDOMWrapper> passWeak(*world->globalData(), wrapper, wrapperOwner(world, domObject), wrapperContext(world, domObject));
-        pair<DOMObjectWrapperMap::iterator, bool> result = world->m_wrappers.add(domObject, passWeak);
-        ASSERT_UNUSED(result, result.second);
+        JSC::PassWeak<JSDOMWrapper> passWeak(wrapper, wrapperOwner(world, domObject), wrapperContext(world, domObject));
+        DOMObjectWrapperMap::AddResult result = world->m_wrappers.add(domObject, passWeak);
+        ASSERT_UNUSED(result, result.isNewEntry);
     }
 
     template <typename DOMClass> inline void uncacheWrapper(DOMWrapperWorld* world, DOMClass* domObject, JSDOMWrapper* wrapper)
     {
         if (clearInlineCachedWrapper(world, domObject, wrapper))
             return;
-        ASSERT(world->m_wrappers.find(domObject)->second.get() == wrapper);
+        ASSERT(world->m_wrappers.find(domObject)->second.was(wrapper));
         world->m_wrappers.remove(domObject);
     }
     
@@ -216,6 +216,8 @@ enum ParameterDefaultPolicy {
 
     inline void* root(MediaList* mediaList)
     {
+        if (CSSRule* parentRule = mediaList->parentRule())
+            return root(parentRule);
         if (CSSStyleSheet* parentStyleSheet = mediaList->parentStyleSheet())
             return root(parentStyleSheet);
         return mediaList;
@@ -279,16 +281,28 @@ enum ParameterDefaultPolicy {
         return toJS(exec, globalObject, ptr.get());
     }
 
-    template <typename Iterable>
-    JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Iterable& iterator)
+    template <typename T>
+    JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<T>& iterator)
     {
         JSC::MarkedArgumentBuffer list;
-        typename Iterable::const_iterator end = iterator.end();
+        typename Vector<T>::const_iterator end = iterator.end();
 
-        for (typename Iterable::const_iterator iter = iterator.begin(); iter != end; ++iter)
+        for (typename Vector<T>::const_iterator iter = iterator.begin(); iter != end; ++iter)
             list.append(toJS(exec, globalObject, WTF::getPtr(*iter)));
 
         return JSC::constructArray(exec, globalObject, list);
+    }
+
+    template<>
+    inline JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<String>& iterator)
+    {
+        JSC::MarkedArgumentBuffer array;
+        Vector<String>::const_iterator end = iterator.end();
+
+        for (Vector<String>::const_iterator it = iterator.begin(); it != end; ++it)
+            array.append(jsString(exec, stringToUString(*it)));
+
+        return JSC::constructArray(exec, globalObject, array);
     }
 
     template <class T>

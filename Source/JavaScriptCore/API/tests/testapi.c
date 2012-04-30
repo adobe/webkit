@@ -678,9 +678,22 @@ static JSValueRef Base_callAsFunction(JSContextRef ctx, JSObjectRef function, JS
     return JSValueMakeNumber(ctx, 1); // distinguish base call from derived call
 }
 
+static JSValueRef Base_returnHardNull(JSContextRef ctx, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    UNUSED_PARAM(ctx);
+    UNUSED_PARAM(function);
+    UNUSED_PARAM(thisObject);
+    UNUSED_PARAM(argumentCount);
+    UNUSED_PARAM(arguments);
+    UNUSED_PARAM(exception);
+    
+    return 0; // should convert to undefined!
+}
+
 static JSStaticFunction Base_staticFunctions[] = {
     { "baseProtoDup", NULL, kJSPropertyAttributeNone },
     { "baseProto", Base_callAsFunction, kJSPropertyAttributeNone },
+    { "baseHardNull", Base_returnHardNull, kJSPropertyAttributeNone },
     { 0, 0, 0 }
 };
 
@@ -850,6 +863,17 @@ static JSObjectRef myConstructor_callAsConstructor(JSContextRef context, JSObjec
     }
     
     return result;
+}
+
+static JSObjectRef myBadConstructor_callAsConstructor(JSContextRef context, JSObjectRef constructorObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    UNUSED_PARAM(context);
+    UNUSED_PARAM(constructorObject);
+    UNUSED_PARAM(argumentCount);
+    UNUSED_PARAM(arguments);
+    UNUSED_PARAM(exception);
+    
+    return 0;
 }
 
 
@@ -1447,6 +1471,11 @@ int main(int argc, char* argv[])
     JSObjectRef myConstructor = JSObjectMakeConstructor(context, NULL, myConstructor_callAsConstructor);
     JSObjectSetProperty(context, globalObject, myConstructorIString, myConstructor, kJSPropertyAttributeNone, NULL);
     JSStringRelease(myConstructorIString);
+    
+    JSStringRef myBadConstructorIString = JSStringCreateWithUTF8CString("MyBadConstructor");
+    JSObjectRef myBadConstructor = JSObjectMakeConstructor(context, NULL, myBadConstructor_callAsConstructor);
+    JSObjectSetProperty(context, globalObject, myBadConstructorIString, myBadConstructor, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(myBadConstructorIString);
     
     ASSERT(!JSObjectSetPrivate(myConstructor, (void*)1));
     ASSERT(!JSObjectGetPrivate(myConstructor));

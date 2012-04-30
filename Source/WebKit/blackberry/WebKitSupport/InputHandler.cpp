@@ -141,7 +141,7 @@ static BlackBerryInputType convertInputType(const HTMLInputElement* inputElement
         return InputTypeTelephone;
     if (inputElement->isURLField())
         return InputTypeURL;
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     if (inputElement->isColorControl())
         return InputTypeColor;
 #endif
@@ -158,6 +158,8 @@ static BlackBerryInputType convertInputType(const HTMLInputElement* inputElement
         return InputTypeEmail;
     if (DOMSupport::elementIdOrNameIndicatesUrl(inputElement))
         return InputTypeURL;
+    if (DOMSupport::elementPatternIndicatesNumber(inputElement))
+        return InputTypeNumber;
     if (DOMSupport::elementPatternIndicatesHexadecimal(inputElement))
         return InputTypeHexadecimal;
 
@@ -396,7 +398,7 @@ void InputHandler::learnText()
     if (textInField.isEmpty())
         return;
 
-    InputLog(LogLevelInfo, "InputHandler::learnText %s", textInField.latin1().data());
+    InputLog(LogLevelInfo, "InputHandler::learnText '%s'", textInField.latin1().data());
     sendLearnTextDetails(textInField);
 }
 
@@ -430,9 +432,9 @@ void InputHandler::setElementUnfocused(bool refocusOccuring)
 
 void InputHandler::enableInputMode(bool inputModeAllowed)
 {
-    FocusLog(LogLevelInfo, "InputHandler::enableInputMode %s, override is %s"
+    FocusLog(LogLevelInfo, "InputHandler::enableInputMode '%s', override is '%s'"
              , inputModeAllowed ? "true" : "false"
-            , m_webPage->m_dumpRenderTree || Platform::Settings::get()->alwaysShowKeyboardOnFocus() ? "true" : "false");
+             , m_webPage->m_dumpRenderTree || Platform::Settings::get()->alwaysShowKeyboardOnFocus() ? "true" : "false");
 
     m_inputModeEnabled = inputModeAllowed;
 
@@ -535,6 +537,17 @@ void InputHandler::nodeTextChanged(const Node* node)
     removeAttributedTextMarker();
 }
 
+WebCore::IntRect InputHandler::boundingBoxForInputField()
+{
+    if (!isActiveTextEdit())
+        return WebCore::IntRect();
+
+    if (!m_currentFocusElement->renderer())
+        return WebCore::IntRect();
+
+    return m_currentFocusElement->renderer()->absoluteBoundingBoxRect();
+}
+
 void InputHandler::ensureFocusTextElementVisible(CaretScrollType scrollType)
 {
     if (!m_inputModeEnabled || !m_currentFocusElement || !m_currentFocusElement->document())
@@ -623,12 +636,27 @@ void InputHandler::ensureFocusTextElementVisible(CaretScrollType scrollType)
             }
 
             // Pad the rect to improve the visual appearance.
-            selectionFocusRect.inflate(4 /* padding in pixels */);
+            // Padding must be large enough to expose the selection / FCC should they exist. Dragging the handle offscreen and releasing
+            // will not trigger an automatic scroll. Using a padding of 40 will fully exposing the width of the current handle and half of
+            // the height making it usable.
+            // FIXME: This will need to be updated when the graphics change.
+            // FIXME: The value of 40 should be calculated as a unit of measure using Graphics::Screen::primaryScreen()->heightInMMToPixels
+            // using a relative value to the size of the handle. We should also consider expanding different amounts horizontally vs vertically.
+            selectionFocusRect.inflate(40 /* padding in pixels */);
             WebCore::IntRect revealRect = layer->getRectToExpose(actualScreenRect, selectionFocusRect,
                                                                  horizontalScrollAlignment,
                                                                  verticalScrollAlignment);
 
-            mainFrameView->setScrollPosition(revealRect.location());
+            mainFrameView->setConstrainsScrollingToContentEdge(false);
+            // In order to adjust the scroll position to ensure the focused input field is visible,
+            // we allow overscrolling. However this overscroll has to be strictly allowed towards the
+            // bottom of the page on the y axis only, where the virtual keyboard pops up from.
+            WebCore::IntPoint scrollLocation = revealRect.location();
+            scrollLocation.clampNegativeToZero();
+            WebCore::IntPoint maximumScrollPosition = WebCore::IntPoint(mainFrameView->contentsWidth() - actualScreenRect.width(), mainFrameView->contentsHeight() - actualScreenRect.height());
+            scrollLocation = scrollLocation.shrunkTo(maximumScrollPosition);
+            mainFrameView->setScrollPosition(scrollLocation);
+            mainFrameView->setConstrainsScrollingToContentEdge(true);
         }
     }
 
@@ -1161,7 +1189,7 @@ void InputHandler::setPopupListIndex(int index)
     clearCurrentFocusElement();
 }
 
-void InputHandler::setPopupListIndexes(int size, bool* selecteds)
+void InputHandler::setPopupListIndexes(int size, const bool* selecteds)
 {
     if (!isActiveSelectPopup())
         return clearCurrentFocusElement();
@@ -1509,6 +1537,8 @@ bool InputHandler::setText(spannable_string_t* spannableString)
     String textToInsert = convertSpannableStringToString(spannableString);
     int textLength = textToInsert.length();
 
+    InputLog(LogLevelInfo, "InputHandler::setText spannableString is '%s', of length %d \n", textToInsert.latin1().data(), textLength);
+
     span_t* changedSpan = firstSpanInString(spannableString, CHANGED_ATTRIB);
     int composingTextStart = m_composingTextStart;
     int composingTextEnd = m_composingTextEnd;
@@ -1517,19 +1547,26 @@ bool InputHandler::setText(spannable_string_t* spannableString)
 
     if (isTrailingSingleCharacter(changedSpan, textLength, composingTextLength)) {
         // Handle the case where text is being composed.
-        if (firstSpanInString(spannableString, COMPOSED_TEXT_ATTRIB))
+        if (firstSpanInString(spannableString, COMPOSED_TEXT_ATTRIB)) {
+            InputLog(LogLevelInfo, "InputHandler::setText Single trailing character detected.  Text is being composed. \n");
             return editor->command("InsertText").execute(textToInsert.right(1));
+        }
+        InputLog(LogLevelInfo, "InputHandler::setText Single trailing character detected. Text is not being composed. \n");
         return handleKeyboardInput(Platform::KeyboardEvent(textToInsert[textLength - 1], Platform::KeyboardEvent::KeyChar, 0), false /* changeIsPartOfComposition */);
     }
 
     // If no spans have changed, treat it as a delete operation.
     if (!changedSpan) {
         // If the composition length is the same as our string length, then we don't need to do anything.
-        if (composingTextLength == textLength)
+        if (composingTextLength == textLength) {
+            InputLog(LogLevelInfo, "InputHandler::setText No spans have changed. New text is the same length as the old. Nothing to do. \n");
             return true;
+        }
 
-        if (composingTextLength - textLength == 1)
+        if (composingTextLength - textLength == 1) {
+            InputLog(LogLevelInfo, "InputHandler::setText No spans have changed. New text is one character shorter than the old. Treating as 'delete'. \n");
             return editor->command("DeleteBackward").execute();
+        }
     }
 
     if (composingTextLength && !setSelection(composingTextStart, composingTextEnd, true /* changeIsPartOfComposition */))
@@ -1544,8 +1581,6 @@ bool InputHandler::setText(spannable_string_t* spannableString)
         return true;
     }
 
-    InputLog(LogLevelInfo, "setText spannableString is %s, %d \n", textToInsert.latin1().data(), textLength);
-
     // Triggering an insert of the text with a space character trailing
     // causes new text to adopt the previous text style.
     // Remove it and apply it as a keypress later.
@@ -1557,27 +1592,25 @@ bool InputHandler::setText(spannable_string_t* spannableString)
         textToInsert.remove(textLength, 1);
     }
 
-    InputLog(LogLevelInfo, "InputHandler::setText Request being processed Text before %s", elementText().latin1().data());
+    InputLog(LogLevelInfo, "InputHandler::setText Request being processed. Text before processing: '%s'", elementText().latin1().data());
 
     if (textLength == 1 && !spannableString->spans_count) {
         // Handle single key non-attributed entry as key press rather than insert to allow
         // triggering of javascript events.
-
+        InputLog(LogLevelInfo, "InputHandler::setText Single character entry treated as key-press in the absense of spans. \n");
         return handleKeyboardInput(Platform::KeyboardEvent(textToInsert[0], Platform::KeyboardEvent::KeyChar, 0), true /* changeIsPartOfComposition */);
     }
 
     // Perform the text change as a single command if there is one.
     if (!textToInsert.isEmpty() && !editor->command("InsertText").execute(textToInsert)) {
-        InputLog(LogLevelWarn, "InputHandler::setText Failed to insert text %s", textToInsert.latin1().data());
+        InputLog(LogLevelWarn, "InputHandler::setText Failed to insert text '%s'", textToInsert.latin1().data());
         return false;
     }
-
-    InputLog(LogLevelInfo, "InputHandler::setText Request being processed Text after insert %s", elementText().latin1().data());
 
     if (requiresSpaceKeyPress)
         handleKeyboardInput(Platform::KeyboardEvent(32 /* space */, Platform::KeyboardEvent::KeyChar, 0), true /* changeIsPartOfComposition */);
 
-    InputLog(LogLevelInfo, "InputHandler::setText Text after %s", elementText().latin1().data());
+    InputLog(LogLevelInfo, "InputHandler::setText Request being processed. Text after processing '%s'", elementText().latin1().data());
 
     return true;
 }

@@ -167,6 +167,8 @@ shouldBe("constructedObject.value", 1);
 shouldBe("myObject instanceof MyObject", true);
 shouldBe("(new Object()) instanceof MyObject", false);
 
+shouldThrow("new MyBadConstructor()");
+
 MyObject.nullGetSet = 1;
 shouldBe("MyObject.nullGetSet", 1);
 shouldThrow("MyObject.nullCall()");
@@ -185,6 +187,8 @@ shouldBe("derived.baseOnly", 1);
 shouldBe("derived.protoOnly()", 2);
 shouldBe("derived.protoDup", 2);
 shouldBe("derived.derivedOnly", 2)
+
+shouldBe("derived.baseHardNull()", undefined)
 
 // base properties throw 1 when set; derived, 2
 shouldBe("derived.baseDup = 0", 2);

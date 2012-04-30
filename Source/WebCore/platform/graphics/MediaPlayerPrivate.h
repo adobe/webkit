@@ -158,8 +158,16 @@ public:
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
+    virtual MediaPlayer::AddIdStatus sourceAddId(const String&, const String&) { return MediaPlayer::NotSupported; }
+    virtual bool sourceRemoveId(const String&) { return false; }
     virtual bool sourceAppend(const unsigned char*, unsigned) { return false; }
     virtual void sourceEndOfStream(MediaPlayer::EndOfStreamStatus) { };
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA)
+    virtual MediaPlayer::MediaKeyException addKey(const String& keySystem, const unsigned char* key, unsigned keyLength, const unsigned char* initData, unsigned initDataLength, const String& sessionId) { return MediaPlayer::KeySystemNotSupported; }
+    virtual MediaPlayer::MediaKeyException generateKeyRequest(const String& keySystem, const unsigned char* initData, unsigned initDataLength) { return MediaPlayer::KeySystemNotSupported; }
+    virtual MediaPlayer::MediaKeyException cancelKeyRequest(const String& keySystem, const String& sessionId) { return MediaPlayer::KeySystemNotSupported; }
 #endif
 };
 

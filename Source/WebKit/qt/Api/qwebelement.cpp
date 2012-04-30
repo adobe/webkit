@@ -26,7 +26,6 @@
 #include "CSSRule.h"
 #include "CSSRuleList.h"
 #include "CSSStyleRule.h"
-#include "CSSStyleSelector.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "FrameView.h"
@@ -51,6 +50,7 @@
 #include "RenderImage.h"
 #include "ScriptState.h"
 #include "StaticNodeList.h"
+#include "StyleResolver.h"
 #include "qwebframe.h"
 #include "qwebframe_p.h"
 #if USE(JSC)
@@ -552,7 +552,7 @@ QRect QWebElement::geometry() const
 {
     if (!m_element)
         return QRect();
-    return m_element->getRect();
+    return m_element->getPixelSnappedRect();
 }
 
 /*!
@@ -839,7 +839,7 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (!m_element || !m_element->isStyledElement())
         return QString();
 
-    int propID = cssPropertyID(name);
+    CSSPropertyID propID = cssPropertyID(name);
 
     if (!propID)
         return QString();
@@ -862,7 +862,7 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         // declarations, as well as embedded and inline style declarations.
 
         Document* doc = m_element->document();
-        if (RefPtr<CSSRuleList> rules = doc->styleSelector()->styleRulesForElement(m_element, /*authorOnly*/ true)) {
+        if (RefPtr<CSSRuleList> rules = doc->styleResolver()->styleRulesForElement(m_element, /*authorOnly*/ true)) {
             for (int i = rules->length(); i > 0; --i) {
                 CSSStyleRule* rule = static_cast<CSSStyleRule*>(rules->item(i - 1));
 
@@ -880,8 +880,6 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (strategy == ComputedStyle) {
         if (!m_element || !m_element->isStyledElement())
             return QString();
-
-        int propID = cssPropertyID(name);
 
         RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(m_element, true);
         if (!propID || !style)
@@ -908,7 +906,7 @@ void QWebElement::setStyleProperty(const QString &name, const QString &value)
     if (!m_element || !m_element->isStyledElement())
         return;
 
-    int propID = cssPropertyID(name);
+    CSSPropertyID propID = cssPropertyID(name);
     static_cast<StyledElement*>(m_element)->setInlineStyleProperty(propID, value);
 }
 

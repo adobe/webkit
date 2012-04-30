@@ -21,21 +21,26 @@
 #include "config.h"
 #include "QtPageClient.h"
 
+#include "DrawingAreaProxy.h"
+#include "LayerTreeContext.h"
 #include "QtWebPageEventHandler.h"
 #include "QtWebUndoController.h"
+#include "ShareableBitmap.h"
 #include "WebContextMenuProxyQt.h"
 #include "WebEditCommandProxy.h"
 #include "WebPopupMenuProxyQt.h"
 #include "qquickwebview_p.h"
 #include "qquickwebview_p_p.h"
 #include <QGuiApplication>
+#include <QQuickCanvas>
 #include <WebCore/Cursor.h>
 #include <WebCore/DragData.h>
 #include <WebCore/FloatRect.h>
 #include <WebCore/NotImplemented.h>
 
-using namespace WebKit;
 using namespace WebCore;
+
+namespace WebKit {
 
 QtPageClient::QtPageClient()
     : m_webView(0)
@@ -85,9 +90,9 @@ void QtPageClient::didChangeContentsSize(const IntSize& newSize)
     QQuickWebViewPrivate::get(m_webView)->didChangeContentsSize(newSize);
 }
 
-void QtPageClient::didChangeViewportProperties(const WebCore::ViewportArguments& args)
+void QtPageClient::didChangeViewportProperties(const WebCore::ViewportAttributes& attr)
 {
-    QQuickWebViewPrivate::get(m_webView)->didChangeViewportProperties(args);
+    QQuickWebViewPrivate::get(m_webView)->didChangeViewportProperties(attr);
 }
 
 void QtPageClient::startDrag(const WebCore::DragData& dragData, PassRefPtr<ShareableBitmap> dragImage)
@@ -270,6 +275,11 @@ bool QtPageClient::isViewVisible()
 {
     if (!m_webView)
         return false;
+
+    // FIXME: this is a workaround while QWindow::isExposed() is not ready.
+    if (m_webView->canvas() && m_webView->canvas()->windowState() == Qt::WindowMinimized)
+        return false;
+
     return m_webView->isVisible() && m_webView->page()->isVisible();
 }
 
@@ -294,3 +304,4 @@ void QtPageClient::updateAcceleratedCompositingMode(const LayerTreeContext&)
     // FIXME: Implement.
 }
 
+} // namespace WebKit

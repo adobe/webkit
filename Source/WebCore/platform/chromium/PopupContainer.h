@@ -99,7 +99,7 @@ public:
     int selectedIndex() const;
 
     // Refresh the popup values from the PopupMenuClient.
-    void refresh(const IntRect& targetControlRect);
+    IntRect refresh(const IntRect& targetControlRect);
 
     // The menu per-item data.
     const WTF::Vector<PopupItem*>& popupData() const;
@@ -138,7 +138,13 @@ private:
 
     PopupContainerSettings m_settings;
     PopupType m_popupType;
+
+    // This contains the "ideal" dimensions and position for the popup
+    // (PopupContainer's frameRect() location should always be (0, 0), since
+    // it is rendered inside (and relative to) a WebWidget, which should get
+    // the actual popup position through chromeClientChromium()).
     IntRect m_originalFrameRect;
+
     // Whether the popup is currently open.
     bool m_popupOpen;
 };

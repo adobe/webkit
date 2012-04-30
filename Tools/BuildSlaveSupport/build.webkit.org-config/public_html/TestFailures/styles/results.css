@@ -23,12 +23,24 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-.results-view ul.actions, .ui-dialog ul.actions {
+.non-action-button, .results-view ul.actions, .ui-dialog ul.actions {
     float: right;
     margin: 0;
     padding: 5px 0px;
     list-style: none;
     display: inline-block;
+}
+
+.non-action-button {
+    padding: 5px;
+}
+
+.results-view ul.actions.rebaseline-action {
+    float: none;
+    position: absolute;
+    right: 4px;
+    top: 7px;
+    padding: 0;
 }
 
 .results-view ul.actions li, .ui-dialog ul.actions li {
@@ -79,15 +91,63 @@
     height: auto;
 }
 
-.ui-state-default .link-title, .ui-state-default .link-title:link, .ui-state-default .link-title:visited {
+.results-view .top-panel {
+    min-height: 100px;
+    max-height: 20%;
+    overflow: auto;
+    position: relative;
+}
+
+.results-view .resize-handle {
+    height: 5px;
+    text-align: center;
+    -webkit-user-select: none;
+    line-height: 5px;
+    cursor: ns-resize;
+    font-size: 5px;
+    font-weight: bold;
+    padding: 1px;
+}
+
+.results-view .resize-handle:before {
+    content: '|||';
+}
+
+.results-view .link-title,
+.results-view .active .non-link-title {
     display: none;
 }
-.ui-state-active .link-title, .ui-state-active .link-title:link, .ui-state-active .link-title:visited {
-    text-decoration: underline;
+
+.results-view .non-link-title,
+.results-view .active .link-title {
     display: inline-block;
 }
-.ui-state-active .non-link-title, .ui-state-active .non-link-title:link, .ui-state-active .non-link-title:visited {
-    display: none;
+
+.results-view h3 {
+    font-size: 16px;
+    border-top: 1px solid #DDD;
+    margin: 0;
+    cursor: pointer;
+}
+
+.results-view h3:not(.active):hover {
+    background-color: #EEE;
+}
+
+.results-view .active {
+    background-color: #CCC;
+}
+
+/* CSS percentages in standards-mode are dumb. You need to have a percentage or fixed height
+   all the way up the tree in order to have percentages resolve. */
+html, body, #onebar, .results-view, .test-selector {
+    height: 100%;
+}
+
+#results {
+    /* FIXME: We really should use flexbox so we don't have to do this. But that requires restructuring the DOM a bit. */;
+    height: -webkit-calc(100% - 39px);
+    box-sizing: border-box;
 }
 
 /*** status console ***/
@@ -132,4 +192,10 @@
 .status-content:last-child {
     border-bottom: 0;
     margin-bottom: 0;
+}
+
+.flakiness-iframe, .flakiness-iframe-placeholder {
+    border: none;
+    height: 0;
+    width: 100%;
 }

@@ -37,7 +37,6 @@
 #include "JIT.h"
 #include "JITDriver.h"
 #include "JSActivation.h"
-#include "JSByteArray.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSPropertyNameIterator.h"
 #include "JSStaticScopeObject.h"
@@ -389,10 +388,11 @@ LLINT_SLOW_PATH_DECL(register_file_check)
     dataLog("Num vars = %u.\n", exec->codeBlock()->m_numVars);
     dataLog("Current end is at %p.\n", exec->globalData().interpreter->registerFile().end());
 #endif
-    ASSERT(&exec->registers()[exec->codeBlock()->m_numCalleeRegisters] > exec->globalData().interpreter->registerFile().end());
+    ASSERT(&exec->registers()[exec->codeBlock()->m_numCalleeRegisters] > exec->globalData().interpreter->registerFile().commitEnd());
     if (UNLIKELY(!globalData.interpreter->registerFile().grow(&exec->registers()[exec->codeBlock()->m_numCalleeRegisters]))) {
         ReturnAddressPtr returnPC = exec->returnPC();
         exec = exec->callerFrame();
+        exec->globalData().topCallFrame = exec;
         globalData.exception = createStackOverflowError(exec);
         interpreterThrowInCaller(exec, returnPC);
         pc = returnToThrowForThrownException(exec);
@@ -407,6 +407,7 @@ LLINT_SLOW_PATH_DECL(slow_path_call_arityCheck)
     if (!newExec) {
         ReturnAddressPtr returnPC = exec->returnPC();
         exec = exec->callerFrame();
+        exec->globalData().topCallFrame = exec;
         globalData.exception = createStackOverflowError(exec);
         interpreterThrowInCaller(exec, returnPC);
         LLINT_RETURN_TWO(bitwise_cast<void*>(static_cast<uintptr_t>(1)), exec);
@@ -421,6 +422,7 @@ LLINT_SLOW_PATH_DECL(slow_path_construct_arityCheck)
     if (!newExec) {
         ReturnAddressPtr returnPC = exec->returnPC();
         exec = exec->callerFrame();
+        exec->globalData().topCallFrame = exec;
         globalData.exception = createStackOverflowError(exec);
         interpreterThrowInCaller(exec, returnPC);
         LLINT_RETURN_TWO(bitwise_cast<void*>(static_cast<uintptr_t>(1)), exec);
@@ -702,31 +704,6 @@ LLINT_SLOW_PATH_DECL(slow_path_typeof)
     LLINT_RETURN(jsTypeStringForValue(exec, LLINT_OP_C(2).jsValue()));
 }
 
-LLINT_SLOW_PATH_DECL(slow_path_is_undefined)
-{
-    LLINT_BEGIN();
-    JSValue v = LLINT_OP_C(2).jsValue();
-    LLINT_RETURN(jsBoolean(v.isCell() ? v.asCell()->structure()->typeInfo().masqueradesAsUndefined() : v.isUndefined()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_boolean)
-{
-    LLINT_BEGIN();
-    LLINT_RETURN(jsBoolean(LLINT_OP_C(2).jsValue().isBoolean()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_number)
-{
-    LLINT_BEGIN();
-    LLINT_RETURN(jsBoolean(LLINT_OP_C(2).jsValue().isNumber()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_string)
-{
-    LLINT_BEGIN();
-    LLINT_RETURN(jsBoolean(isJSString(LLINT_OP_C(2).jsValue())));
-}
-
 LLINT_SLOW_PATH_DECL(slow_path_is_object)
 {
     LLINT_BEGIN();
@@ -982,9 +959,6 @@ inline JSValue getByVal(ExecState* exec, JSValue baseValue, JSValue subscript)
         if (isJSString(baseValue) && asString(baseValue)->canGetIndex(i))
             return asString(baseValue)->getIndex(exec, i);
         
-        if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i))
-            return asByteArray(baseValue)->getIndex(exec, i);
-        
         return baseValue.get(exec, i);
     }
     
@@ -1035,18 +1009,6 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_val)
             else
                 JSArray::putByIndex(jsArray, exec, i, value, exec->codeBlock()->isStrictMode());
             LLINT_END();
-        }
-        if (isJSByteArray(baseValue)
-            && asByteArray(baseValue)->canAccessIndex(i)) {
-            JSByteArray* jsByteArray = asByteArray(baseValue);
-            if (value.isInt32()) {
-                jsByteArray->setIndex(i, value.asInt32());
-                LLINT_END();
-            }
-            if (value.isNumber()) {
-                jsByteArray->setIndex(i, value.asNumber());
-                LLINT_END();
-            }
         }
         baseValue.putByIndex(exec, i, value, exec->codeBlock()->isStrictMode());
         LLINT_END();
@@ -1254,7 +1216,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
 {
     ExecState* exec = execCallee->callerFrame();
     JSGlobalData& globalData = exec->globalData();
-    
+
     execCallee->setScopeChain(exec->scopeChain());
     execCallee->setCodeBlock(0);
     execCallee->clearReturnPC();
@@ -1266,6 +1228,8 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
         ASSERT(callType != CallTypeJS);
     
         if (callType == CallTypeHost) {
+            NativeCallFrameTracer tracer(&globalData, execCallee);
+            execCallee->setCallee(asObject(callee));
             globalData.hostCallReturnValue = JSValue::decode(callData.native.function(execCallee));
             
             LLINT_CALL_RETURN(execCallee, pc, reinterpret_cast<void*>(getHostCallReturnValue));
@@ -1276,6 +1240,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
 #endif
 
         ASSERT(callType == CallTypeNone);
+        NativeCallFrameTracer tracer(&globalData, exec);
         LLINT_CALL_THROW(exec, pc, createNotAFunctionError(exec, callee));
     }
 
@@ -1287,6 +1252,8 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
     ASSERT(constructType != ConstructTypeJS);
     
     if (constructType == ConstructTypeHost) {
+        NativeCallFrameTracer tracer(&globalData, execCallee);
+        execCallee->setCallee(asObject(callee));
         globalData.hostCallReturnValue = JSValue::decode(constructData.native.function(execCallee));
 
         LLINT_CALL_RETURN(execCallee, pc, reinterpret_cast<void*>(getHostCallReturnValue));
@@ -1297,6 +1264,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
 #endif
 
     ASSERT(constructType == ConstructTypeNone);
+    NativeCallFrameTracer tracer(&globalData, exec);
     LLINT_CALL_THROW(exec, pc, createNotAConstructorError(exec, callee));
 }
 

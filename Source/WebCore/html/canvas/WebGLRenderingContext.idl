@@ -384,7 +384,6 @@ module html {
 
         /* Shader Source */
         const unsigned int COMPILE_STATUS                 = 0x8B81;
-        const unsigned int SHADER_COMPILER                = 0x8DFA;
 
         /* Shader Precision-Specified Types */
         const unsigned int LOW_FLOAT                      = 0x8DF0;
@@ -550,8 +549,7 @@ module html {
 
         [StrictTypeChecking, TreatReturnedNullStringAs=Null] DOMString    getShaderInfoLog(in WebGLShader shader) raises(DOMException);
 
-        // TBD
-        // void glGetShaderPrecisionFormat (GLenum shadertype, GLenum precisiontype, GLint* range, GLint* precision);
+        [StrictTypeChecking] WebGLShaderPrecisionFormat getShaderPrecisionFormat(in unsigned long shadertype, in unsigned long precisiontype) raises(DOMException);
 
         [StrictTypeChecking, TreatReturnedNullStringAs=Null] DOMString    getShaderSource(in WebGLShader shader) raises(DOMException);
 

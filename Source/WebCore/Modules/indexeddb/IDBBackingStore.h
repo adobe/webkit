@@ -88,8 +88,14 @@ public:
 
     class Cursor : public RefCounted<Cursor> {
     public:
+        enum IteratorState {
+            Ready = 0,
+            Seek
+        };
+
         virtual PassRefPtr<Cursor> clone() = 0;
-        virtual bool continueFunction(const IDBKey* = 0) = 0;
+        virtual bool advance(unsigned long) = 0;
+        virtual bool continueFunction(const IDBKey* = 0, IteratorState = Seek) = 0;
         virtual PassRefPtr<IDBKey> key() = 0;
         virtual PassRefPtr<IDBKey> primaryKey() = 0;
         virtual String value() = 0;

@@ -118,9 +118,11 @@ void SVGImageElement::parseAttribute(Attribute* attr)
         setXBaseValue(SVGLength::construct(LengthModeWidth, attr->value(), parseError));
     else if (attr->name() == SVGNames::yAttr)
         setYBaseValue(SVGLength::construct(LengthModeHeight, attr->value(), parseError));
-    else if (attr->name() == SVGNames::preserveAspectRatioAttr)
-        SVGPreserveAspectRatio::parsePreserveAspectRatio(this, attr->value());
-    else if (attr->name() == SVGNames::widthAttr)
+    else if (attr->name() == SVGNames::preserveAspectRatioAttr) {
+        SVGPreserveAspectRatio preserveAspectRatio;
+        preserveAspectRatio.parse(attr->value());
+        setPreserveAspectRatioBaseValue(preserveAspectRatio);
+    } else if (attr->name() == SVGNames::widthAttr)
         setWidthBaseValue(SVGLength::construct(LengthModeWidth, attr->value(), parseError, ForbidNegativeLengths));
     else if (attr->name() == SVGNames::heightAttr)
         setHeightBaseValue(SVGLength::construct(LengthModeHeight, attr->value(), parseError, ForbidNegativeLengths));
@@ -194,7 +196,7 @@ RenderObject* SVGImageElement::createRenderer(RenderArena* arena, RenderStyle*)
 
 bool SVGImageElement::haveLoadedRequiredResources()
 {
-    return !externalResourcesRequiredBaseValue() || m_imageLoader.haveFiredLoadEvent();
+    return !externalResourcesRequiredBaseValue() || !m_imageLoader.hasPendingLoadEvent();
 }
 
 void SVGImageElement::attach()
@@ -209,13 +211,15 @@ void SVGImageElement::attach()
     }
 }
 
-void SVGImageElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGImageElement::insertedInto(Node* rootParent)
 {
-    SVGStyledTransformableElement::insertedIntoDocument();
-
+    SVGStyledTransformableElement::insertedInto(rootParent);
+    if (!rootParent->inDocument())
+        return InsertionDone;
     // Update image loader, as soon as we're living in the tree.
     // We can only resolve base URIs properly, after that!
     m_imageLoader.updateFromElement();
+    return InsertionDone;
 }
 
 const QualifiedName& SVGImageElement::imageSourceAttributeName() const

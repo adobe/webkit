@@ -50,13 +50,13 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_scrollable(false)
     , m_shouldScrollOnMainThread(false)
     , m_haveWheelEventHandlers(false)
-    , m_backgroundCoversViewport(false)
     , m_doubleSided(true)
     , m_layerPropertyChanged(false)
     , m_masksToBounds(false)
     , m_opaque(false)
     , m_opacity(1.0)
     , m_preserves3D(false)
+    , m_drawCheckerboardForMissingTiles(false)
     , m_usesLayerClipping(false)
     , m_isNonCompositedContent(false)
     , m_drawsContent(false)
@@ -69,6 +69,9 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_debugBorderWidth(0)
     , m_drawTransformIsAnimating(false)
     , m_screenSpaceTransformIsAnimating(false)
+#ifndef NDEBUG
+    , m_betweenWillDrawAndDidDraw(false)
+#endif
     , m_layerAnimationController(CCLayerAnimationController::create(this))
 {
     ASSERT(CCProxy::isImplThread());
@@ -77,6 +80,9 @@ CCLayerImpl::CCLayerImpl(int id)
 CCLayerImpl::~CCLayerImpl()
 {
     ASSERT(CCProxy::isImplThread());
+#ifndef NDEBUG
+    ASSERT(!m_betweenWillDrawAndDidDraw);
+#endif
 }
 
 void CCLayerImpl::addChild(PassOwnPtr<CCLayerImpl> child)
@@ -136,41 +142,21 @@ PassOwnPtr<CCSharedQuadState> CCLayerImpl::createSharedQuadState() const
     return CCSharedQuadState::create(quadTransform(), drawTransform(), visibleLayerRect(), layerClipRect, drawOpacity(), opaque());
 }
 
-void CCLayerImpl::appendQuads(CCQuadCuller& quadList, const CCSharedQuadState* sharedQuadState, bool&)
+void CCLayerImpl::willDraw(LayerRendererChromium*)
 {
-    appendGutterQuads(quadList, sharedQuadState);
+#ifndef NDEBUG
+    // willDraw/didDraw must be matched.
+    ASSERT(!m_betweenWillDrawAndDidDraw);
+    m_betweenWillDrawAndDidDraw = true;
+#endif
 }
 
-void CCLayerImpl::appendGutterQuads(CCQuadCuller& quadList, const CCSharedQuadState* sharedQuadState)
+void CCLayerImpl::didDraw()
 {
-    if (!backgroundCoversViewport() || !backgroundColor().isValid())
-        return;
-
-    const IntRect& layerRect = visibleLayerRect();
-    IntRect clip = screenSpaceTransform().inverse().mapRect(clipRect());
-
-    if (layerRect.isEmpty()) {
-        quadList.append(CCSolidColorDrawQuad::create(sharedQuadState, clip, backgroundColor()));
-        return;
-    }
-
-    IntRect gutterRects[4];
-    for (int i = 0; i < 4; i++)
-        gutterRects[i] = clip;
-    gutterRects[0].shiftMaxYEdgeTo(layerRect.y());
-    gutterRects[1].shiftYEdgeTo(layerRect.maxY());
-    gutterRects[2].shiftMaxXEdgeTo(layerRect.x());
-    gutterRects[3].shiftXEdgeTo(layerRect.maxX());
-
-    gutterRects[2].shiftYEdgeTo(layerRect.y());
-    gutterRects[3].shiftYEdgeTo(layerRect.y());
-    gutterRects[2].shiftMaxYEdgeTo(layerRect.maxY());
-    gutterRects[3].shiftMaxYEdgeTo(layerRect.maxY());
-
-    for (int i = 0; i < 4; i++) {
-        if (!gutterRects[i].isEmpty())
-            quadList.append(CCSolidColorDrawQuad::create(sharedQuadState, gutterRects[i], backgroundColor()));
-    }
+#ifndef NDEBUG
+    ASSERT(m_betweenWillDrawAndDidDraw);
+    m_betweenWillDrawAndDidDraw = false;
+#endif
 }
 
 void CCLayerImpl::appendDebugBorderQuad(CCQuadCuller& quadList, const CCSharedQuadState* sharedQuadState) const
@@ -195,6 +181,37 @@ void CCLayerImpl::scrollBy(const FloatSize& scroll)
     // Clamp newDelta so that position + delta stays within scroll bounds.
     m_scrollDelta = newDelta.expandedTo(minDelta).shrunkTo(maxDelta);
     noteLayerPropertyChangedForSubtree();
+}
+
+CCInputHandlerClient::ScrollStatus CCLayerImpl::tryScroll(const IntPoint& viewportPoint, CCInputHandlerClient::ScrollInputType type) const
+{
+    if (shouldScrollOnMainThread()) {
+        TRACE_EVENT("tryScroll Failed shouldScrollOnMainThread", this, 0);
+        return CCInputHandlerClient::ScrollFailed;
+    }
+
+    if (!screenSpaceTransform().isInvertible()) {
+        TRACE_EVENT("tryScroll Failed nonInvertibleTransform", this, 0);
+        return CCInputHandlerClient::ScrollIgnored;
+    }
+
+    IntPoint contentPoint(screenSpaceTransform().inverse().mapPoint(viewportPoint));
+    if (nonFastScrollableRegion().contains(contentPoint)) {
+        TRACE_EVENT("tryScroll Failed nonFastScrollableRegion", this, 0);
+        return CCInputHandlerClient::ScrollFailed;
+    }
+
+    if (type == CCInputHandlerClient::Wheel && haveWheelEventHandlers()) {
+        TRACE_EVENT("tryScroll Failed wheelEventHandlers", this, 0);
+        return CCInputHandlerClient::ScrollFailed;
+    }
+
+    if (!scrollable()) {
+        TRACE_EVENT("tryScroll Ignored not scrollable", this, 0);
+        return CCInputHandlerClient::ScrollIgnored;
+    }
+
+    return CCInputHandlerClient::ScrollStarted;
 }
 
 const IntRect CCLayerImpl::getDrawRect() const
@@ -392,15 +409,6 @@ void CCLayerImpl::setBackgroundColor(const Color& backgroundColor)
     m_layerPropertyChanged = true;
 }
 
-void CCLayerImpl::setBackgroundCoversViewport(bool backgroundCoversViewport)
-{
-    if (m_backgroundCoversViewport == backgroundCoversViewport)
-        return;
-
-    m_backgroundCoversViewport = backgroundCoversViewport;
-    m_layerPropertyChanged = true;
-}
-
 void CCLayerImpl::setFilters(const FilterOperations& filters)
 {
     if (m_filters == filters)
@@ -408,6 +416,15 @@ void CCLayerImpl::setFilters(const FilterOperations& filters)
 
     m_filters = filters;
     noteLayerPropertyChangedForSubtree();
+}
+
+void CCLayerImpl::setBackgroundFilters(const FilterOperations& backgroundFilters)
+{
+    if (m_backgroundFilters == backgroundFilters)
+        return;
+
+    m_backgroundFilters = backgroundFilters;
+    m_layerPropertyChanged = true;
 }
 
 void CCLayerImpl::setMasksToBounds(bool masksToBounds)
@@ -550,6 +567,13 @@ void CCLayerImpl::setDoubleSided(bool doubleSided)
 
     m_doubleSided = doubleSided;
     noteLayerPropertyChangedForSubtree();
+}
+
+Region CCLayerImpl::visibleContentOpaqueRegion() const
+{
+    if (opaque())
+        return visibleLayerRect();
+    return Region();
 }
 
 void CCLayerImpl::didLoseContext()

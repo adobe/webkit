@@ -135,7 +135,6 @@ void ChildListMutationScope::MutationAccumulator::willRemoveChild(PassRefPtr<Nod
 
 void ChildListMutationScope::MutationAccumulator::enqueueMutationRecord()
 {
-    ASSERT(!isEmpty());
     if (isEmpty()) {
         clear();
         return;
@@ -211,9 +210,9 @@ void ChildListMutationScope::MutationAccumulationRouter::willRemoveChild(Node* t
 
 void ChildListMutationScope::MutationAccumulationRouter::incrementScopingLevel(Node* target)
 {
-    pair<ScopingLevelMap::iterator, bool> result = m_scopingLevels.add(target, 1);
-    if (!result.second) {
-        ++(result.first->second);
+    ScopingLevelMap::AddResult result = m_scopingLevels.add(target, 1);
+    if (!result.isNewEntry) {
+        ++(result.iterator->second);
         return;
     }
 

@@ -37,7 +37,7 @@ namespace WebCore {
 
 JSEventListener::JSEventListener(JSObject* function, JSObject* wrapper, bool isAttribute, DOMWrapperWorld* isolatedWorld)
     : EventListener(JSEventListenerType)
-    , m_wrapper(*isolatedWorld->globalData(), wrapper)
+    , m_wrapper(wrapper)
     , m_isAttribute(isAttribute)
     , m_isolatedWorld(isolatedWorld)
 {
@@ -87,7 +87,7 @@ void JSEventListener::handleEvent(ScriptExecutionContext* scriptExecutionContext
 
     Frame* frame = 0;
     if (scriptExecutionContext->isDocument()) {
-        JSDOMWindow* window = static_cast<JSDOMWindow*>(globalObject);
+        JSDOMWindow* window = jsCast<JSDOMWindow*>(globalObject);
         frame = window->impl()->frame();
         if (!frame)
             return;

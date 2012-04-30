@@ -146,16 +146,16 @@ void RenderLineBoxList::dirtyLineBoxes()
         curr->dirtyLineBoxes();
 }
 
-bool RenderLineBoxList::rangeIntersectsRect(RenderBoxModelObject* renderer, int logicalTop, int logicalBottom, const IntRect& rect, const IntPoint& offset) const
+bool RenderLineBoxList::rangeIntersectsRect(RenderBoxModelObject* renderer, LayoutUnit logicalTop, LayoutUnit logicalBottom, const LayoutRect& rect, const LayoutPoint& offset) const
 {
     RenderBox* block;
     if (renderer->isBox())
         block = toRenderBox(renderer);
     else
         block = renderer->containingBlock();
-    int physicalStart = block->flipForWritingMode(logicalTop);
-    int physicalEnd = block->flipForWritingMode(logicalBottom);
-    int physicalExtent = abs(physicalEnd - physicalStart);
+    LayoutUnit physicalStart = block->flipForWritingMode(logicalTop);
+    LayoutUnit physicalEnd = block->flipForWritingMode(logicalBottom);
+    LayoutUnit physicalExtent = abs(physicalEnd - physicalStart);
     physicalStart = min(physicalStart, physicalEnd);
     
     if (renderer->style()->isHorizontalWritingMode()) {
@@ -191,11 +191,11 @@ bool RenderLineBoxList::anyLineIntersectsRect(RenderBoxModelObject* renderer, co
     return rangeIntersectsRect(renderer, logicalTop, logicalBottom, rect, offset);
 }
 
-bool RenderLineBoxList::lineIntersectsDirtyRect(RenderBoxModelObject* renderer, InlineFlowBox* box, const PaintInfo& paintInfo, const IntPoint& offset) const
+bool RenderLineBoxList::lineIntersectsDirtyRect(RenderBoxModelObject* renderer, InlineFlowBox* box, const PaintInfo& paintInfo, const LayoutPoint& offset) const
 {
     RootInlineBox* root = box->root();
-    int logicalTop = min(box->logicalTopVisualOverflow(root->lineTop()), root->selectionTop()) - renderer->maximalOutlineSize(paintInfo.phase);
-    int logicalBottom = box->logicalBottomVisualOverflow(root->lineBottom()) + renderer->maximalOutlineSize(paintInfo.phase);
+    LayoutUnit logicalTop = min<LayoutUnit>(box->logicalTopVisualOverflow(root->lineTop()), root->selectionTop()) - renderer->maximalOutlineSize(paintInfo.phase);
+    LayoutUnit logicalBottom = box->logicalBottomVisualOverflow(root->lineBottom()) + renderer->maximalOutlineSize(paintInfo.phase);
     
     return rangeIntersectsRect(renderer, logicalTop, logicalBottom, paintInfo.rect, offset);
 }
@@ -245,7 +245,7 @@ void RenderLineBoxList::paint(RenderBoxModelObject* renderer, PaintInfo& paintIn
             if (bottomForPaginationCheck - topForPaginationCheck <= v->printRect().height()) {
                 if (paintOffset.y() + bottomForPaginationCheck > v->printRect().maxY()) {
                     if (RootInlineBox* nextRootBox = curr->root()->nextRootBox())
-                        bottomForPaginationCheck = min(bottomForPaginationCheck, min(nextRootBox->logicalTopVisualOverflow(), nextRootBox->lineTop()));
+                        bottomForPaginationCheck = min(bottomForPaginationCheck, min<LayoutUnit>(nextRootBox->logicalTopVisualOverflow(), nextRootBox->lineTop()));
                 }
                 if (paintOffset.y() + bottomForPaginationCheck > v->printRect().maxY()) {
                     if (paintOffset.y() + topForPaginationCheck < v->truncatedAt())
@@ -321,9 +321,9 @@ void RenderLineBoxList::dirtyLinesFromChangedChild(RenderObject* container, Rend
     if (!firstBox) {
         // For an empty inline, go ahead and propagate the check up to our parent, unless the parent
         // is already dirty.
-        if (container->isInline() && !container->parent()->selfNeedsLayout()) {
+        if (container->isInline() && !container->parent()->ancestorLineBoxDirty()) {
             container->parent()->dirtyLinesFromChangedChild(container);
-            container->setNeedsLayout(true); // Mark the container as needing layout to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
+            container->setAncestorLineBoxDirty(); // Mark the container to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
         }
         return;
     }
@@ -361,9 +361,9 @@ void RenderLineBoxList::dirtyLinesFromChangedChild(RenderObject* container, Rend
             // we won't find a previous sibling, but firstBox can be pointing to a following sibling.
             // This isn't good enough, since we won't locate the root line box that encloses the removed
             // <br>. We have to just over-invalidate a bit and go up to our parent.
-            if (!inlineContainer->parent()->selfNeedsLayout()) {
+            if (!inlineContainer->parent()->ancestorLineBoxDirty()) {
                 inlineContainer->parent()->dirtyLinesFromChangedChild(inlineContainer);
-                inlineContainer->setNeedsLayout(true); // Mark the container as needing layout to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
+                inlineContainer->setAncestorLineBoxDirty(); // Mark the container to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
             }
             return;
         }

@@ -26,6 +26,7 @@
 #ifndef AbstractMacroAssembler_h
 #define AbstractMacroAssembler_h
 
+#include "AssemblerBuffer.h"
 #include "CodeLocation.h"
 #include "MacroAssemblerCodeRef.h"
 #include <wtf/CryptographicallyRandomNumber.h>
@@ -450,6 +451,12 @@ public:
             , m_condition(condition)
         {
         }
+#elif CPU(SH4)
+        Jump(AssemblerLabel jmp, SH4Assembler::JumpType type = SH4Assembler::JumpFar)
+            : m_label(jmp)
+            , m_type(type)
+        {
+        }
 #else
         Jump(AssemblerLabel jmp)    
             : m_label(jmp)
@@ -461,6 +468,8 @@ public:
         {
 #if CPU(ARM_THUMB2)
             masm->m_assembler.linkJump(m_label, masm->m_assembler.label(), m_type, m_condition);
+#elif CPU(SH4)
+            masm->m_assembler.linkJump(m_label, masm->m_assembler.label(), m_type);
 #else
             masm->m_assembler.linkJump(m_label, masm->m_assembler.label());
 #endif
@@ -483,6 +492,24 @@ public:
         ARMv7Assembler::JumpType m_type;
         ARMv7Assembler::Condition m_condition;
 #endif
+#if CPU(SH4)
+        SH4Assembler::JumpType m_type;
+#endif
+    };
+
+    struct PatchableJump {
+        PatchableJump()
+        {
+        }
+
+        explicit PatchableJump(Jump jump)
+            : m_jump(jump)
+        {
+        }
+
+        operator Jump&() { return m_jump; }
+
+        Jump m_jump;
     };
 
     // JumpList:
@@ -551,7 +578,7 @@ public:
     }
 
     template<typename T, typename U>
-    ptrdiff_t differenceBetween(T from, U to)
+    static ptrdiff_t differenceBetween(T from, U to)
     {
         return AssemblerType::getDifferenceBetweenLabels(from.m_label, to.m_label);
     }
@@ -561,27 +588,15 @@ public:
         return reinterpret_cast<ptrdiff_t>(b.executableAddress()) - reinterpret_cast<ptrdiff_t>(a.executableAddress());
     }
 
-    void beginUninterruptedSequence() { m_inUninterruptedSequence = true; }
-    void endUninterruptedSequence() { m_inUninterruptedSequence = false; }
-
     unsigned debugOffset() { return m_assembler.debugOffset(); }
 
 protected:
     AbstractMacroAssembler()
-        : m_inUninterruptedSequence(false)
-        , m_randomSource(cryptographicallyRandomNumber())
+        : m_randomSource(cryptographicallyRandomNumber())
     {
     }
 
     AssemblerType m_assembler;
-
-    bool inUninterruptedSequence()
-    {
-        return m_inUninterruptedSequence;
-    }
-
-    bool m_inUninterruptedSequence;
-    
     
     uint32_t random()
     {

@@ -48,12 +48,13 @@ namespace WebCore {
 
 PassRefPtr<Clipboard> Clipboard::create(ClipboardAccessPolicy policy, DragData* dragData, Frame* frame)
 {
-    return ClipboardMac::create(DragAndDrop, dragData->pasteboardName(), policy, frame);
+    return ClipboardMac::create(DragAndDrop, dragData->pasteboardName(), policy, dragData->containsFiles() ? ClipboardMac::DragAndDropFiles : ClipboardMac::DragAndDropData, frame);
 }
 
-ClipboardMac::ClipboardMac(ClipboardType clipboardType, const String& pasteboardName, ClipboardAccessPolicy policy, Frame *frame)
+ClipboardMac::ClipboardMac(ClipboardType clipboardType, const String& pasteboardName, ClipboardAccessPolicy policy, ClipboardContents clipboardContents, Frame *frame)
     : Clipboard(policy, clipboardType)
     , m_pasteboardName(pasteboardName)
+    , m_clipboardContents(clipboardContents)
     , m_frame(frame)
 {
     m_changeCount = platformStrategies()->pasteboardStrategy()->changeCount(m_pasteboardName);
@@ -86,6 +87,10 @@ static String cocoaTypeFromHTMLClipboardType(const String& type)
     if (qType == "text/uri-list")
         // special case because UTI doesn't work with Cocoa's URL type
         return String(NSURLPboardType); // note special case in getData to read NSFilenamesType
+
+    // Blacklist types that might contain subframe information
+    if (qType == "text/rtf" || qType == "public.rtf" || qType == "com.apple.traditional-mac-plain-text")
+        return String();
 
     // Try UTI now
     String mimeType = qType;
@@ -202,9 +207,8 @@ static Vector<String> absoluteURLsFromPasteboard(const String& pasteboardName, b
 
     // Fallback to NSURLPboardType (which is a single URL)
     if (availableTypes.contains(String(NSURLPboardType))) {
-        platformStrategies()->pasteboardStrategy()->getPathnamesForType(absoluteURLs, String(NSURLPboardType), pasteboardName);
-        if (!absoluteURLs.isEmpty())
-            return absoluteURLs;
+        absoluteURLs.append(platformStrategies()->pasteboardStrategy()->stringForType(String(NSURLPboardType), pasteboardName));
+        return absoluteURLs;
     }
 
     // No file paths on the pasteboard, return nil
@@ -213,7 +217,7 @@ static Vector<String> absoluteURLsFromPasteboard(const String& pasteboardName, b
 
 String ClipboardMac::getData(const String& type) const
 {
-    if (policy() != ClipboardReadable)
+    if (policy() != ClipboardReadable || m_clipboardContents == DragAndDropFiles)
         return String();
 
     const String& cocoaType = cocoaTypeFromHTMLClipboardType(type);
@@ -242,30 +246,23 @@ String ClipboardMac::getData(const String& type) const
 
 bool ClipboardMac::setData(const String &type, const String &data)
 {
-    if (policy() != ClipboardWritable)
+    if (policy() != ClipboardWritable || m_clipboardContents == DragAndDropFiles)
         return false;
     // note NSPasteboard enforces changeCount itself on writing - can't write if not the owner
 
     const String& cocoaType = cocoaTypeFromHTMLClipboardType(type);
     String cocoaData = data;
 
-    if (cocoaType == String(NSURLPboardType)) {
+    if (cocoaType == String(NSURLPboardType) || cocoaType == String(kUTTypeFileURL)) {
+        NSURL *url = [NSURL URLWithString:cocoaData];
+        if ([url isFileURL])
+            return false;
+
         Vector<String> types;
-        types.append(String(NSURLPboardType));
+        types.append(cocoaType);
+        platformStrategies()->pasteboardStrategy()->setTypes(types, m_pasteboardName);
+        platformStrategies()->pasteboardStrategy()->setStringForType(cocoaData, cocoaType, m_pasteboardName);
 
-        platformStrategies()->pasteboardStrategy()->addTypes(types, m_pasteboardName);
-        platformStrategies()->pasteboardStrategy()->setStringForType(cocoaData, String(NSURLPboardType), m_pasteboardName);
-        NSURL *url = [[NSURL alloc] initWithString:cocoaData];
-
-        if ([url isFileURL] && m_frame->document()->securityOrigin()->canLoadLocalResources()) {
-            types.append(String(NSFilenamesPboardType));
-            platformStrategies()->pasteboardStrategy()->addTypes(types, m_pasteboardName);
-            Vector<String> fileList;
-            fileList.append(String([url path]));
-            platformStrategies()->pasteboardStrategy()->setPathnamesForType(fileList, String(NSFilenamesPboardType), m_pasteboardName);
-        }
-
-        [url release];
         return true;
     }
 
@@ -312,7 +309,7 @@ HashSet<String> ClipboardMac::types() const
 // clipboard are not reflected in any FileList objects the page has accessed and stored
 PassRefPtr<FileList> ClipboardMac::files() const
 {
-    if (policy() != ClipboardReadable)
+    if (policy() != ClipboardReadable || m_clipboardContents == DragAndDropData)
         return FileList::create();
 
     Vector<String> absoluteURLs = absoluteURLsFromPasteboardFilenames(m_pasteboardName);

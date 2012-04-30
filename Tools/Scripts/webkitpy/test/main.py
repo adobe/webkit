@@ -1,3 +1,4 @@
+# Copyright (C) 2012 Google, Inc.
 # Copyright (C) 2010 Chris Jerdonek (cjerdonek@webkit.org)
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,34 +25,27 @@
 
 import logging
 import optparse
-import os
 import StringIO
 import sys
 import traceback
 import unittest
 
-# NOTE: We intentionally do not depend on anything else in webkitpy here to avoid breaking test-webkitpy.
+from webkitpy.common.system.filesystem import FileSystem
+from webkitpy.test.test_finder import TestFinder
+from webkitpy.test.runner import TestRunner
 
 _log = logging.getLogger(__name__)
 
 
 class Tester(object):
-    @staticmethod
-    def clean_packages(dirs):
-        """Delete all .pyc files under dirs that have no .py file."""
-        for dir_to_clean in dirs:
-            _log.debug("Cleaning orphaned *.pyc files from: %s" % dir_to_clean)
-            for dir_path, dir_names, file_names in os.walk(dir_to_clean):
-                for file_name in file_names:
-                    if file_name.endswith(".pyc") and file_name[:-1] not in file_names:
-                        file_path = os.path.join(dir_path, file_name)
-                        _log.info("Deleting orphan *.pyc file: %s" % file_path)
-                        os.remove(file_path)
+    def __init__(self, filesystem=None):
+        self.finder = TestFinder(filesystem or FileSystem())
+        self.stream = sys.stderr
 
-    def __init__(self):
-        self._verbosity = 1
+    def add_tree(self, top_directory, starting_subdirectory=None):
+        self.finder.add_tree(top_directory, starting_subdirectory)
 
-    def parse_args(self, argv):
+    def _parse_args(self):
         parser = optparse.OptionParser(usage='usage: %prog [options] [args...]')
         parser.add_option('-a', '--all', action='store_true', default=False,
                           help='run all the tests'),
@@ -59,10 +53,8 @@ class Tester(object):
                           help='generate code coverage info (requires http://pypi.python.org/pypi/coverage)'),
         parser.add_option('-q', '--quiet', action='store_true', default=False,
                           help='run quietly (errors, warnings, and progress only)'),
-        parser.add_option('-s', '--silent', action='store_true', default=False,
-                          help='run silently (errors and warnings only)'),
-        parser.add_option('-x', '--xml', action='store_true', default=False,
-                          help='output xUnit-style XML output')
+        parser.add_option('-t', '--timing', action='store_true', default=False,
+                          help='display per-test execution time (implies --verbose)'),
         parser.add_option('-v', '--verbose', action='count', default=0,
                           help='verbose output (specify once for individual test results, twice for debug messages)')
         parser.add_option('--skip-integrationtests', action='store_true', default=False,
@@ -71,27 +63,21 @@ class Tester(object):
         parser.epilog = ('[args...] is an optional list of modules, test_classes, or individual tests. '
                          'If no args are given, all the tests will be run.')
 
-        self.progName = os.path.basename(argv[0])
-        return parser.parse_args(argv[1:])
+        return parser.parse_args()
 
-    def configure(self, options):
+    def _configure(self, options):
         self._options = options
 
-        if options.silent:
-            self._verbosity = 0
-            self._configure_logging(logging.WARNING)
-        elif options.quiet:
-            self._verbosity = 1
-            self._configure_logging(logging.WARNING)
-        elif options.verbose == 0:
-            self._verbosity = 1
-            self._configure_logging(logging.INFO)
-        elif options.verbose == 1:
-            self._verbosity = 2
-            self._configure_logging(logging.INFO)
+        if options.timing:
+            # --timing implies --verbose
+            options.verbose = max(options.verbose, 1)
+
+        log_level = logging.INFO
+        if options.quiet:
+            log_level = logging.WARNING
         elif options.verbose == 2:
-            self._verbosity = 2
-            self._configure_logging(logging.DEBUG)
+            log_level = logging.DEBUG
+        self._configure_logging(log_level)
 
     def _configure_logging(self, log_level):
         """Configure the root logger.
@@ -100,7 +86,7 @@ class Tester(object):
         except for messages from the autoinstall module.  Also set the
         logging level as described below.
         """
-        handler = logging.StreamHandler(sys.stderr)
+        handler = logging.StreamHandler(self.stream)
         # We constrain the level on the handler rather than on the root
         # logger itself.  This is probably better because the handler is
         # configured and known only to this module, whereas the root logger
@@ -108,6 +94,7 @@ class Tester(object):
         # Modifying the handler, then, is less intrusive and less likely to
         # interfere with modifications made by other modules (e.g. in unit
         # tests).
+        handler.name = __name__
         handler.setLevel(log_level)
         formatter = logging.Formatter("%(message)s")
         handler.setFormatter(formatter)
@@ -141,61 +128,16 @@ class Tester(object):
         _log.info("Suppressing most webkitpy logging while running unit tests.")
         handler.addFilter(testing_filter)
 
-    def run(self, dirs, args):
-        args = args or self._find_modules(dirs)
-        return self._run_tests(dirs, args)
+    def run(self):
+        options, args = self._parse_args()
+        self._configure(options)
 
-    def _find_modules(self, dirs):
-        modules = []
-        for dir_to_search in dirs:
-            modules.extend(self._find_modules_under(dir_to_search, '_unittest.py'))
-            if not self._options.skip_integrationtests:
-                modules.extend(self._find_modules_under(dir_to_search, '_integrationtest.py'))
-        modules.sort()
+        self.finder.clean_trees()
 
-        for module in modules:
-            _log.debug("Found: %s" % module)
+        names = self.finder.find_names(args, self._options.skip_integrationtests, self._options.all)
+        return self._run_tests(names)
 
-        # FIXME: Figure out how to move this to test-webkitpy in order to to make this file more generic.
-        if not self._options.all:
-            slow_tests = ('webkitpy.common.checkout.scm.scm_unittest',)
-            self._exclude(modules, slow_tests, 'are really, really slow', 31818)
-
-            if sys.platform == 'win32':
-                win32_blacklist = ('webkitpy.common.checkout',
-                                   'webkitpy.common.config',
-                                   'webkitpy.tool')
-                self._exclude(modules, win32_blacklist, 'fail horribly on win32', 54526)
-
-        return modules
-
-    def _exclude(self, modules, module_prefixes, reason, bugid):
-        _log.info('Skipping tests in the following modules or packages because they %s:' % reason)
-        for prefix in module_prefixes:
-            _log.info('    %s' % prefix)
-            modules_to_exclude = filter(lambda m: m.startswith(prefix), modules)
-            for m in modules_to_exclude:
-                if len(modules_to_exclude) > 1:
-                    _log.debug('        %s' % m)
-                modules.remove(m)
-        _log.info('    (https://bugs.webkit.org/show_bug.cgi?id=%d; use --all to include)' % bugid)
-        _log.info('')
-
-    def _find_modules_under(self, dir_to_search, suffix):
-
-        def to_package(dir_path):
-            return dir_path.replace(dir_to_search + os.sep, '').replace(os.sep, '.')
-
-        def to_module(filename, package):
-            return package + '.' + filename.replace('.py', '')
-
-        modules = []
-        for dir_path, _, filenames in os.walk(dir_to_search):
-            package = to_package(dir_path)
-            modules.extend(to_module(f, package) for f in filenames if f.endswith(suffix))
-        return modules
-
-    def _run_tests(self, dirs, args):
+    def _run_tests(self, names):
         if self._options.coverage:
             try:
                 import webkitpy.thirdparty.autoinstalled.coverage as coverage
@@ -205,28 +147,29 @@ class Tester(object):
             cov = coverage.coverage()
             cov.start()
 
+        # Make sure PYTHONPATH is set up properly.
+        sys.path = self.finder.additional_paths(sys.path) + sys.path
+
         _log.debug("Loading the tests...")
 
         loader = unittest.defaultTestLoader
         suites = []
-        for name in args:
-            if self._is_module(dirs, name):
-                # import modules explicitly before loading their tests because
-                # loadTestsFromName() produces lousy error messages for bad modules.
+        for name in names:
+            if self.finder.is_module(name):
+                # if we failed to load a name and it looks like a module,
+                # try importing it directly, because loadTestsFromName()
+                # produces lousy error messages for bad modules.
                 try:
                     __import__(name)
                 except ImportError, e:
                     _log.fatal('Failed to import %s:' % name)
                     self._log_exception()
                     return False
+
             suites.append(loader.loadTestsFromName(name, None))
 
         test_suite = unittest.TestSuite(suites)
-        if self._options.xml:
-            from webkitpy.thirdparty.autoinstalled.xmlrunner import XMLTestRunner
-            test_runner = XMLTestRunner(output='test-webkitpy-xml-reports')
-        else:
-            test_runner = unittest.TextTestRunner(verbosity=self._verbosity)
+        test_runner = TestRunner(self.stream, self._options, loader)
 
         _log.debug("Running the tests.")
         result = test_runner.run(test_suite)
@@ -235,10 +178,6 @@ class Tester(object):
             cov.save()
             cov.report(show_missing=False)
         return result.wasSuccessful()
-
-    def _is_module(self, dirs, name):
-        relpath = name.replace('.', os.sep) + '.py'
-        return any(os.path.exists(os.path.join(d, relpath)) for d in dirs)
 
     def _log_exception(self):
         s = StringIO.StringIO()

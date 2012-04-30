@@ -67,13 +67,13 @@
 #if ENABLE(GEOLOCATION)
 #include "GeolocationClientMock.h"
 #include "GeolocationClientQt.h"
+#include "GeolocationController.h"
 #endif
 #include "GeolocationPermissionClientQt.h"
 #include "HTMLFormElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
-#include "HashMap.h"
 #include "HitTestResult.h"
 #include "Image.h"
 #include "InitWebCoreQt.h"
@@ -100,7 +100,6 @@
 #include "PluginPackage.h"
 #include "ProgressTracker.h"
 #include "QtPlatformPlugin.h"
-#include "RefPtr.h"
 #include "RenderTextControl.h"
 #include "RenderThemeQt.h"
 #include "SchemeRegistry.h"
@@ -326,13 +325,16 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
     pageClients.editorClient = new EditorClientQt(q);
     pageClients.dragClient = new DragClientQt(q);
     pageClients.inspectorClient = new InspectorClientQt(q);
-#if ENABLE(GEOLOCATION)
-    if (useMock)
-        pageClients.geolocationClient = new GeolocationClientMock;
-    else
-        pageClients.geolocationClient = new GeolocationClientQt(q);
-#endif
     page = new Page(pageClients);
+#if ENABLE(GEOLOCATION)
+    if (useMock) {
+        // In case running in DumpRenderTree mode set the controller to mock provider.
+        GeolocationClientMock* mock = new GeolocationClientMock;
+        WebCore::provideGeolocationTo(page, mock);
+        mock->setController(WebCore::GeolocationController::from(page));
+    } else
+        WebCore::provideGeolocationTo(page, new GeolocationClientQt(q));
+#endif
 #if ENABLE(DEVICE_ORIENTATION)
     if (useMock)
         WebCore::provideDeviceOrientationTo(page, new DeviceOrientationClientMock);
@@ -351,11 +353,6 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
     // as expected out of the box, we use a default group similar to what other ports are doing.
     page->setGroupName("Default Group");
 
-    // In case running in DumpRenderTree mode set the controller to mock provider.
-#if ENABLE(GEOLOCATION)
-    if (QWebPagePrivate::drtRun)
-        static_cast<GeolocationClientMock*>(pageClients.geolocationClient)->setController(page->geolocationController());
-#endif
     settings = new QWebSettings(page->settings());
 
 #if ENABLE(WEB_SOCKETS)
@@ -1350,7 +1347,7 @@ bool QWebPagePrivate::touchEvent(QTouchEvent* event)
     event->setAccepted(true);
 
     // Return whether the default action was cancelled in the JS event handler
-    return frame->eventHandler()->handleTouchEvent(PlatformTouchEvent(event));
+    return frame->eventHandler()->handleTouchEvent(convertTouchEvent(event));
 #else
     event->ignore();
     return false;
@@ -1395,7 +1392,7 @@ QVariant QWebPage::inputMethodQuery(Qt::InputMethodQuery property) const
         case Qt::ImFont: {
             if (renderTextControl) {
                 RenderStyle* renderStyle = renderTextControl->style();
-                return QVariant(QFont(renderStyle->font().font()));
+                return QVariant(QFont(renderStyle->font().syntheticFont()));
             }
             return QVariant(QFont());
         }
@@ -1568,7 +1565,7 @@ IntPoint QWebPagePrivate::TouchAdjuster::findCandidatePointForTouch(const IntPoi
     int x = touchPoint.x();
     int y = touchPoint.y();
 
-    RefPtr<NodeList> intersectedNodes = document->nodesFromRect(x, y, m_topPadding, m_rightPadding, m_bottomPadding, m_leftPadding, false);
+    RefPtr<NodeList> intersectedNodes = document->nodesFromRect(x, y, m_topPadding, m_rightPadding, m_bottomPadding, m_leftPadding, false /*ignoreClipping*/, false /*allowShadowContent*/);
     if (!intersectedNodes)
         return IntPoint();
 
@@ -1588,7 +1585,7 @@ IntPoint QWebPagePrivate::TouchAdjuster::findCandidatePointForTouch(const IntPoi
         if (!currentElement || (!isClickableElement(currentElement, 0) && !isValidFrameOwner(currentElement)))
             continue;
 
-        IntRect currentElementBoundingRect = currentElement->getRect();
+        IntRect currentElementBoundingRect = currentElement->getPixelSnappedRect();
         currentElementBoundingRect.intersect(touchRect);
 
         if (currentElementBoundingRect.isEmpty())

@@ -182,6 +182,7 @@ PassRefPtr<InspectorObject> InspectorProfilerAgent::createSnapshotHeader(const S
     header->setString("title", snapshot.title());
     header->setNumber("uid", snapshot.uid());
     header->setString("typeId", String(HeapProfileType));
+    header->setNumber("maxJSObjectId", snapshot.maxSnapshotJSObjectId());
     return header;
 }
 
@@ -240,14 +241,16 @@ String InspectorProfilerAgent::getCurrentUserInitiatedProfileName(bool increment
     return makeString(UserInitiatedProfileName, '.', String::number(m_currentUserInitiatedProfileNumber));
 }
 
-void InspectorProfilerAgent::getProfileHeaders(ErrorString*, RefPtr<InspectorArray>& headers)
+void InspectorProfilerAgent::getProfileHeaders(ErrorString*, RefPtr<TypeBuilder::Array<InspectorObject> >& headers)
 {
+    headers = TypeBuilder::Array<InspectorObject>::create();
+
     ProfilesMap::iterator profilesEnd = m_profiles.end();
     for (ProfilesMap::iterator it = m_profiles.begin(); it != profilesEnd; ++it)
-        headers->pushObject(createProfileHeader(*it->second));
+        headers->addItem(createProfileHeader(*it->second));
     HeapSnapshotsMap::iterator snapshotsEnd = m_snapshots.end();
     for (HeapSnapshotsMap::iterator it = m_snapshots.begin(); it != snapshotsEnd; ++it)
-        headers->pushObject(createSnapshotHeader(*it->second));
+        headers->addItem(createSnapshotHeader(*it->second));
 }
 
 namespace {
@@ -426,21 +429,21 @@ void InspectorProfilerAgent::toggleRecordButton(bool isProfiling)
         m_frontend->setRecordingProfile(isProfiling);
 }
 
-void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, int id, const String* objectGroup, RefPtr<InspectorObject>& result)
+void InspectorProfilerAgent::getObjectByHeapObjectId(ErrorString* error, int id, const String* objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result)
 {
     ScriptObject heapObject = ScriptProfiler::objectByHeapObjectId(id);
     if (heapObject.hasNoValue()) {
-        *error = "Object is not available.";
+        *error = "Object is not available";
         return;
     }
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptFor(heapObject.scriptState());
     if (injectedScript.hasNoValue()) {
-        *error = "Object is not available. Inspected context is gone.";
+        *error = "Object is not available. Inspected context is gone";
         return;
     }
     result = injectedScript.wrapObject(heapObject, objectGroup ? *objectGroup : "");
     if (!result)
-        *error = "Failed to wrap object.";
+        *error = "Failed to wrap object";
 }
 
 } // namespace WebCore

@@ -75,21 +75,26 @@ namespace JSC { namespace DFG {
     macro(ValueToInt32, NodeResultInt32 | NodeMustGenerate) \
     /* Used to box the result of URShift nodes (result has range 0..2^32-1). */\
     macro(UInt32ToNumber, NodeResultNumber) \
+    \
     /* Used to cast known integers to doubles, so as to separate the double form */\
     /* of the value from the integer form. */\
     macro(Int32ToDouble, NodeResultNumber) \
+    /* Used to speculate that a double value is actually an integer. */\
+    macro(DoubleAsInt32, NodeResultInt32) \
+    /* Used to record places where we must check if a value is a number. */\
+    macro(CheckNumber, NodeMustGenerate) \
     \
     /* Nodes for arithmetic operations. */\
-    macro(ArithAdd, NodeResultNumber) \
-    macro(ArithSub, NodeResultNumber) \
-    macro(ArithNegate, NodeResultNumber) \
-    macro(ArithMul, NodeResultNumber) \
-    macro(ArithDiv, NodeResultNumber) \
-    macro(ArithMod, NodeResultNumber) \
-    macro(ArithAbs, NodeResultNumber) \
-    macro(ArithMin, NodeResultNumber) \
-    macro(ArithMax, NodeResultNumber) \
-    macro(ArithSqrt, NodeResultNumber) \
+    macro(ArithAdd, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithSub, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithNegate, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithMul, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithDiv, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithMod, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithAbs, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithMin, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithMax, NodeResultNumber | NodeMustGenerate) \
+    macro(ArithSqrt, NodeResultNumber | NodeMustGenerate) \
     \
     /* Add of values may either be arithmetic, or result in string concatenation. */\
     macro(ValueAdd, NodeResultJS | NodeMustGenerate | NodeMightClobber) \
@@ -113,7 +118,6 @@ namespace JSC { namespace DFG {
     macro(PutByOffset, NodeMustGenerate | NodeClobbersWorld) \
     macro(GetArrayLength, NodeResultInt32) \
     macro(GetStringLength, NodeResultInt32) \
-    macro(GetByteArrayLength, NodeResultInt32) \
     macro(GetInt8ArrayLength, NodeResultInt32) \
     macro(GetInt16ArrayLength, NodeResultInt32) \
     macro(GetInt32ArrayLength, NodeResultInt32) \
@@ -170,6 +174,12 @@ namespace JSC { namespace DFG {
     macro(Breakpoint, NodeMustGenerate | NodeClobbersWorld) \
     macro(CheckHasInstance, NodeMustGenerate) \
     macro(InstanceOf, NodeResultBoolean) \
+    macro(IsUndefined, NodeResultBoolean) \
+    macro(IsBoolean, NodeResultBoolean) \
+    macro(IsNumber, NodeResultBoolean) \
+    macro(IsString, NodeResultBoolean) \
+    macro(IsObject, NodeResultBoolean) \
+    macro(IsFunction, NodeResultBoolean) \
     macro(LogicalNot, NodeResultBoolean | NodeMightClobber) \
     macro(ToPrimitive, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(StrCat, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \

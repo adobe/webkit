@@ -29,24 +29,113 @@
 
 #include "RenderMathMLBlock.h"
 
-#include "FontSelector.h"
 #include "GraphicsContext.h"
 #include "MathMLNames.h"
-#include "RenderInline.h"
-#include "RenderText.h"
+
+#if ENABLE(DEBUG_MATH_LAYOUT)
+#include "PaintInfo.h"
+#endif
 
 namespace WebCore {
     
 using namespace MathMLNames;
     
 RenderMathMLBlock::RenderMathMLBlock(Node* container) 
-    : RenderBlock(container) 
+    : RenderBlock(container)
+    , m_intrinsicPaddingBefore(0)
+    , m_intrinsicPaddingAfter(0)
+    , m_intrinsicPaddingStart(0)
+    , m_intrinsicPaddingEnd(0)
 {
 }
 
 bool RenderMathMLBlock::isChildAllowed(RenderObject* child, RenderStyle*) const
 {
     return child->node() && child->node()->nodeType() == Node::ELEMENT_NODE;
+}
+
+LayoutUnit RenderMathMLBlock::paddingTop() const
+{
+    LayoutUnit result = computedCSSPaddingTop();
+    switch (style()->writingMode()) {
+    case TopToBottomWritingMode:
+        return result + m_intrinsicPaddingBefore;
+    case BottomToTopWritingMode:
+        return result + m_intrinsicPaddingAfter;
+    case LeftToRightWritingMode:
+    case RightToLeftWritingMode:
+        return result + (style()->isLeftToRightDirection() ? m_intrinsicPaddingStart : m_intrinsicPaddingEnd);
+    }
+    ASSERT_NOT_REACHED();
+    return result;
+}
+
+LayoutUnit RenderMathMLBlock::paddingBottom() const
+{
+    LayoutUnit result = computedCSSPaddingBottom();
+    switch (style()->writingMode()) {
+    case TopToBottomWritingMode:
+        return result + m_intrinsicPaddingAfter;
+    case BottomToTopWritingMode:
+        return result + m_intrinsicPaddingBefore;
+    case LeftToRightWritingMode:
+    case RightToLeftWritingMode:
+        return result + (style()->isLeftToRightDirection() ? m_intrinsicPaddingEnd : m_intrinsicPaddingStart);
+    }
+    ASSERT_NOT_REACHED();
+    return result;
+}
+
+LayoutUnit RenderMathMLBlock::paddingLeft() const
+{
+    LayoutUnit result = computedCSSPaddingLeft();
+    switch (style()->writingMode()) {
+    case LeftToRightWritingMode:
+        return result + m_intrinsicPaddingBefore;
+    case RightToLeftWritingMode:
+        return result + m_intrinsicPaddingAfter;
+    case TopToBottomWritingMode:
+    case BottomToTopWritingMode:
+        return result + (style()->isLeftToRightDirection() ? m_intrinsicPaddingStart : m_intrinsicPaddingEnd);
+    }
+    ASSERT_NOT_REACHED();
+    return result;
+}
+
+LayoutUnit RenderMathMLBlock::paddingRight() const
+{
+    LayoutUnit result = computedCSSPaddingRight();
+    switch (style()->writingMode()) {
+    case RightToLeftWritingMode:
+        return result + m_intrinsicPaddingBefore;
+    case LeftToRightWritingMode:
+        return result + m_intrinsicPaddingAfter;
+    case TopToBottomWritingMode:
+    case BottomToTopWritingMode:
+        return result + (style()->isLeftToRightDirection() ? m_intrinsicPaddingEnd : m_intrinsicPaddingStart);
+    }
+    ASSERT_NOT_REACHED();
+    return result;
+}
+
+LayoutUnit RenderMathMLBlock::paddingBefore() const
+{
+    return computedCSSPaddingBefore() + m_intrinsicPaddingBefore;
+}
+
+LayoutUnit RenderMathMLBlock::paddingAfter() const
+{
+    return computedCSSPaddingAfter() + m_intrinsicPaddingAfter;
+}
+
+LayoutUnit RenderMathMLBlock::paddingStart() const
+{
+    return computedCSSPaddingStart() + m_intrinsicPaddingStart;
+}
+
+LayoutUnit RenderMathMLBlock::paddingEnd() const
+{
+    return computedCSSPaddingEnd() + m_intrinsicPaddingEnd;
 }
 
 RenderMathMLBlock* RenderMathMLBlock::createAlmostAnonymousBlock(EDisplay display)

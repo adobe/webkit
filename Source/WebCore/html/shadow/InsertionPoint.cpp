@@ -48,9 +48,8 @@ InsertionPoint::~InsertionPoint()
 
 void InsertionPoint::attach()
 {
-    TreeScope* scope = treeScope();
-    if (scope->isShadowRoot()) {
-        ShadowRoot* root = toShadowRoot(scope);
+    if (isShadowBoundary()) {
+        ShadowRoot* root = toShadowRoot(treeScope()->rootNode());
         if (doesSelectFromHostChildren()) {
             distributeHostChildren(root->tree());
             attachDistributedNode();
@@ -66,7 +65,8 @@ void InsertionPoint::attach()
 
 void InsertionPoint::detach()
 {
-    if (ShadowRoot* root = toShadowRoot(shadowTreeRootNode())) {
+    ShadowRoot* root = toShadowRoot(shadowTreeRootNode());
+    if (root && isActive()) {
         ShadowTree* tree = root->tree();
 
         if (doesSelectFromHostChildren())
@@ -85,11 +85,11 @@ void InsertionPoint::detach()
 
 ShadowRoot* InsertionPoint::assignedFrom() const
 {
-    TreeScope* scope = treeScope();
-    if (!scope->isShadowRoot())
+    Node* treeScopeRoot = treeScope()->rootNode();
+    if (!treeScopeRoot->isShadowRoot())
         return 0;
 
-    ShadowRoot* olderShadowRoot = toShadowRoot(scope)->olderShadowRoot();
+    ShadowRoot* olderShadowRoot = toShadowRoot(treeScopeRoot)->olderShadowRoot();
     if (olderShadowRoot && olderShadowRoot->assignedTo() == this)
         return olderShadowRoot;
     return 0;
@@ -97,9 +97,19 @@ ShadowRoot* InsertionPoint::assignedFrom() const
 
 bool InsertionPoint::isShadowBoundary() const
 {
-    if (TreeScope* scope = treeScope())
-        return scope->isShadowRoot();
-    return false;
+    return treeScope()->rootNode()->isShadowRoot() && isActive();
+}
+
+bool InsertionPoint::isActive() const
+{
+    const Node* node = parentNode();
+    while (node) {
+        if (WebCore::isInsertionPoint(node))
+            return false;
+
+        node = node->parentNode();
+    }
+    return true;
 }
 
 bool InsertionPoint::rendererIsNeeded(const NodeRenderingContext& context)

@@ -38,7 +38,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #endif
 
@@ -94,11 +94,10 @@ InternalSettings::InternalSettings(Frame* frame)
     : FrameDestructionObserver(frame)
     , m_originalPasswordEchoDurationInSeconds(settings()->passwordEchoDurationInSeconds())
     , m_originalPasswordEchoEnabled(settings()->passwordEchoEnabled())
+    , m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
 #if ENABLE(SHADOW_DOM)
     , m_originalShadowDOMEnabled(RuntimeEnabledFeatures::shadowDOMEnabled())
 #endif
-
-
 {
 }
 
@@ -106,6 +105,7 @@ void InternalSettings::restoreTo(Settings* settings)
 {
     settings->setPasswordEchoDurationInSeconds(m_originalPasswordEchoDurationInSeconds);
     settings->setPasswordEchoEnabled(m_originalPasswordEchoEnabled);
+    RuntimeEnabledFeatures::setCSSExclusionsEnabled(m_originalCSSExclusionsEnabled);
 #if ENABLE(SHADOW_DOM)
     RuntimeEnabledFeatures::setShadowDOMEnabled(m_originalShadowDOMEnabled);
 #endif
@@ -293,6 +293,40 @@ void InternalSettings::setPictographFontFamily(const String& family, const Strin
 {
     InternalSettingsGuardForSettings();
     setFontFamily(settings(), family, script, &Settings::setPictographFontFamily);
+}
+
+void InternalSettings::setEnableScrollAnimator(bool enabled, ExceptionCode& ec)
+{
+#if ENABLE(SMOOTH_SCROLLING)
+    InternalSettingsGuardForSettings();
+    settings()->setEnableScrollAnimator(enabled);
+#else
+    UNUSED_PARAM(enabled);
+    UNUSED_PARAM(ec);
+#endif
+}
+
+bool InternalSettings::scrollAnimatorEnabled(ExceptionCode& ec)
+{
+#if ENABLE(SMOOTH_SCROLLING)
+    InternalSettingsGuardForSettingsReturn(false);
+    return settings()->scrollAnimatorEnabled();
+#else
+    UNUSED_PARAM(ec);
+    return false;
+#endif
+}
+
+void InternalSettings::setCSSExclusionsEnabled(bool enabled, ExceptionCode& ec)
+{
+    UNUSED_PARAM(ec);
+    RuntimeEnabledFeatures::setCSSExclusionsEnabled(enabled);
+}
+
+void InternalSettings::setMediaPlaybackRequiresUserGesture(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setMediaPlaybackRequiresUserGesture(enabled);
 }
 
 }

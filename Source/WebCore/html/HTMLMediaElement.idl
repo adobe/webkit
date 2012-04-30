@@ -46,7 +46,11 @@ module html {
     readonly attribute TimeRanges buffered;
     void load() 
         raises (DOMException);
+#if defined(ENABLE_ENCRYPTED_MEDIA) && ENABLE_ENCRYPTED_MEDIA
+    DOMString canPlayType(in [Optional=DefaultIsUndefined] DOMString type, in [Optional=DefaultIsNullString, TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString keySystem);
+#else
     DOMString canPlayType(in [Optional=DefaultIsUndefined] DOMString type);
+#endif
 
     // ready state
     const unsigned short HAVE_NOTHING = 0;
@@ -93,22 +97,40 @@ module html {
 
 #if defined(ENABLE_MEDIA_SOURCE) && ENABLE_MEDIA_SOURCE
     // URL passed to src attribute to enable the media source logic.
-    readonly attribute [V8EnabledAtRuntime=webkitMediaSource, URL] DOMString webkitMediaSourceURL;
+    readonly attribute [V8EnabledAtRuntime=mediaSource, URL] DOMString webkitMediaSourceURL;
+
+    // Manages IDs for appending media to the source.
+    [V8EnabledAtRuntime=mediaSource] void webkitSourceAddId(in DOMString id, in DOMString type) raises (DOMException);
+    [V8EnabledAtRuntime=mediaSource] void webkitSourceRemoveId(in DOMString id) raises (DOMException);
 
     // Appends media to to the source.
-    [V8EnabledAtRuntime=webkitMediaSource] void webkitSourceAppend(in Uint8Array data) raises (DOMException);
+    [V8EnabledAtRuntime=mediaSource] void webkitSourceAppend(in Uint8Array data) raises (DOMException);
 
     // Signals the end of stream.
-    [V8EnabledAtRuntime=webkitMediaSource] const unsigned short EOS_NO_ERROR = 0; // End of stream reached w/o error.
-    [V8EnabledAtRuntime=webkitMediaSource] const unsigned short EOS_NETWORK_ERR = 1; // A network error triggered end of stream.
-    [V8EnabledAtRuntime=webkitMediaSource] const unsigned short EOS_DECODE_ERR = 2; // A decode error triggered end of stream.
-    [V8EnabledAtRuntime=webkitMediaSource] void webkitSourceEndOfStream(in unsigned short status) raises (DOMException);
+    [V8EnabledAtRuntime=mediaSource] const unsigned short EOS_NO_ERROR = 0; // End of stream reached w/o error.
+    [V8EnabledAtRuntime=mediaSource] const unsigned short EOS_NETWORK_ERR = 1; // A network error triggered end of stream.
+    [V8EnabledAtRuntime=mediaSource] const unsigned short EOS_DECODE_ERR = 2; // A decode error triggered end of stream.
+    [V8EnabledAtRuntime=mediaSource] void webkitSourceEndOfStream(in unsigned short status) raises (DOMException);
 
     // Indicates the current state of the media source.
-    [V8EnabledAtRuntime=webkitMediaSource] const unsigned short SOURCE_CLOSED = 0;
-    [V8EnabledAtRuntime=webkitMediaSource] const unsigned short SOURCE_OPEN = 1;
-    [V8EnabledAtRuntime=webkitMediaSource] const unsigned short SOURCE_ENDED = 2;
-    readonly attribute [V8EnabledAtRuntime=webkitMediaSource] unsigned short webkitSourceState;
+    [V8EnabledAtRuntime=mediaSource] const unsigned short SOURCE_CLOSED = 0;
+    [V8EnabledAtRuntime=mediaSource] const unsigned short SOURCE_OPEN = 1;
+    [V8EnabledAtRuntime=mediaSource] const unsigned short SOURCE_ENDED = 2;
+    readonly attribute [V8EnabledAtRuntime=mediaSource] unsigned short webkitSourceState;
+#endif
+
+#if defined(ENABLE_ENCRYPTED_MEDIA) && ENABLE_ENCRYPTED_MEDIA
+    [V8EnabledAtRuntime=encryptedMedia] void webkitGenerateKeyRequest(in [TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString keySystem, in [Optional] Uint8Array initData)
+        raises (DOMException);
+    [V8EnabledAtRuntime=encryptedMedia] void webkitAddKey(in [TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString keySystem, in Uint8Array key, in [Optional] Uint8Array initData, in [Optional=DefaultIsNullString] DOMString sessionId)
+        raises (DOMException);
+    [V8EnabledAtRuntime=encryptedMedia] void webkitCancelKeyRequest(in [TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString keySystem, in [Optional=DefaultIsNullString] DOMString sessionId)
+        raises (DOMException);
+
+    attribute [V8EnabledAtRuntime=encryptedMedia] EventListener onwebkitkeyadded;
+    attribute [V8EnabledAtRuntime=encryptedMedia] EventListener onwebkitkeyerror;
+    attribute [V8EnabledAtRuntime=encryptedMedia] EventListener onwebkitkeymessage;
+    attribute [V8EnabledAtRuntime=encryptedMedia] EventListener onwebkitneedkey;
 #endif
 
 #if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK

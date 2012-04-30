@@ -21,7 +21,7 @@
 #include "config.h"
 #include "RenderDetailsMarker.h"
 
-#if ENABLE(DETAILS)
+#if ENABLE(DETAILS) || ENABLE(CALENDAR_PICKER)
 
 #include "Element.h"
 #include "GraphicsContext.h"
@@ -105,10 +105,10 @@ Path RenderDetailsMarker::getCanonicalPath() const
     return Path();
 }
 
-Path RenderDetailsMarker::getPath(const IntPoint& origin) const
+Path RenderDetailsMarker::getPath(const LayoutPoint& origin) const
 {
     Path result = getCanonicalPath();
-    result.transform(AffineTransform().scale(logicalHeight()));
+    result.transform(AffineTransform().scale(contentWidth(), contentHeight()));
     result.translate(FloatSize(origin.x(), origin.y()));
     return result;
 }
@@ -134,14 +134,19 @@ void RenderDetailsMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOf
     paintInfo.context->setStrokeThickness(1.0f);
     paintInfo.context->setFillColor(color, style()->colorSpace());
 
+    boxOrigin.move(borderLeft() + paddingLeft(), borderTop() + paddingTop());
     paintInfo.context->fillPath(getPath(boxOrigin));
 }
 
 bool RenderDetailsMarker::isOpen() const
 {
     for (RenderObject* renderer = parent(); renderer; renderer = renderer->parent()) {
-        if (renderer->node() && renderer->node()->hasTagName(detailsTag))
+        if (!renderer->node())
+            continue;
+        if (renderer->node()->hasTagName(detailsTag))
             return !toElement(renderer->node())->getAttribute(openAttr).isNull();
+        if (renderer->node()->hasTagName(inputTag))
+            return true;
     }
 
     return false;

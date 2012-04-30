@@ -29,6 +29,14 @@
 #include <QTouchEvent>
 #endif
 
+#if PLATFORM(BLACKBERRY)
+namespace BlackBerry {
+namespace Platform {
+class TouchPoint;
+};
+};
+#endif
+
 namespace WebCore {
 
 class PlatformTouchEvent;
@@ -45,12 +53,19 @@ public:
     };
 
     // This is necessary for us to be able to build synthetic events.
-    PlatformTouchPoint() { };
+    PlatformTouchPoint()
+        : m_id(0)
+        , m_radiusY(0)
+        , m_radiusX(0)
+        , m_rotationAngle(0)
+        , m_force(0)
+    {
+    }
 
-#if PLATFORM(QT)
-    PlatformTouchPoint(const QTouchEvent::TouchPoint&, State);
-#elif PLATFORM(EFL)
+#if PLATFORM(EFL)
     PlatformTouchPoint(unsigned id, const IntPoint& windowPos, State);
+#elif PLATFORM(BLACKBERRY)
+    PlatformTouchPoint(const BlackBerry::Platform::TouchPoint&);
 #endif
 
     unsigned id() const { return m_id; }

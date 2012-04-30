@@ -43,17 +43,14 @@ namespace WebKit {
 WebPageCompositorPrivate::WebPageCompositorPrivate(WebPagePrivate* page, WebPageCompositorClient* client)
     : m_client(client)
     , m_webPage(page)
-    , m_animationTimer(this, &WebPageCompositorPrivate::animationTimerFired)
-    , m_timerClient(new Platform::GenericTimerClient(Platform::userInterfaceThreadTimerClient()))
-    , m_pendingAnimationFrame(0.0)
+    , m_drawsRootLayer(false)
 {
-    m_animationTimer.setClient(m_timerClient);
+    setOneShot(true); // one-shot animation client
 }
 
 WebPageCompositorPrivate::~WebPageCompositorPrivate()
 {
-    m_animationTimer.stop();
-    delete m_timerClient;
+    Platform::AnimationFrameRateController::instance()->removeClient(this);
 }
 
 void WebPageCompositorPrivate::setContext(Platform::Graphics::GLES2Context* context)
@@ -110,29 +107,27 @@ void WebPageCompositorPrivate::render(const IntRect& dstRect, const IntRect& tra
     }
 }
 
+bool WebPageCompositorPrivate::drawsRootLayer() const
+{
+    return m_drawsRootLayer;
+}
+
 bool WebPageCompositorPrivate::drawLayers(const IntRect& dstRect, const FloatRect& contents)
 {
     if (!m_layerRenderer)
         return false;
 
-    m_pendingAnimationFrame = 0.0;
-
-    bool shouldClear = false;
+    bool shouldClear = drawsRootLayer();
     if (BackingStore* backingStore = m_webPage->m_backingStore)
-        shouldClear = !backingStore->d->isOpenGLCompositing();
+        shouldClear = shouldClear || !backingStore->d->isOpenGLCompositing();
     m_layerRenderer->setClearSurfaceOnDrawLayers(shouldClear);
 
     m_layerRenderer->drawLayers(contents, m_layoutRectForCompositing, m_contentsSizeForCompositing, dstRect);
     m_lastCompositingResults = m_layerRenderer->lastRenderingResults();
 
     if (m_lastCompositingResults.needsAnimationFrame) {
-        // Using a timeout of 0 actually won't start a timer, it will send a message.
-        if (m_client)
-            m_pendingAnimationFrame = m_client->requestAnimationFrame();
-        else {
-            m_animationTimer.start(1.0 / 60.0);
-            m_webPage->updateDelegatedOverlays();
-        }
+        Platform::AnimationFrameRateController::instance()->addClient(this);
+        m_webPage->updateDelegatedOverlays();
     }
 
     return true;
@@ -140,10 +135,11 @@ bool WebPageCompositorPrivate::drawLayers(const IntRect& dstRect, const FloatRec
 
 void WebPageCompositorPrivate::releaseLayerResources()
 {
-    m_layerRenderer->releaseLayerResources();
+    if (m_layerRenderer)
+        m_layerRenderer->releaseLayerResources();
 }
 
-void WebPageCompositorPrivate::animationTimerFired()
+void WebPageCompositorPrivate::animationFrameChanged()
 {
     BackingStore* backingStore = m_webPage->m_backingStore;
     if (!backingStore) {

@@ -100,6 +100,13 @@ void WebKitMutationObserver::observe(Node* node, MutationObserverOptions options
     node->document()->addMutationObserverTypes(registration->mutationTypes());
 }
 
+Vector<RefPtr<MutationRecord> > WebKitMutationObserver::takeRecords()
+{
+    Vector<RefPtr<MutationRecord> > records;
+    records.swap(m_records);
+    return records;
+}
+
 void WebKitMutationObserver::disconnect()
 {
     m_records.clear();
@@ -135,16 +142,29 @@ void WebKitMutationObserver::enqueueMutationRecord(PassRefPtr<MutationRecord> mu
     activeMutationObservers().add(this);
 }
 
+void WebKitMutationObserver::setHasTransientRegistration()
+{
+    ASSERT(isMainThread());
+    activeMutationObservers().add(this);
+}
+
 void WebKitMutationObserver::deliver()
 {
+    // Calling clearTransientRegistrations() can modify m_registrations, so it's necessary
+    // to make a copy of the transient registrations before operating on them.
+    Vector<MutationObserverRegistration*, 1> transientRegistrations;
+    for (HashSet<MutationObserverRegistration*>::iterator iter = m_registrations.begin(); iter != m_registrations.end(); ++iter) {
+        if ((*iter)->hasTransientRegistrations())
+            transientRegistrations.append(*iter);
+    }
+    for (size_t i = 0; i < transientRegistrations.size(); ++i)
+        transientRegistrations[i]->clearTransientRegistrations();
+
     if (m_records.isEmpty())
         return;
 
-    MutationRecordArray records;
+    Vector<RefPtr<MutationRecord> > records;
     records.swap(m_records);
-
-    for (HashSet<MutationObserverRegistration*>::iterator iter = m_registrations.begin(); iter != m_registrations.end(); ++iter)
-        (*iter)->clearTransientRegistrations();
 
     m_callback->handleEvent(&records, this);
 }

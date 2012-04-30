@@ -56,9 +56,8 @@ public:
     LayoutUnit width() const { return m_frameRect.width(); }
     LayoutUnit height() const { return m_frameRect.height(); }
 
-    // FIXME: The implementation for these functions will change once we move to subpixel layout. See bug 60318.
-    int pixelSnappedWidth() const { return m_frameRect.width(); }
-    int pixelSnappedHeight() const { return m_frameRect.height(); }
+    int pixelSnappedWidth() const { return m_frameRect.pixelSnappedWidth(); }
+    int pixelSnappedHeight() const { return m_frameRect.pixelSnappedHeight(); }
 
     // These represent your location relative to your container as a physical offset.
     // In layout related methods you almost always want the logical location (e.g. x() and y()).
@@ -123,6 +122,7 @@ public:
     LayoutPoint location() const { return m_frameRect.location(); }
     LayoutSize locationOffset() const { return LayoutSize(x(), y()); }
     LayoutSize size() const { return m_frameRect.size(); }
+    IntSize pixelSnappedSize() const { return m_frameRect.pixelSnappedSize(); }
 
     void setLocation(const LayoutPoint& location) { m_frameRect.setLocation(location); }
     
@@ -130,19 +130,23 @@ public:
     void move(LayoutUnit dx, LayoutUnit dy) { m_frameRect.move(dx, dy); }
 
     LayoutRect frameRect() const { return m_frameRect; }
+    IntRect pixelSnappedFrameRect() const { return pixelSnappedIntRect(m_frameRect); }
     void setFrameRect(const LayoutRect& rect) { m_frameRect = rect; }
 
-    // FIXME: We shouldn't be returning this as a LayoutRect, since it loses its position and won't properly pixel snap.
     LayoutRect borderBoxRect() const { return LayoutRect(LayoutPoint(), size()); }
-    IntRect pixelSnappedBorderBoxRect() const { return IntRect(IntPoint(), IntSize(m_frameRect.pixelSnappedWidth(), m_frameRect.pixelSnappedHeight())); }
-    virtual IntRect borderBoundingBox() const { return pixelSnappedBorderBoxRect(); }
+    IntRect pixelSnappedBorderBoxRect() const { return IntRect(IntPoint(), m_frameRect.pixelSnappedSize()); }
+    virtual IntRect borderBoundingBox() const { return pixelSnappedBorderBoxRect(); } 
 
-    // The content area of the box (excludes padding and border).
-    LayoutRect contentBoxRect(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return LayoutRect(borderLeft() + paddingLeft(paddingOption), borderTop() + paddingTop(paddingOption), contentWidth(paddingOption), contentHeight(paddingOption)); }
+    // The content area of the box (excludes padding - and intrinsic padding for table cells, etc... - and border).
+    LayoutRect contentBoxRect() const { return LayoutRect(borderLeft() + paddingLeft(), borderTop() + paddingTop(), contentWidth(), contentHeight()); }
     // The content box in absolute coords. Ignores transforms.
-    LayoutRect absoluteContentBox() const;
+    IntRect absoluteContentBox() const;
     // The content box converted to absolute coords (taking transforms into account).
     FloatQuad absoluteContentQuad() const;
+
+    // This returns the content area of the box (excluding padding and border). The only difference with contentBoxRect is that computedCSSContentBoxRect
+    // does include the intrinsic padding in the content box as this is what some callers expect (like getComputedStyle).
+    LayoutRect computedCSSContentBoxRect() const { return LayoutRect(borderLeft() + computedCSSPaddingLeft(), borderTop() + computedCSSPaddingTop(), clientWidth() - computedCSSPaddingLeft() - computedCSSPaddingRight(), clientHeight() - computedCSSPaddingTop() - computedCSSPaddingBottom()); }
 
     // Bounds of the outline box in absolute coords. Respects transforms
     virtual LayoutRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, LayoutPoint* cachedOffsetToRepaintContainer) const;
@@ -159,18 +163,18 @@ public:
     // but it is on the right in vertical-rl.
     LayoutRect layoutOverflowRect() const { return m_overflow ? m_overflow->layoutOverflowRect() : clientBoxRect(); }
     IntRect pixelSnappedLayoutOverflowRect() const { return pixelSnappedIntRect(layoutOverflowRect()); }
-    LayoutUnit minYLayoutOverflow() const { return m_overflow? m_overflow->minYLayoutOverflow() : borderTop(); }
-    LayoutUnit maxYLayoutOverflow() const { return m_overflow ? m_overflow->maxYLayoutOverflow() : borderTop() + clientHeight(); }
-    LayoutUnit minXLayoutOverflow() const { return m_overflow ? m_overflow->minXLayoutOverflow() : borderLeft(); }
-    LayoutUnit maxXLayoutOverflow() const { return m_overflow ? m_overflow->maxXLayoutOverflow() : borderLeft() + clientWidth(); }
+    LayoutUnit minYLayoutOverflow() const { return m_overflow? m_overflow->minYLayoutOverflow() : static_cast<LayoutUnit>(borderTop()); }
+    LayoutUnit maxYLayoutOverflow() const { return m_overflow ? m_overflow->maxYLayoutOverflow() : static_cast<LayoutUnit>(borderTop()) + clientHeight(); }
+    LayoutUnit minXLayoutOverflow() const { return m_overflow ? m_overflow->minXLayoutOverflow() : static_cast<LayoutUnit>(borderLeft()); }
+    LayoutUnit maxXLayoutOverflow() const { return m_overflow ? m_overflow->maxXLayoutOverflow() : static_cast<LayoutUnit>(borderLeft()) + clientWidth(); }
     LayoutSize maxLayoutOverflow() const { return LayoutSize(maxXLayoutOverflow(), maxYLayoutOverflow()); }
     LayoutUnit logicalLeftLayoutOverflow() const { return style()->isHorizontalWritingMode() ? minXLayoutOverflow() : minYLayoutOverflow(); }
     LayoutUnit logicalRightLayoutOverflow() const { return style()->isHorizontalWritingMode() ? maxXLayoutOverflow() : maxYLayoutOverflow(); }
     
     virtual LayoutRect visualOverflowRect() const { return m_overflow ? m_overflow->visualOverflowRect() : borderBoxRect(); }
-    LayoutUnit minYVisualOverflow() const { return m_overflow? m_overflow->minYVisualOverflow() : zeroLayoutUnit; }
+    LayoutUnit minYVisualOverflow() const { return m_overflow? m_overflow->minYVisualOverflow() : ZERO_LAYOUT_UNIT; }
     LayoutUnit maxYVisualOverflow() const { return m_overflow ? m_overflow->maxYVisualOverflow() : height(); }
-    LayoutUnit minXVisualOverflow() const { return m_overflow ? m_overflow->minXVisualOverflow() : zeroLayoutUnit; }
+    LayoutUnit minXVisualOverflow() const { return m_overflow ? m_overflow->minXVisualOverflow() : ZERO_LAYOUT_UNIT; }
     LayoutUnit maxXVisualOverflow() const { return m_overflow ? m_overflow->maxXVisualOverflow() : width(); }
     LayoutUnit logicalLeftVisualOverflow() const { return style()->isHorizontalWritingMode() ? minXVisualOverflow() : minYVisualOverflow(); }
     LayoutUnit logicalRightVisualOverflow() const { return style()->isHorizontalWritingMode() ? maxXVisualOverflow() : maxYVisualOverflow(); }
@@ -185,10 +189,10 @@ public:
     
     void updateLayerTransform();
 
-    LayoutUnit contentWidth(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return clientWidth() - paddingLeft(paddingOption) - paddingRight(paddingOption); }
-    LayoutUnit contentHeight(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return clientHeight() - paddingTop(paddingOption) - paddingBottom(paddingOption); }
-    LayoutUnit contentLogicalWidth(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return style()->isHorizontalWritingMode() ? contentWidth(paddingOption) : contentHeight(paddingOption); }
-    LayoutUnit contentLogicalHeight(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return style()->isHorizontalWritingMode() ? contentHeight(paddingOption) : contentWidth(paddingOption); }
+    LayoutUnit contentWidth() const { return clientWidth() - paddingLeft() - paddingRight(); }
+    LayoutUnit contentHeight() const { return clientHeight() - paddingTop() - paddingBottom(); }
+    LayoutUnit contentLogicalWidth() const { return style()->isHorizontalWritingMode() ? contentWidth() : contentHeight(); }
+    LayoutUnit contentLogicalHeight() const { return style()->isHorizontalWritingMode() ? contentHeight() : contentWidth(); }
 
     // IE extensions. Used to calculate offsetWidth/Height.  Overridden by inlines (RenderFlow)
     // to return the remaining width on a given line (and the height of a single line).
@@ -315,13 +319,14 @@ public:
 
     virtual LayoutUnit containingBlockLogicalWidthForContent() const;
     LayoutUnit containingBlockLogicalWidthForContentInRegion(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage) const;
+    LayoutUnit containingBlockAvailableLineWidthInRegion(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage) const;
     LayoutUnit perpendicularContainingBlockLogicalHeight() const;
     
     virtual void computeLogicalWidth();
     virtual void computeLogicalHeight();
 
     RenderBoxRegionInfo* renderBoxRegionInfo(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage, RenderBoxRegionInfoFlags = CacheRenderBoxRegionInfo) const;
-    void computeLogicalWidthInRegion(RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = zeroLayoutUnit);
+    void computeLogicalWidthInRegion(RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = ZERO_LAYOUT_UNIT);
 
     bool stretchesToViewport() const
     {
@@ -456,7 +461,7 @@ public:
     virtual void computeIntrinsicRatioInformation(FloatSize& /* intrinsicSize */, double& /* intrinsicRatio */, bool& /* isPercentageIntrinsicSize */) const { }
 
     IntSize scrolledContentOffset() const;
-    IntSize cachedSizeForOverflowClip() const;
+    LayoutSize cachedSizeForOverflowClip() const;
     void updateCachedSizeForOverflowClip();
     void clearCachedSizeForOverflowClip();
 
@@ -483,6 +488,12 @@ public:
         }
 
         return false;
+    }
+
+    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject*) const
+    {
+        ASSERT_NOT_REACHED();
+        return 0;
     }
 
 protected:
@@ -515,6 +526,32 @@ protected:
 
     void paintRootBoxFillLayers(const PaintInfo&);
 
+    // These functions are only used internally to manipulate the render tree structure via remove/insert/appendChildNode.
+    // Since they are typically called only to move objects around within anonymous blocks (which only have layers in
+    // the case of column spans), the default for fullRemoveInsert is false rather than true.
+    void moveChildTo(RenderBox* toBox, RenderObject* child, RenderObject* beforeChild, bool fullRemoveInsert = false);
+    void moveChildTo(RenderBox* to, RenderObject* child, bool fullRemoveInsert = false)
+    {
+        moveChildTo(to, child, 0, fullRemoveInsert);
+    }
+    void moveAllChildrenTo(RenderBox* toBox, bool fullRemoveInsert = false)
+    {
+        moveAllChildrenTo(toBox, 0, fullRemoveInsert);
+    }
+    void moveAllChildrenTo(RenderBox* toBox, RenderObject* beforeChild, bool fullRemoveInsert = false)
+    {
+        moveChildrenTo(toBox, firstChild(), 0, beforeChild, fullRemoveInsert);
+    }
+    // Move all of the kids from |startChild| up to but excluding |endChild|. 0 can be passed as the |endChild| to denote
+    // that all the kids from |startChild| onwards should be moved.
+    void moveChildrenTo(RenderBox* toBox, RenderObject* startChild, RenderObject* endChild, bool fullRemoveInsert = false)
+    {
+        moveChildrenTo(toBox, startChild, endChild, 0, fullRemoveInsert);
+    }
+    void moveChildrenTo(RenderBox* toBox, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
+   
+    RenderObject* splitAnonymousBoxesAroundChild(RenderObject* beforeChild);
+ 
 private:
     bool fixedElementLaysOutRelativeToFrame(Frame*, FrameView*) const;
 

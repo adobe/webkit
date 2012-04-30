@@ -145,13 +145,13 @@ function test()
 
             uiSourceCodeList[0].requestContent(didRequestContent1);
 
-            function didRequestContent1(mimeType, content)
+            function didRequestContent1(content, contentEncoded, mimeType)
             {
                 InspectorTest.assertEquals(0, content.indexOf("window.addEventListener"));
                 uiSourceCodeList[1].requestContent(didRequestContent2);
             }
 
-            function didRequestContent2(mimeType, content)
+            function didRequestContent2(content, contentEncoded, mimeType)
             {
                 InspectorTest.assertEquals(0, content.indexOf("function ClickHandler()"));
                 next();
@@ -181,7 +181,7 @@ function test()
 
             uiSourceCodeList[0].requestContent(didRequestContent);
 
-            function didRequestContent(mimeType, content)
+            function didRequestContent(content, contentEncoded, mimeType)
             {
                 InspectorTest.assertEquals("<source content>", content);
                 next();
@@ -190,12 +190,14 @@ function test()
 
         function testSourceMapCouldNotBeLoaded(next)
         {
+            WebInspector.settings.sourceMapsEnabled.set(true);
             WebInspector.debuggerModel._scripts = [];
             var mainScriptMapping = new WebInspector.MainScriptMapping();
             mainScriptMapping.addEventListener(WebInspector.MainScriptMapping.Events.UISourceCodeListChanged, uiSourceCodeListChanged);
 
             var script = InspectorTest.createScriptMock("compiled.js", 0, 0, true, "");
             script.sourceMapURL = "http://localhost:8000/inspector/resources/source-map.json_";
+            console.error = function() {}; // Error message is platform dependent.
             mainScriptMapping.addScript(script);
 
             function uiSourceCodeListChanged(event)

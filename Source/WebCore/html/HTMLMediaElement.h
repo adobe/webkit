@@ -128,7 +128,7 @@ public:
 
     PassRefPtr<TimeRanges> buffered() const;
     void load(ExceptionCode&);
-    String canPlayType(const String& mimeType) const;
+    String canPlayType(const String& mimeType, const String& keySystem = String()) const;
 
 // ready state
     ReadyState readyState() const;
@@ -172,6 +172,8 @@ public:
 #if ENABLE(MEDIA_SOURCE)
 //  Media Source.
     const KURL& webkitMediaSourceURL() const { return m_mediaSourceURL; }
+    void webkitSourceAddId(const String&, const String&, ExceptionCode&);
+    void webkitSourceRemoveId(const String&, ExceptionCode&);
     void webkitSourceAppend(PassRefPtr<Uint8Array> data, ExceptionCode&);
     enum EndOfStreamStatus { EOS_NO_ERROR, EOS_NETWORK_ERR, EOS_DECODE_ERR };
     void webkitSourceEndOfStream(unsigned short, ExceptionCode&);
@@ -179,6 +181,19 @@ public:
     SourceState webkitSourceState() const;
     void setSourceState(SourceState);
 #endif 
+
+#if ENABLE(ENCRYPTED_MEDIA)
+    void webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionCode&);
+    void webkitGenerateKeyRequest(const String& keySystem, ExceptionCode&);
+    void webkitAddKey(const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionCode&);
+    void webkitAddKey(const String& keySystem, PassRefPtr<Uint8Array> key, ExceptionCode&);
+    void webkitCancelKeyRequest(const String& keySystem, const String& sessionId, ExceptionCode&);
+
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeyadded);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeyerror);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeymessage);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitneedkey);
+#endif
 
 // controls
     bool controls() const;
@@ -252,6 +267,13 @@ public:
     void createMediaPlayerProxy();
     void updateWidget(PluginCreationOption);
 #endif
+
+    // EventTarget function.
+    // Both Node (via HTMLElement) and ActiveDOMObject define this method, which
+    // causes an ambiguity error at compile time. This class's constructor
+    // ensures that both implementations return document, so return the result
+    // of one of them here.
+    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return HTMLElement::scriptExecutionContext(); }
 
     bool hasSingleSecurityOrigin() const { return !m_player || m_player->hasSingleSecurityOrigin(); }
     
@@ -340,8 +362,8 @@ private:
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual void didRecalcStyle(StyleChange);
     
     virtual void defaultEventHandler(Event*);
@@ -387,6 +409,14 @@ private:
 #if ENABLE(MEDIA_SOURCE)
     virtual void mediaPlayerSourceOpened();
     virtual String mediaPlayerSourceURL() const;
+    bool isValidSourceId(const String&, ExceptionCode&) const;
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA)
+    virtual void mediaPlayerKeyAdded(MediaPlayer*, const String& keySystem, const String& sessionId) OVERRIDE;
+    virtual void mediaPlayerKeyError(MediaPlayer*, const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode, unsigned short systemCode) OVERRIDE;
+    virtual void mediaPlayerKeyMessage(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength) OVERRIDE;
+    virtual void mediaPlayerKeyNeeded(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength) OVERRIDE;
 #endif
 
     virtual String mediaPlayerReferrer() const OVERRIDE;
@@ -409,7 +439,7 @@ private:
     
     // loading
     void selectMediaResource();
-    void loadResource(const KURL&, ContentType&);
+    void loadResource(const KURL&, ContentType&, const String& keySystem);
     void scheduleNextSourceChild();
     void loadNextSourceChild();
     void userCancelledLoad();
@@ -420,7 +450,8 @@ private:
     void waitForSourceChange();
     void prepareToPlay();
 
-    KURL selectNextSourceChild(ContentType*, InvalidURLAction);
+    KURL selectNextSourceChild(ContentType*, String* keySystem, InvalidURLAction);
+
     void mediaLoadingFailed(MediaPlayer::NetworkState);
 
 #if ENABLE(VIDEO_TRACK)
@@ -501,7 +532,7 @@ private:
     Timer<HTMLMediaElement> m_progressEventTimer;
     Timer<HTMLMediaElement> m_playbackProgressTimer;
     RefPtr<TimeRanges> m_playedTimeRanges;
-    GenericEventQueue m_asyncEventQueue;
+    OwnPtr<GenericEventQueue> m_asyncEventQueue;
 
     float m_playbackRate;
     float m_defaultPlaybackRate;
@@ -549,6 +580,7 @@ private:
 #if ENABLE(MEDIA_SOURCE)
     KURL m_mediaSourceURL;
     SourceState m_sourceState;
+    HashSet<String> m_sourceIDs;
 #endif
 
     mutable float m_cachedTime;

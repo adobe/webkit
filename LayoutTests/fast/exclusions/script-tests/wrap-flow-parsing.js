@@ -1,5 +1,7 @@
 description('Test parsing of the CSS wrap-flow property.');
 
+internals.settings.setCSSExclusionsEnabled(true);
+
 function test(declaration) {
     var div = document.createElement("div");
     div.setAttribute("style", declaration);
@@ -34,8 +36,8 @@ function testNotInherited(parentValue, childValue) {
 
 shouldBeEqualToString('test("-webkit-wrap-flow: auto")', "auto");
 shouldBeEqualToString('test("-webkit-wrap-flow: both")', "both");
-shouldBeEqualToString('test("-webkit-wrap-flow: left")', "left");
-shouldBeEqualToString('test("-webkit-wrap-flow: right")', "right");
+shouldBeEqualToString('test("-webkit-wrap-flow: start")', "start");
+shouldBeEqualToString('test("-webkit-wrap-flow: end")', "end");
 shouldBeEqualToString('test("-webkit-wrap-flow: maximum")', "maximum");
 shouldBeEqualToString('test("-webkit-wrap-flow: clear")', "clear");
 
@@ -48,6 +50,6 @@ shouldBeEqualToString('testComputedStyle("auto")', "auto");
 shouldBeEqualToString('testComputedStyle("5")', "auto");
 shouldBeEqualToString('testComputedStyle("\'string\'")', "auto");
 
-shouldBeEqualToString('testNotInherited("auto", "left")', "left");
-shouldBeEqualToString('testNotInherited("right", "auto")', "auto");
+shouldBeEqualToString('testNotInherited("auto", "start")', "start");
+shouldBeEqualToString('testNotInherited("end", "auto")', "auto");
 shouldBeEqualToString('testNotInherited("both", "clear")', "clear");

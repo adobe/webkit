@@ -22,17 +22,18 @@
 #ifndef Heap_h
 #define Heap_h
 
+#include "BlockAllocator.h"
 #include "DFGCodeBlocks.h"
-#include "HandleHeap.h"
+#include "HandleSet.h"
 #include "HandleStack.h"
 #include "MarkedAllocator.h"
 #include "MarkedBlock.h"
 #include "MarkedBlockSet.h"
 #include "MarkedSpace.h"
 #include "SlotVisitor.h"
+#include "WeakHandleOwner.h"
+#include "WeakSet.h"
 #include "WriteBarrierSupport.h"
-#include <wtf/DoublyLinkedList.h>
-#include <wtf/Forward.h>
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashSet.h>
 
@@ -42,6 +43,7 @@ namespace JSC {
 
     class CopiedSpace;
     class CodeBlock;
+    class FunctionExecutable;
     class GCActivityCallback;
     class GlobalCodeBlock;
     class Heap;
@@ -71,8 +73,8 @@ namespace JSC {
     public:
         friend class JIT;
         friend class MarkStackThreadSharedData;
-        static Heap* heap(JSValue); // 0 for immediate values
-        static Heap* heap(JSCell*);
+        static Heap* heap(const JSValue); // 0 for immediate values
+        static Heap* heap(const JSCell*);
 
         static bool isMarked(const void*);
         static bool testAndSetMarked(const void*);
@@ -84,7 +86,7 @@ namespace JSC {
 
         Heap(JSGlobalData*, HeapSize);
         ~Heap();
-        JS_EXPORT_PRIVATE void destroy(); // JSGlobalData must call destroy() before ~Heap().
+        JS_EXPORT_PRIVATE void lastChanceToFinalize();
 
         JSGlobalData* globalData() const { return m_globalData; }
         MarkedSpace& objectSpace() { return m_objectSpace; }
@@ -105,11 +107,18 @@ namespace JSC {
 
         typedef void (*Finalizer)(JSCell*);
         JS_EXPORT_PRIVATE void addFinalizer(JSCell*, Finalizer);
+        void addFunctionExecutable(FunctionExecutable*);
+        void removeFunctionExecutable(FunctionExecutable*);
 
         void notifyIsSafeToCollect() { m_isSafeToCollect = true; }
+
         JS_EXPORT_PRIVATE void collectAllGarbage();
+        enum SweepToggle { DoNotSweep, DoSweep };
+        bool shouldCollect();
+        void collect(SweepToggle);
 
         void reportExtraMemoryCost(size_t cost);
+        JS_EXPORT_PRIVATE void reportAbandonedObjectGraph();
 
         JS_EXPORT_PRIVATE void protect(JSValue);
         JS_EXPORT_PRIVATE bool unprotect(JSValue); // True when the protect count drops to 0.
@@ -133,12 +142,17 @@ namespace JSC {
         template<typename Functor> typename Functor::ReturnType forEachProtectedCell(Functor&);
         template<typename Functor> typename Functor::ReturnType forEachProtectedCell();
 
-        HandleHeap* handleHeap() { return &m_handleHeap; }
+        WeakSet* weakSet() { return &m_weakSet; }
+        HandleSet* handleSet() { return &m_handleSet; }
         HandleStack* handleStack() { return &m_handleStack; }
 
         void getConservativeRegisterRoots(HashSet<JSCell*>& roots);
 
         double lastGCLength() { return m_lastGCLength; }
+
+        JS_EXPORT_PRIVATE void discardAllCompiledCode();
+
+        void didAllocate(size_t);
 
     private:
         friend class CodeBlock;
@@ -152,11 +166,6 @@ namespace JSC {
 
         void* allocateWithDestructor(size_t);
         void* allocateWithoutDestructor(size_t);
-
-        size_t waterMark();
-        size_t highWaterMark();
-        void setHighWaterMark(size_t);
-        bool shouldCollect();
 
         static const size_t minExtraCost = 256;
         static const size_t maxExtraCost = 1024 * 1024;
@@ -174,7 +183,6 @@ namespace JSC {
         void canonicalizeCellLivenessData();
 
         void resetAllocators();
-        void freeBlocks(MarkedBlock*);
 
         void clearMarks();
         void markRoots(bool fullGC);
@@ -183,42 +191,27 @@ namespace JSC {
         void harvestWeakReferences();
         void finalizeUnconditionalFinalizers();
         
-        enum SweepToggle { DoNotSweep, DoSweep };
-        void collect(SweepToggle);
-        void shrink();
-        void releaseFreeBlocks();
         void sweep();
 
         RegisterFile& registerFile();
+        BlockAllocator& blockAllocator();
 
-        void waitForRelativeTimeWhileHoldingLock(double relative);
-        void waitForRelativeTime(double relative);
-        void blockFreeingThreadMain();
-        static void blockFreeingThreadStartFunc(void* heap);
-        
         const HeapSize m_heapSize;
         const size_t m_minBytesPerCycle;
-        size_t m_lastFullGCSize;
-        size_t m_waterMark;
-        size_t m_highWaterMark;
+        size_t m_sizeAfterLastCollect;
+
+        size_t m_bytesAllocatedLimit;
+        size_t m_bytesAllocated;
         
         OperationInProgress m_operationInProgress;
         MarkedSpace m_objectSpace;
         CopiedSpace m_storageSpace;
 
-        DoublyLinkedList<HeapBlock> m_freeBlocks;
-        size_t m_numberOfFreeBlocks;
-        
-        ThreadIdentifier m_blockFreeingThread;
-        Mutex m_freeBlockLock;
-        ThreadCondition m_freeBlockCondition;
-        bool m_blockFreeingThreadShouldQuit;
+        BlockAllocator m_blockAllocator;
 
 #if ENABLE(SIMPLE_HEAP_PROFILING)
         VTableSpectrum m_destroyedTypeCounts;
 #endif
-
-        size_t m_extraCost;
 
         ProtectCountSet m_protectedValues;
         Vector<Vector<ValueStringPair>* > m_tempSortingVectors;
@@ -231,7 +224,8 @@ namespace JSC {
         MarkStackThreadSharedData m_sharedData;
         SlotVisitor m_slotVisitor;
 
-        HandleHeap m_handleHeap;
+        WeakSet m_weakSet;
+        HandleSet m_handleSet;
         HandleStack m_handleStack;
         DFGCodeBlocks m_dfgCodeBlocks;
         FinalizerOwner m_finalizerOwner;
@@ -240,6 +234,9 @@ namespace JSC {
 
         JSGlobalData* m_globalData;
         double m_lastGCLength;
+        double m_lastCodeDiscardTime;
+
+        DoublyLinkedList<FunctionExecutable> m_functions;
     };
 
     inline bool Heap::shouldCollect()
@@ -247,7 +244,7 @@ namespace JSC {
 #if ENABLE(GGC)
         return m_objectSpace.nurseryWaterMark() >= m_minBytesPerCycle && m_isSafeToCollect;
 #else
-        return waterMark() >= highWaterMark() && m_isSafeToCollect;
+        return m_bytesAllocated > m_bytesAllocatedLimit && m_isSafeToCollect;
 #endif
     }
 
@@ -256,12 +253,12 @@ namespace JSC {
         return m_operationInProgress != NoOperation;
     }
 
-    inline Heap* Heap::heap(JSCell* cell)
+    inline Heap* Heap::heap(const JSCell* cell)
     {
         return MarkedBlock::blockFor(cell)->heap();
     }
 
-    inline Heap* Heap::heap(JSValue v)
+    inline Heap* Heap::heap(const JSValue v)
     {
         if (!v.isCell())
             return 0;
@@ -281,21 +278,6 @@ namespace JSC {
     inline void Heap::setMarked(const void* cell)
     {
         MarkedBlock::blockFor(cell)->setMarked(cell);
-    }
-
-    inline size_t Heap::waterMark()
-    {
-        return m_objectSpace.waterMark() + m_storageSpace.waterMark();
-    }
-
-    inline size_t Heap::highWaterMark()
-    {
-        return m_highWaterMark;
-    }
-
-    inline void Heap::setHighWaterMark(size_t newHighWaterMark)
-    {
-        m_highWaterMark = newHighWaterMark;
     }
 
 #if ENABLE(GGC)
@@ -344,7 +326,7 @@ namespace JSC {
         ProtectCountSet::iterator end = m_protectedValues.end();
         for (ProtectCountSet::iterator it = m_protectedValues.begin(); it != end; ++it)
             functor(it->first);
-        m_handleHeap.forEachStrongHandle(functor, m_protectedValues);
+        m_handleSet.forEachStrongHandle(functor, m_protectedValues);
 
         return functor.returnValue();
     }
@@ -375,6 +357,11 @@ namespace JSC {
     inline CheckedBoolean Heap::tryReallocateStorage(void** ptr, size_t oldSize, size_t newSize)
     {
         return m_storageSpace.tryReallocate(ptr, oldSize, newSize);
+    }
+
+    inline BlockAllocator& Heap::blockAllocator()
+    {
+        return m_blockAllocator;
     }
 
 } // namespace JSC

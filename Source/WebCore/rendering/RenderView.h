@@ -26,24 +26,23 @@
 #include "LayoutState.h"
 #include "PODFreeListArena.h"
 #include "RenderBlock.h"
-#include <wtf/ListHashSet.h>
 #include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
-class RenderFlowThread;
+class FlowThreadController;
 class RenderWidget;
 
 #if USE(ACCELERATED_COMPOSITING)
 class RenderLayerCompositor;
 #endif
 
-typedef ListHashSet<RenderFlowThread*> RenderFlowThreadList;
-
 class RenderView : public RenderBlock {
 public:
     RenderView(Node*, FrameView*);
     virtual ~RenderView();
+
+    bool hitTest(const HitTestRequest&, HitTestResult&);
 
     virtual const char* renderName() const { return "RenderView"; }
 
@@ -68,14 +67,14 @@ public:
 
     FrameView* frameView() const { return m_frameView; }
 
-    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, IntRect&, bool fixed = false) const;
-    virtual void repaintViewRectangle(const IntRect&, bool immediate = false);
+    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
+    virtual void repaintViewRectangle(const LayoutRect&, bool immediate = false);
     // Repaint the view, and all composited layers that intersect the given absolute rectangle.
     // FIXME: ideally we'd never have to do this, if all repaints are container-relative.
-    virtual void repaintRectangleInViewAndCompositedLayers(const IntRect&, bool immediate = false);
+    virtual void repaintRectangleInViewAndCompositedLayers(const LayoutRect&, bool immediate = false);
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
-    virtual void paintBoxDecorations(PaintInfo&, const IntPoint&);
+    virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&) OVERRIDE;
 
     enum SelectionRepaintMode { RepaintNewXOROld, RepaintNewMinusOld, RepaintNothing };
     void setSelection(RenderObject* start, int startPos, RenderObject* end, int endPos, SelectionRepaintMode = RepaintNewXOROld);
@@ -98,7 +97,7 @@ public:
 #endif
     int maximalOutlineSize() const { return m_maximalOutlineSize; }
 
-    virtual IntRect viewRect() const;
+    virtual LayoutRect viewRect() const OVERRIDE;
 
     void updateWidgetPositions();
     void addWidget(RenderWidget*);
@@ -172,20 +171,8 @@ public:
 
     IntRect documentRect() const;
 
-    RenderFlowThread* ensureRenderFlowThreadWithName(const AtomicString& flowThread);
-    bool hasRenderFlowThreads() const { return m_renderFlowThreadList && !m_renderFlowThreadList->isEmpty(); }
-    void layoutRenderFlowThreads();
-    bool isRenderFlowThreadOrderDirty() const { return m_isRenderFlowThreadOrderDirty; }
-    void setIsRenderFlowThreadOrderDirty(bool dirty)
-    {
-        m_isRenderFlowThreadOrderDirty = dirty;
-        if (dirty)
-            setNeedsLayout(true);
-    }
-    const RenderFlowThreadList* renderFlowThreadList() const { return m_renderFlowThreadList.get(); }
-
-    RenderFlowThread* currentRenderFlowThread() const { return m_currentRenderFlowThread; }
-    void setCurrentRenderFlowThread(RenderFlowThread* flowThread) { m_currentRenderFlowThread = flowThread; }
+    bool hasRenderNamedFlowThreads() const;
+    FlowThreadController* flowThreadController();
 
     bool inFirstLayoutPhaseOfRegionsAutoHeight() const { return m_inFirstLayoutPhaseOfRegionsAutoHeight; }
     bool needsSecondPassLayoutForRegionsAutoHeight() const;
@@ -207,6 +194,12 @@ public:
 
     IntervalArena* intervalArena();
 
+    IntSize viewportSize() const { return document()->viewportSize(); }
+
+    void setFixedPositionedObjectsNeedLayout();
+    void insertFixedPositionedObject(RenderBox*);
+    void removeFixedPositionedObject(RenderBox*);
+
 protected:
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
@@ -216,7 +209,7 @@ private:
     virtual void calcColumnWidth() OVERRIDE;
     virtual ColumnInfo::PaginationUnit paginationUnit() const OVERRIDE;
 
-    bool shouldRepaint(const IntRect& r) const;
+    bool shouldRepaint(const LayoutRect&) const;
 
     // These functions may only be accessed by LayoutStateMaintainer.
     void pushLayoutState(RenderFlowThread*, bool regionsChanged);
@@ -282,19 +275,20 @@ protected:
 
     typedef HashSet<RenderWidget*> RenderWidgetSet;
     RenderWidgetSet m_widgets;
-    
+
+    typedef HashSet<RenderBox*> RenderBoxSet;
+    OwnPtr<RenderBoxSet> m_fixedPositionedElements;
+
 private:
     unsigned m_pageLogicalHeight;
     bool m_pageLogicalHeightChanged;
-    bool m_isRenderFlowThreadOrderDirty;
     LayoutState* m_layoutState;
     unsigned m_layoutStateDisableCount;
 #if USE(ACCELERATED_COMPOSITING)
     OwnPtr<RenderLayerCompositor> m_compositor;
 #endif
-    OwnPtr<RenderFlowThreadList> m_renderFlowThreadList;
-    RenderFlowThread* m_currentRenderFlowThread;
-    bool m_inFirstLayoutPhaseOfRegionsAutoHeight;
+    OwnPtr<FlowThreadController> m_flowThreadController;
+	bool m_inFirstLayoutPhaseOfRegionsAutoHeight;
     unsigned m_autoHeightRegionsCount;
     bool m_inFirstLayoutPhaseOfExclusionsPositioning;
     unsigned m_cssExclusionsCount;

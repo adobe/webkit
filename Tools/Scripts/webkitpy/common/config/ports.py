@@ -115,6 +115,9 @@ class DeprecatedPort(object):
     def layout_tests_results_path(self):
         return os.path.join(self.results_directory, "full_results.json")
 
+    def unit_tests_results_path(self):
+        return os.path.join(self.results_directory, "webkit_unit_tests_output.xml")
+
 
 class MacPort(DeprecatedPort):
     port_flag_name = "mac"
@@ -182,6 +185,9 @@ class ChromiumPort(DeprecatedPort):
         command.append("--chromium")
         command.append("--skip-failing-tests")
         return command
+
+    def run_webkit_unit_tests_command(self):
+        return self.script_shell_command("run-chromium-webkit-unit-tests")
 
     def run_javascriptcore_tests_command(self):
         return None

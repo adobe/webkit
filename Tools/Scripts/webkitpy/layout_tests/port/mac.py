@@ -27,11 +27,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import os
 import re
 import subprocess
 import time
 
 from webkitpy.common.system.crashlogs import CrashLogs
+from webkitpy.common.system.executive import ScriptError
 from webkitpy.layout_tests.port.apple import ApplePort
 from webkitpy.layout_tests.port.leakdetector import LeakDetector
 
@@ -56,6 +58,10 @@ class MacPort(ApplePort):
     def _most_recent_version(self):
         # This represents the most recently-shipping version of the operating system.
         return self.VERSION_FALLBACK_ORDER[-2]
+
+    def should_retry_crashes(self):
+        # On Apple Mac, we retry crashes due to https://bugs.webkit.org/show_bug.cgi?id=82233
+        return True
 
     def baseline_path(self):
         if self.name() == self._most_recent_version():
@@ -102,7 +108,15 @@ class MacPort(ApplePort):
         if self.is_snowleopard():
             _log.warn("Cannot run tests in parallel on Snow Leopard due to rdar://problem/10621525.")
             return 1
-        return super(MacPort, self).default_child_processes()
+
+        # FIXME: As a temporary workaround while we figure out what's going
+        # on with https://bugs.webkit.org/show_bug.cgi?id=83076, reduce by
+        # half the # of workers we run by default on bigger machines.
+        default_count = super(MacPort, self).default_child_processes()
+        if default_count >= 8:
+            cpu_count = self._executive.cpu_count()
+            return max(1, min(default_count, int(cpu_count / 2)))
+        return default_count
 
     def _build_java_test_support(self):
         java_tests_path = self._filesystem.join(self.layout_tests_dir(), "java")
@@ -142,7 +156,8 @@ class MacPort(ApplePort):
         # We don't use self._run_script() because we don't want to wait for the script
         # to exit and we want the output to show up on stdout in case there are errors
         # launching the browser.
-        self._executive.popen([self._config.script_path('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename], cwd=self._config.webkit_base_dir())
+        self._executive.popen([self._config.script_path('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename],
+            cwd=self._config.webkit_base_dir(), stdout=file(os.devnull), stderr=file(os.devnull))
 
     # FIXME: The next two routines turn off the http locking in order
     # to work around failures on the bots caused when the slave restarts.
@@ -161,26 +176,42 @@ class MacPort(ApplePort):
     def release_http_lock(self):
         pass
 
-    def _get_crash_log(self, name, pid, stdout, stderr):
+    def _get_crash_log(self, name, pid, stdout, stderr, newer_than, time_fn=None, sleep_fn=None):
         # Note that we do slow-spin here and wait, since it appears the time
         # ReportCrash takes to actually write and flush the file varies when there are
         # lots of simultaneous crashes going on.
         # FIXME: Should most of this be moved into CrashLogs()?
+        time_fn = time_fn or time.time
+        sleep_fn = sleep_fn or time.sleep
         crash_log = ''
         crash_logs = CrashLogs(self._filesystem)
-        now = time.time()
+        now = time_fn()
         # FIXME: delete this after we're sure this code is working ...
         _log.debug('looking for crash log for %s:%s' % (name, str(pid)))
-        deadline = now + 5 * int(self.get_option('child_processes'))
+        deadline = now + 5 * int(self.get_option('child_processes', 1))
         while not crash_log and now <= deadline:
-            crash_log = crash_logs.find_newest_log(name, pid, include_errors=True)
+            crash_log = crash_logs.find_newest_log(name, pid, include_errors=True, newer_than=newer_than)
             if not crash_log or not [line for line in crash_log.splitlines() if not line.startswith('ERROR')]:
-                time.sleep(0.1)
-                now = time.time()
+                sleep_fn(0.1)
+                now = time_fn()
         if not crash_log:
             crash_log = 'no crash log found for %s:%d' % (name, pid)
             _log.warning(crash_log)
         return crash_log
+
+    def sample_process(self, name, pid):
+        try:
+            hang_report = self._filesystem.join(self.results_directory(), "%s-%s.sample.txt" % (name, pid))
+            self._executive.run_command([
+                "/usr/bin/sample",
+                pid,
+                10,
+                10,
+                "-file",
+                hang_report,
+            ])
+        except ScriptError, e:
+            _log.warning('Unable to sample process.')
 
     def _path_to_helper(self):
         binary_name = 'LayoutTestHelper'

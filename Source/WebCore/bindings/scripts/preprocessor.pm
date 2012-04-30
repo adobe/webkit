@@ -21,6 +21,7 @@
 use strict;
 use warnings;
 
+use Config;
 use IPC::Open2;
 
 BEGIN {
@@ -40,17 +41,17 @@ sub applyPreprocessor
     my $defines = shift;
     my $preprocessor = shift;
 
+    my @args = ();
     if (!$preprocessor) {
         require Config;
-        my $gccLocation = "";
         if ($ENV{CC}) {
-            $gccLocation = $ENV{CC};
+            $preprocessor = $ENV{CC};
         } elsif (($Config::Config{'osname'}) =~ /solaris/i) {
-            $gccLocation = "/usr/sfw/bin/gcc";
+            $preprocessor = "/usr/sfw/bin/gcc";
         } else {
-            $gccLocation = "/usr/bin/gcc";
+            $preprocessor = "/usr/bin/gcc";
         }
-        $preprocessor = $gccLocation . " -E -P -x c++";
+        push(@args, qw(-E -P -x c++));
     }
 
     # Remove double quotations from $defines and extract macros.
@@ -60,7 +61,20 @@ sub applyPreprocessor
     my @macros = grep { $_ } split(/\s+/, $defines); # grep skips empty macros.
     @macros = map { "-D$_" } @macros;
 
-    my $pid = open2(\*PP_OUT, \*PP_IN, split(' ', $preprocessor), @macros, $fileName);
+    my $pid = 0;
+    if ($Config{osname} eq "cygwin") {
+        # This call can fail if Windows rebases cygwin, so retry a few times until it succeeds.
+        for (my $tries = 0; !$pid && ($tries < 20); $tries++) {
+            eval {
+                $pid = open2(\*PP_OUT, \*PP_IN, split(' ', $preprocessor), @args, @macros, $fileName);
+                1;
+            } or do {
+                sleep 1;
+            }
+        };
+    } else {
+        $pid = open2(\*PP_OUT, \*PP_IN, split(' ', $preprocessor), @args, @macros, $fileName);
+    }
     close PP_IN;
     my @documentContent = <PP_OUT>;
     close PP_OUT;

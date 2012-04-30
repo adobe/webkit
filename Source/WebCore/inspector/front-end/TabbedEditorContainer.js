@@ -27,12 +27,25 @@
  */
 
 /**
- * @implements {WebInspector.EditorContainer}
- * @extends {WebInspector.Object}
- * @constructor
- * @param {WebInspector.EditorContainerDelegate} delegate
+ * @interface
  */
-WebInspector.TabbedEditorContainer = function(delegate)
+WebInspector.TabbedEditorContainerDelegate = function() { }
+
+WebInspector.TabbedEditorContainerDelegate.prototype = {
+    /**
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     * @return {WebInspector.SourceFrame}
+     */
+    viewForFile: function(uiSourceCode) { }
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.Object}
+ * @param {WebInspector.TabbedEditorContainerDelegate} delegate
+ * @param {string} settingName
+ */
+WebInspector.TabbedEditorContainer = function(delegate, settingName)
 {
     this._delegate = delegate;
 
@@ -47,8 +60,14 @@ WebInspector.TabbedEditorContainer = function(delegate)
     this._files = {};
     this._loadedURLs = {};
 
-    this._previouslyViewedFilesSetting = WebInspector.settings.createSetting("previouslyViewedFiles", []);
+    this._previouslyViewedFilesSetting = WebInspector.settings.createSetting(settingName, []);
     this._history = new WebInspector.TabbedEditorContainer.History(this._previouslyViewedFilesSetting.get());
+}
+
+
+WebInspector.TabbedEditorContainer.Events = {
+    EditorSelected: "EditorSelected",
+    EditorClosed: "EditorClosed"
 }
 
 WebInspector.TabbedEditorContainer._tabId = 0;
@@ -57,19 +76,19 @@ WebInspector.TabbedEditorContainer.maximalPreviouslyViewedFilesCount = 30;
 
 WebInspector.TabbedEditorContainer.prototype = {
     /**
+     * @return {WebInspector.View}
+     */
+    get view()
+    {
+        return this._tabbedPane;
+    },
+
+    /**
      * @type {WebInspector.SourceFrame}
      */
     get visibleView()
     {
         return this._tabbedPane.visibleView;
-    },
-
-    /**
-     * @type {Element}
-     */
-    get element()
-    {
-        return this._tabbedPane.element;
     },
 
     /**
@@ -104,7 +123,7 @@ WebInspector.TabbedEditorContainer.prototype = {
         if (userGesture)
             this._editorSelectedByUserAction();
         
-        this.dispatchEventToListeners(WebInspector.EditorContainer.Events.EditorSelected, this._currentFile);
+        this.dispatchEventToListeners(WebInspector.TabbedEditorContainer.Events.EditorSelected, this._currentFile);
     },
 
     /**
@@ -113,7 +132,18 @@ WebInspector.TabbedEditorContainer.prototype = {
      */
     _titleForFile: function(uiSourceCode)
     {
-        return uiSourceCode.displayName;
+        const maxDisplayNameLength = 30;
+        const minDisplayQueryParamLength = 5;
+
+        var parsedURL = uiSourceCode.parsedURL;
+        if (!parsedURL.isValid)
+            return parsedURL.url ? parsedURL.url.trimMiddle(maxDisplayNameLength) : WebInspector.UIString("(program)");
+
+        var maxDisplayQueryParamLength = Math.max(minDisplayQueryParamLength, maxDisplayNameLength - parsedURL.lastPathComponent.length);
+        var displayQueryParams = parsedURL.queryParams ? "?" + parsedURL.queryParams.trimEnd(maxDisplayQueryParamLength - 1) : "";
+        var displayLastPathComponent = parsedURL.lastPathComponent.trimMiddle(maxDisplayNameLength - displayQueryParams.length);
+        var displayName = displayLastPathComponent + displayQueryParams;
+        return displayName || WebInspector.UIString("(program)");
     },
 
     /**
@@ -216,7 +246,7 @@ WebInspector.TabbedEditorContainer.prototype = {
         delete this._files[tabId];
         delete this._currentFile;
 
-        this.dispatchEventToListeners(WebInspector.EditorContainer.Events.EditorClosed, uiSourceCode);
+        this.dispatchEventToListeners(WebInspector.TabbedEditorContainer.Events.EditorClosed, uiSourceCode);
 
         if (userGesture)
             this._editorClosedByUserAction(uiSourceCode);

@@ -124,10 +124,11 @@ static inline bool xfermodePreservesOpaque(const SkPaint& paint, bool srcIsOpaqu
 }
 
 // Returns true if all pixels painted will be opaque.
-static inline bool paintIsOpaque(const SkPaint& paint, const SkBitmap* bitmap = 0, bool checkFillOnly = false)
+static inline bool paintIsOpaque(const SkPaint& paint, OpaqueRegionSkia::DrawType drawType, const SkBitmap* bitmap)
 {
     if (paint.getAlpha() < 0xFF)
         return false;
+    bool checkFillOnly = drawType != OpaqueRegionSkia::FillOrStroke;
     if (!checkFillOnly && paint.getStyle() != SkPaint::kFill_Style && paint.isAntiAlias())
         return false;
     SkShader* shader = paint.getShader();
@@ -147,48 +148,98 @@ static inline bool paintIsOpaque(const SkPaint& paint, const SkBitmap* bitmap = 
     return true;
 }
 
-void OpaqueRegionSkia::didDrawRect(PlatformContextSkia* context, const AffineTransform& transform, const SkRect& fillRect, const SkPaint& paint, const SkBitmap* bitmap)
+// Returns true if there is a rectangular clip, with the result in |deviceClipRect|.
+static inline bool getDeviceClipAsRect(const PlatformContextSkia* context, SkRect& deviceClipRect)
+{
+    // Get the current clip in device coordinate space.
+    if (context->canvas()->getClipType() != SkCanvas::kRect_ClipType)
+        return false;
+
+    SkIRect deviceClipIRect;
+    if (context->canvas()->getClipDeviceBounds(&deviceClipIRect))
+        deviceClipRect.set(deviceClipIRect);
+    else
+        deviceClipRect.setEmpty();
+
+    return true;
+}
+
+static inline SkRect& currentTrackingOpaqueRect(SkRect& rootOpaqueRect, Vector<OpaqueRegionSkia::CanvasLayerState, 3>& canvasLayerStack)
+{
+    // If we are drawing into a canvas layer, then track the opaque rect in that layer.
+    if (!canvasLayerStack.isEmpty())
+        return canvasLayerStack.last().opaqueRect;
+    return rootOpaqueRect;
+}
+
+void OpaqueRegionSkia::pushCanvasLayer(const SkPaint* paint)
+{
+    CanvasLayerState state;
+    if (paint)
+        state.paint = *paint;
+    m_canvasLayerStack.append(state);
+}
+
+void OpaqueRegionSkia::popCanvasLayer(const PlatformContextSkia* context)
+{
+    const CanvasLayerState& canvasLayer = m_canvasLayerStack.last();
+    SkRect layerOpaqueRect = canvasLayer.opaqueRect;
+    SkPaint layerPaint = canvasLayer.paint;
+
+    // Apply the image mask.
+    if (canvasLayer.hasImageMask && !layerOpaqueRect.intersect(canvasLayer.imageOpaqueRect))
+        layerOpaqueRect.setEmpty();
+
+    m_canvasLayerStack.removeLast();
+
+    applyOpaqueRegionFromLayer(context, layerOpaqueRect, layerPaint);
+}
+
+void OpaqueRegionSkia::setImageMask(const SkRect& imageOpaqueRect)
+{
+    ASSERT(!m_canvasLayerStack.isEmpty());
+    m_canvasLayerStack.last().hasImageMask = true;
+    m_canvasLayerStack.last().imageOpaqueRect = imageOpaqueRect;
+}
+
+void OpaqueRegionSkia::didDrawRect(const PlatformContextSkia* context, const SkRect& fillRect, const SkPaint& paint, const SkBitmap* sourceBitmap)
 {
     // Any stroking may put alpha in pixels even if the filling part does not.
     if (paint.getStyle() != SkPaint::kFill_Style) {
-        bool opaque = paintIsOpaque(paint, bitmap);
         bool fillsBounds = false;
 
         if (!paint.canComputeFastBounds())
-            didDrawUnbounded(paint, opaque);
+            didDrawUnbounded(context, paint, FillOrStroke);
         else {
             SkRect strokeRect;
             strokeRect = paint.computeFastBounds(fillRect, &strokeRect);
-            didDraw(context, transform, strokeRect, paint, opaque, fillsBounds);
+            didDraw(context, strokeRect, paint, sourceBitmap, fillsBounds, FillOrStroke);
         }
     }
 
-    bool checkFillOnly = true;
-    bool opaque = paintIsOpaque(paint, bitmap, checkFillOnly);
     bool fillsBounds = paint.getStyle() != SkPaint::kStroke_Style;
-    didDraw(context, transform, fillRect, paint, opaque, fillsBounds);
+    didDraw(context, fillRect, paint, sourceBitmap, fillsBounds, FillOnly);
 }
 
-void OpaqueRegionSkia::didDrawPath(PlatformContextSkia* context, const AffineTransform& transform, const SkPath& path, const SkPaint& paint)
+void OpaqueRegionSkia::didDrawPath(const PlatformContextSkia* context, const SkPath& path, const SkPaint& paint)
 {
     SkRect rect;
     if (path.isRect(&rect)) {
-        didDrawRect(context, transform, rect, paint, 0);
+        didDrawRect(context, rect, paint, 0);
         return;
     }
 
-    bool opaque = paintIsOpaque(paint);
     bool fillsBounds = false;
 
     if (!paint.canComputeFastBounds())
-        didDrawUnbounded(paint, opaque);
+        didDrawUnbounded(context, paint, FillOrStroke);
     else {
         rect = paint.computeFastBounds(path.getBounds(), &rect);
-        didDraw(context, transform, rect, paint, opaque, fillsBounds);
+        didDraw(context, rect, paint, 0, fillsBounds, FillOrStroke);
     }
 }
 
-void OpaqueRegionSkia::didDrawPoints(PlatformContextSkia* context, const AffineTransform& transform, SkCanvas::PointMode mode, int numPoints, const SkPoint points[], const SkPaint& paint)
+void OpaqueRegionSkia::didDrawPoints(const PlatformContextSkia* context, SkCanvas::PointMode mode, int numPoints, const SkPoint points[], const SkPaint& paint)
 {
     if (!numPoints)
         return;
@@ -206,88 +257,99 @@ void OpaqueRegionSkia::didDrawPoints(PlatformContextSkia* context, const AffineT
         rect.fBottom = std::max(rect.fBottom, points[i].fY + 1);
     }
 
-    bool opaque = paintIsOpaque(paint);
     bool fillsBounds = false;
 
     if (!paint.canComputeFastBounds())
-        didDrawUnbounded(paint, opaque);
+        didDrawUnbounded(context, paint, FillOrStroke);
     else {
         rect = paint.computeFastBounds(rect, &rect);
-        didDraw(context, transform, rect, paint, opaque, fillsBounds);
+        didDraw(context, rect, paint, 0, fillsBounds, FillOrStroke);
     }
 }
 
-void OpaqueRegionSkia::didDrawBounded(PlatformContextSkia* context, const AffineTransform& transform, const SkRect& bounds, const SkPaint& paint)
+void OpaqueRegionSkia::didDrawBounded(const PlatformContextSkia* context, const SkRect& bounds, const SkPaint& paint)
 {
-    bool opaque = paintIsOpaque(paint);
     bool fillsBounds = false;
 
     if (!paint.canComputeFastBounds())
-        didDrawUnbounded(paint, opaque);
+        didDrawUnbounded(context, paint, FillOrStroke);
     else {
         SkRect rect;
         rect = paint.computeFastBounds(bounds, &rect);
-        didDraw(context, transform, rect, paint, opaque, fillsBounds);
+        didDraw(context, rect, paint, 0, fillsBounds, FillOrStroke);
     }
 }
 
-void OpaqueRegionSkia::didDraw(PlatformContextSkia* context, const AffineTransform& transform, const SkRect& rect, const SkPaint& paint, bool drawsOpaque, bool fillsBounds)
+void OpaqueRegionSkia::didDraw(const PlatformContextSkia* context, const SkRect& rect, const SkPaint& paint, const SkBitmap* sourceBitmap, bool fillsBounds, DrawType drawType)
 {
     SkRect targetRect = rect;
-
-    bool xfersOpaque = xfermodeIsOpaque(paint, drawsOpaque);
-    bool preservesOpaque = xfermodePreservesOpaque(paint, drawsOpaque);
 
     // Apply the transform to device coordinate space.
     SkMatrix canvasTransform = context->canvas()->getTotalMatrix();
     if (!canvasTransform.mapRect(&targetRect))
         fillsBounds = false;
 
-    // Apply the current clip in device coordinate space.
-    if (context->canvas()->getClipType() != SkCanvas::kRect_ClipType)
+    // Apply the current clip.
+    SkRect deviceClipRect;
+    if (!getDeviceClipAsRect(context, deviceClipRect))
         fillsBounds = false;
-    else {
-        SkIRect deviceClip;
-        context->canvas()->getClipDeviceBounds(&deviceClip);
-        if (!targetRect.intersect(SkIntToScalar(deviceClip.fLeft), SkIntToScalar(deviceClip.fTop), SkIntToScalar(deviceClip.fRight), SkIntToScalar(deviceClip.fBottom)))
-            return;
-    }
+    else if (!targetRect.intersect(deviceClipRect))
+        return;
 
-    // Apply any layers that we are drawing into.
-    for (SkCanvas::LayerIter it(context->canvas(), false); !it.done(); it.next()) {
-        // Apply the layer's clip (which is in device space)
-        const SkRegion& deviceLayerClip = it.clip();
-        if (deviceLayerClip.isEmpty() || !deviceLayerClip.isRect())
-            fillsBounds = false;
-        else {
-            SkIRect clipBounds = it.clip().getBounds();
-            if (!targetRect.intersect(SkIntToScalar(clipBounds.fLeft), SkIntToScalar(clipBounds.fTop), SkIntToScalar(clipBounds.fRight), SkIntToScalar(clipBounds.fBottom)))
-                return;
-        }
-
-        // Make sure the paint stays opaque through the layer.
-        bool drawsOpaque = paintIsOpaque(it.paint());
-        xfersOpaque = xfersOpaque && xfermodeIsOpaque(it.paint(), drawsOpaque);
-        preservesOpaque = preservesOpaque && xfermodePreservesOpaque(it.paint(), drawsOpaque);
-    }
-
-    // Apply the transform to the tracking space.
-    SkMatrix canvasToTargetTransform = transform;
-    if (!canvasToTargetTransform.mapRect(&targetRect))
-        fillsBounds = false;
+    bool drawsOpaque = paintIsOpaque(paint, drawType, sourceBitmap);
+    bool xfersOpaque = xfermodeIsOpaque(paint, drawsOpaque);
+    bool preservesOpaque = xfermodePreservesOpaque(paint, drawsOpaque);
 
     if (fillsBounds && xfersOpaque)
         markRectAsOpaque(targetRect);
-    else if (SkRect::Intersects(targetRect, m_opaqueRect) && !preservesOpaque)
+    else if (!preservesOpaque)
         markRectAsNonOpaque(targetRect);
 }
 
-void OpaqueRegionSkia::didDrawUnbounded(const SkPaint& paint, bool drawsOpaque)
+void OpaqueRegionSkia::didDrawUnbounded(const PlatformContextSkia* context, const SkPaint& paint, DrawType drawType)
 {
-    if (!xfermodePreservesOpaque(paint, drawsOpaque)) {
-        // We don't know what was drawn on so just destroy the known opaque area.
-        m_opaqueRect = SkRect::MakeEmpty();
-    }
+    bool drawsOpaque = paintIsOpaque(paint, drawType, 0);
+    bool preservesOpaque = xfermodePreservesOpaque(paint, drawsOpaque);
+
+    if (preservesOpaque)
+        return;
+
+    SkRect deviceClipRect;
+    getDeviceClipAsRect(context, deviceClipRect);
+    markRectAsNonOpaque(deviceClipRect);
+}
+
+void OpaqueRegionSkia::applyOpaqueRegionFromLayer(const PlatformContextSkia* context, const SkRect& layerOpaqueRect, const SkPaint& paint)
+{
+    SkRect deviceClipRect;
+    bool deviceClipIsARect = getDeviceClipAsRect(context, deviceClipRect);
+
+    if (deviceClipRect.isEmpty())
+        return;
+
+    SkRect sourceOpaqueRect = layerOpaqueRect;
+    // Save the opaque area in the destination, so we can preserve the parts of it under the source opaque area if possible.
+    SkRect destinationOpaqueRect = currentTrackingOpaqueRect(m_opaqueRect, m_canvasLayerStack);
+
+    bool outsideSourceOpaqueRectPreservesOpaque = xfermodePreservesOpaque(paint, false);
+    if (!outsideSourceOpaqueRectPreservesOpaque)
+        markRectAsNonOpaque(deviceClipRect);
+
+    if (!deviceClipIsARect)
+        return;
+    if (!sourceOpaqueRect.intersect(deviceClipRect))
+        return;
+
+    bool sourceOpaqueRectDrawsOpaque = paintIsOpaque(paint, FillOnly, 0);
+    bool sourceOpaqueRectXfersOpaque = xfermodeIsOpaque(paint, sourceOpaqueRectDrawsOpaque);
+    bool sourceOpaqueRectPreservesOpaque = xfermodePreservesOpaque(paint, sourceOpaqueRectDrawsOpaque);
+
+    // If the layer's opaque area is being drawn opaque in the layer below, then mark it opaque. Otherwise,
+    // if it preserves opaque then keep the intersection of the two.
+    if (sourceOpaqueRectXfersOpaque)
+        markRectAsOpaque(sourceOpaqueRect);
+    else if (sourceOpaqueRectPreservesOpaque && sourceOpaqueRect.intersect(destinationOpaqueRect))
+        markRectAsOpaque(sourceOpaqueRect);
 }
 
 void OpaqueRegionSkia::markRectAsOpaque(const SkRect& rect)
@@ -297,31 +359,33 @@ void OpaqueRegionSkia::markRectAsOpaque(const SkRect& rect)
     // rectangle then we do that, as that is the cheapest way to increase the area returned
     // without increasing the complexity.
 
+    SkRect& opaqueRect = currentTrackingOpaqueRect(m_opaqueRect, m_canvasLayerStack);
+
     if (rect.isEmpty())
         return;
-    if (m_opaqueRect.contains(rect))
+    if (opaqueRect.contains(rect))
         return;
-    if (rect.contains(m_opaqueRect)) {
-        m_opaqueRect = rect;
+    if (rect.contains(opaqueRect)) {
+        opaqueRect = rect;
         return;
     }
 
-    if (rect.fTop <= m_opaqueRect.fTop && rect.fBottom >= m_opaqueRect.fBottom) {
-        if (rect.fLeft < m_opaqueRect.fLeft && rect.fRight >= m_opaqueRect.fLeft)
-            m_opaqueRect.fLeft = rect.fLeft;
-        if (rect.fRight > m_opaqueRect.fRight && rect.fLeft <= m_opaqueRect.fRight)
-            m_opaqueRect.fRight = rect.fRight;
-    } else if (rect.fLeft <= m_opaqueRect.fLeft && rect.fRight >= m_opaqueRect.fRight) {
-        if (rect.fTop < m_opaqueRect.fTop && rect.fBottom >= m_opaqueRect.fTop)
-            m_opaqueRect.fTop = rect.fTop;
-        if (rect.fBottom > m_opaqueRect.fBottom && rect.fTop <= m_opaqueRect.fBottom)
-            m_opaqueRect.fBottom = rect.fBottom;
+    if (rect.fTop <= opaqueRect.fTop && rect.fBottom >= opaqueRect.fBottom) {
+        if (rect.fLeft < opaqueRect.fLeft && rect.fRight >= opaqueRect.fLeft)
+            opaqueRect.fLeft = rect.fLeft;
+        if (rect.fRight > opaqueRect.fRight && rect.fLeft <= opaqueRect.fRight)
+            opaqueRect.fRight = rect.fRight;
+    } else if (rect.fLeft <= opaqueRect.fLeft && rect.fRight >= opaqueRect.fRight) {
+        if (rect.fTop < opaqueRect.fTop && rect.fBottom >= opaqueRect.fTop)
+            opaqueRect.fTop = rect.fTop;
+        if (rect.fBottom > opaqueRect.fBottom && rect.fTop <= opaqueRect.fBottom)
+            opaqueRect.fBottom = rect.fBottom;
     }
 
-    long opaqueArea = (long)m_opaqueRect.width() * (long)m_opaqueRect.height();
+    long opaqueArea = (long)opaqueRect.width() * (long)opaqueRect.height();
     long area = (long)rect.width() * (long)rect.height();
     if (area > opaqueArea)
-        m_opaqueRect = rect;
+        opaqueRect = rect;
 }
 
 void OpaqueRegionSkia::markRectAsNonOpaque(const SkRect& rect)
@@ -329,34 +393,43 @@ void OpaqueRegionSkia::markRectAsNonOpaque(const SkRect& rect)
     // We want to keep as much of the current opaque rectangle as we can, so find the one largest
     // rectangle inside m_opaqueRect that does not intersect with |rect|.
 
-    if (rect.contains(m_opaqueRect)) {
-        m_opaqueRect.setEmpty();
+    SkRect& opaqueRect = currentTrackingOpaqueRect(m_opaqueRect, m_canvasLayerStack);
+
+    if (!SkRect::Intersects(rect, opaqueRect))
+        return;
+    if (rect.contains(opaqueRect)) {
+        markAllAsNonOpaque();
         return;
     }
 
-    int deltaLeft = rect.fLeft - m_opaqueRect.fLeft;
-    int deltaRight = m_opaqueRect.fRight - rect.fRight;
-    int deltaTop = rect.fTop - m_opaqueRect.fTop;
-    int deltaBottom = m_opaqueRect.fBottom - rect.fBottom;
+    int deltaLeft = rect.fLeft - opaqueRect.fLeft;
+    int deltaRight = opaqueRect.fRight - rect.fRight;
+    int deltaTop = rect.fTop - opaqueRect.fTop;
+    int deltaBottom = opaqueRect.fBottom - rect.fBottom;
 
-    // horizontal is the larger of the two rectangles to the left or to the right of |rect| and inside m_opaqueRect.
-    // vertical is the larger of the two rectangles above or below |rect| and inside m_opaqueRect.
-    SkRect horizontal = m_opaqueRect;
+    // horizontal is the larger of the two rectangles to the left or to the right of |rect| and inside opaqueRect.
+    // vertical is the larger of the two rectangles above or below |rect| and inside opaqueRect.
+    SkRect horizontal = opaqueRect;
     if (deltaTop > deltaBottom)
         horizontal.fBottom = rect.fTop;
     else
         horizontal.fTop = rect.fBottom;
-    SkRect vertical = m_opaqueRect;
+    SkRect vertical = opaqueRect;
     if (deltaLeft > deltaRight)
         vertical.fRight = rect.fLeft;
     else
         vertical.fLeft = rect.fRight;
 
     if ((long)horizontal.width() * (long)horizontal.height() > (long)vertical.width() * (long)vertical.height())
-        m_opaqueRect = horizontal;
+        opaqueRect = horizontal;
     else
-        m_opaqueRect = vertical;
+        opaqueRect = vertical;
 }
 
+void OpaqueRegionSkia::markAllAsNonOpaque()
+{
+    SkRect& opaqueRect = currentTrackingOpaqueRect(m_opaqueRect, m_canvasLayerStack);
+    opaqueRect.setEmpty();
+}
 
 } // namespace WebCore

@@ -95,12 +95,14 @@ public:
     bool openLineInputPopup(WebCore::HTMLInputElement*);
     bool openSelectPopup(WebCore::HTMLSelectElement*);
     void setPopupListIndex(int);
-    void setPopupListIndexes(int size, bool* selecteds);
+    void setPopupListIndexes(int size, const bool* selecteds);
 
     bool processingChange() const { return m_processingChange; }
     void setProcessingChange(bool processingChange) { m_processingChange = processingChange; }
 
     WTF::String elementText();
+
+    WebCore::IntRect boundingBoxForInputField();
 
     // IMF driven calls.
     bool setBatchEditingActive(bool);

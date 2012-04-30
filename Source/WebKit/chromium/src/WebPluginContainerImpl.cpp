@@ -33,7 +33,6 @@
 
 #include "Chrome.h"
 #include "ChromeClientImpl.h"
-#include "PluginLayerChromium.h"
 #include "ScrollbarGroup.h"
 #include "platform/WebClipboard.h"
 #include "WebCursorInfo.h"
@@ -328,23 +327,31 @@ void WebPluginContainerImpl::reportGeometry()
 
     m_webPlugin->updateGeometry(windowRect, clipRect, cutOutRects, isVisible());
 
-    if (m_scrollbarGroup)
+    if (m_scrollbarGroup) {
         m_scrollbarGroup->scrollAnimator()->contentsResized();
+        m_scrollbarGroup->setFrameRect(frameRect());
+    }
 }
 
-void WebPluginContainerImpl::setBackingTextureId(unsigned id)
+void WebPluginContainerImpl::setBackingTextureId(unsigned textureId)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    unsigned currId = m_platformLayer->textureId();
-    if (currId == id)
+    if (m_textureId == textureId)
         return;
 
-    m_platformLayer->setTextureId(id);
+    ASSERT(m_ioSurfaceLayer.isNull());
+
+    if (m_textureLayer.isNull())
+        m_textureLayer = WebExternalTextureLayer::create();
+    m_textureLayer.setTextureId(textureId);
+
     // If anyone of the IDs is zero we need to switch between hardware
     // and software compositing. This is done by triggering a style recalc
     // on the container element.
-    if (!(currId * id))
+    if (!m_textureId || !textureId)
         m_element->setNeedsStyleRecalc(WebCore::SyntheticStyleChange);
+
+    m_textureId = textureId;
 #endif
 }
 
@@ -352,26 +359,34 @@ void WebPluginContainerImpl::setBackingIOSurfaceId(int width,
                                                    int height,
                                                    uint32_t ioSurfaceId)
 {
-#if OS(DARWIN) && USE(ACCELERATED_COMPOSITING)
-    uint32_t currentId = m_platformLayer->getIOSurfaceId();
-    if (ioSurfaceId == currentId)
+#if USE(ACCELERATED_COMPOSITING)
+    if (ioSurfaceId == m_ioSurfaceId)
         return;
 
-    m_platformLayer->setIOSurfaceProperties(width, height, ioSurfaceId);
+    ASSERT(m_textureLayer.isNull());
+
+    if (m_ioSurfaceLayer.isNull())
+        m_ioSurfaceLayer = WebIOSurfaceLayer::create();
+    m_ioSurfaceLayer.setIOSurfaceProperties(ioSurfaceId, WebSize(width, height));
 
     // If anyone of the IDs is zero we need to switch between hardware
     // and software compositing. This is done by triggering a style recalc
     // on the container element.
-    if (!(ioSurfaceId * currentId))
+    if (!ioSurfaceId || !m_ioSurfaceId)
         m_element->setNeedsStyleRecalc(WebCore::SyntheticStyleChange);
+
+    m_ioSurfaceId = ioSurfaceId;
 #endif
 }
 
 void WebPluginContainerImpl::commitBackingTexture()
 {
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_platformLayer)
-        m_platformLayer->setNeedsDisplay();
+    if (!m_textureLayer.isNull())
+        m_textureLayer.invalidate();
+
+    if (!m_ioSurfaceLayer.isNull())
+        m_ioSurfaceLayer.invalidate();
 #endif
 }
 
@@ -438,8 +453,11 @@ void WebPluginContainerImpl::zoomLevelChanged(double zoomLevel)
 void WebPluginContainerImpl::setOpaque(bool opaque)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_platformLayer)
-        m_platformLayer->setOpaque(opaque);
+    if (!m_textureLayer.isNull())
+        m_textureLayer.setOpaque(opaque);
+
+    if (!m_ioSurfaceLayer.isNull())
+        m_ioSurfaceLayer.setOpaque(opaque);
 #endif
 }
 
@@ -451,10 +469,10 @@ bool WebPluginContainerImpl::isRectTopmost(const WebRect& rect)
 
     // hitTestResultAtPoint() takes a padding rectangle.
     // FIXME: We'll be off by 1 when the width or height is even.
-    IntRect windowRect = convertToContainingWindow(static_cast<IntRect>(rect));
-    LayoutPoint center = windowRect.center();
+    IntRect documentRect(x() + rect.x, y() + rect.y, rect.width, rect.height);
+    LayoutPoint center = documentRect.center();
     // Make the rect we're checking (the point surrounded by padding rects) contained inside the requested rect. (Note that -1/2 is 0.)
-    LayoutSize padding((windowRect.width() - 1) / 2, (windowRect.height() - 1) / 2);
+    LayoutSize padding((documentRect.width() - 1) / 2, (documentRect.height() - 1) / 2);
     HitTestResult result =
         page->mainFrame()->eventHandler()->hitTestResultAtPoint(center, false, false, DontHitTestScrollbars, HitTestRequest::ReadOnly | HitTestRequest::Active, padding);
     const HitTestResult::NodeSet& nodes = result.rectBasedTestResult();
@@ -514,15 +532,18 @@ void WebPluginContainerImpl::willDestroyPluginLoadObserver(WebPluginLoadObserver
 #if USE(ACCELERATED_COMPOSITING)
 WebCore::LayerChromium* WebPluginContainerImpl::platformLayer() const
 {
-    return (m_platformLayer->textureId() || m_platformLayer->getIOSurfaceId()) ? m_platformLayer.get() : 0;
+    if (m_textureId)
+        return m_textureLayer.unwrap<LayerChromium>();
+    if (m_ioSurfaceId)
+        return m_ioSurfaceLayer.unwrap<LayerChromium>();
+    return 0;
 }
 #endif
-
 
 ScrollbarGroup* WebPluginContainerImpl::scrollbarGroup()
 {
     if (!m_scrollbarGroup)
-        m_scrollbarGroup = adoptPtr(new ScrollbarGroup(m_element->document()->frame()->view()));
+        m_scrollbarGroup = adoptPtr(new ScrollbarGroup(m_element->document()->frame()->view(), frameRect()));
     return m_scrollbarGroup.get();
 }
 
@@ -555,7 +576,8 @@ WebPluginContainerImpl::WebPluginContainerImpl(WebCore::HTMLPlugInElement* eleme
     , m_element(element)
     , m_webPlugin(webPlugin)
 #if USE(ACCELERATED_COMPOSITING)
-    , m_platformLayer(PluginLayerChromium::create())
+    , m_textureId(0)
+    , m_ioSurfaceId(0)
 #endif
 {
 }

@@ -16,6 +16,8 @@ QT += declarative quick quick-private
 
 CONFIG += staticlib
 
+RESOURCES += $$PWD/WebKit2.qrc
+
 HEADERS += \
     Platform/CoreIPC/ArgumentDecoder.h \
     Platform/CoreIPC/ArgumentEncoder.h \
@@ -34,6 +36,7 @@ HEADERS += \
     Platform/SharedMemory.h \
     Platform/WorkQueue.h \
     PluginProcess/PluginControllerProxy.h \
+    PluginProcess/PluginCreationParameters.h \
     PluginProcess/PluginProcess.h \
     PluginProcess/WebProcessConnection.h \
     Shared/API/c/WKBase.h \
@@ -64,6 +67,7 @@ HEADERS += \
     Shared/API/c/qt/WKImageQt.h \
     Shared/APIClientTraits.h \
     Shared/ShareableBitmap.h \
+    Shared/ShareableSurface.h \
     Shared/CacheModel.h \
     Shared/ChildProcess.h \
     Shared/DictionaryPopupInfo.h \
@@ -81,11 +85,13 @@ HEADERS += \
     Shared/OriginAndDatabases.h \
     Shared/PlatformPopupMenuData.h \
     Shared/PrintInfo.h \
+    Shared/ProcessExecutablePath.h \
     Shared/SameDocumentNavigationType.h \
     Shared/SecurityOriginData.h \
     Shared/SessionState.h \
     Shared/StatisticsData.h \
     Shared/StringPairVector.h \
+    Shared/SurfaceUpdateInfo.h \
     Shared/UpdateInfo.h \
     Shared/UserMessageCoders.h \
     Shared/VisitedLinkTable.h \
@@ -202,6 +208,11 @@ HEADERS += \
     UIProcess/GenericCallback.h \
     UIProcess/GeolocationPermissionRequestManagerProxy.h \
     UIProcess/GeolocationPermissionRequestProxy.h \
+    UIProcess/InspectorServer/WebInspectorServer.h \
+    UIProcess/InspectorServer/WebSocketServer.h \
+    UIProcess/InspectorServer/WebSocketServerClient.h \
+    UIProcess/InspectorServer/WebSocketServerConnection.h \
+    UIProcess/InspectorServer/qt/WebSocketServerQt.h \
     UIProcess/Launcher/ProcessLauncher.h \
     UIProcess/Launcher/ThreadLauncher.h \
     UIProcess/LayerTreeHostProxy.h \
@@ -275,7 +286,6 @@ HEADERS += \
     UIProcess/qt/QtWebPagePolicyClient.h \
     UIProcess/qt/QtWebPageSGNode.h \
     UIProcess/qt/QtWebPageUIClient.h \
-    UIProcess/qt/QtFlickProvider.h \
     UIProcess/qt/QtViewportInteractionEngine.h \
     UIProcess/qt/QtWebUndoController.h \
     UIProcess/qt/QtWebIconDatabaseClient.h \
@@ -305,6 +315,7 @@ HEADERS += \
     WebProcess/InjectedBundle/DOM/InjectedBundleRangeHandle.h \
     WebProcess/InjectedBundle/InjectedBundle.h \
     WebProcess/InjectedBundle/InjectedBundleClient.h \
+    WebProcess/InjectedBundle/InjectedBundleDOMWindowExtension.h \
     WebProcess/InjectedBundle/InjectedBundleHitTestResult.h \
     WebProcess/InjectedBundle/InjectedBundleNavigationAction.h \
     WebProcess/InjectedBundle/InjectedBundlePageContextMenuClient.h \
@@ -355,6 +366,7 @@ HEADERS += \
     WebProcess/WebPage/FindController.h \
     WebProcess/WebPage/TapHighlightController.h \
     WebProcess/WebPage/PageOverlay.h \
+    WebProcess/WebPage/UpdateAtlas.h \
     WebProcess/WebPage/WebContextMenu.h \
     WebProcess/WebPage/WebFrame.h \
     WebProcess/WebPage/WebInspector.h \
@@ -362,6 +374,7 @@ HEADERS += \
     WebProcess/WebPage/WebPage.h \
     WebProcess/WebPage/WebPageGroupProxy.h \
     WebProcess/WebPage/WebUndoStep.h \
+    WebProcess/WebPage/qt/LayerTreeHostQt.h \
     WebProcess/WebConnectionToUIProcess.h \
     WebProcess/WebProcess.h \
     WebProcess/qt/QtBuiltinBundle.h \
@@ -382,6 +395,7 @@ SOURCES += \
     Platform/WorkQueue.cpp \
     Platform/qt/ModuleQt.cpp \
     PluginProcess/PluginControllerProxy.cpp \
+    PluginProcess/PluginCreationParameters.cpp \
     PluginProcess/PluginProcess.cpp \
     PluginProcess/WebProcessConnection.cpp \
     PluginProcess/qt/PluginControllerProxyQt.cpp \
@@ -415,6 +429,7 @@ SOURCES += \
     Shared/Plugins/Netscape/NetscapePluginModuleNone.cpp \
     Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp \
     Shared/ShareableBitmap.cpp \
+    Shared/ShareableSurface.cpp \
     Shared/Plugins/NPRemoteObjectMap.cpp \
     Shared/Plugins/NPIdentifierData.cpp \
     Shared/Plugins/NPObjectMessageReceiver.cpp \
@@ -436,6 +451,7 @@ SOURCES += \
     Shared/SecurityOriginData.cpp \
     Shared/SessionState.cpp \
     Shared/StatisticsData.cpp \
+    Shared/SurfaceUpdateInfo.cpp \
     Shared/UpdateInfo.cpp \
     Shared/VisitedLinkTable.cpp \
     Shared/WebBackForwardListItem.cpp \
@@ -474,6 +490,7 @@ SOURCES += \
     Shared/qt/NativeWebKeyboardEventQt.cpp \
     Shared/qt/NativeWebMouseEventQt.cpp \
     Shared/qt/NativeWebWheelEventQt.cpp \
+    Shared/qt/ProcessExecutablePathQt.cpp \
     Shared/qt/WebCoreArgumentCodersQt.cpp \
     Shared/qt/WebEventFactoryQt.cpp \
     Shared/qt/QtNetworkReplyData.cpp \
@@ -537,6 +554,11 @@ SOURCES += \
     UIProcess/FindIndicator.cpp \
     UIProcess/GeolocationPermissionRequestManagerProxy.cpp \
     UIProcess/GeolocationPermissionRequestProxy.cpp \
+    UIProcess/InspectorServer/WebInspectorServer.cpp \
+    UIProcess/InspectorServer/WebSocketServer.cpp \
+    UIProcess/InspectorServer/WebSocketServerConnection.cpp \
+    UIProcess/InspectorServer/qt/WebInspectorServerQt.cpp \
+    UIProcess/InspectorServer/qt/WebSocketServerQt.cpp \
     UIProcess/Launcher/ProcessLauncher.cpp \
     UIProcess/Launcher/ThreadLauncher.cpp \
     UIProcess/Launcher/qt/ProcessLauncherQt.cpp \
@@ -612,7 +634,6 @@ SOURCES += \
     UIProcess/qt/QtWebPageSGNode.cpp \
     UIProcess/qt/QtWebPageUIClient.cpp \
     UIProcess/qt/TextCheckerQt.cpp \
-    UIProcess/qt/QtFlickProvider.cpp \
     UIProcess/qt/QtViewportInteractionEngine.cpp \
     UIProcess/qt/WebContextMenuProxyQt.cpp \
     UIProcess/qt/WebContextQt.cpp \
@@ -638,6 +659,7 @@ SOURCES += \
     WebProcess/InjectedBundle/API/c/WKBundle.cpp \
     WebProcess/InjectedBundle/API/c/WKBundleBackForwardList.cpp \
     WebProcess/InjectedBundle/API/c/WKBundleBackForwardListItem.cpp \
+    WebProcess/InjectedBundle/API/c/WKBundleDOMWindowExtension.cpp \
     WebProcess/InjectedBundle/API/c/WKBundleFrame.cpp \
     WebProcess/InjectedBundle/API/c/WKBundleHitTestResult.cpp \
     WebProcess/InjectedBundle/API/c/WKBundleInspector.cpp \
@@ -653,6 +675,7 @@ SOURCES += \
     WebProcess/InjectedBundle/InjectedBundleBackForwardList.cpp \
     WebProcess/InjectedBundle/InjectedBundleBackForwardListItem.cpp \
     WebProcess/InjectedBundle/InjectedBundleClient.cpp \
+    WebProcess/InjectedBundle/InjectedBundleDOMWindowExtension.cpp \
     WebProcess/InjectedBundle/InjectedBundleHitTestResult.cpp \
     WebProcess/InjectedBundle/InjectedBundleNavigationAction.cpp \
     WebProcess/InjectedBundle/InjectedBundlePageContextMenuClient.cpp \
@@ -715,6 +738,7 @@ SOURCES += \
     WebProcess/WebPage/LayerTreeHost.cpp \
     WebProcess/WebPage/PageOverlay.cpp \
     WebProcess/WebPage/TiledBackingStoreRemoteTile.cpp \
+    WebProcess/WebPage/UpdateAtlas.cpp \
     WebProcess/WebPage/WebBackForwardListProxy.cpp \
     WebProcess/WebPage/WebContextMenu.cpp \
     WebProcess/WebPage/WebFrame.cpp \
@@ -769,6 +793,8 @@ contains(DEFINES, ENABLE_GEOLOCATION=1): QT += location
 
 plugin_backend_xlib {
     DEFINES += XP_UNIX
+    PKGCONFIG += x11
+    DEFINES += MOZ_X11
 }
 
 include(DerivedSources.pri)

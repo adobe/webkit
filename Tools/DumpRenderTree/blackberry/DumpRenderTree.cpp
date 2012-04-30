@@ -77,6 +77,7 @@ bool waitForPolicy = false;
 // FIXME: Assuming LayoutTests has been copied to /developer/LayoutTests/
 static const char* const kSDCLayoutTestsURI = "file:///developer/LayoutTests/";
 static const char* httpTestSyntax = "http/tests/";
+static const char* localTestSyntax = "local/";
 static const char* httpPrefixURL = "http://127.0.0.1:8000/";
 
 using namespace std;
@@ -252,7 +253,6 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting()
     settings->setFrameFlatteningEnabled(false);
     settings->setMaximumPagesInCache(0);
     settings->setPluginsEnabled(true);
-    settings->setUserScalable(true);
     // Apply new settings to current page, see more in the destructor of WebSettingsTransaction.
     WebSettingsTransaction webSettingTransaction(settings);
 
@@ -263,6 +263,7 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting()
 
     m_page->setVirtualViewportSize(800, 600);
     m_page->resetVirtualViewportOnCommitted(false);
+    m_page->setUserScalable(true);
     m_page->setJavaScriptCanAccessClipboard(true);
 
     if (WebCore::Page* page = DumpRenderTreeSupport::corePage(m_page)) {
@@ -340,7 +341,10 @@ bool DumpRenderTree::isHTTPTest(const WTF::String& test)
 {
     if (test.length() < strlen(httpTestSyntax))
         return false;
-    return test.lower().substring(0, strlen(httpTestSyntax)) == httpTestSyntax;
+    WTF::String testLower = test.lower();
+    int lenHttpTestSyntax = strlen(httpTestSyntax);
+    return testLower.substring(0, lenHttpTestSyntax) == httpTestSyntax
+            && testLower.substring(lenHttpTestSyntax, strlen(localTestSyntax)) != localTestSyntax;
 }
 
 void DumpRenderTree::getTestsToRun()

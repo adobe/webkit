@@ -27,14 +27,8 @@
 #define QtPanGestureRecognizer_h
 
 #include "QtGestureRecognizer.h"
-
 #include <QPointF>
-#include <QScopedPointer>
-#include <QtCore/QtGlobal>
-
-QT_BEGIN_NAMESPACE
-class QTouchEvent;
-QT_END_NAMESPACE
+#include <QTouchEvent>
 
 namespace WebKit {
 
@@ -43,12 +37,14 @@ const qreal panningInitialTriggerDistanceThreshold = 5.;
 class QtPanGestureRecognizer : public QtGestureRecognizer {
 public:
     QtPanGestureRecognizer(QtWebPageEventHandler*);
-    bool recognize(const QTouchEvent*);
-    void reset();
+    bool update(const QTouchEvent::TouchPoint&, qint64 eventTimestampMillis);
+    void finish(const QTouchEvent::TouchPoint&, qint64 eventTimestampMillis);
+    void cancel();
 
 private:
-    QPointF m_firstPosition;
-    QScopedPointer<QTouchEvent> m_touchBegin;
+    QPointF m_firstScreenPosition;
+    QPointF m_lastPosition;
+    qint64 m_lastEventTimestampMillis;
 };
 
 } // namespace WebKit

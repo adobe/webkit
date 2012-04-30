@@ -45,9 +45,14 @@
 #include <wtf/RefPtr.h>
 #include <wtf/text/AtomicStringHash.h>
 
+#if ENABLE(NOTIFICATIONS)
+#include "Timer.h"
+#endif
+
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 namespace WebCore {
 
+class Dictionary;
 class NotificationCenter;
 class ResourceError;
 class ResourceResponse;
@@ -56,17 +61,25 @@ class ThreadableLoader;
 
 typedef int ExceptionCode;
 
-class Notification : public RefCounted<Notification>, public ActiveDOMObject, public ThreadableLoaderClient, public EventTarget {
+class Notification : public RefCounted<Notification>, public ActiveDOMObject, public EventTarget {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     Notification();
+#if ENABLE(LEGACY_NOTIFICATIONS)
     static PassRefPtr<Notification> create(const KURL&, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter> provider);
     static PassRefPtr<Notification> create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter> provider);
+#endif
+#if ENABLE(NOTIFICATIONS)
+    static PassRefPtr<Notification> create(ScriptExecutionContext*, const String& title, const Dictionary& options);
+#endif
     
     virtual ~Notification();
 
     void show();
-    void cancel();
+#if ENABLE(LEGACY_NOTIFICATIONS)
+    void cancel() { close(); }
+#endif
+    void close();
 
     bool isHTML() const { return m_isHTML; }
     void setHTML(bool isHTML) { m_isHTML = isHTML; }
@@ -75,14 +88,20 @@ public:
     void setURL(KURL url) { m_notificationURL = url; }
     
     KURL iconURL() const { return m_icon; }
+
     String title() const { return m_title; }
     String body() const { return m_body; }
 
     String dir() const { return m_direction; }
     void setDir(const String& dir) { m_direction = dir; }
-    
-    String replaceId() const { return m_replaceId; }
-    void setReplaceId(const String& replaceId) { m_replaceId = replaceId; }
+
+#if ENABLE(LEGACY_NOTIFICATIONS)
+    String replaceId() const { return tag(); }
+    void setReplaceId(const String& replaceId) { setTag(replaceId); }
+#endif
+
+    String tag() const { return m_tag; }
+    void setTag(const String& tag) { m_tag = tag; }
 
     TextDirection direction() const { return dir() == "rtl" ? RTL : LTR; }
 
@@ -109,23 +128,23 @@ public:
     // ActiveDOMObject interface
     virtual void contextDestroyed();
 
-    void stopLoading();
-
-    SharedBuffer* iconData() { return m_iconData.get(); }
-    void releaseIconData() { m_iconData = 0; }
+    void stopLoadingIcon();
 
     // Deprecated. Use functions from NotificationCenter.
     void detachPresenter() { }
 
-    virtual void didReceiveResponse(unsigned long, const ResourceResponse&);
-    virtual void didReceiveData(const char* data, int dataLength);
-    virtual void didFinishLoading(unsigned long identifier, double finishTime);
-    virtual void didFail(const ResourceError&);
-    virtual void didFailRedirectCheck();
+    void finalize();
 
 private:
+#if ENABLE(LEGACY_NOTIFICATIONS)
     Notification(const KURL&, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter>);
     Notification(const String& title, const String& body, const String& iconURI, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter>);
+#endif
+#if ENABLE(NOTIFICATIONS)
+    Notification(ScriptExecutionContext*, const String& title);
+#endif
+
+    void setBody(const String& body) { m_body = body; }
 
     // EventTarget interface
     virtual void refEventTarget() { ref(); }
@@ -133,9 +152,13 @@ private:
     virtual EventTargetData* eventTargetData();
     virtual EventTargetData* ensureEventTargetData();
 
-    void startLoading();
-    void finishLoading();
+    void startLoadingIcon();
+    void finishLoadingIcon();
 
+#if ENABLE(NOTIFICATIONS)
+    void taskTimerFired(Timer<Notification>*);
+#endif
+    
     bool m_isHTML;
 
     // Text notifications.
@@ -146,13 +169,12 @@ private:
     KURL m_notificationURL;
 
     String m_direction;
-    String m_replaceId;
+    String m_tag;
 
     enum NotificationState {
         Idle = 0,
-        Loading = 1,
-        Showing = 2,
-        Cancelled = 3
+        Showing = 1,
+        Closed = 2,
     };
 
     NotificationState m_state;
@@ -161,8 +183,9 @@ private:
     
     EventTargetData m_eventTargetData;
 
-    RefPtr<ThreadableLoader> m_loader;
-    RefPtr<SharedBuffer> m_iconData;
+#if ENABLE(NOTIFICATIONS)
+    OwnPtr<Timer<Notification> > m_taskTimer;
+#endif
 };
 
 } // namespace WebCore

@@ -40,7 +40,6 @@
 #include "SkRect.h"
 
 namespace WebCore {
-class AffineTransform;
 class PlatformContextSkia;
 
 // This class is an encapsulation of functionality for PlatformContextSkia, and its methods are mirrored
@@ -53,20 +52,48 @@ public:
     // The resulting opaque region as a single rect.
     IntRect asRect() const;
 
-    // FIXME: make all the PlatformContextSkia* into a const pointer when Skia fixes LayerIter's SkCanvas*.
+    void pushCanvasLayer(const SkPaint*);
+    void popCanvasLayer(const PlatformContextSkia*);
 
-    void didDrawRect(PlatformContextSkia*, const AffineTransform&, const SkRect&, const SkPaint&, const SkBitmap*);
-    void didDrawPath(PlatformContextSkia*, const AffineTransform&, const SkPath&, const SkPaint&);
-    void didDrawPoints(PlatformContextSkia*, const AffineTransform&, SkCanvas::PointMode, int numPoints, const SkPoint[], const SkPaint&);
-    void didDrawBounded(PlatformContextSkia*, const AffineTransform&, const SkRect&, const SkPaint&);
+    void setImageMask(const SkRect& imageOpaqueRect);
+
+    void didDrawRect(const PlatformContextSkia*, const SkRect&, const SkPaint&, const SkBitmap* sourceBitmap);
+    void didDrawPath(const PlatformContextSkia*, const SkPath&, const SkPaint&);
+    void didDrawPoints(const PlatformContextSkia*, SkCanvas::PointMode, int numPoints, const SkPoint[], const SkPaint&);
+    void didDrawBounded(const PlatformContextSkia*, const SkRect&, const SkPaint&);
+
+    enum DrawType {
+        FillOnly,
+        FillOrStroke
+    };
+
+    struct CanvasLayerState {
+        CanvasLayerState()
+            : hasImageMask(false)
+            , opaqueRect(SkRect::MakeEmpty())
+        { }
+
+        SkPaint paint;
+
+        // An image mask is being applied to the layer.
+        bool hasImageMask;
+        // The opaque area in the image mask.
+        SkRect imageOpaqueRect;
+
+        SkRect opaqueRect;
+    };
 
 private:
-    void didDraw(PlatformContextSkia*, const AffineTransform&, const SkRect&, const SkPaint&, bool drawsOpaque, bool fillsBounds);
-    void didDrawUnbounded(const SkPaint&, bool drawsOpaque);
+    void didDraw(const PlatformContextSkia*, const SkRect&, const SkPaint&, const SkBitmap* sourceBitmap, bool fillsBounds, DrawType);
+    void didDrawUnbounded(const PlatformContextSkia*, const SkPaint&, DrawType);
+    void applyOpaqueRegionFromLayer(const PlatformContextSkia*, const SkRect& layerOpaqueRect, const SkPaint&);
     void markRectAsOpaque(const SkRect&);
     void markRectAsNonOpaque(const SkRect&);
+    void markAllAsNonOpaque();
 
     SkRect m_opaqueRect;
+
+    Vector<CanvasLayerState, 3> m_canvasLayerStack;
 };
 
 }

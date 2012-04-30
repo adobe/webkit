@@ -27,13 +27,14 @@
 #include "NodeRenderingContext.h"
 
 #include "ContainerNode.h"
+#include "FlowThreadController.h"
 #include "HTMLContentElement.h"
 #include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "HTMLShadowElement.h"
 #include "Node.h"
-#include "RenderFlowThread.h"
 #include "RenderFullScreen.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "ShadowRoot.h"
@@ -100,7 +101,11 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
                 m_phase = AttachingNotFallbacked;
             else
                 m_phase = AttachingFallbacked;
-            m_parentNodeForRenderingAndStyle = NodeRenderingContext(parent).parentNodeForRenderingAndStyle();
+
+            if (toInsertionPoint(parent)->isActive())
+                m_parentNodeForRenderingAndStyle = NodeRenderingContext(parent).parentNodeForRenderingAndStyle();
+            else
+                m_parentNodeForRenderingAndStyle = parent;
             return;
         }
     }
@@ -201,7 +206,7 @@ static inline RenderObject* firstRendererOf(Node* node)
             return node->renderer();
         }
 
-        if (isInsertionPoint(node)) {
+        if (isInsertionPoint(node) && toInsertionPoint(node)->isActive()) {
             if (RenderObject* first = firstRendererOfInsertionPoint(toInsertionPoint(node)))
                 return first;
         }
@@ -219,7 +224,7 @@ static inline RenderObject* lastRendererOf(Node* node)
                 continue;
             return node->renderer();
         }
-        if (isInsertionPoint(node)) {
+        if (isInsertionPoint(node) && toInsertionPoint(node)->isActive()) {
             if (RenderObject* last = lastRendererOfInsertionPoint(toInsertionPoint(node)))
                 return last;
         }
@@ -317,6 +322,10 @@ void NodeRenderingContext::moveToFlowThreadIfNeeded()
     if (!m_node->isElementNode() || !m_style || m_style->flowThread().isEmpty())
         return;
 
+    // FIXME: Do not collect elements if they are in shadow tree.
+    if (m_node->isInShadowTree())
+        return;
+
 #if ENABLE(SVG)
     // Allow only svg root elements to be directly collected by a render flow thread.
     if (m_node->isSVGElement()
@@ -326,7 +335,9 @@ void NodeRenderingContext::moveToFlowThreadIfNeeded()
 
     m_flowThread = m_style->flowThread();
     ASSERT(m_node->document()->renderView());
-    m_parentFlowRenderer = m_node->document()->renderView()->ensureRenderFlowThreadWithName(m_flowThread);
+    FlowThreadController* flowThreadController = m_node->document()->renderView()->flowThreadController();
+    m_parentFlowRenderer = flowThreadController->ensureRenderFlowThreadWithName(m_flowThread);
+    flowThreadController->registerNamedFlowContentNode(m_node, m_parentFlowRenderer);
 }
 
 NodeRendererFactory::NodeRendererFactory(Node* node)

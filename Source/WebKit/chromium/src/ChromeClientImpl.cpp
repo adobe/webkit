@@ -34,7 +34,7 @@
 
 #include "AXObjectCache.h"
 #include "AccessibilityObject.h"
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #include "ColorChooserClient.h"
 #include "ColorChooserProxy.h"
@@ -52,6 +52,7 @@
 #include "FrameView.h"
 #include "Geolocation.h"
 #include "GraphicsLayer.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HitTestResult.h"
 #include "Icon.h"
@@ -68,11 +69,12 @@
 #include "SearchPopupMenuChromium.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "TextFieldDecorationElement.h"
 #if USE(V8)
 #include "V8Proxy.h"
 #endif
 #include "WebAccessibilityObject.h"
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "WebColorChooser.h"
 #include "WebColorChooserClientImpl.h"
 #endif
@@ -99,6 +101,7 @@
 #include "WebWindowFeatures.h"
 #include "WindowFeatures.h"
 #include "WrappedResourceRequest.h"
+#include <public/Platform.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringConcatenate.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -315,7 +318,7 @@ WebNavigationPolicy ChromeClientImpl::getNavigationPolicy()
         policy = WebNavigationPolicyNewBackgroundTab;
     return policy;
 }
- 
+
 void ChromeClientImpl::show()
 {
     if (!m_webView->client())
@@ -642,11 +645,13 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
     if (!m_webView->settings()->viewportEnabled() || !m_webView->isFixedLayoutModeEnabled() || !m_webView->client() || !m_webView->page())
         return;
 
+    bool useDefaultDeviceScaleFactor = false;
     ViewportArguments args;
-    if (arguments == args)
+    if (arguments == args) {
         // Default viewport arguments passed in. This is a signal to reset the viewport.
         args.width = ViewportArguments::ValueDesktopWidth;
-    else
+        useDefaultDeviceScaleFactor = true;
+    } else
         args = arguments;
 
     FrameView* frameView = m_webView->mainFrameImpl()->frameView();
@@ -671,7 +676,10 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
 
     // FIXME: Investigate the impact this has on layout/rendering if any.
     // This exposes the correct device scale to javascript and media queries.
-    m_webView->setDeviceScaleFactor(computed.devicePixelRatio);
+    if (useDefaultDeviceScaleFactor && settings->defaultDeviceScaleFactor())
+        m_webView->setDeviceScaleFactor(settings->defaultDeviceScaleFactor());
+    else
+        m_webView->setDeviceScaleFactor(computed.devicePixelRatio);
     m_webView->setPageScaleFactorLimits(computed.minimumScale, computed.maximumScale);
     m_webView->setPageScaleFactorPreservingScrollOffset(computed.initialScale * computed.devicePixelRatio);
 #endif
@@ -698,7 +706,7 @@ void ChromeClientImpl::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64
     ASSERT_NOT_REACHED();
 }
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 PassOwnPtr<ColorChooser> ChromeClientImpl::createColorChooser(ColorChooserClient* chooserClient, const Color& initialColor)
 {
     WebViewClient* client = m_webView->client();
@@ -969,7 +977,7 @@ bool ChromeClientImpl::selectItemAlignmentFollowsMenuWritingDirection()
 
 bool ChromeClientImpl::hasOpenedPopup() const
 {
-    return !!m_webView->selectPopup();
+    return m_webView->hasOpenedPopup();
 }
 
 PassRefPtr<PopupMenu> ChromeClientImpl::createPopupMenu(PopupMenuClient* client) const
@@ -985,6 +993,41 @@ PassRefPtr<SearchPopupMenu> ChromeClientImpl::createSearchPopupMenu(PopupMenuCli
     return adoptRef(new SearchPopupMenuChromium(client));
 }
 
+#if ENABLE(PAGE_POPUP)
+PagePopup* ChromeClientImpl::openPagePopup(PagePopupClient* client, const IntRect& originBoundsInRootView)
+{
+    return m_webView->openPagePopup(client, originBoundsInRootView);
+}
+
+void ChromeClientImpl::closePagePopup(PagePopup* popup)
+{
+    m_webView->closePagePopup(popup);
+}
+#endif
+
+bool ChromeClientImpl::willAddTextFieldDecorationsTo(HTMLInputElement* input)
+{
+    ASSERT(input);
+    const Vector<OwnPtr<TextFieldDecorator> >& decorators = m_webView->textFieldDecorators();
+    for (unsigned i = 0; i < decorators.size(); ++i) {
+        if (decorators[i]->willAddDecorationTo(input))
+            return true;
+    }
+    return false;
+}
+
+void ChromeClientImpl::addTextFieldDecorationsTo(HTMLInputElement* input)
+{
+    ASSERT(willAddTextFieldDecorationsTo(input));
+    const Vector<OwnPtr<TextFieldDecorator> >& decorators = m_webView->textFieldDecorators();
+    for (unsigned i = 0; i < decorators.size(); ++i) {
+        if (!decorators[i]->willAddDecorationTo(input))
+            continue;
+        RefPtr<TextFieldDecorationElement> decoration = TextFieldDecorationElement::create(input->document(), decorators[i].get());
+        decoration->decorate(input);
+    }
+}
+
 bool ChromeClientImpl::shouldRunModalDialogDuringPageDismissal(const DialogType& dialogType, const String& dialogMessage, FrameLoader::PageDismissalType dismissalType) const
 {
     const char* kDialogs[] = {"alert", "confirm", "prompt", "showModalDialog"};
@@ -995,7 +1038,7 @@ bool ChromeClientImpl::shouldRunModalDialogDuringPageDismissal(const DialogType&
     int dismissal = static_cast<int>(dismissalType) - 1; // Exclude NoDismissal.
     ASSERT(0 <= dismissal && dismissal < static_cast<int>(arraysize(kDismissals)));
 
-    PlatformSupport::histogramEnumeration("Renderer.ModalDialogsDuringPageDismissal", dismissal * arraysize(kDialogs) + dialog, arraysize(kDialogs) * arraysize(kDismissals));
+    WebKit::Platform::current()->histogramEnumeration("Renderer.ModalDialogsDuringPageDismissal", dismissal * arraysize(kDialogs) + dialog, arraysize(kDialogs) * arraysize(kDismissals));
 
     m_webView->mainFrame()->addMessageToConsole(WebConsoleMessage(WebConsoleMessage::LevelError, makeString("Blocked ", kDialogs[dialog], "('", dialogMessage, "') during ", kDismissals[dismissal], ".")));
 

@@ -9,7 +9,6 @@ SET(WTF_HEADERS
     Bitmap.h
     BoundsCheckedPointer.h
     BumpPointerAllocator.h
-    ByteArray.h
     Compiler.h
     Complex.h
     CryptographicallyRandomNumber.h
@@ -136,7 +135,6 @@ SET(WTF_SOURCES
     ArrayBufferView.cpp
     Assertions.cpp
     BitVector.cpp
-    ByteArray.cpp
     CryptographicallyRandomNumber.cpp
     CurrentTime.cpp
     DateMath.cpp
@@ -187,18 +185,17 @@ SET(WTF_SOURCES
 SET(WTF_INCLUDE_DIRECTORIES
     "${WTF_DIR}"
     "${WTF_DIR}/wtf"
-    "${WTF_DIR}/wtf/unicode"
     "${WTF_DIR}/wtf/dtoa"
+    "${WTF_DIR}/wtf/threads"
+    "${WTF_DIR}/wtf/unicode"
     "${THIRDPARTY_DIR}"
     "${CMAKE_BINARY_DIR}"
 )
 
-IF (ENABLE_FAST_MALLOC)
+IF (NOT USE_SYSTEM_MALLOC)
     LIST(APPEND WTF_SOURCES
         TCSystemAlloc.cpp
     )
-ELSE ()
-    ADD_DEFINITIONS(-DUSE_SYSTEM_MALLOC=1)
 ENDIF()
 
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
@@ -208,6 +205,7 @@ INCLUDE_DIRECTORIES(${WTF_INCLUDE_DIRECTORIES})
 ADD_DEFINITIONS(-DBUILDING_WTF)
 ADD_LIBRARY(${WTF_LIBRARY_NAME} STATIC ${WTF_HEADERS} ${WTF_SOURCES})
 TARGET_LINK_LIBRARIES(${WTF_LIBRARY_NAME} ${WTF_LIBRARIES})
+SET_TARGET_PROPERTIES(${WTF_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")
 
 IF (WTF_LINK_FLAGS)
     ADD_TARGET_PROPERTIES(${WTF_LIBRARY_NAME} LINK_FLAGS "${WTF_LINK_FLAGS}")

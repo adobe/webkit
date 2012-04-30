@@ -43,6 +43,7 @@
 #include "TextBreakIterator.h"
 #include "VisiblePosition.h"
 #include "visible_units.h"
+#include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
 
 #if USE(ICU_UNICODE) && !UCONFIG_NO_COLLATION
@@ -261,6 +262,8 @@ TextIterator::TextIterator()
     , m_handledFirstLetter(false)
     , m_ignoresStyleVisibility(false)
     , m_emitsObjectReplacementCharacters(false)
+    , m_stopsOnFormControls(false)
+    , m_shouldStop(false)
 {
 }
 
@@ -282,6 +285,8 @@ TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
     , m_handledFirstLetter(false)
     , m_ignoresStyleVisibility(behavior & TextIteratorIgnoresStyleVisibility)
     , m_emitsObjectReplacementCharacters(behavior & TextIteratorEmitsObjectReplacementCharacters)
+    , m_stopsOnFormControls(behavior & TextIteratorStopsOnFormControls)
+    , m_shouldStop(false)
 {
     if (!r)
         return;
@@ -341,6 +346,9 @@ TextIterator::~TextIterator()
 
 void TextIterator::advance()
 {
+    if (m_shouldStop)
+        return;
+
     // reset the run information
     m_positionNode = 0;
     m_textLength = 0;
@@ -373,6 +381,9 @@ void TextIterator::advance()
     }
 
     while (m_node && m_node != m_pastEndNode) {
+        if (!m_shouldStop && m_stopsOnFormControls && HTMLFormControlElement::enclosingFormControlElement(m_node))
+            m_shouldStop = true;
+
         // if the range ends at offset 0 of an element, represent the
         // position, but not the content, of that element e.g. if the
         // node is a blockflow element, emit a newline that
@@ -1073,6 +1084,8 @@ SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator()
     , m_singleCharacterBuffer(0)
     , m_havePassedStartNode(false)
     , m_shouldHandleFirstLetter(false)
+    , m_stopsOnFormControls(false)
+    , m_shouldStop(false)
 {
 }
 
@@ -1096,8 +1109,10 @@ SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range* r,
     , m_singleCharacterBuffer(0)
     , m_havePassedStartNode(false)
     , m_shouldHandleFirstLetter(false)
+    , m_stopsOnFormControls(behavior & TextIteratorStopsOnFormControls)
+    , m_shouldStop(false)
 {
-    ASSERT(m_behavior == TextIteratorDefaultBehavior);
+    ASSERT(m_behavior == TextIteratorDefaultBehavior || m_behavior == TextIteratorStopsOnFormControls);
 
     if (!r)
         return;
@@ -1149,6 +1164,14 @@ SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range* r,
 void SimplifiedBackwardsTextIterator::advance()
 {
     ASSERT(m_positionNode);
+
+    if (m_shouldStop)
+        return;
+
+    if (m_stopsOnFormControls && HTMLFormControlElement::enclosingFormControlElement(m_node)) {
+        m_shouldStop = true;
+        return;
+    }
 
     m_positionNode = 0;
     m_textLength = 0;

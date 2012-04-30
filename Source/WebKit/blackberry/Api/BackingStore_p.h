@@ -26,10 +26,9 @@
 #include "Timer.h"
 #include <BlackBerryPlatformGraphics.h>
 #include <BlackBerryPlatformGuardedPointer.h>
+#include <pthread.h>
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
-
-#include <pthread.h>
 
 namespace WebCore {
 class IntRect;
@@ -99,7 +98,6 @@ class BackingStorePrivate : public BlackBerry::Platform::GuardedPointerBase {
 public:
     enum TileMatrixDirection { Horizontal, Vertical };
     BackingStorePrivate();
-    ~BackingStorePrivate();
 
     // Returns whether direct rendering is explicitly turned on or is
     // required because the surface pool is not large enough to meet
@@ -200,7 +198,6 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     void blendCompositingSurface(const Platform::IntRect& dstRect);
     void clearCompositingSurface();
-    bool drawSubLayers();
     bool drawLayersOnCommitIfNeeded();
     void drawAndBlendLayersForDirectRendering(const Platform::IntRect& dirtyRect);
     // WebPage will call this when drawing layers to tell us we don't need to
@@ -298,6 +295,7 @@ public:
 
     // This takes transformed contents coordinates.
     void renderContents(BlackBerry::Platform::Graphics::Buffer*, const Platform::IntPoint& surfaceOffset, const Platform::IntRect& contentsRect) const;
+    void renderContents(BlackBerry::Platform::Graphics::Drawable* /*drawable*/, double /*scale*/, const Platform::IntRect& /*contentsRect*/) const;
 
     void blitToWindow(const Platform::IntRect& dstRect, const BlackBerry::Platform::Graphics::Buffer* srcBuffer, const Platform::IntRect& srcRect, bool blend, unsigned char globalAlpha);
     void checkerWindow(const Platform::IntRect& dstRect, const Platform::IntPoint& contentsOrigin, double contentsScale);
@@ -368,6 +366,9 @@ public:
     mutable bool m_needsDrawLayersOnCommit; // Not thread safe, WebKit thread only
     bool m_isDirectRenderingAnimationMessageScheduled;
 #endif
+
+protected:
+    virtual ~BackingStorePrivate();
 };
 } // namespace WebKit
 } // namespace BlackBerry

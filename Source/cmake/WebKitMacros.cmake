@@ -89,7 +89,7 @@ MACRO (GENERATE_DOM_NAMES _namespace _attrs)
     ADD_CUSTOM_COMMAND(
         OUTPUT  ${_outputfiles}
         DEPENDS ${NAMES_GENERATOR} ${SCRIPTS_BINDINGS} ${_attrs} ${_tags}
-        COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${NAMES_GENERATOR} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --outputDir ${DERIVED_SOURCES_WEBCORE_DIR} ${_arguments} ${_additionArguments}
+        COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${NAMES_GENERATOR} --preprocessor "${CODE_GENERATOR_PREPROCESSOR_WITH_LINEMARKERS}" --outputDir ${DERIVED_SOURCES_WEBCORE_DIR} ${_arguments} ${_additionArguments}
         VERBATIM)
 ENDMACRO ()
 
@@ -169,4 +169,52 @@ MACRO (WEBKIT_WRAP_SOURCELIST)
     ENDFOREACH ()
 
     SOURCE_GROUP("DerivedSources" REGULAR_EXPRESSION "${DERIVED_SOURCES_WEBCORE_DIR}")
+ENDMACRO ()
+
+
+MACRO (WEBKIT_CREATE_FORWARDING_HEADER _target_directory _file)
+    GET_FILENAME_COMPONENT(_absolute "${_file}" ABSOLUTE)
+    GET_FILENAME_COMPONENT(_name "${_file}" NAME)
+    SET(_content "#include \"${_absolute}\"\n")
+    SET(_filename "${_target_directory}/${_name}")
+
+    IF (EXISTS "${_filename}")
+        FILE(READ "${_filename}" _old_content)
+    ENDIF ()
+
+    IF (NOT _old_content STREQUAL _content)
+        FILE(WRITE "${_filename}" "${_content}")
+    ENDIF ()
+ENDMACRO ()
+
+MACRO (WEBKIT_CREATE_FORWARDING_HEADERS _framework)
+    SET(_processing_directories 0)
+    SET(_processing_files 0)
+    SET(_target_directory "${DERIVED_SOURCES_DIR}/ForwardingHeaders/${_framework}")
+
+    FILE(GLOB _files "${_target_directory}/*.h")
+    FOREACH (_file ${_files})
+        FILE(READ "${_file}" _content)
+        STRING(REGEX MATCH "^#include \"([^\"]*)\"" _matched ${_content})
+        IF (_matched AND NOT EXISTS "${CMAKE_MATCH_1}")
+           FILE(REMOVE "${_file}")
+        ENDIF()
+    ENDFOREACH ()
+
+    FOREACH (_currentArg ${ARGN})
+        IF ("${_currentArg}" STREQUAL "DIRECTORIES")
+            SET(_processing_directories 1)
+            SET(_processing_files 0)
+        ELSEIF ("${_currentArg}" STREQUAL "FILES")
+            SET(_processing_directories 0)
+            SET(_processing_files 1)
+        ELSEIF (_processing_directories)
+            FILE(GLOB _files "${_currentArg}/*.h")
+            FOREACH (_file ${_files})
+                WEBKIT_CREATE_FORWARDING_HEADER(${_target_directory} ${_file})
+            ENDFOREACH ()
+        ELSEIF (_processing_files)
+            WEBKIT_CREATE_FORWARDING_HEADER(${_target_directory} ${_currentArg})
+        ENDIF ()
+    ENDFOREACH ()
 ENDMACRO ()

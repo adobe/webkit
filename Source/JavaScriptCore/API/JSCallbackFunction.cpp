@@ -70,14 +70,14 @@ EncodedJSValue JSCallbackFunction::call(ExecState* exec)
     JSValueRef result;
     {
         APICallbackShim callbackShim(exec);
-        result = static_cast<JSCallbackFunction*>(toJS(functionRef))->m_callback(execRef, functionRef, thisObjRef, argumentCount, arguments.data(), &exception);
+        result = jsCast<JSCallbackFunction*>(toJS(functionRef))->m_callback(execRef, functionRef, thisObjRef, argumentCount, arguments.data(), &exception);
     }
     if (exception)
         throwError(exec, toJS(exec, exception));
 
     // result must be a valid JSValue.
     if (!result)
-        return throwVMTypeError(exec);
+        return JSValue::encode(jsUndefined());
 
     return JSValue::encode(toJS(exec, result));
 }

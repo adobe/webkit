@@ -34,37 +34,52 @@ namespace WebCore {
 
 class GraphicsContext3D;
 class TextureAllocator;
+class TextureCopier;
+class TextureUploader;
 
 class CCTextureUpdater {
 public:
-    CCTextureUpdater(TextureAllocator*);
+    CCTextureUpdater();
     ~CCTextureUpdater();
 
-    void append(LayerTextureUpdater::Texture*, const IntRect& sourceRect, const IntRect& destRect);
-    void appendPartial(LayerTextureUpdater::Texture*, const IntRect& sourceRect, const IntRect& destRect);
+    void appendUpdate(LayerTextureUpdater::Texture*, const IntRect& sourceRect, const IntRect& destRect);
+    void appendPartialUpdate(LayerTextureUpdater::Texture*, const IntRect& sourceRect, const IntRect& destRect);
+    void appendCopy(unsigned sourceTexture, unsigned destTexture, const IntSize&);
+    void appendManagedCopy(unsigned sourceTexture, ManagedTexture* destTexture, const IntSize&);
 
     bool hasMoreUpdates() const;
 
     // Update some textures. Returns true if more textures left to process.
-    bool update(GraphicsContext3D*, size_t count);
+    bool update(GraphicsContext3D*, TextureAllocator*, TextureCopier*, TextureUploader*, size_t count);
 
     void clear();
 
-    TextureAllocator* allocator() { return m_allocator; }
-
 private:
     struct UpdateEntry {
-        LayerTextureUpdater::Texture* m_texture;
-        IntRect m_sourceRect;
-        IntRect m_destRect;
+        LayerTextureUpdater::Texture* texture;
+        IntRect sourceRect;
+        IntRect destRect;
     };
 
-    static void append(LayerTextureUpdater::Texture*, const IntRect& sourceRect, const IntRect& destRect, Vector<UpdateEntry>&);
+    struct CopyEntry {
+        IntSize size;
+        unsigned sourceTexture;
+        unsigned destTexture;
+    };
 
-    TextureAllocator* m_allocator;
+    struct ManagedCopyEntry {
+        IntSize size;
+        unsigned sourceTexture;
+        ManagedTexture* destTexture;
+    };
+
+    static void appendUpdate(LayerTextureUpdater::Texture*, const IntRect& sourceRect, const IntRect& destRect, Vector<UpdateEntry>&);
+
     size_t m_entryIndex;
     Vector<UpdateEntry> m_entries;
     Vector<UpdateEntry> m_partialEntries;
+    Vector<CopyEntry> m_copyEntries;
+    Vector<ManagedCopyEntry> m_managedCopyEntries;
 };
 
 }

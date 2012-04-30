@@ -948,13 +948,16 @@ void DumpRenderTree::dump()
     fputs("#EOF\n", stdout);
     fputs("#EOF\n", stderr);
 
-    // FIXME: All other ports don't dump pixels, if generatePixelResults is false.
-    if (m_dumpPixels) {
-        QImage image(m_page->viewportSize(), QImage::Format_ARGB32);
-        image.fill(Qt::white);
-        QPainter painter(&image);
-        mainFrame->render(&painter);
-        painter.end();
+    if (m_dumpPixels && !m_controller->shouldDumpAsText()) {
+        QImage image;
+        if (!m_controller->isPrinting()) {
+            image = QImage(m_page->viewportSize(), QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            QPainter painter(&image);
+            mainFrame->render(&painter);
+            painter.end();
+        } else
+            image = DumpRenderTreeSupportQt::paintPagesWithBoundaries(mainFrame);
 
         QCryptographicHash hash(QCryptographicHash::Md5);
         for (int row = 0; row < image.height(); ++row)

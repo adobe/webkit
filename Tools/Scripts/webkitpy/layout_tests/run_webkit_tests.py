@@ -39,6 +39,7 @@ import sys
 from webkitpy.common.host import Host
 from webkitpy.layout_tests.controllers.manager import Manager, WorkerException
 from webkitpy.layout_tests.models import test_expectations
+from webkitpy.layout_tests.port import port_options
 from webkitpy.layout_tests.views import printing
 
 
@@ -85,7 +86,7 @@ def lint(port, options, expectations_class):
 def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdout):
     warnings = _set_up_derived_options(port, options)
 
-    printer = printing.Printer(port, options, regular_output, buildbot_output, configure_logging=True)
+    printer = printing.Printer(port, options, regular_output, buildbot_output, logger=logging.getLogger())
 
     for warning in warnings:
         _log.warning(warning)
@@ -134,13 +135,6 @@ def _set_up_derived_options(port, options):
     # We return a list of warnings to print after the printer is initialized.
     warnings = []
 
-    if options.worker_model is None:
-        options.worker_model = port.default_worker_model()
-
-    if options.worker_model == 'inline':
-        if options.child_processes and int(options.child_processes) > 1:
-            warnings.append("--worker-model=inline overrides --child-processes")
-        options.child_processes = "1"
     if not options.child_processes:
         options.child_processes = os.environ.get("WEBKIT_TEST_CHILD_PROCESSES",
                                                  str(port.default_child_processes()))
@@ -198,27 +192,7 @@ def parse_args(args=None):
 
     option_group_definitions = []
 
-    # FIXME: All of these options should be stored closer to the code which
-    # FIXME: actually uses them. configuration_options should move
-    # FIXME: to WebKitPort and be shared across all scripts.
-    option_group_definitions.append(("Configuration Options", [
-        optparse.make_option("-t", "--target", dest="configuration",
-                             help="(DEPRECATED)"),
-        # FIXME: --help should display which configuration is default.
-        optparse.make_option('--debug', action='store_const', const='Debug',
-                             dest="configuration",
-                             help='Set the configuration to Debug'),
-        optparse.make_option('--release', action='store_const',
-                             const='Release', dest="configuration",
-                             help='Set the configuration to Release'),
-        # old-run-webkit-tests also accepts -c, --configuration CONFIGURATION.
-        optparse.make_option("--platform", help="Override port/platform being tested (i.e. chromium-mac)"),
-        optparse.make_option("--chromium", action="store_const", const='chromium', dest='platform', help='Alias for --platform=chromium'),
-        optparse.make_option('--efl', action='store_const', const='efl', dest="platform", help='Alias for --platform=efl'),
-        optparse.make_option('--gtk', action='store_const', const='gtk', dest="platform", help='Alias for --platform=gtk'),
-        optparse.make_option('--qt', action='store_const', const='qt', dest="platform", help='Alias for --platform=qt'),
-    ]))
-
+    option_group_definitions.append(("Configuration options", port_options()))
     option_group_definitions.append(("Printing Options", printing.print_options()))
 
     # FIXME: These options should move onto the ChromiumPort.
@@ -332,6 +306,9 @@ def parse_args(args=None):
             default=[], help="Additional directory where to look for test "
                  "baselines (will take precendence over platform baselines). "
                  "Specify multiple times to add multiple search path entries."),
+        optparse.make_option("--additional-expectations", action="append", default=[],
+            help="Path to a test_expectations file that will override previous expectations. "
+                 "Specify multiple times for multiple sets of overrides."),
         optparse.make_option("--no-show-results", action="store_false",
             default=True, dest="show_results",
             help="Don't launch a browser with results after the tests "
@@ -407,16 +384,8 @@ def parse_args(args=None):
         optparse.make_option("--child-processes",
             help="Number of DumpRenderTrees to run in parallel."),
         # FIXME: Display default number of child processes that will run.
-        optparse.make_option("--worker-model", action="store",
-            default=None, help=("controls worker model. Valid values are "
-                                "'inline' and 'processes'.")),
-        optparse.make_option("-f", "--experimental-fully-parallel",
-            action="store_true",
+        optparse.make_option("-f", "--fully-parallel", action="store_true",
             help="run all tests in parallel"),
-        optparse.make_option("--no-experimental-fully-parallel",
-            action="store_false",
-            dest="experimental_fully_parallel",
-            help="do not run all tests in parallel"),
         optparse.make_option("--exit-after-n-failures", type="int", default=500,
             help="Exit after the first N failures instead of running all "
             "tests"),
@@ -479,6 +448,7 @@ def main():
         host = Host()
     host._initialize_scm()
     port = host.port_factory.get(options.platform, options)
+    logging.getLogger().setLevel(logging.DEBUG if options.verbose else logging.INFO)
     return run(port, options, args)
 
 

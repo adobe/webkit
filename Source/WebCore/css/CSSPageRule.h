@@ -23,42 +23,35 @@
 #define CSSPageRule_h
 
 #include "CSSRule.h"
-#include "CSSSelectorList.h"
-#include "StylePropertySet.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-class CSSSelector;
-class CSSSelectorList;
+class CSSStyleDeclaration;
+class CSSStyleSheet;
+class StyleRulePage;
+class StyleRuleCSSStyleDeclaration;
 
 class CSSPageRule : public CSSRule {
 public:
-    static PassRefPtr<CSSPageRule> create(CSSStyleSheet* parent)
-    {
-        return adoptRef(new CSSPageRule(parent));
-    }
+    static PassRefPtr<CSSPageRule> create(StyleRulePage* rule, CSSStyleSheet* sheet) { return adoptRef(new CSSPageRule(rule, sheet)); }
+
     ~CSSPageRule();
 
-    CSSStyleDeclaration* style() const { return m_style->ensureRuleCSSStyleDeclaration(this); }
+    CSSStyleDeclaration* style() const;
 
     String selectorText() const;
     void setSelectorText(const String&);
 
     String cssText() const;
     
-    const CSSSelector* selector() const { return m_selectorList.first(); }
-    StylePropertySet* properties() const { return m_style.get(); }
-    
-    void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectors) { m_selectorList.adoptSelectorVector(selectors); }
-    void setDeclaration(PassRefPtr<StylePropertySet> style) { m_style = style; }
-
 private:
-    CSSPageRule(CSSStyleSheet* parent);
+    CSSPageRule(StyleRulePage*, CSSStyleSheet*);
+    
+    RefPtr<StyleRulePage> m_pageRule;
 
-    RefPtr<StylePropertySet> m_style;
-    CSSSelectorList m_selectorList;
+    mutable RefPtr<StyleRuleCSSStyleDeclaration> m_propertiesCSSOMWrapper;
 };
 
 } // namespace WebCore

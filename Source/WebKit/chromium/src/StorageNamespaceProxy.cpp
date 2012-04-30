@@ -82,7 +82,7 @@ PassRefPtr<StorageArea> StorageNamespaceProxy::storageArea(PassRefPtr<SecurityOr
 
 void StorageNamespaceProxy::close()
 {
-    m_storageNamespace->close();
+    // N/A to the chromium port.
 }
 
 void StorageNamespaceProxy::clearOriginForDeletion(SecurityOrigin* origin)
@@ -98,6 +98,11 @@ void StorageNamespaceProxy::clearAllOriginsForDeletion()
 void StorageNamespaceProxy::sync()
 {
     ASSERT_NOT_REACHED();
+}
+
+bool StorageNamespaceProxy::isSameNamespace(const WebKit::WebStorageNamespace& sessionNamespace)
+{
+    return m_storageNamespace->isSameNamespace(sessionNamespace);
 }
 
 } // namespace WebCore

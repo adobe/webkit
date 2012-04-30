@@ -42,6 +42,8 @@ class Node;
 class RenderRegion;
 class Scrollbar;
 
+enum ShadowContentFilterPolicy { DoNotAllowShadowContent, AllowShadowContent };
+
 class HitTestResult {
 public:
     typedef ListHashSet<RefPtr<Node> > NodeSet;
@@ -49,7 +51,7 @@ public:
     HitTestResult();
     HitTestResult(const LayoutPoint&);
     // Pass non-negative padding values to perform a rect-based hit test.
-    HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
+    HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, ShadowContentFilterPolicy);
     HitTestResult(const HitTestResult&);
     ~HitTestResult();
     HitTestResult& operator=(const HitTestResult&);
@@ -67,6 +69,8 @@ public:
     void setRegion(RenderRegion* region) { m_region = region; }
 
     void setToNonShadowAncestor();
+
+    ShadowContentFilterPolicy shadowContentFilterPolicy() const { return m_shadowContentFilterPolicy; }
 
     void setInnerNode(Node*);
     void setInnerNonSharedNode(Node*);
@@ -108,8 +112,8 @@ public:
 
     // Rect-based hit test related methods.
     bool isRectBasedTest() const { return m_isRectBased; }
-    LayoutRect rectForPoint(const LayoutPoint&) const;
-    static LayoutRect rectForPoint(const LayoutPoint&, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
+    IntRect rectForPoint(const LayoutPoint&) const;
+    static IntRect rectForPoint(const LayoutPoint&, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
     int topPadding() const { return m_topPadding; }
     int rightPadding() const { return m_rightPadding; }
     int bottomPadding() const { return m_bottomPadding; }
@@ -146,6 +150,7 @@ private:
     int m_rightPadding;
     int m_bottomPadding;
     int m_leftPadding;
+    ShadowContentFilterPolicy m_shadowContentFilterPolicy;
     
     RenderRegion* m_region; // The region we're inside.
 
@@ -157,7 +162,7 @@ private:
 // y = p.y() - topPadding
 // width = leftPadding + rightPadding + 1
 // height = topPadding + bottomPadding + 1
-inline LayoutRect HitTestResult::rectForPoint(const LayoutPoint& point) const
+inline IntRect HitTestResult::rectForPoint(const LayoutPoint& point) const
 {
     return rectForPoint(point, m_topPadding, m_rightPadding, m_bottomPadding, m_leftPadding);
 }

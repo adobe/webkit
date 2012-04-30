@@ -51,6 +51,7 @@ using namespace WebCore;
 static RetainPtr<NSWindow> createBackgroundFullscreenWindow(NSRect frame);
 
 static const CFTimeInterval defaultAnimationDuration = 0.5;
+static const NSTimeInterval DefaultWatchdogTimerInterval = 1;
 
 @interface WKFullScreenWindowController(Private)<NSAnimationDelegate>
 - (void)_updateMenuAndDockForFullScreen;
@@ -130,12 +131,22 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
     _webView = webView;
 }
 
+- (BOOL)isFullScreen
+{
+    return _isFullScreen;
+}
+
 #pragma mark -
 #pragma mark NSWindowController overrides
 
 - (void)cancelOperation:(id)sender
 {
-    [self performSelector:@selector(exitFullScreen) withObject:nil afterDelay:0];
+    [self _manager]->requestExitFullScreen();
+
+    // If the page doesn't respond in DefaultWatchdogTimerInterval seconds, it could be because
+    // the WebProcess has hung, so exit anyway.
+    if (!_watchdogTimer)
+        _watchdogTimer = adoptNS([NSTimer scheduledTimerWithTimeInterval:DefaultWatchdogTimerInterval target:self selector:@selector(exitFullScreen) userInfo:nil repeats:NO]);
 }
 
 #pragma mark -
@@ -216,8 +227,8 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
 
     [[self window] makeResponder:webWindowFirstResponder firstResponderIfDescendantOfView:_webView];
 
-    [self _manager]->willEnterFullScreen();
     [self _manager]->setAnimatingFullScreen(true);
+    [self _manager]->willEnterFullScreen();
 }
 
 - (void)beganEnterFullScreenWithInitialFrame:(const WebCore::IntRect&)initialFrame finalFrame:(const WebCore::IntRect&)finalFrame
@@ -243,8 +254,8 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
     if (completed) {
         // Screen updates to be re-enabled ta the end of the current block.
         NSDisableScreenUpdates();
-        [self _manager]->setAnimatingFullScreen(false);
         [self _manager]->didEnterFullScreen();
+        [self _manager]->setAnimatingFullScreen(false);
 
         NSRect windowBounds = [[self window] frame];
         windowBounds.origin = NSZeroPoint;
@@ -275,6 +286,11 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
 
 - (void)exitFullScreen
 {
+    if (_watchdogTimer) {
+        [_watchdogTimer.get() invalidate];
+        _watchdogTimer.clear();
+    }
+
     if (!_isFullScreen)
         return;
     _isFullScreen = NO;
@@ -283,8 +299,8 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
     NSDisableScreenUpdates();
     [[self window] setAutodisplay:NO];
 
-    [self _manager]->willExitFullScreen();
     [self _manager]->setAnimatingFullScreen(true);
+    [self _manager]->willExitFullScreen();
 }
 
 - (void)beganExitFullScreenWithInitialFrame:(const WebCore::IntRect&)initialFrame finalFrame:(const WebCore::IntRect&)finalFrame
@@ -333,8 +349,8 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
     // Screen updates to be re-enabled ta the end of the current function.
     NSDisableScreenUpdates();
 
-    [self _manager]->setAnimatingFullScreen(false);
     [self _manager]->didExitFullScreen();
+    [self _manager]->setAnimatingFullScreen(false);
 
     NSResponder *firstResponder = [[self window] firstResponder];
     [self _swapView:_webViewPlaceholder.get() with:_webView];
@@ -353,6 +369,8 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
 
     [_backgroundWindow.get() orderOut:self];
     [_backgroundWindow.get() setFrame:NSZeroRect display:YES];
+
+    [[_webView window] makeKeyAndOrderFront:self];
 
     NSEnableScreenUpdates();
 }
@@ -433,7 +451,8 @@ static const CFTimeInterval defaultAnimationDuration = 0.5;
     [otherView setFrame:[view frame]];        
     [otherView setAutoresizingMask:[view autoresizingMask]];
     [otherView removeFromSuperview];
-    [[view superview] replaceSubview:view with:otherView];
+    [[view superview] addSubview:otherView positioned:NSWindowAbove relativeTo:view];
+    [view removeFromSuperview];
     [CATransaction commit];
 }
 
