@@ -5249,8 +5249,16 @@ bool StyleResolver::createTransformOperations(CSSValue* inValue, RenderStyle* st
             break;
         }
         case WebKitCSSTransformValue::RotateTransformOperation: {
+            Length tx = Length(0, Fixed);
+            Length ty = Length(0, Fixed);
             double angle = firstValue->computeDegrees();
-            operations.operations().append(RotateTransformOperation::create(0, 0, 1, angle, getTransformOperationType(transformValue->operationType())));
+            if (transformValue->length() == 3) {
+                CSSPrimitiveValue* secondValue = static_cast<CSSPrimitiveValue*>(transformValue->itemWithoutBoundsCheck(1));
+                tx = convertToFloatLength(secondValue, style, rootStyle, zoomFactor);
+                CSSPrimitiveValue* thirdValue = static_cast<CSSPrimitiveValue*>(transformValue->itemWithoutBoundsCheck(2));
+                ty = convertToFloatLength(thirdValue, style, rootStyle, zoomFactor);
+            }
+            operations.operations().append(RotateTransformOperation::create(angle, tx, ty, getTransformOperationType(transformValue->operationType())));
             break;
         }
         case WebKitCSSTransformValue::RotateXTransformOperation:

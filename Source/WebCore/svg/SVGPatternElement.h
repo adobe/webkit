@@ -49,13 +49,16 @@ class SVGPatternElement : public SVGStyledElement,
 public:
     static PassRefPtr<SVGPatternElement> create(const QualifiedName&, Document*);
 
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     void collectPatternAttributes(PatternAttributes&) const;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
 
 private:
     SVGPatternElement(const QualifiedName&, Document*);
     
     virtual bool isValid() const { return SVGTests::isValid(); }
     virtual bool needsPendingResourceHandling() const { return false; }
+    static CSSPropertyID cssPropertyIdForSVGAttributeName(const QualifiedName&);
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(Attribute*) OVERRIDE;

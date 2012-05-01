@@ -100,13 +100,44 @@ bool SVGPatternElement::isSupportedAttribute(const QualifiedName& attrName)
         SVGFitToViewBox::addSupportedAttributes(supportedAttributes);
         supportedAttributes.add(SVGNames::patternUnitsAttr);
         supportedAttributes.add(SVGNames::patternContentUnitsAttr);
-        supportedAttributes.add(SVGNames::patternTransformAttr);
+        //supportedAttributes.add(SVGNames::patternTransformAttr);
         supportedAttributes.add(SVGNames::xAttr);
         supportedAttributes.add(SVGNames::yAttr);
         supportedAttributes.add(SVGNames::widthAttr);
         supportedAttributes.add(SVGNames::heightAttr);
     }
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+}
+
+
+CSSPropertyID SVGPatternElement::cssPropertyIdForSVGAttributeName(const QualifiedName& name)
+{
+    static HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap = 0;
+    if (!propertyNameToIdMap) {
+        propertyNameToIdMap = new HashMap<AtomicStringImpl*, CSSPropertyID>;
+        propertyNameToIdMap->set(SVGNames::patternTransformAttr.localName().impl(), CSSPropertyWebkitTransform);
+    }
+    
+    return propertyNameToIdMap->get(name.localName().impl());
+}
+
+void SVGPatternElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    CSSPropertyID propertyID = SVGPatternElement::cssPropertyIdForSVGAttributeName(attr->name());
+    if (propertyID > 0) {
+        addPropertyToAttributeStyle(style, propertyID, attr->value());
+        return;
+    }
+    
+    SVGStyledElement::collectStyleForAttribute(attr, style);
+}
+
+bool SVGPatternElement::isPresentationAttribute(const QualifiedName& name) const
+{
+    CSSPropertyID propertyID = SVGPatternElement::cssPropertyIdForSVGAttributeName(name);
+    if (propertyID > 0)
+        return true;
+    return SVGStyledElement::isPresentationAttribute(name);
 }
 
 void SVGPatternElement::parseAttribute(Attribute* attr)
@@ -125,13 +156,13 @@ void SVGPatternElement::parseAttribute(Attribute* attr)
         if (propertyValue > 0)
             setPatternContentUnitsBaseValue(propertyValue);
         return;
-    } else if (attr->name() == SVGNames::patternTransformAttr) {
+    } /*else if (attr->name() == SVGNames::patternTransformAttr) {
         SVGTransformList newList;
         newList.parse(attr->value());
         detachAnimatedPatternTransformListWrappers(newList.size());
         setPatternTransformBaseValue(newList);
         return;
-    } else if (attr->name() == SVGNames::xAttr)
+    }*/ else if (attr->name() == SVGNames::xAttr)
         setXBaseValue(SVGLength::construct(LengthModeWidth, attr->value(), parseError));
     else if (attr->name() == SVGNames::yAttr)
         setYBaseValue(SVGLength::construct(LengthModeHeight, attr->value(), parseError));
@@ -215,11 +246,21 @@ void SVGPatternElement::collectPatternAttributes(PatternAttributes& attributes) 
         if (!attributes.hasPatternContentUnits() && current->hasAttribute(SVGNames::patternContentUnitsAttr))
             attributes.setPatternContentUnits(current->patternContentUnits());
 
-        if (!attributes.hasPatternTransform() && current->hasAttribute(SVGNames::patternTransformAttr)) {
+        // TODO: Share this code with SVGStyledTransformable.
+        RenderStyle* style = renderer()->style();
+        if (style && style->hasTransform()) {
+            TransformationMatrix transform;
+            style->applyTransform(transform, renderer()->objectBoundingBox());
+            
+            // Flatten any 3D transform.
+            attributes.setPatternTransform(transform.toAffineTransform());
+        }
+
+        /*if (!attributes.hasPatternTransform() && current->hasAttribute(SVGNames::patternTransformAttr)) {
             AffineTransform transform;
             current->patternTransform().concatenate(transform);
             attributes.setPatternTransform(transform);
-        }
+        }*/
 
         if (!attributes.hasPatternContentElement() && current->hasChildNodes())
             attributes.setPatternContentElement(current);

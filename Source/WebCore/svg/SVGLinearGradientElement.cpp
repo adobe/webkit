@@ -140,11 +140,21 @@ bool SVGLinearGradientElement::collectGradientAttributes(LinearGradientAttribute
         if (!attributes.hasGradientUnits() && current->hasAttribute(SVGNames::gradientUnitsAttr))
             attributes.setGradientUnits(current->gradientUnits());
 
-        if (!attributes.hasGradientTransform() && current->hasAttribute(SVGNames::gradientTransformAttr)) {
+        // TODO: Share this code with SVGStyledTransformable.
+        RenderStyle* style = renderer()->style();
+        if (style && style->hasTransform()) {
+            TransformationMatrix transform;
+            style->applyTransform(transform, renderer()->objectBoundingBox());
+            
+            // Flatten any 3D transform.
+            attributes.setGradientTransform(transform.toAffineTransform());
+        }
+        
+        /*if (!attributes.hasGradientTransform() && current->hasAttribute(SVGNames::gradientTransformAttr)) {
             AffineTransform transform;
             current->gradientTransform().concatenate(transform);
             attributes.setGradientTransform(transform);
-        }
+        }*/
 
         if (!attributes.hasStops()) {
             const Vector<Gradient::ColorStop>& stops(current->buildStops());

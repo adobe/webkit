@@ -51,11 +51,12 @@ public:
     virtual void toClipPath(Path&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+
 protected:
     SVGStyledTransformableElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGStyledTransformableElement)
@@ -63,6 +64,7 @@ protected:
     END_DECLARE_ANIMATED_PROPERTIES
 
 private:
+    static CSSPropertyID cssPropertyIdForSVGAttributeName(const QualifiedName&);
     virtual bool isStyledTransformable() const { return true; }
 
     // Used by <animateMotion>

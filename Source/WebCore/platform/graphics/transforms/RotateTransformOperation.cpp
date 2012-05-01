@@ -36,7 +36,7 @@ PassRefPtr<TransformOperation> RotateTransformOperation::blend(const TransformOp
         return this;
     
     if (blendToIdentity)
-        return RotateTransformOperation::create(m_x, m_y, m_z, m_angle - m_angle * progress, m_type);
+        return RotateTransformOperation::create(m_x, m_y, m_z, m_originX, m_originY, m_angle - m_angle * progress, m_type);
     
     const RotateTransformOperation* fromOp = static_cast<const RotateTransformOperation*>(from);
     
@@ -45,10 +45,15 @@ PassRefPtr<TransformOperation> RotateTransformOperation::blend(const TransformOp
                    (fromOp->m_x == 0 && fromOp->m_y == 1 && fromOp->m_z == 0) || 
                    (fromOp->m_x == 1 && fromOp->m_y == 0 && fromOp->m_z == 0)) {
         double fromAngle = fromOp ? fromOp->m_angle : 0;
+        Length fromOriginX = fromOp ? fromOp->m_originX : Length(m_originX.type());
+        Length fromOriginY = fromOp ? fromOp->m_originY : Length(m_originY.type());
         return RotateTransformOperation::create(fromOp ? fromOp->m_x : m_x, 
                                                 fromOp ? fromOp->m_y : m_y, 
                                                 fromOp ? fromOp->m_z : m_z, 
-                                                WebCore::blend(fromAngle, m_angle, progress), m_type);
+                                                m_originX.blend(fromOriginX, progress),
+                                                m_originY.blend(fromOriginY, progress),
+                                                WebCore::blend(fromAngle, m_angle, progress),
+                                                m_type);
     }
 
     const RotateTransformOperation* toOp = this;
