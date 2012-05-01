@@ -149,7 +149,7 @@ void RenderView::layout()
     if (needsLayout()) {
         m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
-        if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions() && resetAutoHeightRegionsForFirstLayoutPhase())
+        if (document()->cssRegionsAutoHeightEnabled() && hasRenderNamedFlowThreads() && hasAutoHeightRegions() && flowThreadController()->resetAutoHeightRegionsForFirstLayoutPhase())
             m_inFirstLayoutPhaseOfRegionsAutoHeight = true;
         if (hasCSSExclusions()) {
             m_inFirstLayoutPhaseOfExclusionsPositioning = true;
@@ -170,12 +170,12 @@ void RenderView::layout()
             markCSSExclusionDependentBlocksForLayout();
             m_layoutState = &state;
         }
-        if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions())
-            markAutoHeightRegionsForSecondLayoutPhase();
+        if (document()->cssRegionsAutoHeightEnabled() && hasRenderNamedFlowThreads() && hasAutoHeightRegions())
+            flowThreadController()->markAutoHeightRegionsForSecondLayoutPhase();
         if (needsLayout()) {
             RenderBlock::layout();
-            if (hasRenderFlowThreads())
-                layoutRenderFlowThreads();
+            if (hasRenderNamedFlowThreads())
+                flowThreadController()->layoutRenderNamedFlowThreads();
         }
     }
 
@@ -983,32 +983,6 @@ void RenderView::removeFixedPositionedObject(RenderBox* object)
         return;
 
     m_positionedObjects->remove(object);
-}
-
-bool RenderView::resetAutoHeightRegionsForFirstLayoutPhase()
-{
-    if (!document()->cssRegionsAutoHeightEnabled())
-        return false;
-
-    bool hadFlowsWithAutoHeightRegions = false;
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-        RenderFlowThread* flowRenderer = *iter;
-        if (flowRenderer->resetAutoHeightRegionsForFirstLayoutPhase())
-            hadFlowsWithAutoHeightRegions = true;
-    }
-    
-    return hadFlowsWithAutoHeightRegions;
-}
-
-void RenderView::markAutoHeightRegionsForSecondLayoutPhase()
-{
-    if (!document()->cssRegionsAutoHeightEnabled())
-        return;
-
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-        RenderFlowThread* flowRenderer = *iter;
-        flowRenderer->markAutoHeightRegionsForSecondLayoutPhase();
-    }
 }
 
 void RenderView::resetCSSExclusionsForFirstLayoutPass()

@@ -36,6 +36,7 @@
 #include "PaintInfo.h"
 #include "RenderBoxRegionInfo.h"
 #include "RenderNamedFlowThread.h"
+#include "RenderRegionMultiColumn.h"
 #include "RenderView.h"
 #include "StyleResolver.h"
 

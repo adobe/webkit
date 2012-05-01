@@ -65,6 +65,9 @@ public:
     void registerNamedFlowContentNode(Node*, RenderNamedFlowThread*);
     void unregisterNamedFlowContentNode(Node*);
 
+    bool resetAutoHeightRegionsForFirstLayoutPhase();
+    void markAutoHeightRegionsForSecondLayoutPhase();
+
 protected:
     FlowThreadController(RenderView*);
 
@@ -72,6 +75,7 @@ private:
     RenderView* m_view;
     RenderFlowThread* m_currentRenderFlowThread;
     bool m_isRenderNamedFlowThreadOrderDirty;
+    // FIXME: As we got a separate class for the flows, we should drop the pointer on m_renderNamedFlowThreadList and inline it.
     OwnPtr<RenderNamedFlowThreadList> m_renderNamedFlowThreadList;
     // maps a content node to its render flow thread.
     HashMap<Node*, RenderNamedFlowThread*> m_mapNamedFlowContentNodes;

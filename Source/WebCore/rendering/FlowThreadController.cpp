@@ -122,4 +122,30 @@ void FlowThreadController::unregisterNamedFlowContentNode(Node* contentNode)
     m_mapNamedFlowContentNodes.remove(contentNode);
 }
 
+bool FlowThreadController::resetAutoHeightRegionsForFirstLayoutPhase()
+{
+    if (!m_view->document()->cssRegionsAutoHeightEnabled())
+        return false;
+
+    bool hadFlowsWithAutoHeightRegions = false;
+    for (RenderNamedFlowThreadList::iterator iter = m_renderNamedFlowThreadList->begin(); iter != m_renderNamedFlowThreadList->end(); ++iter) {
+        RenderNamedFlowThread* flowRenderer = *iter;
+        if (flowRenderer->resetAutoHeightRegionsForFirstLayoutPhase())
+            hadFlowsWithAutoHeightRegions = true;
+    }
+    
+    return hadFlowsWithAutoHeightRegions;
+}
+
+void FlowThreadController::markAutoHeightRegionsForSecondLayoutPhase()
+{
+    if (!m_view->document()->cssRegionsAutoHeightEnabled())
+        return;
+
+    for (RenderNamedFlowThreadList::iterator iter = m_renderNamedFlowThreadList->begin(); iter != m_renderNamedFlowThreadList->end(); ++iter) {
+        RenderNamedFlowThread* flowRenderer = *iter;
+        flowRenderer->markAutoHeightRegionsForSecondLayoutPhase();
+    }
+}
+
 } // namespace WebCore

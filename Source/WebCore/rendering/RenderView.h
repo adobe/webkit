@@ -176,8 +176,6 @@ public:
 
     bool inFirstLayoutPhaseOfRegionsAutoHeight() const { return m_inFirstLayoutPhaseOfRegionsAutoHeight; }
     bool needsSecondPassLayoutForRegionsAutoHeight() const;
-    bool resetAutoHeightRegionsForFirstLayoutPhase();
-    void markAutoHeightRegionsForSecondLayoutPhase();
     
     bool hasAutoHeightRegions() const { return m_autoHeightRegionsCount; }
     void incrementAutoHeightRegions() { ++m_autoHeightRegionsCount; }

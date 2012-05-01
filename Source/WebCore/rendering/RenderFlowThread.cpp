@@ -445,10 +445,10 @@ void RenderFlowThread::updateRegionRects()
         LayoutRect regionRect;
         LayoutUnit size = 0;
         if (isHorizontalWritingMode()) {
-            regionRect = LayoutRect(style()->direction() == LTR ? zeroLayoutUnit : logicalWidth() - region->contentWidth(), logicalHeight, region->contentWidth(), region->contentHeight());
+            regionRect = LayoutRect(style()->direction() == LTR ? ZERO_LAYOUT_UNIT : logicalWidth() - region->contentWidth(), logicalHeight, region->contentWidth(), region->contentHeight());
             size = regionRect.height();
         } else {
-            regionRect = LayoutRect(logicalHeight, style()->direction() == LTR ? zeroLayoutUnit : logicalWidth() - region->contentHeight(), region->contentWidth(), region->contentHeight());
+            regionRect = LayoutRect(logicalHeight, style()->direction() == LTR ? ZERO_LAYOUT_UNIT : logicalWidth() - region->contentHeight(), region->contentWidth(), region->contentHeight());
             size = regionRect.width();
         }
         if (view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
@@ -997,7 +997,7 @@ bool RenderFlowThread::addRegionForcedBreak(LayoutUnit offset, RenderObject* bre
         updateRegionRects();
 
     if (adjustment)
-        *adjustment = max<LayoutUnit>(zeroLayoutUnit, accumulatedOffset - offset);
+        *adjustment = max<LayoutUnit>(ZERO_LAYOUT_UNIT, accumulatedOffset - offset);
     
     return computedAtLeastAHeight;
 }
