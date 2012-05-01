@@ -55,7 +55,7 @@ bool RuntimeEnabledFeatures::isTouchEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceMotionEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceOrientationEnabled = true;
 bool RuntimeEnabledFeatures::isSpeechInputEnabled = true;
-bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = false;
+bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = true;
 
 #if ENABLE(SCRIPTED_SPEECH)
 bool RuntimeEnabledFeatures::isScriptedSpeechEnabled = false;
