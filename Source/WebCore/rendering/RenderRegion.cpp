@@ -123,11 +123,8 @@ void RenderRegion::setRegionObjectsRegionStyle()
             continue;
         RenderObject* object = node->renderer();
 
-        RefPtr<RenderStyle> objectOriginalStyle = object->style();
         RefPtr<RenderStyle> objectStyleInRegion = computeStyleInRegion(object);
-        object->setStyleInternal(objectStyleInRegion);
-
-        m_renderObjectRegionStyle.set(object, objectOriginalStyle);
+        setObjectStyleInRegion(object, objectStyleInRegion);
 
         computeChildrenStyleInRegion(object);
     }
@@ -324,14 +321,9 @@ PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderObject* o
     ASSERT(object->node() && object->node()->isElementNode());
 
     Element* element = toElement(object->node());
-    RefPtr<RenderStyle> renderBoxRegionStyle = object->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
+    RefPtr<RenderStyle> renderObjectRegionStyle = object->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
 
-    if (!object->hasBoxDecorations()) {
-        bool hasBoxDecorations = object->isTableCell() || renderBoxRegionStyle->hasBackground() || renderBoxRegionStyle->hasBorder() || renderBoxRegionStyle->hasAppearance() || renderBoxRegionStyle->boxShadow();
-        (const_cast<RenderObject*>(object))->setHasBoxDecorations(hasBoxDecorations);
-    }
-
-    return renderBoxRegionStyle.release();
+    return renderObjectRegionStyle.release();
 }
 
 void RenderRegion::computeChildrenStyleInRegion(RenderObject* object)
@@ -348,12 +340,27 @@ void RenderRegion::computeChildrenStyleInRegion(RenderObject* object)
         else
             styleInRegion = computeStyleInRegion(child);
 
-        RefPtr<RenderStyle> childOriginalStyle = child->style();
-        child->setStyleInternal(styleInRegion);
-        m_renderObjectRegionStyle.set(child, childOriginalStyle);
+        setObjectStyleInRegion(child, styleInRegion);
 
         computeChildrenStyleInRegion(child);
     }
+}
+
+void RenderRegion::setObjectStyleInRegion(RenderObject* object, PassRefPtr<RenderStyle> styleInRegion)
+{
+    RefPtr<RenderStyle> objectOriginalStyle = object->style();
+    object->setStyleInternal(styleInRegion);
+
+    if (object->isBoxModelObject() && !object->hasBoxDecorations()) {
+        bool hasBoxDecorations = object->isTableCell()
+            || object->style()->hasBackground()
+            || object->style()->hasBorder()
+            || object->style()->hasAppearance()
+            || object->style()->boxShadow();
+        object->setHasBoxDecorations(hasBoxDecorations);
+    }
+
+    m_renderObjectRegionStyle.set(object, objectOriginalStyle);
 }
 
 bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)

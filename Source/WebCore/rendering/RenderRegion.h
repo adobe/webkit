@@ -131,11 +131,18 @@ public:
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 
+    // Compute the style in region for an element.
     PassRefPtr<RenderStyle> computeStyleInRegion(const RenderObject*);
+
+    // Compute style in region for the children in the tree under the specified object.
     void computeChildrenStyleInRegion(RenderObject*);
+
+    // paint is called between these functions.
     void setRegionObjectsRegionStyle();
     void restoreRegionObjectsOriginalStyle();
+
     void clearRegionObjectsRegionStyle();
+    void setObjectStyleInRegion(RenderObject*, PassRefPtr<RenderStyle>);
 
     RenderFlowThread* m_flowThread;
 
