@@ -141,14 +141,10 @@ void FECustomFilter::platformApplySoftware()
     if (m_inputTexture->tiles().numTilesX() != 1 || m_inputTexture->tiles().numTilesY() != 1)
         return;
     
-    // The shader had compiler errors. We cannot draw anything.
-    if (!m_shader->isInitialized())
-        return;
-    
     m_context->clearColor(0, 0, 0, 0);
     m_context->clear(GraphicsContext3D::COLOR_BUFFER_BIT | GraphicsContext3D::DEPTH_BUFFER_BIT);
     
-    bindProgramAndBuffers(srcPixelArray.get());
+    bindProgramAndBuffers(srcPixelArray.get(), newContextSize);
     
     m_context->drawElements(GraphicsContext3D::TRIANGLES, m_mesh->indicesCount(), GraphicsContext3D::UNSIGNED_SHORT, 0);
     
@@ -163,6 +159,10 @@ bool FECustomFilter::initializeContext()
         return false;
     m_context = m_controller->context();
     m_shader = m_controller->compileProgram(m_program.get());
+    if (!m_shader->isInitialized()) {
+        m_context = 0;
+        return false;
+    }
     m_mesh = CustomFilterMesh::create(m_context.get(), m_meshColumns, m_meshRows, 
                                       FloatRect(0, 0, 1, 1),
                                       m_meshType);
@@ -262,7 +262,7 @@ void FECustomFilter::bindProgramParameters()
     }
 }
 
-void FECustomFilter::bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray)
+void FECustomFilter::bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray, const IntSize& boxSize)
 {
     m_context->useProgram(m_shader->program());
     
@@ -280,6 +280,20 @@ void FECustomFilter::bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray)
         projectionMatrix.toColumnMajorFloatArray(glProjectionMatrix);
         m_context->uniformMatrix4fv(m_shader->projectionMatrixLocation(), 1, false, &glProjectionMatrix[0]);
     }
+    
+    if (m_shader->meshSizeLocation() != -1)
+        m_context->uniform2f(m_shader->meshSizeLocation(), m_meshColumns, m_meshRows);
+    
+    if (m_shader->tileSizeLocation() != -1)
+        m_context->uniform2f(m_shader->tileSizeLocation(), 1.0 / m_meshColumns, 1.0 / m_meshRows);
+    
+    if (m_shader->meshBoxLocation() != -1) {
+        // FIXME: This will change when filter margins are implemented.
+        m_context->uniform4f(m_shader->meshBoxLocation(), 0.0, 0.0, 1.0, 1.0);
+    }
+    
+    if (m_shader->samplerSizeLocation() != -1)
+        m_context->uniform2f(m_shader->samplerSizeLocation(), boxSize.width(), boxSize.height());
     
     m_context->bindBuffer(GraphicsContext3D::ARRAY_BUFFER, m_mesh->verticesBufferObject());
     m_context->bindBuffer(GraphicsContext3D::ELEMENT_ARRAY_BUFFER, m_mesh->elementsBufferObject());

@@ -80,7 +80,7 @@ private:
     void bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter*);
     void bindProgramTransformParameters(int uniformLocation, CustomFilterTransformParameter*);
     void bindProgramParameters();
-    void bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray);
+    void bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray, const IntSize& boxSize);
     
     CustomFiltersController* m_controller;
     
