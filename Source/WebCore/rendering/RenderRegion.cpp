@@ -30,6 +30,7 @@
 #include "config.h"
 #include "RenderRegion.h"
 
+#include "FlowThreadController.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "IntRect.h"
@@ -101,41 +102,48 @@ bool RenderRegion::isLastRegion() const
     return m_flowThread->lastRegion() == this;
 }
 
-void RenderRegion::setRegionBoxesRegionStyle()
+// Clear the style for all objects in region
+void RenderRegion::clearRegionObjectsRegionStyle()
+{
+    m_renderObjectRegionStyle.clear();
+}
+
+void RenderRegion::setRegionObjectsRegionStyle()
 {
     if (!hasCustomRegionStyle())
         return;
 
-    for (RenderBoxRegionInfoMap::iterator iter = m_renderBoxRegionInfo.begin(), end = m_renderBoxRegionInfo.end(); iter != end; ++iter) {
-        const RenderBox* box = iter->first;
-        if (!box->canHaveRegionStyle())
+    clearRegionObjectsRegionStyle();
+
+    RenderNamedFlowThread* namedFlow = view()->flowThreadController()->ensureRenderFlowThreadWithName(style()->regionThread());
+    const NamedFlowContentNodes& contentNodes = namedFlow->contentNodes();
+    for (NamedFlowContentNodes::const_iterator iter = contentNodes.begin(), end = contentNodes.end(); iter != end; ++iter) {
+        const Node* node = *iter;
+        if (!node->renderer())
             continue;
+        RenderObject* object = node->renderer();
 
-        // Save original box style to be restored later, after paint.
-        RefPtr<RenderStyle> boxOriginalStyle = box->style();
+        RefPtr<RenderStyle> objectOriginalStyle = object->style();
+        RefPtr<RenderStyle> objectStyleInRegion = computeStyleInRegion(object);
+        object->setStyleInternal(objectStyleInRegion);
 
-        // Set the style to be used for box as the style computed in region.
-        (const_cast<RenderBox*>(box))->setStyleInternal(renderBoxRegionStyle(box));
+        m_renderObjectRegionStyle.set(object, objectOriginalStyle);
 
-        m_renderBoxRegionStyle.set(box, boxOriginalStyle);
+        computeChildrenStyleInRegion(object);
     }
 }
 
-void RenderRegion::restoreRegionBoxesOriginalStyle()
+void RenderRegion::restoreRegionObjectsOriginalStyle()
 {
     if (!hasCustomRegionStyle())
         return;
 
-    for (RenderBoxRegionInfoMap::iterator iter = m_renderBoxRegionInfo.begin(), end = m_renderBoxRegionInfo.end(); iter != end; ++iter) {
-        const RenderBox* box = iter->first;
-        RenderBoxRegionStyleMap::iterator it = m_renderBoxRegionStyle.find(box);
-        if (it == m_renderBoxRegionStyle.end())
-            continue;
-
-        // Restore the box style to the original style and store the box style in region for later use.
-        RefPtr<RenderStyle> boxRegionStyle = box->style();
-        (const_cast<RenderBox*>(box))->setStyleInternal(it->second);
-        m_renderBoxRegionStyle.set(box, boxRegionStyle);
+    for (RenderObjectRegionStyleMap::iterator iter = m_renderObjectRegionStyle.begin(), end = m_renderObjectRegionStyle.end(); iter != end; ++iter) {
+        RenderObject* object = const_cast<RenderObject*>(iter->first);
+        RefPtr<RenderStyle> objectRegionStyle = object->style();
+        RefPtr<RenderStyle> objectOriginalStyle = iter->second;
+        object->setStyleInternal(objectOriginalStyle);
+        // FIXME: store the computed style in region to be used later
     }
 }
 
@@ -145,9 +153,9 @@ void RenderRegion::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintO
     if (!m_flowThread || !isValid())
         return;
 
-    setRegionBoxesRegionStyle();
+    setRegionObjectsRegionStyle();
     m_flowThread->paintIntoRegion(paintInfo, this, LayoutPoint(paintOffset.x() + borderLeft() + paddingLeft(), paintOffset.y() + borderTop() + paddingTop()));
-    restoreRegionBoxesOriginalStyle();
+    restoreRegionObjectsOriginalStyle();
 }
 
 // Hit Testing
@@ -307,42 +315,45 @@ LayoutUnit RenderRegion::offsetFromLogicalTopOfFirstPage() const
     return regionRect().x();
 }
 
-PassRefPtr<RenderStyle> RenderRegion::renderBoxRegionStyle(const RenderBox* renderBox)
+PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderObject* object)
 {
-    // The box for which we are asking for style in region should have its info present
-    // in the region box info map.
-    ASSERT(m_renderBoxRegionInfo.find(renderBox) != m_renderBoxRegionInfo.end());
+    ASSERT(object);
+    ASSERT(object->view());
+    ASSERT(object->view()->document());
+    ASSERT(!object->isAnonymous());
+    ASSERT(object->node() && object->node()->isElementNode());
 
-    RenderBoxRegionStyleMap::iterator it = m_renderBoxRegionStyle.find(renderBox);
-    if (it != m_renderBoxRegionStyle.end())
-        return it->second;
-    return computeStyleInRegion(renderBox);
-}
+    Element* element = toElement(object->node());
+    RefPtr<RenderStyle> renderBoxRegionStyle = object->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
 
-PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderBox* box)
-{
-    ASSERT(box);
-    ASSERT(box->view());
-    ASSERT(box->view()->document());
-    ASSERT(!box->isAnonymous());
-    ASSERT(box->node() && box->node()->isElementNode());
-
-    Element* element = toElement(box->node());
-    RefPtr<RenderStyle> renderBoxRegionStyle = box->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
-    m_renderBoxRegionStyle.add(box, renderBoxRegionStyle);
-
-    if (!box->hasBoxDecorations()) {
-        bool hasBoxDecorations = box->isTableCell() || renderBoxRegionStyle->hasBackground() || renderBoxRegionStyle->hasBorder() || renderBoxRegionStyle->hasAppearance() || renderBoxRegionStyle->boxShadow();
-        (const_cast<RenderBox*>(box))->setHasBoxDecorations(hasBoxDecorations);
+    if (!object->hasBoxDecorations()) {
+        bool hasBoxDecorations = object->isTableCell() || renderBoxRegionStyle->hasBackground() || renderBoxRegionStyle->hasBorder() || renderBoxRegionStyle->hasAppearance() || renderBoxRegionStyle->boxShadow();
+        (const_cast<RenderObject*>(object))->setHasBoxDecorations(hasBoxDecorations);
     }
 
     return renderBoxRegionStyle.release();
 }
 
-void RenderRegion::clearBoxStyleInRegion(const RenderBox* box)
+void RenderRegion::computeChildrenStyleInRegion(RenderObject* object)
 {
-    ASSERT(box);
-    m_renderBoxRegionStyle.remove(box);
+    for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
+        // The style in region for this child should not have been computed yet.
+        ASSERT(!m_renderObjectRegionStyle.contains(child));
+        RefPtr<RenderStyle> styleInRegion;
+
+        if (child->isAnonymous())
+            styleInRegion = RenderStyle::createAnonymousStyle(object->style());
+        else if (child->isText())
+            styleInRegion = RenderStyle::clone(object->style());
+        else
+            styleInRegion = computeStyleInRegion(child);
+
+        RefPtr<RenderStyle> childOriginalStyle = child->style();
+        child->setStyleInternal(styleInRegion);
+        m_renderObjectRegionStyle.set(child, childOriginalStyle);
+
+        computeChildrenStyleInRegion(child);
+    }
 }
 
 bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
