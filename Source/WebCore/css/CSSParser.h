@@ -208,7 +208,7 @@ public:
 #endif
 #endif
 
-    PassRefPtr<CSSValueList> parseTransform(CSSParserValueList*);
+    PassRefPtr<CSSValueList> parseTransform(CSSParserValueList*, bool acceptCommaTerminator = false);
     bool parseTransformOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2, CSSPropertyID& propId3, RefPtr<CSSValue>&, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
     bool parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2,  RefPtr<CSSValue>&, RefPtr<CSSValue>&);
 

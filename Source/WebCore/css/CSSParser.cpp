@@ -6884,7 +6884,7 @@ private:
     CSSParser::Units m_unit;
 };
 
-PassRefPtr<CSSValueList> CSSParser::parseTransform(CSSParserValueList* valueList)
+PassRefPtr<CSSValueList> CSSParser::parseTransform(CSSParserValueList* valueList, bool acceptCommaAsTerminator)
 {
     if (!valueList)
         return 0;
@@ -6893,10 +6893,14 @@ PassRefPtr<CSSValueList> CSSParser::parseTransform(CSSParserValueList* valueList
     // We collect a list of WebKitCSSTransformValues, where each value specifies a single operation.
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
     for (CSSParserValue* value = valueList->current(); value; value = valueList->next()) {
+        // Needed for CSS Shaders.
+        if (acceptCommaAsTerminator && isComma(value))
+            break;
+        
         // Transform functions can be comma separated on SVG presentation attributes.
         if (m_context.mode == SVGAttributeMode && value->unit == CSSParserValue::Operator && value->iValue == ',')
             continue;
-
+        
         if (value->unit != CSSParserValue::Function || !value->function)
             return 0;
 
@@ -7120,9 +7124,11 @@ PassRefPtr<WebKitCSSFilterValue> CSSParser::parseCustomFilter(CSSParserValue* va
         
         // 3d transforms
         if (arg->unit == CSSParserValue::Function && arg->function) {
-            RefPtr<CSSValue> val = parseTransform(argsList);
+            RefPtr<CSSValue> val = parseTransform(argsList, true);
             if (val) {
                 parameter->append(val.release());
+                if (!acceptCommaOperator(argsList))
+                    return 0;
                 continue;
             }
         }
