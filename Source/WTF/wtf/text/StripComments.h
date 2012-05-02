@@ -66,7 +66,7 @@ private:
         }
     }
 
-    void process(UChar);
+    WTF_EXPORT_PRIVATE void process(UChar);
 
     bool peek(UChar& character)
     {

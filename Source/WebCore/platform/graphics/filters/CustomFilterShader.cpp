@@ -32,7 +32,6 @@
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
 #include "CustomFilterShader.h"
 #include "GraphicsContext3D.h"
-#include "ShaderLang.h"
 
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/text/CString.h>
@@ -40,6 +39,14 @@
 #include <wtf/RandomNumber.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StripComments.h>
+
+#if PLATFORM(QT)
+#include "ANGLE/include/GLSLANG/ShaderLang.h"
+#elif !PLATFORM(GTK) && !PLATFORM(EFL) && !PLATFORM(CHROMIUM)
+#include "ANGLE/ShaderLang.h"
+#else
+#include "ShaderLang.h"
+#endif
 
 namespace WebCore {
 
