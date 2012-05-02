@@ -140,6 +140,8 @@ void FECustomFilter::platformApplySoftware()
     // Do not draw the filter if the input image cannot fit inside a single GPU texture.
     if (m_inputTexture->tiles().numTilesX() != 1 || m_inputTexture->tiles().numTilesY() != 1)
         return;
+
+    m_context->enable(GraphicsContext3D::DEPTH_TEST);
     
     m_context->clearColor(0, 0, 0, 0);
     m_context->clear(GraphicsContext3D::COLOR_BUFFER_BIT | GraphicsContext3D::DEPTH_BUFFER_BIT);
