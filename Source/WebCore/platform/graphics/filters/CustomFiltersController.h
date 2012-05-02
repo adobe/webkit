@@ -36,6 +36,8 @@
 
 namespace WebCore {
 
+class CustomFilterProgram;
+class CustomFilterShader;
 class CustomFiltersHost;
 class GraphicsContext3D;
 
@@ -47,6 +49,7 @@ public:
     bool initializeContextIfNeeded() { return m_context.get() ? true : initializeContext(); }
     GraphicsContext3D* context() const { return m_context.get(); }
     
+    PassRefPtr<CustomFilterShader> compileProgram(CustomFilterProgram*);
 private:
     CustomFiltersController(CustomFiltersHost* host);
     

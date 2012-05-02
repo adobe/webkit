@@ -162,7 +162,7 @@ bool FECustomFilter::initializeContext()
     if (!m_controller->initializeContextIfNeeded())
         return false;
     m_context = m_controller->context();
-    m_shader = m_program->createShaderWithContext(m_context.get());
+    m_shader = m_controller->compileProgram(m_program.get());
     m_mesh = CustomFilterMesh::create(m_context.get(), m_meshColumns, m_meshRows, 
                                       FloatRect(0, 0, 1, 1),
                                       m_meshType);

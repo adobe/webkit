@@ -32,6 +32,8 @@
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
 #include "CustomFiltersController.h"
 
+#include "CustomFilterProgram.h"
+#include "CustomFilterShader.h"
 #include "CustomFiltersHost.h"
 #include "GraphicsContext3D.h"
 
@@ -65,6 +67,13 @@ bool CustomFiltersController::initializeContext()
     }
     return true;
 }
+
+PassRefPtr<CustomFilterShader> CustomFiltersController::compileProgram(CustomFilterProgram* program)
+{
+    ASSERT(program->isLoaded());
+    return CustomFilterShader::create(m_context.get(), program->vertexShaderString(), program->fragmentShaderString());
+}
+
 
 } // namespace WebCore
 
