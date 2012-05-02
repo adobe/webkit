@@ -173,17 +173,6 @@ bool CustomFilterShader::rewriteShaders()
     ShBuiltInResources resources;
     ShInitBuiltInResources(&resources);
     
-    m_context->getIntegerv(GraphicsContext3D::MAX_VERTEX_ATTRIBS, &resources.MaxVertexAttribs);
-    m_context->getIntegerv(GraphicsContext3D::MAX_VERTEX_UNIFORM_VECTORS, &resources.MaxVertexUniformVectors);
-    m_context->getIntegerv(GraphicsContext3D::MAX_VARYING_VECTORS, &resources.MaxVaryingVectors);
-    m_context->getIntegerv(GraphicsContext3D::MAX_VERTEX_TEXTURE_IMAGE_UNITS, &resources.MaxVertexTextureImageUnits);
-    m_context->getIntegerv(GraphicsContext3D::MAX_COMBINED_TEXTURE_IMAGE_UNITS, &resources.MaxCombinedTextureImageUnits);
-    m_context->getIntegerv(GraphicsContext3D::MAX_TEXTURE_IMAGE_UNITS, &resources.MaxTextureImageUnits);
-    m_context->getIntegerv(GraphicsContext3D::MAX_FRAGMENT_UNIFORM_VECTORS, &resources.MaxFragmentUniformVectors);
-
-    // Always set to 1 for OpenGL ES.
-    resources.MaxDrawBuffers = 1;
-    
     ShHandle vertexCompiler = ShConstructCompiler(SH_VERTEX_SHADER, SH_CSS_SHADERS_SPEC, SH_GLSL_OUTPUT, &resources);
     ShHandle fragmentCompiler = ShConstructCompiler(SH_FRAGMENT_SHADER, SH_CSS_SHADERS_SPEC, SH_GLSL_OUTPUT, &resources);
     
