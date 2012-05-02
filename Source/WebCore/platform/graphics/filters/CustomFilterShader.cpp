@@ -32,23 +32,40 @@
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
 #include "CustomFilterShader.h"
 #include "GraphicsContext3D.h"
+#include "ShaderLang.h"
+
+#include <wtf/OwnArrayPtr.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
+#include <wtf/RandomNumber.h>
+#include <wtf/text/StringBuilder.h>
+#include <wtf/text/StripComments.h>
 
 namespace WebCore {
 
 #define SHADER(Src) (#Src)
 
+static String randomGeneratedString(size_t len)
+{
+    const char alphabetSize = 'z' - 'a';
+    StringBuilder builder;
+    builder.append('_');
+    for (size_t i = 0; i < len; ++i) {
+        char character = static_cast<char>(trunc(randomNumber() * alphabetSize)) + 'a';
+        builder.append(character);
+    }
+    return builder.toString();
+}
+
 String CustomFilterShader::defaultVertexShaderString()
 {
     DEFINE_STATIC_LOCAL(String, vertexShaderString, SHADER(
-        precision mediump float;
         attribute vec4 a_position;
         attribute vec2 a_texCoord;
         uniform mat4 u_projectionMatrix;
-        varying vec2 v_texCoord;
         void main()
         {
             gl_Position = u_projectionMatrix * a_position;
-            v_texCoord = a_texCoord;
         }
     ));
     return vertexShaderString;
@@ -57,12 +74,8 @@ String CustomFilterShader::defaultVertexShaderString()
 String CustomFilterShader::defaultFragmentShaderString()
 {
     DEFINE_STATIC_LOCAL(String, fragmentShaderString, SHADER(
-        precision mediump float;
-        varying vec2 v_texCoord;
-        uniform sampler2D u_texture;
         void main()
         {
-            gl_FragColor = texture2D(u_texture, v_texCoord);
         }
     ));
     return fragmentShaderString;
@@ -86,6 +99,13 @@ CustomFilterShader::CustomFilterShader(GraphicsContext3D* context, const String&
     , m_contentSamplerLocation(-1)
     , m_isInitialized(false)
 {
+    m_hiddenSuffix = randomGeneratedString(5);
+    
+    if (!rewriteShaders()) {
+        printf("Shader compiler error: %s\n", m_errorLog.utf8().data());
+        return;
+    }
+    
     Platform3DObject vertexShader = compileShader(GraphicsContext3D::VERTEX_SHADER, m_vertexShaderString);
     if (!vertexShader)
         return;
@@ -109,6 +129,85 @@ CustomFilterShader::CustomFilterShader(GraphicsContext3D* context, const String&
     m_isInitialized = true;
 }
 
+static bool getANGLETranslatedString(ShHandle compiler, String source, String& shaderValidationLog, String& translatedShaderSource)
+{
+    CString asciiSource = StripComments(source).result().latin1();
+    printf("\n=======\nShader before:\n%s\nAfter:\n%s\n", source.utf8().data(), asciiSource.data());
+    const char* const shaderSourceStrings[] = { asciiSource.data() };
+    bool validateSuccess = ShCompile(compiler, shaderSourceStrings, 1, SH_OBJECT_CODE);
+    if (!validateSuccess) {
+        int logSize = 0;
+        ShGetInfo(compiler, SH_INFO_LOG_LENGTH, &logSize);
+        if (logSize > 1) {
+            OwnArrayPtr<char> logBuffer = adoptArrayPtr(new char[logSize]);
+            if (logBuffer) {
+                ShGetInfoLog(compiler, logBuffer.get());
+                shaderValidationLog += logBuffer.get();
+            }
+        }
+        return false;
+    }
+    
+    int translationLength = 0;
+    ShGetInfo(compiler, SH_OBJECT_CODE_LENGTH, &translationLength);
+    if (translationLength <= 0)
+        return false;
+    OwnArrayPtr<char> translationBuffer = adoptArrayPtr(new char[translationLength]);
+    if (!translationBuffer)
+        return false;
+    ShGetObjectCode(compiler, translationBuffer.get());
+
+    StringBuilder shaderSourceBuilder;
+    shaderSourceBuilder.append("precision mediump float;\n");
+    shaderSourceBuilder.append(translationBuffer.get());
+    translatedShaderSource = shaderSourceBuilder.toString();
+
+    printf("Translated to:\n%s\n", translatedShaderSource.utf8().data());
+    return true;
+}
+
+bool CustomFilterShader::rewriteShaders()
+{
+    ShInitialize();
+
+    ShBuiltInResources resources;
+    ShInitBuiltInResources(&resources);
+    
+    m_context->getIntegerv(GraphicsContext3D::MAX_VERTEX_ATTRIBS, &resources.MaxVertexAttribs);
+    m_context->getIntegerv(GraphicsContext3D::MAX_VERTEX_UNIFORM_VECTORS, &resources.MaxVertexUniformVectors);
+    m_context->getIntegerv(GraphicsContext3D::MAX_VARYING_VECTORS, &resources.MaxVaryingVectors);
+    m_context->getIntegerv(GraphicsContext3D::MAX_VERTEX_TEXTURE_IMAGE_UNITS, &resources.MaxVertexTextureImageUnits);
+    m_context->getIntegerv(GraphicsContext3D::MAX_COMBINED_TEXTURE_IMAGE_UNITS, &resources.MaxCombinedTextureImageUnits);
+    m_context->getIntegerv(GraphicsContext3D::MAX_TEXTURE_IMAGE_UNITS, &resources.MaxTextureImageUnits);
+    m_context->getIntegerv(GraphicsContext3D::MAX_FRAGMENT_UNIFORM_VECTORS, &resources.MaxFragmentUniformVectors);
+
+    // Always set to 1 for OpenGL ES.
+    resources.MaxDrawBuffers = 1;
+    
+    ShHandle vertexCompiler = ShConstructCompiler(SH_VERTEX_SHADER, SH_CSS_SHADERS_SPEC, SH_GLSL_OUTPUT, &resources);
+    ShHandle fragmentCompiler = ShConstructCompiler(SH_FRAGMENT_SHADER, SH_CSS_SHADERS_SPEC, SH_GLSL_OUTPUT, &resources);
+    
+    bool valid = false;
+    
+    if (fragmentCompiler && vertexCompiler) {
+        CString hiddenSuffixUtf8 = m_hiddenSuffix.utf8();
+        ShSetHiddenSymbolSuffix(vertexCompiler, hiddenSuffixUtf8.data());
+        ShSetHiddenSymbolSuffix(fragmentCompiler, hiddenSuffixUtf8.data());
+        valid = true;
+        if (!getANGLETranslatedString(vertexCompiler, m_vertexShaderString, m_errorLog, m_vertexShaderString))
+            valid = false;
+        if (!getANGLETranslatedString(fragmentCompiler, m_fragmentShaderString, m_errorLog, m_fragmentShaderString))
+            valid = false;
+    }
+    
+    if (fragmentCompiler)
+        ShDestruct(fragmentCompiler);
+    if (vertexCompiler)
+        ShDestruct(vertexCompiler);
+    
+    return valid;
+}
+
 Platform3DObject CustomFilterShader::compileShader(GC3Denum shaderType, const String& shaderString)
 {
     Platform3DObject shader = m_context->createShader(shaderType);
@@ -120,6 +219,8 @@ Platform3DObject CustomFilterShader::compileShader(GC3Denum shaderType, const St
     if (!compiled) {
         // FIXME: This is an invalid shader. Throw some errors.
         // https://bugs.webkit.org/show_bug.cgi?id=74416
+        String errorLog = m_context->getShaderInfoLog(shader);
+        printf("Error compiling shader source:%s\n%s\n", shaderString.utf8().data(), errorLog.utf8().data());
         m_context->deleteShader(shader);
         return 0;
     }
@@ -156,7 +257,9 @@ void CustomFilterShader::initializeParameterLocations()
     m_tileSizeLocation = m_context->getUniformLocation(m_program, "u_tileSize");
     m_meshSizeLocation = m_context->getUniformLocation(m_program, "u_meshSize");
     m_projectionMatrixLocation = m_context->getUniformLocation(m_program, "u_projectionMatrix");
-    m_samplerLocation = m_context->getUniformLocation(m_program, "u_texture");
+    String uTextureName = String("css_u_texture") + m_hiddenSuffix;
+    m_samplerLocation = m_context->getUniformLocation(m_program, uTextureName.latin1().data());
+    printf("texture name is %s found at %d\n", uTextureName.latin1().data(), m_samplerLocation);
     m_samplerSizeLocation = m_context->getUniformLocation(m_program, "u_textureSize");
     m_contentSamplerLocation = m_context->getUniformLocation(m_program, "u_contentTexture");
 }
