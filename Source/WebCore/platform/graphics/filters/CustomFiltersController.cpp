@@ -36,8 +36,35 @@
 #include "CustomFilterShader.h"
 #include "CustomFiltersHost.h"
 #include "GraphicsContext3D.h"
+#include <wtf/text/StringHash.h>
 
 namespace WebCore {
+
+#define SHADER(Src) (#Src)
+
+String CustomFiltersController::defaultVertexShaderString()
+{
+    DEFINE_STATIC_LOCAL(String, vertexShaderString, SHADER(
+        attribute vec4 a_position;
+        attribute vec2 a_texCoord;
+        uniform mat4 u_projectionMatrix;
+        void main()
+        {
+            gl_Position = u_projectionMatrix * a_position;
+        }
+    ));
+    return vertexShaderString;
+}
+
+String CustomFiltersController::defaultFragmentShaderString()
+{
+    DEFINE_STATIC_LOCAL(String, fragmentShaderString, SHADER(
+        void main()
+        {
+        }
+    ));
+    return fragmentShaderString;
+}
 
 PassOwnPtr<CustomFiltersController> CustomFiltersController::create(CustomFiltersHost* host)
 {
@@ -71,7 +98,21 @@ bool CustomFiltersController::initializeContext()
 PassRefPtr<CustomFilterShader> CustomFiltersController::compileProgram(CustomFilterProgram* program)
 {
     ASSERT(program->isLoaded());
-    return CustomFilterShader::create(m_context.get(), program->vertexShaderString(), program->fragmentShaderString());
+    String vertexShaderString = program->vertexShaderString();
+    if (vertexShaderString.isNull())
+        vertexShaderString = defaultVertexShaderString();
+
+    String fragmentShaderString = program->fragmentShaderString();
+    if (fragmentShaderString.isNull())
+        fragmentShaderString = defaultFragmentShaderString();
+        
+    CustomFilterProgramKey key(vertexShaderString, fragmentShaderString);
+    CustomFiltersMap::iterator iter = m_filtersMap.find(key);
+    if (iter != m_filtersMap.end())
+        return iter->second;
+    RefPtr<CustomFilterShader> shader = CustomFilterShader::create(m_context.get(), vertexShaderString, fragmentShaderString);
+    m_filtersMap.set(key, shader);
+    return shader.release();
 }
 
 

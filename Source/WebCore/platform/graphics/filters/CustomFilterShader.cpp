@@ -50,8 +50,6 @@
 
 namespace WebCore {
 
-#define SHADER(Src) (#Src)
-
 static String randomGeneratedString(size_t len)
 {
     const char alphabetSize = 'z' - 'a';
@@ -64,34 +62,10 @@ static String randomGeneratedString(size_t len)
     return builder.toString();
 }
 
-String CustomFilterShader::defaultVertexShaderString()
-{
-    DEFINE_STATIC_LOCAL(String, vertexShaderString, SHADER(
-        attribute vec4 a_position;
-        attribute vec2 a_texCoord;
-        uniform mat4 u_projectionMatrix;
-        void main()
-        {
-            gl_Position = u_projectionMatrix * a_position;
-        }
-    ));
-    return vertexShaderString;
-}
-
-String CustomFilterShader::defaultFragmentShaderString()
-{
-    DEFINE_STATIC_LOCAL(String, fragmentShaderString, SHADER(
-        void main()
-        {
-        }
-    ));
-    return fragmentShaderString;
-}
-
 CustomFilterShader::CustomFilterShader(GraphicsContext3D* context, const String& vertexShaderString, const String& fragmentShaderString)
     : m_context(context)
-    , m_vertexShaderString(!vertexShaderString.isNull() ? vertexShaderString : defaultVertexShaderString())
-    , m_fragmentShaderString(!fragmentShaderString.isNull() ? fragmentShaderString : defaultFragmentShaderString())
+    , m_vertexShaderString(vertexShaderString)
+    , m_fragmentShaderString(fragmentShaderString)
     , m_program(0)
     , m_positionAttribLocation(-1)
     , m_texAttribLocation(-1)
@@ -106,6 +80,9 @@ CustomFilterShader::CustomFilterShader(GraphicsContext3D* context, const String&
     , m_contentSamplerLocation(-1)
     , m_isInitialized(false)
 {
+    ASSERT(!vertexShaderString.isNull());
+    ASSERT(!fragmentShaderString.isNull());
+    
     m_hiddenSuffix = randomGeneratedString(5);
     
     if (!rewriteShaders()) {

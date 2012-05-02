@@ -31,8 +31,10 @@
 #define CustomFiltersController_h
 
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-#include <wtf/RefPtr.h>
+#include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -55,8 +57,15 @@ private:
     
     bool initializeContext();
     
+    static String defaultVertexShaderString();
+    static String defaultFragmentShaderString();
+    
     CustomFiltersHost* m_host;
     RefPtr<GraphicsContext3D> m_context;
+    
+    typedef pair<String, String> CustomFilterProgramKey;
+    typedef HashMap<CustomFilterProgramKey, RefPtr<CustomFilterShader> > CustomFiltersMap;
+    CustomFiltersMap m_filtersMap;
 };
 
 } // namespace WebCore

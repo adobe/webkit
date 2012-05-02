@@ -78,9 +78,6 @@ private:
     Platform3DObject linkProgram(Platform3DObject vertexShader, Platform3DObject fragmentShader);
     void initializeParameterLocations();
     
-    static String defaultVertexShaderString();
-    static String defaultFragmentShaderString();
-    
     RefPtr<GraphicsContext3D> m_context;
     
     String m_vertexShaderString;
