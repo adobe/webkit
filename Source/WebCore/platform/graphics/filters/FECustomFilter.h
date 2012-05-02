@@ -47,6 +47,7 @@ class CachedShader;
 class CustomFilterMesh;
 class CustomFilterNumberParameter;
 class CustomFilterProgram;
+class CustomFilterTransformParameter;
 class CustomFilterShader;
 class DrawingBuffer;
 class GraphicsContext3D;
@@ -74,6 +75,7 @@ private:
     void resizeContext(const IntSize& newContextSize);
     void bindVertexAttribute(int attributeLocation, unsigned size, unsigned& offset);
     void bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter*);
+    void bindProgramTransformParameters(int uniformLocation, CustomFilterTransformParameter*);
     void bindProgramParameters();
     void bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray);
     

@@ -1441,6 +1441,8 @@
 		503D0CAB14B5B08700F32F57 /* CustomFilterProgram.h in Headers */ = {isa = PBXBuildFile; fileRef = 503D0CA814B5B08700F32F57 /* CustomFilterProgram.h */; settings = {ATTRIBUTES = (); }; };
 		503D0CAC14B5B08700F32F57 /* CustomFilterProgramClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 503D0CA914B5B08700F32F57 /* CustomFilterProgramClient.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		503D0CAE14B5B0BA00F32F57 /* StyleCustomFilterProgram.h in Headers */ = {isa = PBXBuildFile; fileRef = 503D0CAD14B5B0BA00F32F57 /* StyleCustomFilterProgram.h */; settings = {ATTRIBUTES = (); }; };
+		5068FAF91550B696001C328D /* CustomFilterTransformParameter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5068FAF71550B696001C328D /* CustomFilterTransformParameter.cpp */; };
+		5068FAFA1550B696001C328D /* CustomFilterTransformParameter.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FAF81550B696001C328D /* CustomFilterTransformParameter.h */; };
 		508C3C37152F84B7005479EF /* WrappingContext.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 508C3C34152F73E0005479EF /* WrappingContext.cpp */; };
 		508CCA4F13CF106B003151F3 /* RenderFlowThread.h in Headers */ = {isa = PBXBuildFile; fileRef = 508CCA4D13CF106B003151F3 /* RenderFlowThread.h */; };
 		508CCA5013CF106B003151F3 /* RenderFlowThread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 508CCA4E13CF106B003151F3 /* RenderFlowThread.cpp */; };
@@ -8439,6 +8441,8 @@
 		503D0CA814B5B08700F32F57 /* CustomFilterProgram.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFilterProgram.h; path = filters/CustomFilterProgram.h; sourceTree = "<group>"; };
 		503D0CA914B5B08700F32F57 /* CustomFilterProgramClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFilterProgramClient.h; path = filters/CustomFilterProgramClient.h; sourceTree = "<group>"; };
 		503D0CAD14B5B0BA00F32F57 /* StyleCustomFilterProgram.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StyleCustomFilterProgram.h; path = style/StyleCustomFilterProgram.h; sourceTree = "<group>"; };
+		5068FAF71550B696001C328D /* CustomFilterTransformParameter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CustomFilterTransformParameter.cpp; path = filters/CustomFilterTransformParameter.cpp; sourceTree = "<group>"; };
+		5068FAF81550B696001C328D /* CustomFilterTransformParameter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFilterTransformParameter.h; path = filters/CustomFilterTransformParameter.h; sourceTree = "<group>"; };
 		508C3C34152F73E0005479EF /* WrappingContext.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WrappingContext.cpp; sourceTree = "<group>"; };
 		508C3C35152F73E0005479EF /* WrappingContext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WrappingContext.h; sourceTree = "<group>"; };
 		508CCA4D13CF106B003151F3 /* RenderFlowThread.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenderFlowThread.h; sourceTree = "<group>"; };
@@ -17694,6 +17698,8 @@
 		A75E8B7F0E1DE2B0007F2481 /* filters */ = {
 			isa = PBXGroup;
 			children = (
+				5068FAF71550B696001C328D /* CustomFilterTransformParameter.cpp */,
+				5068FAF81550B696001C328D /* CustomFilterTransformParameter.h */,
 				49ECEB5C1499790D00CDD3A4 /* arm */,
 				50D405F7147D31F300D30BB5 /* CustomFilterMesh.cpp */,
 				50D405F8147D31F300D30BB5 /* CustomFilterMesh.h */,
@@ -24849,6 +24855,7 @@
 				71A57DF2154BE25C0009D120 /* SVGPathUtilities.h in Headers */,
 				78D02BC6154A18DF00B62D05 /* CSSPropertyAnimation.h in Headers */,
 				50E95A981514E731005EE60A /* RenderRegionMultiColumn.h in Headers */,
+				5068FAFA1550B696001C328D /* CustomFilterTransformParameter.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -27867,6 +27874,7 @@
 				78D02BC5154A18DF00B62D05 /* CSSPropertyAnimation.cpp in Sources */,
 				50E95A971514E731005EE60A /* RenderRegionMultiColumn.cpp in Sources */,
 				508C3C37152F84B7005479EF /* WrappingContext.cpp in Sources */,
+				5068FAF91550B696001C328D /* CustomFilterTransformParameter.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

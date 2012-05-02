@@ -3735,6 +3735,8 @@
             'platform/graphics/efl/IntRectEfl.cpp',
             'platform/graphics/filters/CustomFilterMesh.h',
             'platform/graphics/filters/CustomFilterNumberParameter.h',
+            'platform/graphics/filters/CustomFilterTransformParameter.cpp',
+            'platform/graphics/filters/CustomFilterTransformParameter.h',
             'platform/graphics/filters/CustomFilterOperation.cpp',
             'platform/graphics/filters/CustomFilterOperation.h',
             'platform/graphics/filters/CustomFilterParameter.h',

@@ -136,6 +136,7 @@
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterOperation.h"
 #include "CustomFilterParameter.h"
+#include "CustomFilterTransformParameter.h"
 #include "StyleCachedShader.h"
 #include "StyleCustomFilterProgram.h"
 #include "StylePendingShader.h"
@@ -5505,19 +5506,27 @@ bool StyleResolver::parseCustomFilterParameterList(CSSValue* parametersValue, Cu
             CSSValueList* values = static_cast<CSSValueList*>(iterator.value());
             iterator.advance();
             
-            // We can have only arrays of booleans or numbers, so use the first value to choose between those two.
-            // Make sure we have at least one value. We need up to 4 values (all booleans or all numbers).
-            if (!values->length() || values->length() > 4)
-                return false;
+            if (values->length() && values->itemWithoutBoundsCheck(0)->isWebKitCSSTransformValue()) {
+                TransformOperations operations;
+                createTransformOperations(values, style(), m_rootElementStyle, operations);
+                if (!operations.size())
+                    return false;
+                parameter = CustomFilterTransformParameter::create(name, operations);
+            } else {
+                // We can have only arrays of booleans or numbers, so use the first value to choose between those two.
+                // Make sure we have at least one value. We need up to 4 values (all booleans or all numbers).
+                if (!values->length() || values->length() > 4)
+                    return false;
             
-            if (!values->itemWithoutBoundsCheck(0)->isPrimitiveValue())
-                return false;
+                if (!values->itemWithoutBoundsCheck(0)->isPrimitiveValue())
+                    return false;
             
-            CSSPrimitiveValue* firstPrimitiveValue = static_cast<CSSPrimitiveValue*>(values->itemWithoutBoundsCheck(0));
-            if (firstPrimitiveValue->primitiveType() == CSSPrimitiveValue::CSS_NUMBER)
-                parameter = parseCustomFilterNumberParamter(name, values);
-            // FIXME: Implement the boolean array parameter here.
-            // https://bugs.webkit.org/show_bug.cgi?id=76438
+                CSSPrimitiveValue* firstPrimitiveValue = static_cast<CSSPrimitiveValue*>(values->itemWithoutBoundsCheck(0));
+                if (firstPrimitiveValue->primitiveType() == CSSPrimitiveValue::CSS_NUMBER)
+                    parameter = parseCustomFilterNumberParamter(name, values);
+                // FIXME: Implement the boolean array parameter here.
+                // https://bugs.webkit.org/show_bug.cgi?id=76438
+            }
         }
         
         if (!parameter)

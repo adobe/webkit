@@ -40,6 +40,7 @@ class StylePropertyShorthand;
 
 #if ENABLE(CSS_SHADERS)
 class CustomFilterNumberParameter;
+class CustomFilterTransformParameter;
 class CustomFilterParameter;
 #endif
 
@@ -102,6 +103,7 @@ private:
 
 #if ENABLE(CSS_SHADERS)
     PassRefPtr<CSSValue> valueForCustomFilterNumberParameter(const CustomFilterNumberParameter*) const;
+    PassRefPtr<CSSValue> valueForCustomFilterTransformParameter(const CustomFilterTransformParameter*) const;
     PassRefPtr<CSSValue> valueForCustomFilterParameter(const CustomFilterParameter*) const;
 #endif
 

@@ -2098,7 +2098,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         if (id == CSSValueNone)
             validPrimitive = true;
         else {
-            PassRefPtr<CSSValue> val = parseTransform();
+            PassRefPtr<CSSValue> val = parseTransform(m_valueList.get());
             if (val) {
                 addProperty(propId, val, important);
                 return true;
@@ -6884,15 +6884,15 @@ private:
     CSSParser::Units m_unit;
 };
 
-PassRefPtr<CSSValueList> CSSParser::parseTransform()
+PassRefPtr<CSSValueList> CSSParser::parseTransform(CSSParserValueList* valueList)
 {
-    if (!m_valueList)
+    if (!valueList)
         return 0;
 
     // The transform is a list of functional primitives that specify transform operations.
     // We collect a list of WebKitCSSTransformValues, where each value specifies a single operation.
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-    for (CSSParserValue* value = m_valueList->current(); value; value = m_valueList->next()) {
+    for (CSSParserValue* value = valueList->current(); value; value = valueList->next()) {
         // Transform functions can be comma separated on SVG presentation attributes.
         if (m_context.mode == SVGAttributeMode && value->unit == CSSParserValue::Operator && value->iValue == ',')
             continue;
@@ -7112,10 +7112,20 @@ PassRefPtr<WebKitCSSFilterValue> CSSParser::parseCustomFilter(CSSParserValue* va
 
         RefPtr<CSSValueList> parameter = CSSValueList::createSpaceSeparated();
         parameter->append(createPrimitiveStringValue(arg));
+        paramList->append(parameter);
         argsList->next();
 
         if (!(arg = argsList->current()))
             return 0;
+        
+        // 3d transforms
+        if (arg->unit == CSSParserValue::Function && arg->function) {
+            RefPtr<CSSValue> val = parseTransform(argsList);
+            if (val) {
+                parameter->append(val.release());
+                continue;
+            }
+        }
 
         // TODO: Implement other parameters types parsing.
         // textures: https://bugs.webkit.org/show_bug.cgi?id=71442
@@ -7134,7 +7144,6 @@ PassRefPtr<WebKitCSSFilterValue> CSSParser::parseCustomFilter(CSSParserValue* va
         if (!paramValueList->length() || paramValueList->length() > 4)
             return 0;
         parameter->append(paramValueList.release());
-        paramList->append(parameter.release());
         if (!acceptCommaOperator(argsList))
             return 0;
     }

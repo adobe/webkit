@@ -36,6 +36,7 @@
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterParameter.h"
 #include "CustomFilterProgram.h"
+#include "CustomFilterTransformParameter.h"
 #include "CustomFilterShader.h"
 #include "DrawingBuffer.h"
 #include "GraphicsContext3D.h"
@@ -189,6 +190,15 @@ void FECustomFilter::bindProgramNumberParameters(int uniformLocation, CustomFilt
     }
 }
 
+void FECustomFilter::bindProgramTransformParameters(int uniformLocation, CustomFilterTransformParameter* transformParameter)
+{
+    TransformationMatrix transform;
+    transformParameter->transform().apply(FloatSize(1, 1), transform);
+    float glMatrix[16];
+    transform.toColumnMajorFloatArray(glMatrix);
+    m_context->uniformMatrix4fv(uniformLocation, 1, false, &glMatrix[0]);
+}
+
 void FECustomFilter::bindProgramParameters()
 {
     // FIXME: Find a way to reset uniforms that are not specified in CSS. This is needed to avoid using values
@@ -204,6 +214,9 @@ void FECustomFilter::bindProgramParameters()
         switch (parameter->parameterType()) {
         case CustomFilterParameter::NUMBER:
             bindProgramNumberParameters(uniformLocation, static_cast<CustomFilterNumberParameter*>(parameter));
+            break;
+        case CustomFilterParameter::TRANSFORM:
+            bindProgramTransformParameters(uniformLocation, static_cast<CustomFilterTransformParameter*>(parameter));
             break;
         }
     }

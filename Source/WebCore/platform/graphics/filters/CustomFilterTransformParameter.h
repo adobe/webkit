@@ -27,52 +27,40 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CustomFilterParameter_h
-#define CustomFilterParameter_h
+#ifndef CustomFilterTransformParameter_h
+#define CustomFilterTransformParameter_h
 
 #if ENABLE(CSS_SHADERS)
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/text/WTFString.h>
+#include "CustomFilterParameter.h"
+#include "TransformOperations.h"
 
 namespace WebCore {
 
-class CustomFilterParameter : public RefCounted<CustomFilterParameter> {
+class TransformationMatrix;
+
+class CustomFilterTransformParameter : public CustomFilterParameter {
 public:
-    // FIXME: Implement other parameters types:
-    // booleans: https://bugs.webkit.org/show_bug.cgi?id=76438
-    // textures: https://bugs.webkit.org/show_bug.cgi?id=71442
-    // 3d-transforms: https://bugs.webkit.org/show_bug.cgi?id=71443
-    // mat2, mat3, mat4: https://bugs.webkit.org/show_bug.cgi?id=71444
-    enum ParameterType {
-        NUMBER,
-        TRANSFORM
-    };
+    static PassRefPtr<CustomFilterTransformParameter> create(const String& name, const TransformOperations& transform)
+    {
+        return adoptRef(new CustomFilterTransformParameter(name, transform));
+    }
+
+    virtual PassRefPtr<CustomFilterParameter> blend(const CustomFilterParameter* from, double progress);
+    virtual bool operator==(const CustomFilterParameter& o) const;
     
-    virtual ~CustomFilterParameter() { }
-    
-    ParameterType parameterType() const { return m_type; }
-    const String& name() const { return m_name; }
-    
-    bool isSameType(const CustomFilterParameter& other) const { return parameterType() == other.parameterType(); }
-    
-    virtual PassRefPtr<CustomFilterParameter> blend(const CustomFilterParameter*, double progress) = 0;
-    virtual bool operator==(const CustomFilterParameter&) const = 0;
-    bool operator!=(const CustomFilterParameter& o) const { return !(*this == o); }
-protected:
-    CustomFilterParameter(ParameterType type, const String& name)
-        : m_name(name)
-        , m_type(type)
+    const TransformOperations& transform() const { return m_transform; };
+private:
+    CustomFilterTransformParameter(const String& name, const TransformOperations& transform)
+        : CustomFilterParameter(TRANSFORM, name)
+        , m_transform(transform)
     {
     }
 
-private:
-    String m_name;
-    ParameterType m_type;
+    TransformOperations m_transform;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(CSS_SHADERS)
 
-#endif // CustomFilterParameter_h
+#endif // CustomFilterTransformParameter_h

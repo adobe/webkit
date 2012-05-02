@@ -43,6 +43,7 @@
 #include "CursorList.h"
 #if ENABLE(CSS_SHADERS)
 #include "CustomFilterNumberParameter.h"
+#include "CustomFilterTransformParameter.h"
 #include "CustomFilterOperation.h"
 #include "CustomFilterParameter.h"
 #endif
@@ -674,15 +675,8 @@ static LayoutRect sizingBox(RenderObject* renderer)
     return box->style()->boxSizing() == BORDER_BOX ? box->borderBoxRect() : box->computedCSSContentBoxRect();
 }
 
-static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const RenderStyle* style)
+static PassRefPtr<CSSValue> computedTransformFunction(const TransformationMatrix& transform, const RenderStyle* style = 0)
 {
-    if (!renderer || style->transform().operations().isEmpty())
-        return cssValuePool().createIdentifierValue(CSSValueNone);
-
-    LayoutRect box = sizingBox(renderer);
-
-    TransformationMatrix transform;
-    style->applyTransform(transform, box.size(), RenderStyle::ExcludeTransformOrigin);
     // Note that this does not flatten to an affine transform if ENABLE(3D_RENDERING) is off, by design.
 
     RefPtr<WebKitCSSTransformValue> transformVal;
@@ -695,8 +689,13 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
         transformVal->append(cssValuePool().createValue(transform.b(), CSSPrimitiveValue::CSS_NUMBER));
         transformVal->append(cssValuePool().createValue(transform.c(), CSSPrimitiveValue::CSS_NUMBER));
         transformVal->append(cssValuePool().createValue(transform.d(), CSSPrimitiveValue::CSS_NUMBER));
-        transformVal->append(zoomAdjustedNumberValue(transform.e(), style));
-        transformVal->append(zoomAdjustedNumberValue(transform.f(), style));
+        if (style) {
+            transformVal->append(zoomAdjustedNumberValue(transform.e(), style));
+            transformVal->append(zoomAdjustedNumberValue(transform.f(), style));
+        } else {
+            transformVal->append(cssValuePool().createValue(transform.e(), CSSPrimitiveValue::CSS_NUMBER));
+            transformVal->append(cssValuePool().createValue(transform.f(), CSSPrimitiveValue::CSS_NUMBER));
+        }
     } else {
         transformVal = WebKitCSSTransformValue::create(WebKitCSSTransformValue::Matrix3DTransformOperation);
 
@@ -715,9 +714,15 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
         transformVal->append(cssValuePool().createValue(transform.m33(), CSSPrimitiveValue::CSS_NUMBER));
         transformVal->append(cssValuePool().createValue(transform.m34(), CSSPrimitiveValue::CSS_NUMBER));
 
-        transformVal->append(zoomAdjustedNumberValue(transform.m41(), style));
-        transformVal->append(zoomAdjustedNumberValue(transform.m42(), style));
-        transformVal->append(zoomAdjustedNumberValue(transform.m43(), style));
+        if (style) {
+            transformVal->append(zoomAdjustedNumberValue(transform.m41(), style));
+            transformVal->append(zoomAdjustedNumberValue(transform.m42(), style));
+            transformVal->append(zoomAdjustedNumberValue(transform.m43(), style));
+        } else {
+            transformVal->append(cssValuePool().createValue(transform.m41(), CSSPrimitiveValue::CSS_NUMBER));
+            transformVal->append(cssValuePool().createValue(transform.m42(), CSSPrimitiveValue::CSS_NUMBER));
+            transformVal->append(cssValuePool().createValue(transform.m43(), CSSPrimitiveValue::CSS_NUMBER));
+        }
         transformVal->append(cssValuePool().createValue(transform.m44(), CSSPrimitiveValue::CSS_NUMBER));
     }
 
@@ -725,6 +730,19 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
     list->append(transformVal);
 
     return list.release();
+}
+
+static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const RenderStyle* style)
+{
+    if (!renderer || style->transform().operations().isEmpty())
+        return cssValuePool().createIdentifierValue(CSSValueNone);
+
+    LayoutRect box = sizingBox(renderer);
+
+    TransformationMatrix transform;
+    style->applyTransform(transform, box.size(), RenderStyle::ExcludeTransformOrigin);
+    
+    return computedTransformFunction(transform, style);
 }
 
 #if ENABLE(CSS_SHADERS)
@@ -736,6 +754,13 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForCustomFilterNumberPara
     return numberParameterValue.release();
 }
 
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForCustomFilterTransformParameter(const CustomFilterTransformParameter* transformParameter) const
+{
+    TransformationMatrix transform;
+    transformParameter->transform().apply(FloatSize(1, 1), transform);
+    return computedTransformFunction(transform);
+}
+
 PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForCustomFilterParameter(const CustomFilterParameter* parameter) const
 {
     // FIXME: Add here computed style for the other types: boolean, transform, matrix, texture.
@@ -743,6 +768,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForCustomFilterParameter(
     switch (parameter->parameterType()) {
     case CustomFilterParameter::NUMBER:
         return valueForCustomFilterNumberParameter(static_cast<const CustomFilterNumberParameter*>(parameter));
+    case CustomFilterParameter::TRANSFORM:
+        return valueForCustomFilterTransformParameter(static_cast<const CustomFilterTransformParameter*>(parameter));
     }
     
     ASSERT_NOT_REACHED();
