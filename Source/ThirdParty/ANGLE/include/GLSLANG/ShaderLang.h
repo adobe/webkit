@@ -49,7 +49,8 @@ typedef enum {
 
 typedef enum {
   SH_GLES2_SPEC = 0x8B40,
-  SH_WEBGL_SPEC = 0x8B41
+  SH_WEBGL_SPEC = 0x8B41,
+  SH_CSS_SHADERS_SPEC = 0x8B42
 } ShShaderSpec;
 
 typedef enum {
@@ -108,6 +109,11 @@ typedef enum {
   SH_DEPENDENCY_GRAPH           = 0x0400
 } ShCompileOptions;
 
+typedef enum {
+    SH_TEXCOORD_ATTRIBUTE_NAME = 1,
+    SH_TEXTURE_UNIFORM_NAME = 2
+} ShCSSShaderInfo;
+    
 //
 // Driver must call this first, once, before doing any other
 // compiler operations.
@@ -175,6 +181,43 @@ COMPILER_EXPORT ShHandle ShConstructCompiler(
     ShShaderOutput output,
     const ShBuiltInResources* resources);
 COMPILER_EXPORT void ShDestruct(ShHandle handle);
+
+//
+// Under the SH_CSS_SHADER_SPEC, the compiler will insert some hidden symbols
+// in the shader.
+// These symbols will be behind the reserved "css_" prefix, so they will be
+// inaccessible to the original shader code that was compiled.
+// For added security, the compiler also accepts a suffix to append to these 
+// hidden symbols, which can be a random string.
+// This can make it very difficult to guess what the hidden symbol is, even if
+// the "css_" prefix restriction fails due to a bug in the compiler.
+// If compiling both a vertex shader and a fragment shader, the same hidden
+// symbol suffix should be passed to both the vertex shader compiler and the 
+// fragment shader compiler.
+// This ensures that any hidden varyings have the same generated name in both
+// shaders.
+// The default hidden symbol suffix, if you do not provide one, is the empty 
+// string.
+//
+// Under the SH_CSS_SHADER_SPEC, the following hidden symbols will be created,
+// where "XXX" represents the hidden symbol suffix you provide via this function.
+//
+// Vertex Shader Hidden Symbols:
+//     varying vec2 css_v_texCoordXXX
+//
+// Fragment Shader Hidden Symbols:
+//     varying vec2 css_v_texCoordXXX
+//     uniform sampler2D css_u_textureXXX
+//
+// Parameters:
+// handle: Specifies the handle of compiler to be used.
+// suffix: Specifies a pointer to a null-terminated string containing the hidden
+//         symbol suffix.
+//         There is no length restriction on the string, but be aware that the
+//         generated symbol names may be changed and truncated if the shader is
+//         compiled with the SH_MAP_LONG_VARIABLES_NAME flag.
+//
+COMPILER_EXPORT void ShSetHiddenSymbolSuffix(const ShHandle handle, const char* const suffix);
 
 //
 // Compiles the given shader source.

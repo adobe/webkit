@@ -27,6 +27,11 @@ class TCompiler;
 class TDepGraph;
 
 //
+// Helper function to identify specs based on the WebGL spec.
+//
+bool isWebGLSpecSubset(ShShaderSpec spec);
+
+//
 // The base class used to back handles returned to the driver.
 //
 class TShHandleBase {
@@ -52,6 +57,7 @@ public:
     virtual TCompiler* getAsCompiler() { return this; }
 
     bool Init(const ShBuiltInResources& resources);
+    void setHiddenSymbolSuffix(const char* const suffix) { hiddenSymbolSuffix = suffix; }
     bool compile(const char* const shaderStrings[],
                  const int numStrings,
                  int compileOptions);
@@ -71,6 +77,9 @@ protected:
     void clearResults();
     // Return true if function recursion is detected.
     bool detectRecursion(TIntermNode* root);
+    // Rewrites a CSS shader's intermediate tree into a valid GLSL shader,
+    // and returns the potentially new intermediate tree root.
+    TIntermNode* rewriteCSSShader(TIntermNode* root);
     // Returns true if the given shader does not exceed the minimum
     // functionality mandated in GLSL 1.0 spec Appendix A.
     bool validateLimitations(TIntermNode* root);
@@ -91,6 +100,8 @@ protected:
 private:
     ShShaderType shaderType;
     ShShaderSpec shaderSpec;
+
+    TString hiddenSymbolSuffix;    
 
     // Built-in symbol table for the given language, spec, and resources.
     // It is preserved from compile-to-compile.

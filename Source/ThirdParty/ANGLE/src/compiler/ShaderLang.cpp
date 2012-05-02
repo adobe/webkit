@@ -161,6 +161,23 @@ void ShDestruct(ShHandle handle)
 }
 
 //
+// Set the suffix that the compiler will append to hidden symbols as a
+// backup security measure.
+//
+COMPILER_EXPORT void ShSetHiddenSymbolSuffix(const ShHandle handle, const char* const suffix)
+{
+    if (handle == 0)
+        return;
+
+    TShHandleBase* base = static_cast<TShHandleBase*>(handle);
+    TCompiler* compiler = base->getAsCompiler();
+    if (compiler == 0)
+        return;
+
+    compiler->setHiddenSymbolSuffix(suffix);
+}
+
+//
 // Do an actual compile on the given strings.  The result is left 
 // in the given compile object.
 //

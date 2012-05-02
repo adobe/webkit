@@ -12,6 +12,16 @@
 		49951C0A14B7AAD80060E96E /* BuiltInFunctionEmulator.h in Headers */ = {isa = PBXBuildFile; fileRef = 49951C0614B7AAD80060E96E /* BuiltInFunctionEmulator.h */; };
 		49951C0B14B7AAD80060E96E /* DetectRecursion.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49951C0714B7AAD80060E96E /* DetectRecursion.cpp */; };
 		49951C0C14B7AAD80060E96E /* DetectRecursion.h in Headers */ = {isa = PBXBuildFile; fileRef = 49951C0814B7AAD80060E96E /* DetectRecursion.h */; };
+		5068FB091550B963001C328D /* FindSymbolUsage.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FAFF1550B963001C328D /* FindSymbolUsage.h */; };
+		5068FB0A1550B963001C328D /* RenameFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FB001550B963001C328D /* RenameFunction.h */; };
+		5068FB0B1550B963001C328D /* RewriteCSSFragmentShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5068FB011550B963001C328D /* RewriteCSSFragmentShader.cpp */; };
+		5068FB0C1550B963001C328D /* RewriteCSSFragmentShader.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FB021550B963001C328D /* RewriteCSSFragmentShader.h */; };
+		5068FB0D1550B963001C328D /* RewriteCSSShaderBase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5068FB031550B963001C328D /* RewriteCSSShaderBase.cpp */; };
+		5068FB0E1550B963001C328D /* RewriteCSSShaderBase.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FB041550B963001C328D /* RewriteCSSShaderBase.h */; };
+		5068FB0F1550B963001C328D /* RewriteCSSShaderHelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5068FB051550B963001C328D /* RewriteCSSShaderHelper.cpp */; };
+		5068FB101550B963001C328D /* RewriteCSSShaderHelper.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FB061550B963001C328D /* RewriteCSSShaderHelper.h */; };
+		5068FB111550B963001C328D /* RewriteCSSVertexShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5068FB071550B963001C328D /* RewriteCSSVertexShader.cpp */; };
+		5068FB121550B963001C328D /* RewriteCSSVertexShader.h in Headers */ = {isa = PBXBuildFile; fileRef = 5068FB081550B963001C328D /* RewriteCSSVertexShader.h */; };
 		508C3C1A152D10A5005479EF /* ValidateWebSafeFragmentShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 508C3C16152D10A5005479EF /* ValidateWebSafeFragmentShader.cpp */; };
 		508C3C1B152D10A5005479EF /* ValidateWebSafeFragmentShader.h in Headers */ = {isa = PBXBuildFile; fileRef = 508C3C17152D10A5005479EF /* ValidateWebSafeFragmentShader.h */; };
 		508C3C1C152D10A5005479EF /* ValidateWebSafeVertexShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 508C3C18152D10A5005479EF /* ValidateWebSafeVertexShader.cpp */; };
@@ -84,6 +94,16 @@
 		49951C0614B7AAD80060E96E /* BuiltInFunctionEmulator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BuiltInFunctionEmulator.h; sourceTree = "<group>"; };
 		49951C0714B7AAD80060E96E /* DetectRecursion.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DetectRecursion.cpp; sourceTree = "<group>"; };
 		49951C0814B7AAD80060E96E /* DetectRecursion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DetectRecursion.h; sourceTree = "<group>"; };
+		5068FAFF1550B963001C328D /* FindSymbolUsage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FindSymbolUsage.h; sourceTree = "<group>"; };
+		5068FB001550B963001C328D /* RenameFunction.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenameFunction.h; sourceTree = "<group>"; };
+		5068FB011550B963001C328D /* RewriteCSSFragmentShader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RewriteCSSFragmentShader.cpp; sourceTree = "<group>"; };
+		5068FB021550B963001C328D /* RewriteCSSFragmentShader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RewriteCSSFragmentShader.h; sourceTree = "<group>"; };
+		5068FB031550B963001C328D /* RewriteCSSShaderBase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RewriteCSSShaderBase.cpp; sourceTree = "<group>"; };
+		5068FB041550B963001C328D /* RewriteCSSShaderBase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RewriteCSSShaderBase.h; sourceTree = "<group>"; };
+		5068FB051550B963001C328D /* RewriteCSSShaderHelper.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RewriteCSSShaderHelper.cpp; sourceTree = "<group>"; };
+		5068FB061550B963001C328D /* RewriteCSSShaderHelper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RewriteCSSShaderHelper.h; sourceTree = "<group>"; };
+		5068FB071550B963001C328D /* RewriteCSSVertexShader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RewriteCSSVertexShader.cpp; sourceTree = "<group>"; };
+		5068FB081550B963001C328D /* RewriteCSSVertexShader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RewriteCSSVertexShader.h; sourceTree = "<group>"; };
 		508C3C16152D10A5005479EF /* ValidateWebSafeFragmentShader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ValidateWebSafeFragmentShader.cpp; sourceTree = "<group>"; };
 		508C3C17152D10A5005479EF /* ValidateWebSafeFragmentShader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ValidateWebSafeFragmentShader.h; sourceTree = "<group>"; };
 		508C3C18152D10A5005479EF /* ValidateWebSafeVertexShader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ValidateWebSafeVertexShader.cpp; sourceTree = "<group>"; };
@@ -307,6 +327,16 @@
 		FB39D1851200F26200088E69 /* compiler */ = {
 			isa = PBXGroup;
 			children = (
+				5068FAFF1550B963001C328D /* FindSymbolUsage.h */,
+				5068FB001550B963001C328D /* RenameFunction.h */,
+				5068FB011550B963001C328D /* RewriteCSSFragmentShader.cpp */,
+				5068FB021550B963001C328D /* RewriteCSSFragmentShader.h */,
+				5068FB031550B963001C328D /* RewriteCSSShaderBase.cpp */,
+				5068FB041550B963001C328D /* RewriteCSSShaderBase.h */,
+				5068FB051550B963001C328D /* RewriteCSSShaderHelper.cpp */,
+				5068FB061550B963001C328D /* RewriteCSSShaderHelper.h */,
+				5068FB071550B963001C328D /* RewriteCSSVertexShader.cpp */,
+				5068FB081550B963001C328D /* RewriteCSSVertexShader.h */,
 				FB39D1861200F26200088E69 /* BaseTypes.h */,
 				FB39D1871200F26200088E69 /* CodeGenGLSL.cpp */,
 				FB39D1881200F26200088E69 /* CodeGenHLSL.cpp */,
@@ -546,6 +576,12 @@
 				508C3C26152D10AD005479EF /* DependencyGraph.h in Headers */,
 				508C3C28152D10AD005479EF /* DependencyGraphFactory.h in Headers */,
 				508C3C2A152D10AD005479EF /* DependencyGraphOutput.h in Headers */,
+				5068FB091550B963001C328D /* FindSymbolUsage.h in Headers */,
+				5068FB0A1550B963001C328D /* RenameFunction.h in Headers */,
+				5068FB0C1550B963001C328D /* RewriteCSSFragmentShader.h in Headers */,
+				5068FB0E1550B963001C328D /* RewriteCSSShaderBase.h in Headers */,
+				5068FB101550B963001C328D /* RewriteCSSShaderHelper.h in Headers */,
+				5068FB121550B963001C328D /* RewriteCSSVertexShader.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -648,6 +684,10 @@
 				508C3C27152D10AD005479EF /* DependencyGraphFactory.cpp in Sources */,
 				508C3C29152D10AD005479EF /* DependencyGraphOutput.cpp in Sources */,
 				508C3C2B152D10AD005479EF /* DependencyGraphTraverse.cpp in Sources */,
+				5068FB0B1550B963001C328D /* RewriteCSSFragmentShader.cpp in Sources */,
+				5068FB0D1550B963001C328D /* RewriteCSSShaderBase.cpp in Sources */,
+				5068FB0F1550B963001C328D /* RewriteCSSShaderHelper.cpp in Sources */,
+				5068FB111550B963001C328D /* RewriteCSSVertexShader.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

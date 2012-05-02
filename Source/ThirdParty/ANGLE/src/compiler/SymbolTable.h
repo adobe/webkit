@@ -282,7 +282,7 @@ public:
         return table[currentLevel()]->insert(symbol);
     }
 
-    TSymbol* find(const TString& name, bool* builtIn = 0, bool *sameScope = 0) 
+    TSymbol* find(const TString& name, bool* builtIn = 0, bool *sameScope = 0) const
     {
         int level = currentLevel();
         TSymbol* symbol;

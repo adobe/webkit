@@ -10,8 +10,15 @@
 #include "compiler/Initialize.h"
 #include "compiler/MapLongVariableNames.h"
 #include "compiler/ParseHelper.h"
+#include "compiler/RewriteCSSFragmentShader.h"
+#include "compiler/RewriteCSSVertexShader.h"
 #include "compiler/ShHandle.h"
 #include "compiler/ValidateLimitations.h"
+
+bool isWebGLSpecSubset(ShShaderSpec spec)
+{
+    return spec == SH_WEBGL_SPEC || spec == SH_CSS_SHADERS_SPEC;
+}
 
 namespace {
 bool InitializeSymbolTable(
@@ -123,7 +130,7 @@ bool TCompiler::compile(const char* const shaderStrings[],
         return true;
 
     // If compiling for WebGL, validate loop and indexing as well.
-    if (shaderSpec == SH_WEBGL_SPEC)
+    if (isWebGLSpecSubset(shaderSpec))
         compileOptions |= SH_VALIDATE_LOOP_INDEXING;
 
     // First string is path of source file if flag is set. The actual source follows.
@@ -160,6 +167,13 @@ bool TCompiler::compile(const char* const shaderStrings[],
 
         if (success && (compileOptions & SH_VALIDATE_LOOP_INDEXING))
             success = validateLimitations(root);
+
+        if (success && shaderSpec == SH_CSS_SHADERS_SPEC) {
+            // The tree root (GlobalParseContext->treeRoot) may change as a side effect
+            // of rewriting the shader according the CSS Shaders spec.
+            root = rewriteCSSShader(root);
+            parseContext.treeRoot = root;
+        }
 
         // Unroll for-loop markup needs to happen after validateLimitations pass.
         if (success && (compileOptions & SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX))
@@ -232,6 +246,19 @@ bool TCompiler::detectRecursion(TIntermNode* root)
         default:
             UNREACHABLE();
             return false;
+    }
+}
+
+TIntermNode* TCompiler::rewriteCSSShader(TIntermNode* root)
+{
+    if (shaderType == SH_VERTEX_SHADER) {
+        RewriteCSSVertexShader rewriter(root, symbolTable, hiddenSymbolSuffix);
+        rewriter.rewrite();
+        return rewriter.getNewTreeRoot();
+    } else {
+        RewriteCSSFragmentShader rewriter(root, symbolTable, hiddenSymbolSuffix);
+        rewriter.rewrite();
+        return rewriter.getNewTreeRoot();
     }
 }
 
