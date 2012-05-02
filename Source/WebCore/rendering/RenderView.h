@@ -28,6 +28,10 @@
 #include "RenderBlock.h"
 #include <wtf/OwnPtr.h>
 
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+#include "CustomFiltersHost.h"
+#endif
+
 namespace WebCore {
 
 class FlowThreadController;
@@ -37,7 +41,11 @@ class RenderWidget;
 class RenderLayerCompositor;
 #endif
 
-class RenderView : public RenderBlock {
+class RenderView : public RenderBlock
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+                 , public CustomFiltersHost
+#endif
+{
 public:
     RenderView(Node*, FrameView*);
     virtual ~RenderView();
@@ -198,6 +206,9 @@ public:
     void insertFixedPositionedObject(RenderBox*);
     void removeFixedPositionedObject(RenderBox*);
 
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+    virtual HostWindow* customFiltersHostWindow() const;
+#endif
 protected:
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;

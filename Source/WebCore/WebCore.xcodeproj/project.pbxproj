@@ -1448,6 +1448,9 @@
 		508CCA5013CF106B003151F3 /* RenderFlowThread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 508CCA4E13CF106B003151F3 /* RenderFlowThread.cpp */; };
 		509CC9FB14C069ED00BBECBD /* CustomFilterParameter.h in Headers */ = {isa = PBXBuildFile; fileRef = 509CC9FA14C069ED00BBECBD /* CustomFilterParameter.h */; };
 		50ACE2CB14B5D79300446666 /* CustomFilterOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = 50ACE2CA14B5D79300446666 /* CustomFilterOperation.h */; };
+		50C8CA901551BC9F00426324 /* CustomFiltersController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50C8CA8B1551BC9B00426324 /* CustomFiltersController.cpp */; };
+		50C8CA911551BCA300426324 /* CustomFiltersHost.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50C8CA8D1551BC9B00426324 /* CustomFiltersHost.cpp */; };
+		50C8CA961551C8C300426324 /* CustomFiltersHost.h in Headers */ = {isa = PBXBuildFile; fileRef = 50C8CA8E1551BC9B00426324 /* CustomFiltersHost.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		50CC089A14C6E99C0017AB51 /* CustomFilterNumberParameter.h in Headers */ = {isa = PBXBuildFile; fileRef = 50CC089914C6E99C0017AB51 /* CustomFilterNumberParameter.h */; };
 		50CC0A3914C6F5B10017AB51 /* CustomFilterOperation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50CC0A3814C6F5B10017AB51 /* CustomFilterOperation.cpp */; };
 		50D10D991545F5760096D288 /* RenderLayerFilterInfo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50D10D971545F5760096D288 /* RenderLayerFilterInfo.cpp */; };
@@ -8450,6 +8453,10 @@
 		509CC9FA14C069ED00BBECBD /* CustomFilterParameter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFilterParameter.h; path = filters/CustomFilterParameter.h; sourceTree = "<group>"; };
 		50ACE2CA14B5D79300446666 /* CustomFilterOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFilterOperation.h; path = filters/CustomFilterOperation.h; sourceTree = "<group>"; };
 		50B42157146976960087E604 /* WebKitCSSShaderValue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebKitCSSShaderValue.h; sourceTree = "<group>"; };
+		50C8CA8B1551BC9B00426324 /* CustomFiltersController.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CustomFiltersController.cpp; path = filters/CustomFiltersController.cpp; sourceTree = "<group>"; };
+		50C8CA8C1551BC9B00426324 /* CustomFiltersController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFiltersController.h; path = filters/CustomFiltersController.h; sourceTree = "<group>"; };
+		50C8CA8D1551BC9B00426324 /* CustomFiltersHost.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CustomFiltersHost.cpp; path = filters/CustomFiltersHost.cpp; sourceTree = "<group>"; };
+		50C8CA8E1551BC9B00426324 /* CustomFiltersHost.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFiltersHost.h; path = filters/CustomFiltersHost.h; sourceTree = "<group>"; };
 		50CC089914C6E99C0017AB51 /* CustomFilterNumberParameter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CustomFilterNumberParameter.h; path = filters/CustomFilterNumberParameter.h; sourceTree = "<group>"; };
 		50CC0A3814C6F5B10017AB51 /* CustomFilterOperation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CustomFilterOperation.cpp; path = filters/CustomFilterOperation.cpp; sourceTree = "<group>"; };
 		50D10D971545F5760096D288 /* RenderLayerFilterInfo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RenderLayerFilterInfo.cpp; sourceTree = "<group>"; };
@@ -17698,6 +17705,10 @@
 		A75E8B7F0E1DE2B0007F2481 /* filters */ = {
 			isa = PBXGroup;
 			children = (
+				50C8CA8B1551BC9B00426324 /* CustomFiltersController.cpp */,
+				50C8CA8C1551BC9B00426324 /* CustomFiltersController.h */,
+				50C8CA8D1551BC9B00426324 /* CustomFiltersHost.cpp */,
+				50C8CA8E1551BC9B00426324 /* CustomFiltersHost.h */,
 				5068FAF71550B696001C328D /* CustomFilterTransformParameter.cpp */,
 				5068FAF81550B696001C328D /* CustomFilterTransformParameter.h */,
 				49ECEB5C1499790D00CDD3A4 /* arm */,
@@ -24856,6 +24867,7 @@
 				78D02BC6154A18DF00B62D05 /* CSSPropertyAnimation.h in Headers */,
 				50E95A981514E731005EE60A /* RenderRegionMultiColumn.h in Headers */,
 				5068FAFA1550B696001C328D /* CustomFilterTransformParameter.h in Headers */,
+				50C8CA961551C8C300426324 /* CustomFiltersHost.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -27875,6 +27887,8 @@
 				50E95A971514E731005EE60A /* RenderRegionMultiColumn.cpp in Sources */,
 				508C3C37152F84B7005479EF /* WrappingContext.cpp in Sources */,
 				5068FAF91550B696001C328D /* CustomFilterTransformParameter.cpp in Sources */,
+				50C8CA901551BC9F00426324 /* CustomFiltersController.cpp in Sources */,
+				50C8CA911551BCA300426324 /* CustomFiltersHost.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

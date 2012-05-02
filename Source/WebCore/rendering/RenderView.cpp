@@ -999,4 +999,12 @@ void RenderView::markCSSExclusionDependentBlocksForLayout()
         layer()->wrappingContext()->markDescendantsForSecondLayoutPass();
 }
 
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+HostWindow* RenderView::customFiltersHostWindow() const
+{
+    return frameView()->root()->hostWindow();
+}
+#endif
+
+
 } // namespace WebCore
