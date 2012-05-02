@@ -42,10 +42,10 @@
 #include <wtf/MathExtras.h>
 
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-#include "CustomFilterProgram.h"
 #include "CustomFilterOperation.h"
+#include "CustomFilterProgram.h"
 #include "FECustomFilter.h"
-#include "FrameView.h"
+#include "RenderView.h"
 #include "Settings.h"
 #endif
 
@@ -271,7 +271,8 @@ bool FilterEffectRenderer::build(Document* document, const FilterOperations& ope
             CustomFilterOperation* customFilterOperation = static_cast<CustomFilterOperation*>(filterOperation);
             RefPtr<CustomFilterProgram> program = customFilterOperation->program();
             if (program->isLoaded()) {
-                effect = FECustomFilter::create(this, document->view()->root()->hostWindow(), program, customFilterOperation->parameters(),
+                document->renderView()->ensureHasFiltersController();
+                effect = FECustomFilter::create(this, document->renderView()->customFiltersController(), program, customFilterOperation->parameters(),
                                                 customFilterOperation->meshRows(), customFilterOperation->meshColumns(),
                                                 customFilterOperation->meshBoxType(), customFilterOperation->meshType());
                 m_hasCustomShaderFilter = true;

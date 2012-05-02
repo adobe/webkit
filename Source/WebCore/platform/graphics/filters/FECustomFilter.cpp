@@ -36,8 +36,9 @@
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterParameter.h"
 #include "CustomFilterProgram.h"
-#include "CustomFilterTransformParameter.h"
+#include "CustomFiltersController.h"
 #include "CustomFilterShader.h"
+#include "CustomFilterTransformParameter.h"
 #include "DrawingBuffer.h"
 #include "GraphicsContext3D.h"
 #include "ImageData.h"
@@ -73,11 +74,11 @@ static void orthogonalProjectionMatrix(TransformationMatrix& matrix, float left,
     matrix.setM44(1.0f);
 }
 
-FECustomFilter::FECustomFilter(Filter* filter, HostWindow* hostWindow, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
+FECustomFilter::FECustomFilter(Filter* filter, CustomFiltersController* controller, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
                                unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType meshBoxType,
                                CustomFilterOperation::MeshType meshType)
     : FilterEffect(filter)
-    , m_hostWindow(hostWindow)
+    , m_controller(controller)
     , m_frameBuffer(0)
     , m_depthBuffer(0)
     , m_destTexture(0)
@@ -90,11 +91,11 @@ FECustomFilter::FECustomFilter(Filter* filter, HostWindow* hostWindow, PassRefPt
 {
 }
 
-PassRefPtr<FECustomFilter> FECustomFilter::create(Filter* filter, HostWindow* hostWindow, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
+PassRefPtr<FECustomFilter> FECustomFilter::create(Filter* filter, CustomFiltersController* controller, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
                                            unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType meshBoxType,
                                            CustomFilterOperation::MeshType meshType)
 {
-    return adoptRef(new FECustomFilter(filter, hostWindow, program, parameters, meshRows, meshColumns, meshBoxType, meshType));
+    return adoptRef(new FECustomFilter(filter, controller, program, parameters, meshRows, meshColumns, meshBoxType, meshType));
 }
 
 FECustomFilter::~FECustomFilter()
@@ -157,14 +158,10 @@ void FECustomFilter::platformApplySoftware()
 
 bool FECustomFilter::initializeContext()
 {
-    GraphicsContext3D::Attributes attributes;
-    attributes.preserveDrawingBuffer = true;
-    attributes.premultipliedAlpha = false;
-    
     ASSERT(!m_context.get());
-    m_context = GraphicsContext3D::create(attributes, m_hostWindow, GraphicsContext3D::RenderOffscreen);
-    if (!m_context->makeContextCurrent())
+    if (!m_controller->initializeContextIfNeeded())
         return false;
+    m_context = m_controller->context();
     m_shader = m_program->createShaderWithContext(m_context.get());
     m_mesh = CustomFilterMesh::create(m_context.get(), m_meshColumns, m_meshRows, 
                                       FloatRect(0, 0, 1, 1),
