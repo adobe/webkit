@@ -356,7 +356,11 @@ public:
 
     virtual bool isRenderFlowThread() const { return false; }
     virtual bool isRenderNamedFlowThread() const { return false; }
-    bool canHaveRegionStyle() const { return isRenderBlock() && !isAnonymous() && !isRenderFlowThread(); }
+    bool canHaveRegionStyle() const {
+        return isRenderBlock()
+            && !isAnonymous()
+            && !isRenderFlowThread()
+            && (node() && !node()->isInShadowTree()); }
 
     bool isRoot() const { return document()->documentElement() == m_node; }
     bool isBody() const;

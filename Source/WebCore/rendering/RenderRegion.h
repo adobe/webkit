@@ -83,8 +83,6 @@ public:
     bool isFirstRegion() const;
     bool isLastRegion() const;
 
-    void clearBoxStyleInRegion(const RenderBox*);
-
     enum RegionState {
         RegionUndefined,
         RegionEmpty,
@@ -126,14 +124,25 @@ public:
     // Fix for inline-block regions with width:auto
     // (to avoid the computation path for inline replaced elements in RenderBox::computeLogicalWidthInRegion).
     virtual bool isInlineBlockOrInlineTable() const { return isInline() && isReplaced(); }
-   
+
+    // Do nothing for the moment as styles are computed for every paint.
+    void clearBoxStyleInRegion(const RenderBox*) { }
+
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 
-    PassRefPtr<RenderStyle> renderBoxRegionStyle(const RenderBox*);
-    PassRefPtr<RenderStyle> computeStyleInRegion(const RenderBox*);
-    void setRegionBoxesRegionStyle();
-    void restoreRegionBoxesOriginalStyle();
+    // Compute the style in region for an element.
+    PassRefPtr<RenderStyle> computeStyleInRegion(const RenderObject*);
+
+    // Compute style in region for the children in the tree under the specified object.
+    void computeChildrenStyleInRegion(RenderObject*);
+
+    // paint is called between these functions.
+    void setRegionObjectsRegionStyle();
+    void restoreRegionObjectsOriginalStyle();
+
+    void clearRegionObjectsRegionStyle();
+    void setObjectStyleInRegion(RenderObject*, PassRefPtr<RenderStyle>);
 
     RenderFlowThread* m_flowThread;
 
@@ -150,8 +159,8 @@ private:
     typedef HashMap<const RenderBox*, OwnPtr<RenderBoxRegionInfo> > RenderBoxRegionInfoMap;
     RenderBoxRegionInfoMap m_renderBoxRegionInfo;
 
-    typedef HashMap<const RenderBox*, RefPtr<RenderStyle> > RenderBoxRegionStyleMap;
-    RenderBoxRegionStyleMap m_renderBoxRegionStyle;
+    typedef HashMap<const RenderObject*, RefPtr<RenderStyle> > RenderObjectRegionStyleMap;
+    RenderObjectRegionStyleMap m_renderObjectRegionStyle;
 
     RenderRegionMultiColumn* m_parentMultiColumnRegion; 
     
