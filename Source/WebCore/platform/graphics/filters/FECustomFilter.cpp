@@ -136,6 +136,9 @@ void FECustomFilter::platformApplySoftware()
     
     if (!hadContext || m_contextSize != newContextSize)
         resizeContext(newContextSize);
+
+    m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_frameBuffer);
+    m_context->viewport(0, 0, newContextSize.width(), newContextSize.height());
     
     // Do not draw the filter if the input image cannot fit inside a single GPU texture.
     if (m_inputTexture->tiles().numTilesX() != 1 || m_inputTexture->tiles().numTilesY() != 1)
@@ -149,6 +152,8 @@ void FECustomFilter::platformApplySoftware()
     bindProgramAndBuffers(srcPixelArray.get(), newContextSize);
     
     m_context->drawElements(GraphicsContext3D::TRIANGLES, m_mesh->indicesCount(), GraphicsContext3D::UNSIGNED_SHORT, 0);
+
+    disableAttributes();
     
     ASSERT(static_cast<size_t>(newContextSize.width() * newContextSize.height() * 4) == dstPixelArray->length());
     m_context->readPixels(0, 0, newContextSize.width(), newContextSize.height(), GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, dstPixelArray->data());
@@ -198,8 +203,6 @@ void FECustomFilter::resizeContext(const IntSize& newContextSize)
     m_context->renderbufferStorage(GraphicsContext3D::RENDERBUFFER, GraphicsContext3D::DEPTH_COMPONENT16, newContextSize.width(), newContextSize.height());
     m_context->framebufferRenderbuffer(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::DEPTH_ATTACHMENT, GraphicsContext3D::RENDERBUFFER, m_depthBuffer);
     
-    m_context->viewport(0, 0, newContextSize.width(), newContextSize.height());
-    
     m_contextSize = newContextSize;
 }
 
@@ -210,6 +213,21 @@ void FECustomFilter::bindVertexAttribute(int attributeLocation, unsigned size, u
         m_context->enableVertexAttribArray(attributeLocation);
     }
     offset += size * sizeof(float);
+}
+
+void FECustomFilter::disableVertexAttribute(int attributeLocation)
+{
+    if (attributeLocation != -1)
+        m_context->disableVertexAttribArray(attributeLocation);
+}
+
+void FECustomFilter::disableAttributes()
+{
+    disableVertexAttribute(m_shader->positionAttribLocation());
+    disableVertexAttribute(m_shader->texAttribLocation());
+    disableVertexAttribute(m_shader->meshAttribLocation());
+    if (m_meshType == CustomFilterOperation::DETACHED)
+        disableVertexAttribute(m_shader->triangleAttribLocation());
 }
 
 void FECustomFilter::bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter* numberParameter)

@@ -77,6 +77,8 @@ private:
     void deleteRenderBuffers();
     void resizeContext(const IntSize& newContextSize);
     void bindVertexAttribute(int attributeLocation, unsigned size, unsigned& offset);
+    void disableVertexAttribute(int attributeLocation);
+    void disableAttributes();
     void bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter*);
     void bindProgramTransformParameters(int uniformLocation, CustomFilterTransformParameter*);
     void bindProgramParameters();
