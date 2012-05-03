@@ -213,7 +213,8 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
         || style()->verticalAlign() != BASELINE
         || style()->textEmphasisMark() != TextEmphasisMarkNone
         || (checkFonts && (!parentStyle->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(style()->font().fontMetrics())
-        || parentStyle->lineHeight() != style()->lineHeight()));
+        || parentStyle->lineHeight() != style()->lineHeight()))
+        || inRenderFlowThread();
 
     if (!alwaysCreateLineBoxes && checkFonts && document()->usesFirstLineRules()) {
         // Have to check the first line style as well.
