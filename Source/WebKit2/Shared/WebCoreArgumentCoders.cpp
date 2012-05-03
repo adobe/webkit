@@ -142,15 +142,14 @@ bool ArgumentCoder<IntSize>::decode(ArgumentDecoder* decoder, IntSize& intSize)
     return SimpleArgumentCoder<IntSize>::decode(decoder, intSize);
 }
 
-
-void ArgumentCoder<ViewportArguments>::encode(ArgumentEncoder* encoder, const ViewportArguments& viewportArguments)
+void ArgumentCoder<ViewportAttributes>::encode(ArgumentEncoder* encoder, const ViewportAttributes& viewportAttributes)
 {
-    SimpleArgumentCoder<ViewportArguments>::encode(encoder, viewportArguments);
+    SimpleArgumentCoder<ViewportAttributes>::encode(encoder, viewportAttributes);
 }
 
-bool ArgumentCoder<ViewportArguments>::decode(ArgumentDecoder* decoder, ViewportArguments& viewportArguments)
+bool ArgumentCoder<ViewportAttributes>::decode(ArgumentDecoder* decoder, ViewportAttributes& viewportAttributes)
 {
-    return SimpleArgumentCoder<ViewportArguments>::decode(decoder, viewportArguments);
+    return SimpleArgumentCoder<ViewportAttributes>::decode(decoder, viewportAttributes);
 }
 
 void ArgumentCoder<MimeClassInfo>::encode(ArgumentEncoder* encoder, const MimeClassInfo& mimeClassInfo)
@@ -1085,7 +1084,7 @@ void ArgumentCoder<RefPtr<Animation> >::encode(ArgumentEncoder* encoder, const R
     encodeBoolAndValue(encoder, animation->isIterationCountSet(), animation->iterationCount());
     encodeBoolAndValue(encoder, animation->isNameSet(), animation->name());
     encodeBoolAndEnumValue(encoder, animation->isPlayStateSet(), animation->playState());
-    encodeBoolAndValue(encoder, animation->isPropertySet(), animation->property());
+    encodeBoolAndValue(encoder, animation->isPropertySet(), static_cast<int>(animation->property()));
     encodeBoolAndValue<RefPtr<TimingFunction> >(encoder, animation->isTimingFunctionSet(), animation->timingFunction());
     encoder->encodeBool(animation->isNoneAnimation());
 }
@@ -1163,7 +1162,7 @@ bool ArgumentCoder<RefPtr<Animation> >::decode(ArgumentDecoder* decoder, RefPtr<
     if (isPlayStateSet)
         animation->setPlayState(playState);
     if (isPropertySet)
-        animation->setProperty(property);
+        animation->setProperty(static_cast<CSSPropertyID>(property));
     if (isTimingFunctionSet)
         animation->setTimingFunction(timingFunction);
 

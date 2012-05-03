@@ -35,8 +35,10 @@
 #include "PaintPhase.h"
 #include "RenderObjectChildList.h"
 #include "RenderStyle.h"
+#include "ScrollBehavior.h"
 #include "TextAffinity.h"
 #include "TransformationMatrix.h"
+#include <wtf/HashSet.h>
 #include <wtf/UnusedParam.h>
 
 #if USE(CG) || USE(CAIRO) || USE(SKIA) || PLATFORM(QT)
@@ -97,6 +99,11 @@ enum BoxSide {
     BSLeft
 };
 
+enum MarkingBehavior {
+    MarkOnlyThis,
+    MarkContainingBlockChain,
+};
+
 const int caretWidth = 1;
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -116,6 +123,8 @@ struct DashboardRegionValue {
     int type;
 };
 #endif
+
+typedef WTF::HashSet<const RenderObject*> RenderObjectAncestorLineboxDirtySet;
 
 #ifndef NDEBUG
 const int showTreeCharacterOffset = 39;
@@ -196,6 +205,9 @@ public:
     void moveLayers(RenderLayer* oldParent, RenderLayer* newParent);
     RenderLayer* findNextLayer(RenderLayer* parentLayer, RenderObject* startPoint, bool checkParent = true);
 
+    // Scrolling is a RenderBox concept, however some code just cares about recursively scrolling our enclosing ScrollableArea(s).
+    bool scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX = ScrollAlignment::alignCenterIfNeeded, const ScrollAlignment& alignY = ScrollAlignment::alignCenterIfNeeded);
+
     // Convenience function for getting to the nearest enclosing box of a RenderObject.
     RenderBox* enclosingBox() const;
     RenderBoxModelObject* enclosingBoxModelObject() const;
@@ -220,8 +232,6 @@ public:
     // again.  We have to make sure the render tree updates as needed to accommodate the new
     // normal flow object.
     void handleDynamicFloatPositionChange();
-    
-    RenderTable* createAnonymousTable() const;
     
     // RenderObject tree manipulation
     //////////////////////////////////////////
@@ -316,6 +326,7 @@ public:
     virtual bool isRenderInline() const { return false; }
     virtual bool isRenderPart() const { return false; }
     virtual bool isRenderRegion() const { return false; }
+    virtual bool isRenderRegionMultiColumn() const { return false; }
     virtual bool isRenderView() const { return false; }
     virtual bool isReplica() const { return false; }
 
@@ -344,7 +355,12 @@ public:
 #endif
 
     virtual bool isRenderFlowThread() const { return false; }
-    bool canHaveRegionStyle() const { return isRenderBlock() && !isAnonymous() && !isRenderFlowThread(); }
+    virtual bool isRenderNamedFlowThread() const { return false; }
+    bool canHaveRegionStyle() const {
+        return isRenderBlock()
+            && !isAnonymous()
+            && !isRenderFlowThread()
+            && (node() && !node()->isInShadowTree()); }
 
     bool isRoot() const { return document()->documentElement() == m_node; }
     bool isBody() const;
@@ -370,6 +386,22 @@ public:
     void setChildrenInline(bool b) { m_bitfields.setChildrenInline(b); }
     bool hasColumns() const { return m_bitfields.hasColumns(); }
     void setHasColumns(bool b = true) { m_bitfields.setHasColumns(b); }
+
+    bool ancestorLineBoxDirty() const { return s_ancestorLineboxDirtySet && s_ancestorLineboxDirtySet->contains(this); }
+    void setAncestorLineBoxDirty(bool b = true)
+    {
+        if (b) {
+            if (!s_ancestorLineboxDirtySet)
+                s_ancestorLineboxDirtySet = new RenderObjectAncestorLineboxDirtySet;
+            s_ancestorLineboxDirtySet->add(this);
+        } else if (s_ancestorLineboxDirtySet) {
+            s_ancestorLineboxDirtySet->remove(this);
+            if (s_ancestorLineboxDirtySet->isEmpty()) {
+                delete s_ancestorLineboxDirtySet;
+                s_ancestorLineboxDirtySet = 0;
+            }
+        }
+    }
 
     bool inRenderFlowThread() const { return m_bitfields.inRenderFlowThread(); }
     void setInRenderFlowThread(bool b = true) { m_bitfields.setInRenderFlowThread(b); }
@@ -511,6 +543,8 @@ public:
     bool hasFilter() const { return false; }
 #endif
 
+    bool needsWrappingContext() const { return style() && ((style()->wrapThrough() == WrapThroughNone) || (style()->wrapFlow() != WrapFlowAuto)); }
+
     inline bool preservesNewline() const;
 
 #if !HAVE(PATH_BASED_BORDER_RADIUS_DRAWING)
@@ -558,11 +592,11 @@ public:
     RenderBoxModelObject* offsetParent() const;
 
     void markContainingBlocksForLayout(bool scheduleRelayout = true, RenderObject* newRoot = 0);
-    void setNeedsLayout(bool b, bool markParents = true);
-    void setChildNeedsLayout(bool b, bool markParents = true);
+    void setNeedsLayout(bool needsLayout, MarkingBehavior = MarkContainingBlockChain);
+    void setChildNeedsLayout(bool childNeedsLayout, MarkingBehavior = MarkContainingBlockChain);
     void setNeedsPositionedMovementLayout();
     void setNeedsSimplifiedNormalFlowLayout();
-    void setPreferredLogicalWidthsDirty(bool, bool markParents = true);
+    void setPreferredLogicalWidthsDirty(bool, MarkingBehavior = MarkContainingBlockChain);
     void invalidateContainerPreferredLogicalWidths();
     
     void setNeedsLayoutAndPrefWidthsRecalc()
@@ -607,6 +641,8 @@ public:
     void collectDashboardRegions(Vector<DashboardRegionValue>&);
 #endif
 
+    bool isComposited() const;
+
     bool hitTest(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter = HitTestAll);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
@@ -631,6 +667,8 @@ public:
 
     // returns the containing block level element for this element.
     RenderBlock* containingBlock() const;
+
+    TransformationMatrix absoluteTransformationMatrix() const;
 
     // Convert the given local point to absolute coordinates
     // FIXME: Temporary. If useTransforms is true, take transforms into account. Eventually localToAbsolute() will always be transform-aware.
@@ -852,6 +890,8 @@ public:
     // Return the renderer whose background style is used to paint the root background. Should only be called on the renderer for which isRoot() is true.
     RenderObject* rendererForRootBackground();
 
+    RespectImageOrientationEnum shouldRespectImageOrientation() const;
+
 protected:
     inline bool layerCreationAllowedForSubtree() const;
 
@@ -891,6 +931,8 @@ private:
     RenderObject* m_parent;
     RenderObject* m_previous;
     RenderObject* m_next;
+
+    static RenderObjectAncestorLineboxDirtySet* s_ancestorLineboxDirtySet;
 
 #ifndef NDEBUG
     bool m_hasAXObject             : 1;
@@ -1034,14 +1076,14 @@ inline bool RenderObject::isBeforeOrAfterContent() const
     return isBeforeContent() || isAfterContent();
 }
 
-inline void RenderObject::setNeedsLayout(bool b, bool markParents)
+inline void RenderObject::setNeedsLayout(bool needsLayout, MarkingBehavior markParents)
 {
     bool alreadyNeededLayout = m_bitfields.needsLayout();
-    m_bitfields.setNeedsLayout(b);
-    if (b) {
+    m_bitfields.setNeedsLayout(needsLayout);
+    if (needsLayout) {
         ASSERT(!isSetNeedsLayoutForbidden());
         if (!alreadyNeededLayout) {
-            if (markParents)
+            if (markParents == MarkContainingBlockChain)
                 markContainingBlocksForLayout();
             if (hasLayer())
                 setLayerNeedsFullRepaint();
@@ -1052,16 +1094,17 @@ inline void RenderObject::setNeedsLayout(bool b, bool markParents)
         setNeedsSimplifiedNormalFlowLayout(false);
         setNormalChildNeedsLayout(false);
         setNeedsPositionedMovementLayout(false);
+        setAncestorLineBoxDirty(false);
     }
 }
 
-inline void RenderObject::setChildNeedsLayout(bool b, bool markParents)
+inline void RenderObject::setChildNeedsLayout(bool childNeedsLayout, MarkingBehavior markParents)
 {
     bool alreadyNeededLayout = normalChildNeedsLayout();
-    setNormalChildNeedsLayout(b);
-    if (b) {
+    setNormalChildNeedsLayout(childNeedsLayout);
+    if (childNeedsLayout) {
         ASSERT(!isSetNeedsLayoutForbidden());
-        if (!alreadyNeededLayout && markParents)
+        if (!alreadyNeededLayout && markParents == MarkContainingBlockChain)
             markContainingBlocksForLayout();
     } else {
         setPosChildNeedsLayout(false);

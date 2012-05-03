@@ -32,55 +32,73 @@
 #include "GraphicsContext3D.h"
 #include "LayerTextureUpdater.h"
 #include "ManagedTexture.h"
+#include "TextureCopier.h"
+#include "TextureUploader.h"
 
 using namespace std;
 
 namespace WebCore {
 
-CCTextureUpdater::CCTextureUpdater(TextureAllocator* allocator)
-    : m_allocator(allocator)
-    , m_entryIndex(0)
+CCTextureUpdater::CCTextureUpdater()
+    : m_entryIndex(0)
 {
-    ASSERT(m_allocator);
 }
 
 CCTextureUpdater::~CCTextureUpdater()
 {
 }
 
-void CCTextureUpdater::append(LayerTextureUpdater::Texture* texture, const IntRect& sourceRect, const IntRect& destRect, Vector<UpdateEntry>& entries)
+void CCTextureUpdater::appendUpdate(LayerTextureUpdater::Texture* texture, const IntRect& sourceRect, const IntRect& destRect, Vector<UpdateEntry>& entries)
 {
     ASSERT(texture);
 
     UpdateEntry entry;
-    entry.m_texture = texture;
-    entry.m_sourceRect = sourceRect;
-    entry.m_destRect = destRect;
+    entry.texture = texture;
+    entry.sourceRect = sourceRect;
+    entry.destRect = destRect;
     entries.append(entry);
 }
 
-void CCTextureUpdater::append(LayerTextureUpdater::Texture* texture, const IntRect& sourceRect, const IntRect& destRect)
+void CCTextureUpdater::appendUpdate(LayerTextureUpdater::Texture* texture, const IntRect& sourceRect, const IntRect& destRect)
 {
-    append(texture, sourceRect, destRect, m_entries);
+    appendUpdate(texture, sourceRect, destRect, m_entries);
 }
 
-void CCTextureUpdater::appendPartial(LayerTextureUpdater::Texture* texture, const IntRect& sourceRect, const IntRect& destRect)
+void CCTextureUpdater::appendPartialUpdate(LayerTextureUpdater::Texture* texture, const IntRect& sourceRect, const IntRect& destRect)
 {
-    append(texture, sourceRect, destRect, m_partialEntries);
+    appendUpdate(texture, sourceRect, destRect, m_partialEntries);
+}
+
+void CCTextureUpdater::appendCopy(unsigned sourceTexture, unsigned destTexture, const IntSize& size)
+{
+    CopyEntry copy;
+    copy.sourceTexture = sourceTexture;
+    copy.destTexture = destTexture;
+    copy.size = size;
+    m_copyEntries.append(copy);
+}
+
+void CCTextureUpdater::appendManagedCopy(unsigned sourceTexture, ManagedTexture* destTexture, const IntSize& size)
+{
+    ManagedCopyEntry copy;
+    copy.sourceTexture = sourceTexture;
+    copy.destTexture = destTexture;
+    copy.size = size;
+    m_managedCopyEntries.append(copy);
 }
 
 bool CCTextureUpdater::hasMoreUpdates() const
 {
-    return m_entries.size() || m_partialEntries.size();
+    return m_entries.size() || m_partialEntries.size() || m_copyEntries.size() || m_managedCopyEntries.size();
 }
 
-bool CCTextureUpdater::update(GraphicsContext3D* context, size_t count)
+bool CCTextureUpdater::update(GraphicsContext3D* context, TextureAllocator* allocator, TextureCopier* copier, TextureUploader* uploader, size_t count)
 {
     size_t index;
     size_t maxIndex = min(m_entryIndex + count, m_entries.size());
     for (index = m_entryIndex; index < maxIndex; ++index) {
         UpdateEntry& entry = m_entries[index];
-        entry.m_texture->updateRect(context, m_allocator, entry.m_sourceRect, entry.m_destRect);
+        uploader->uploadTexture(context, entry.texture, allocator, entry.sourceRect, entry.destRect);
     }
 
     bool moreUpdates = maxIndex < m_entries.size();
@@ -98,8 +116,23 @@ bool CCTextureUpdater::update(GraphicsContext3D* context, size_t count)
 
     for (index = 0; index < m_partialEntries.size(); ++index) {
         UpdateEntry& entry = m_partialEntries[index];
-        entry.m_texture->updateRect(context, m_allocator, entry.m_sourceRect, entry.m_destRect);
+        uploader->uploadTexture(context, entry.texture, allocator, entry.sourceRect, entry.destRect);
     }
+
+    for (index = 0; index < m_copyEntries.size(); ++index) {
+        CopyEntry& copyEntry = m_copyEntries[index];
+        copier->copyTexture(context, copyEntry.sourceTexture, copyEntry.destTexture, copyEntry.size);
+    }
+    for (index = 0; index < m_managedCopyEntries.size(); ++index) {
+        ManagedCopyEntry& managedCopyEntry = m_managedCopyEntries[index];
+        managedCopyEntry.destTexture->allocate(allocator);
+        copier->copyTexture(context, managedCopyEntry.sourceTexture, managedCopyEntry.destTexture->textureId(), managedCopyEntry.size);
+    }
+    // If we've performed any texture copies, we need to insert a flush here into the compositor context
+    // before letting the main thread proceed as it may make draw calls to the source texture of one of
+    // our copy operations.
+    if (m_copyEntries.size() || m_managedCopyEntries.size())
+        context->flush();
 
     // If no entries left to process, auto-clear.
     clear();
@@ -111,6 +144,8 @@ void CCTextureUpdater::clear()
     m_entryIndex = 0;
     m_entries.clear();
     m_partialEntries.clear();
+    m_copyEntries.clear();
+    m_managedCopyEntries.clear();
 }
 
 }

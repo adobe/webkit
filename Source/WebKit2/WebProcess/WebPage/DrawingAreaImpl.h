@@ -61,6 +61,8 @@ private:
     virtual void didInstallPageOverlay();
     virtual void didUninstallPageOverlay();
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&);
+    virtual void setPageOverlayOpacity(float);
+    virtual bool pageOverlayShouldApplyFadeWhenPainting() const;
 
     virtual void setPaintingEnabled(bool);
 
@@ -69,6 +71,10 @@ private:
 
 #if PLATFORM(WIN)
     virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&);
+#endif
+
+#if PLATFORM(MAC)
+    virtual void setLayerHostingMode(uint32_t) OVERRIDE;
 #endif
 
 #if USE(UI_SIDE_COMPOSITING)

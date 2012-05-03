@@ -25,6 +25,8 @@
 #ifndef RotateTransformOperation_h
 #define RotateTransformOperation_h
 
+#include "Length.h"
+#include "LengthFunctions.h"
 #include "TransformOperation.h"
 
 namespace WebCore {
@@ -33,18 +35,40 @@ class RotateTransformOperation : public TransformOperation {
 public:
     static PassRefPtr<RotateTransformOperation> create(double angle, OperationType type)
     {
-        return adoptRef(new RotateTransformOperation(0, 0, 1, angle, type));
+        return adoptRef(new RotateTransformOperation(0, 0, 1, Length(0, Fixed), Length(0, Fixed), angle, type));
+    }
+
+    static PassRefPtr<RotateTransformOperation> create(double angle, const Length& originX, const Length& originY, OperationType type)
+    {
+        return adoptRef(new RotateTransformOperation(0, 0, 1, originX, originY, angle, type));
     }
 
     static PassRefPtr<RotateTransformOperation> create(double x, double y, double z, double angle, OperationType type)
     {
-        return adoptRef(new RotateTransformOperation(x, y, z, angle, type));
+        return adoptRef(new RotateTransformOperation(x, y, z, Length(0, Fixed), Length(0, Fixed), angle, type));
     }
+    
+    static PassRefPtr<RotateTransformOperation> create(double x, double y, double z, const Length& originX, const Length& originY, double angle, OperationType type)
+    {
+        return adoptRef(new RotateTransformOperation(x, y, z, originX, originY, angle, type));
+    }
+    
+    bool hasOrigin() { return !(m_originX.type() == Fixed && m_originX.isZero() && m_originY.type() == Fixed && m_originY.isZero()); }
+    
+    double originX(const FloatSize& borderBoxSize) const { return floatValueForLength(m_originX, borderBoxSize.width()); }
+    double originY(const FloatSize& borderBoxSize) const { return floatValueForLength(m_originY, borderBoxSize.height()); }
 
     double x() const { return m_x; }
     double y() const { return m_y; }
     double z() const { return m_z; }
+    Length originX() const { return m_originX; }
+    Length originY() const { return m_originY; }
     double angle() const { return m_angle; }
+
+    void resetOrigin() {
+        m_originX = Length(0, Fixed);
+        m_originY = Length(0, Fixed);
+    }
 
 private:
     virtual bool isIdentity() const { return m_angle == 0; }
@@ -57,21 +81,27 @@ private:
         if (!isSameType(o))
             return false;
         const RotateTransformOperation* r = static_cast<const RotateTransformOperation*>(&o);
-        return m_x == r->m_x && m_y == r->m_y && m_z == r->m_z && m_angle == r->m_angle;
+        return m_x == r->m_x && m_y == r->m_y && m_z == r->m_z && m_originX == r->m_originX && m_originY == r->m_originY && m_angle == r->m_angle;
     }
 
-    virtual bool apply(TransformationMatrix& transform, const FloatSize& /*borderBoxSize*/) const
+    virtual bool apply(TransformationMatrix& transform, const FloatSize& borderBoxSize) const
     {
+        float originX = this->originX(borderBoxSize);
+        float originY = this->originY(borderBoxSize);
+        transform.translate(originX, originY);
         transform.rotate3d(m_x, m_y, m_z, m_angle);
-        return false;
+        transform.translate(-originX, -originY);
+        return m_originX.type() == Percent || m_originY.type() == Percent;
     }
 
     virtual PassRefPtr<TransformOperation> blend(const TransformOperation* from, double progress, bool blendToIdentity = false);
 
-    RotateTransformOperation(double x, double y, double z, double angle, OperationType type)
+    RotateTransformOperation(double x, double y, double z, const Length& originX, const Length& originY, double angle, OperationType type)
         : m_x(x)
         , m_y(y)
         , m_z(z)
+        , m_originX(originX)
+        , m_originY(originY)
         , m_angle(angle)
         , m_type(type)
     {
@@ -81,6 +111,8 @@ private:
     double m_x;
     double m_y;
     double m_z;
+    Length m_originX;
+    Length m_originY;
     double m_angle;
     OperationType m_type;
 };

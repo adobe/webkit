@@ -28,10 +28,19 @@
 
 #include "JSObject.h"
 #include "ObjectPrototype.h"
+#include <wtf/Float32Array.h>
+#include <wtf/Float64Array.h>
 #include <wtf/Forward.h>
+#include <wtf/Int16Array.h>
+#include <wtf/Int32Array.h>
+#include <wtf/Int8Array.h>
+#include <wtf/Uint16Array.h>
+#include <wtf/Uint32Array.h>
+#include <wtf/Uint8Array.h>
+#include <wtf/Uint8ClampedArray.h>
 
 namespace JSC {
-
+    
 #define TYPED_ARRAY(name, type) \
 class JS##name##Array : public JSNonFinalObject { \
 public: \
@@ -47,7 +56,7 @@ public: \
     static bool getOwnPropertyDescriptor(JSC::JSObject*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::PropertyDescriptor&);\
     static bool getOwnPropertySlotByIndex(JSC::JSCell*, JSC::ExecState*, unsigned propertyName, JSC::PropertySlot&);\
     static void put(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier& propertyName, JSC::JSValue, JSC::PutPropertySlot&);\
-    static void putByIndex(JSC::JSCell*, JSC::ExecState*, unsigned propertyName, JSC::JSValue);\
+    static void putByIndex(JSC::JSCell*, JSC::ExecState*, unsigned propertyName, JSC::JSValue, bool);\
     static const JSC::ClassInfo s_info;\
 \
     static JSC::Structure* createStructure(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)\
@@ -179,8 +188,8 @@ static EncodedJSValue JSC_HOST_CALL constructJS##name##Array(ExecState* callFram
     return JSValue::encode(JS##name##Array::create(structure, callFrame->lexicalGlobalObject(), name##Array::create(length)));\
 }
 
-#if ENABLE(COMMANDLINE_TYPEDARRAYS)
 TYPED_ARRAY(Uint8, uint8_t);
+TYPED_ARRAY(Uint8Clamped, uint8_t);
 TYPED_ARRAY(Uint16, uint16_t);
 TYPED_ARRAY(Uint32, uint32_t);
 TYPED_ARRAY(Int8, int8_t);
@@ -188,7 +197,6 @@ TYPED_ARRAY(Int16, int16_t);
 TYPED_ARRAY(Int32, int32_t);
 TYPED_ARRAY(Float32, float);
 TYPED_ARRAY(Float64, double);
-#endif
 
 }
 

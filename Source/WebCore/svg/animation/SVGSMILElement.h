@@ -47,8 +47,8 @@ public:
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     
     virtual bool hasValidAttributeType() = 0;
     virtual void animationAttributeChanged() = 0;
@@ -105,7 +105,7 @@ public:
     void setDocumentOrderIndex(unsigned index) { m_documentOrderIndex = index; }
 
     virtual bool isAdditive() const = 0;
-    virtual void resetToBaseValue(const String&) = 0;
+    virtual void resetToBaseValue() = 0;
     virtual void applyResultsToTarget() = 0;
 
 protected:

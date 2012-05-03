@@ -150,12 +150,17 @@ static IntRect screenRectOfContents(Element* element)
     _element = element;
 }
 
+- (BOOL)isFullScreen
+{
+    return _isFullScreen;
+}
+
 #pragma mark -
 #pragma mark NSWindowController overrides
 
 - (void)cancelOperation:(id)sender
 {
-    [self performSelector:@selector(exitFullScreen) withObject:nil afterDelay:0];
+    [self performSelector:@selector(requestExitFullScreen) withObject:nil afterDelay:0];
 }
 
 #pragma mark -
@@ -290,6 +295,13 @@ static IntRect screenRectOfContents(Element* element)
         [_scaleAnimation.get() stopAnimation];
 }
 
+- (void)requestExitFullScreen
+{
+    if (!_element)
+        return;
+    _element->document()->webkitCancelFullScreen();
+}
+
 - (void)exitFullScreen
 {
     if (!_isFullScreen)
@@ -365,7 +377,9 @@ static IntRect screenRectOfContents(Element* element)
     
     [_backgroundWindow.get() orderOut:self];
     [_backgroundWindow.get() setFrame:NSZeroRect display:YES];
-    
+
+    [[_webView window] makeKeyAndOrderFront:self];
+
     NSEnableScreenUpdates();
 }
 
@@ -440,7 +454,8 @@ static IntRect screenRectOfContents(Element* element)
     [otherView setFrame:[view frame]];        
     [otherView setAutoresizingMask:[view autoresizingMask]];
     [otherView removeFromSuperview];
-    [[view superview] replaceSubview:view with:otherView];
+    [[view superview] addSubview:otherView positioned:NSWindowAbove relativeTo:view];
+    [view removeFromSuperview];
     [CATransaction commit];
 }
 

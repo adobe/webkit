@@ -1289,6 +1289,11 @@ unsigned worldIDForWorld(IWebScriptWorld* world)
     return 0;
 }
 
+void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+    // FIXME: Implement this.
+}
+
 void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
 {
     COMPtr<IWebFramePrivate> framePrivate(Query, frame);
@@ -1302,7 +1307,7 @@ void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObj
         if (FAILED(WebKitCreateInstance(__uuidof(WebScriptWorld), 0, __uuidof(world), reinterpret_cast<void**>(&world))))
             return;
     } else {
-        COMPtr<IWebScriptWorld>& worldSlot = worldMap().add(worldID, 0).first->second;
+        COMPtr<IWebScriptWorld>& worldSlot = worldMap().add(worldID, 0).iterator->second;
         if (!worldSlot && FAILED(WebKitCreateInstance(__uuidof(WebScriptWorld), 0, __uuidof(worldSlot), reinterpret_cast<void**>(&worldSlot))))
             return;
         world = worldSlot;

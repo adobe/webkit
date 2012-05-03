@@ -66,12 +66,12 @@ typedef struct HFONT__* HFONT;
 
 namespace WebCore {
 
+class AsyncFileSystem;
 class Clipboard;
 class Color;
 class Cursor;
 class Document;
 class Frame;
-class GamepadList;
 class GeolocationServiceBridge;
 class GeolocationServiceChromium;
 class GraphicsContext;
@@ -93,9 +93,6 @@ struct FontRenderStyle;
 
 class PlatformSupport {
 public:
-    // Cache --------------------------------------------------------------
-    static void cacheMetadata(const KURL&, double responseTime, const Vector<char>&);
-
     // Clipboard ----------------------------------------------------------
     static uint64_t clipboardSequenceNumber(PasteboardPrivate::ClipboardBuffer);
 
@@ -124,9 +121,6 @@ public:
     static void deleteCookie(const Document*, const KURL&, const String& cookieName);
     static bool cookiesEnabled(const Document*);
 
-    // DNS ----------------------------------------------------------------
-    static void prefetchDNS(const String& hostname);
-
     // File ---------------------------------------------------------------
     static void revealFolderInOS(const String&);
     static bool fileExists(const String&);
@@ -146,6 +140,11 @@ public:
     static bool truncateFile(PlatformFileHandle, long long offset);
     static int readFromFile(PlatformFileHandle, char* data, int length);
     static int writeToFile(PlatformFileHandle, const char* data, int length);
+
+#if ENABLE(FILE_SYSTEM)
+    static String createIsolatedFileSystemName(const String& storageIdentifier, const String& filesystemId);
+    static PassOwnPtr<AsyncFileSystem> createIsolatedFileSystem(const String& originString, const String& filesystemId);
+#endif
 
     // Font ---------------------------------------------------------------
 #if OS(WINDOWS)
@@ -185,43 +184,15 @@ public:
     // Injects key via keyPath into value. Returns true on success.
     static PassRefPtr<SerializedScriptValue> injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>, const String& keyPath);
 
-    // Gamepad -----------------------------------------------------------
-    static void sampleGamepads(GamepadList* into);
-
     // JavaScript ---------------------------------------------------------
     static void notifyJSOutOfMemory(Frame*);
     static bool allowScriptDespiteSettings(const KURL& documentURL);
-
-    // Keygen -------------------------------------------------------------
-    static String signedPublicKeyAndChallengeString(unsigned keySizeIndex, const String& challenge, const KURL&);
 
     // Language -----------------------------------------------------------
     static String computedDefaultLanguage();
 
     // LayoutTestMode -----------------------------------------------------
     static bool layoutTestMode();
-
-    // Memory -------------------------------------------------------------
-    // Returns the current space allocated for the pagefile, in MB.
-    // That is committed size for Windows and virtual memory size for POSIX
-    static int memoryUsageMB();
-    // Same as above, but always returns actual value, without any caches.
-    static int actualMemoryUsageMB();
-    // If memory usage is below this threshold, do not bother forcing GC.
-    static int lowMemoryUsageMB();
-    // If memory usage is above this threshold, force GC more aggressively.
-    static int highMemoryUsageMB();
-    // Delta of memory usage growth (vs. last actualMemoryUsageMB()) to force GC when memory usage is high.
-    static int highUsageDeltaMB();
-
-    // MimeType -----------------------------------------------------------
-    static bool isSupportedImageMIMEType(const String& mimeType);
-    static bool isSupportedJavaScriptMIMEType(const String& mimeType);
-    static bool isSupportedNonImageMIMEType(const String& mimeType);
-    static String mimeTypeForExtension(const String& fileExtension);
-    static String wellKnownMimeTypeForExtension(const String& fileExtension);
-    static String mimeTypeFromFile(const String& filePath);
-    static String preferredExtensionForMIMEType(const String& mimeType);
 
     // Plugin -------------------------------------------------------------
     static bool plugins(bool refresh, Vector<PluginInfo>*);
@@ -236,9 +207,6 @@ public:
     static PassOwnPtr<AudioBus> decodeAudioFileData(const char* data, size_t, double sampleRate);
 #endif
 
-    // Sandbox ------------------------------------------------------------
-    static bool sandboxEnabled();
-
     // Screen -------------------------------------------------------------
     static int screenHorizontalDPI(Widget*);
     static int screenVerticalDPI(Widget*);
@@ -251,16 +219,6 @@ public:
     // SharedTimers -------------------------------------------------------
     static void setSharedTimerFiredFunction(void (*func)());
     static void setSharedTimerFireInterval(double);
-    static void stopSharedTimer();
-
-    // StatsCounters ------------------------------------------------------
-    static void decrementStatsCounter(const char* name);
-    static void incrementStatsCounter(const char* name);
-    static void histogramCustomCounts(const char* name, int sample, int min, int max, int bucketCount);
-    static void histogramEnumeration(const char* name, int sample, int boundaryValue);
-
-    // Sudden Termination
-    static void suddenTerminationChanged(bool enabled);
 
     // Theming ------------------------------------------------------------
 #if OS(WINDOWS)

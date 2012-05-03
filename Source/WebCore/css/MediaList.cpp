@@ -82,6 +82,16 @@ MediaQuerySet::MediaQuerySet(const String& mediaString, bool fallbackToDescripto
         parse("invalid");
 }
 
+MediaQuerySet::MediaQuerySet(const MediaQuerySet& o)
+    : RefCounted<MediaQuerySet>()
+    , m_fallbackToDescriptor(o.m_fallbackToDescriptor)
+    , m_lastLine(o.m_lastLine)
+    , m_queries(o.m_queries.size())
+{
+    for (unsigned i = 0; i < m_queries.size(); ++i)
+        m_queries[i] = o.m_queries[i]->copy();
+}
+
 MediaQuerySet::~MediaQuerySet()
 {
 }
@@ -107,7 +117,7 @@ static String parseMediaDescriptor(const String& string)
 
 bool MediaQuerySet::parse(const String& mediaString)
 {
-    CSSParser parser(true);
+    CSSParser parser(CSSStrictMode);
     
     Vector<OwnPtr<MediaQuery> > result;
     Vector<String> list;
@@ -142,7 +152,7 @@ bool MediaQuerySet::parse(const String& mediaString)
 
 bool MediaQuerySet::add(const String& queryString)
 {
-    CSSParser parser(true);
+    CSSParser parser(CSSStrictMode);
 
     OwnPtr<MediaQuery> parsedQuery = parser.parseMediaQuery(queryString);
     if (!parsedQuery && m_fallbackToDescriptor) {
@@ -159,7 +169,7 @@ bool MediaQuerySet::add(const String& queryString)
 
 bool MediaQuerySet::remove(const String& queryStringToRemove)
 {
-    CSSParser parser(true);
+    CSSParser parser(CSSStrictMode);
 
     OwnPtr<MediaQuery> parsedQuery = parser.parseMediaQuery(queryStringToRemove);
     if (!parsedQuery && m_fallbackToDescriptor) {
@@ -199,17 +209,18 @@ String MediaQuerySet::mediaText() const
     }
     return text;
 }
-
-MediaList* MediaQuerySet::ensureMediaList(CSSStyleSheet* parentSheet) const
-{
-    if (!m_cssomWrapper)
-        m_cssomWrapper = adoptPtr(new MediaList(const_cast<MediaQuerySet*>(this), parentSheet));
-    return m_cssomWrapper.get();
-}
     
 MediaList::MediaList(MediaQuerySet* mediaQueries, CSSStyleSheet* parentSheet)
     : m_mediaQueries(mediaQueries)
     , m_parentStyleSheet(parentSheet)
+    , m_parentRule(0)
+{
+}
+
+MediaList::MediaList(MediaQuerySet* mediaQueries, CSSRule* parentRule)
+    : m_mediaQueries(mediaQueries)
+    , m_parentStyleSheet(0)
+    , m_parentRule(parentRule)
 {
 }
 
@@ -258,10 +269,10 @@ void MediaList::appendMedium(const String& medium, ExceptionCode& ec)
 
 void MediaList::notifyChanged()
 {
-    if (!m_parentStyleSheet)
+    CSSStyleSheet* parentStyleSheet = m_parentRule ? m_parentRule->parentStyleSheet() : m_parentStyleSheet;
+    if (!parentStyleSheet)
         return;
-
-    m_parentStyleSheet->styleSheetChanged();
+    parentStyleSheet->styleSheetChanged();
 }
 
 }

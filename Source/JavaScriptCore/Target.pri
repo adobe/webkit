@@ -71,8 +71,12 @@ SOURCES += \
     heap/CopiedSpace.cpp \
     heap/ConservativeRoots.cpp \
     heap/DFGCodeBlocks.cpp \
-    heap/HandleHeap.cpp \
+    heap/WeakSet.cpp \
+    heap/WeakHandleOwner.cpp \
+    heap/WeakBlock.cpp \
+    heap/HandleSet.cpp \
     heap/HandleStack.cpp \
+    heap/BlockAllocator.cpp \
     heap/Heap.cpp \
     heap/MachineStackMarker.cpp \
     heap/MarkStack.cpp \
@@ -171,7 +175,6 @@ SOURCES += \
     runtime/JSActivation.cpp \
     runtime/JSAPIValueWrapper.cpp \
     runtime/JSArray.cpp \
-    runtime/JSByteArray.cpp \
     runtime/JSCell.cpp \
     runtime/JSDateMath.cpp \
     runtime/JSFunction.cpp \
@@ -187,6 +190,7 @@ SOURCES += \
     runtime/JSPropertyNameIterator.cpp \
     runtime/JSStaticScopeObject.cpp \
     runtime/JSString.cpp \
+    runtime/JSStringJoiner.cpp \
     runtime/JSValue.cpp \
     runtime/JSVariableObject.cpp \
     runtime/JSWrapperObject.cpp \

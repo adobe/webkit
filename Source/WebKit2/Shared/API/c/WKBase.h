@@ -37,6 +37,10 @@
 #include <WebKit2/WKBaseGtk.h>
 #endif
 
+#if defined(BUILDING_SOUP__)
+#include <WebKit2/WKBaseSoup.h>
+#endif
+
 /* WebKit2 shared types */
 
 typedef uint32_t WKTypeID;
@@ -116,6 +120,7 @@ typedef const struct OpaqueWKBundle* WKBundleRef;
 typedef const struct OpaqueWKBundleBackForwardList* WKBundleBackForwardListRef;
 typedef const struct OpaqueWKBundleBackForwardListItem* WKBundleBackForwardListItemRef;
 typedef const struct OpaqueWKBundleDOMCSSStyleDeclaration* WKBundleCSSStyleDeclarationRef;
+typedef const struct OpaqueWKBundleDOMWindowExtension* WKBundleDOMWindowExtensionRef;
 typedef const struct OpaqueWKBundleFrame* WKBundleFrameRef;
 typedef const struct OpaqueWKBundleHitTestResult* WKBundleHitTestResultRef;
 typedef const struct OpaqueWKBundleInspector* WKBundleInspectorRef;

@@ -76,7 +76,6 @@ private:
                 break;
             bool isArray = isArrayPrediction(m_graph[node.child1()].prediction());
             bool isString = isStringPrediction(m_graph[node.child1()].prediction());
-            bool isByteArray = m_graph[node.child1()].shouldSpeculateByteArray();
             bool isInt8Array = m_graph[node.child1()].shouldSpeculateInt8Array();
             bool isInt16Array = m_graph[node.child1()].shouldSpeculateInt16Array();
             bool isInt32Array = m_graph[node.child1()].shouldSpeculateInt32Array();
@@ -86,7 +85,7 @@ private:
             bool isUint32Array = m_graph[node.child1()].shouldSpeculateUint32Array();
             bool isFloat32Array = m_graph[node.child1()].shouldSpeculateFloat32Array();
             bool isFloat64Array = m_graph[node.child1()].shouldSpeculateFloat64Array();
-            if (!isArray && !isString && !isByteArray && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint8ClampedArray && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
+            if (!isArray && !isString && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint8ClampedArray && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
                 break;
             
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
@@ -96,8 +95,6 @@ private:
                 node.setOp(GetArrayLength);
             else if (isString)
                 node.setOp(GetStringLength);
-            else if (isByteArray)
-                node.setOp(GetByteArrayLength);
             else if (isInt8Array)
                 node.setOp(GetInt8ArrayLength);
             else if (isInt16Array)
@@ -187,11 +184,27 @@ private:
         }
             
         case Branch: {
-            if (m_graph[node.child1()].shouldSpeculateInteger())
-                break;
-            if (!m_graph[node.child1()].shouldSpeculateNumber())
-                break;
-            fixDoubleEdge(0);
+            if (!m_graph[node.child1()].shouldSpeculateInteger()
+                && m_graph[node.child1()].shouldSpeculateNumber())
+                fixDoubleEdge(0);
+
+            Node& myNode = m_graph[m_compileIndex]; // reload because the graph may have changed
+            Edge logicalNotEdge = myNode.child1();
+            Node& logicalNot = m_graph[logicalNotEdge];
+            if (logicalNot.op() == LogicalNot
+                && logicalNot.adjustedRefCount() == 1) {
+                Edge newChildEdge = logicalNot.child1();
+                if (m_graph[newChildEdge].hasBooleanResult()) {
+                    m_graph.ref(newChildEdge);
+                    m_graph.deref(logicalNotEdge);
+                    myNode.children.setChild1(newChildEdge);
+                    
+                    BlockIndex toBeTaken = myNode.notTakenBlockIndex();
+                    BlockIndex toBeNotTaken = myNode.takenBlockIndex();
+                    myNode.setTakenBlockIndex(toBeTaken);
+                    myNode.setNotTakenBlockIndex(toBeNotTaken);
+                }
+            }
             break;
         }
             
@@ -234,11 +247,38 @@ private:
         case ArithMin:
         case ArithMax:
         case ArithMul:
-        case ArithDiv:
         case ArithMod: {
             if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()])
                 && node.canSpeculateInteger())
                 break;
+            fixDoubleEdge(0);
+            fixDoubleEdge(1);
+            break;
+        }
+            
+        case ArithDiv: {
+            if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()])
+                && node.canSpeculateInteger()) {
+                if (isX86())
+                    break;
+                fixDoubleEdge(0);
+                fixDoubleEdge(1);
+                
+                Node& oldDivision = m_graph[m_compileIndex];
+                
+                Node newDivision = oldDivision;
+                newDivision.setRefCount(2);
+                newDivision.predict(PredictDouble);
+                NodeIndex newDivisionIndex = m_graph.size();
+                
+                oldDivision.setOp(DoubleAsInt32);
+                oldDivision.children.initialize(Edge(newDivisionIndex, DoubleUse), Edge(), Edge());
+                
+                m_graph.append(newDivision);
+                m_insertionSet.append(m_indexInBlock, newDivisionIndex);
+                
+                break;
+            }
             fixDoubleEdge(0);
             fixDoubleEdge(1);
             break;

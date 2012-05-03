@@ -38,11 +38,11 @@
 #include "GraphicsTypes.h"
 #include "IntSize.h"
 #include "ImageBufferData.h"
-#include <wtf/ByteArray.h>
 #include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/Uint8ClampedArray.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -80,17 +80,9 @@ namespace WebCore {
         static PassOwnPtr<ImageBuffer> create(const IntSize& size, float resolutionScale = 1, ColorSpace colorSpace = ColorSpaceDeviceRGB, RenderingMode renderingMode = Unaccelerated, DeferralMode deferralMode = NonDeferred)
         {
             bool success = false;
-            float scaledWidth = ceilf(resolutionScale * size.width());
-            float scaledHeight = ceilf(resolutionScale * size.height());
-            IntSize internalSize(scaledWidth, scaledHeight);
-
-            OwnPtr<ImageBuffer> buf = adoptPtr(new ImageBuffer(internalSize, colorSpace, renderingMode, deferralMode, success));
+            OwnPtr<ImageBuffer> buf = adoptPtr(new ImageBuffer(size, resolutionScale, colorSpace, renderingMode, deferralMode, success));
             if (!success)
                 return nullptr;
-
-            buf->m_logicalSize = size;
-            buf->m_resolutionScale = resolutionScale;
-            buf->context()->scale(FloatSize(resolutionScale, resolutionScale));
             return buf.release();
         }
 
@@ -104,14 +96,16 @@ namespace WebCore {
 
         PassRefPtr<Image> copyImage(BackingStoreCopy = CopyBackingStore) const;
 
-        PassRefPtr<ByteArray> getUnmultipliedImageData(const IntRect&) const;
-        PassRefPtr<ByteArray> getPremultipliedImageData(const IntRect&) const;
+        enum CoordinateSystem { LogicalCoordinateSystem, BackingStoreCoordinateSystem };
 
-        void putByteArray(Multiply multiplied, ByteArray*, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint);
+        PassRefPtr<Uint8ClampedArray> getUnmultipliedImageData(const IntRect&, CoordinateSystem = LogicalCoordinateSystem) const;
+        PassRefPtr<Uint8ClampedArray> getPremultipliedImageData(const IntRect&, CoordinateSystem = LogicalCoordinateSystem) const;
+
+        void putByteArray(Multiply multiplied, Uint8ClampedArray*, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint, CoordinateSystem = LogicalCoordinateSystem);
         
         void convertToLuminanceMask();
         
-        String toDataURL(const String& mimeType, const double* quality = 0) const;
+        String toDataURL(const String& mimeType, const double* quality = 0, CoordinateSystem = LogicalCoordinateSystem) const;
 #if !USE(CG)
         AffineTransform baseTransform() const { return AffineTransform(); }
         void transformColorSpace(ColorSpace srcColorSpace, ColorSpace dstColorSpace);
@@ -153,7 +147,7 @@ namespace WebCore {
 
         // This constructor will place its success into the given out-variable
         // so that create() knows when it should return failure.
-        ImageBuffer(const IntSize&, ColorSpace, RenderingMode, DeferralMode, bool& success);
+        ImageBuffer(const IntSize&, float resolutionScale, ColorSpace, RenderingMode, DeferralMode, bool& success);
     };
 
 #if USE(CG) || USE(SKIA)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #include "CSSInheritedValue.h"
 #include "CSSInitialValue.h"
 #include "CSSPrimitiveValue.h"
+#include "CSSValueKeywords.h"
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
@@ -37,12 +38,9 @@ namespace WebCore {
 
 class CSSValueList;
 
-class CSSValuePool : public RefCounted<CSSValuePool> {
+class CSSValuePool {
 public:
-    static PassRefPtr<CSSValuePool> create() { return adoptRef(new CSSValuePool); }
-    ~CSSValuePool();
-
-    PassRefPtr<CSSValueList> createFontFaceValue(const AtomicString&, CSSStyleSheet* contextStyleSheet);
+    PassRefPtr<CSSValueList> createFontFaceValue(const AtomicString&);
     PassRefPtr<CSSPrimitiveValue> createFontFamilyValue(const String&);
     PassRefPtr<CSSInheritedValue> createInheritedValue() { return m_inheritedValue; }
     PassRefPtr<CSSInitialValue> createImplicitInitialValue() { return m_implicitInitialValue; }
@@ -60,8 +58,7 @@ private:
     RefPtr<CSSInitialValue> m_implicitInitialValue;
     RefPtr<CSSInitialValue> m_explicitInitialValue;
 
-    typedef HashMap<int, RefPtr<CSSPrimitiveValue> > IdentifierValueCache;
-    IdentifierValueCache m_identifierValueCache;
+    RefPtr<CSSPrimitiveValue> m_identifierValueCache[numCSSValueKeywords];
 
     typedef HashMap<unsigned, RefPtr<CSSPrimitiveValue> > ColorValueCache;
     ColorValueCache m_colorValueCache;
@@ -69,20 +66,22 @@ private:
     RefPtr<CSSPrimitiveValue> m_colorWhite;
     RefPtr<CSSPrimitiveValue> m_colorBlack;
 
-    typedef HashMap<int, RefPtr<CSSPrimitiveValue> > IntegerValueCache;
-    RefPtr<CSSPrimitiveValue> m_pixelZero;
-    RefPtr<CSSPrimitiveValue> m_percentZero;
-    RefPtr<CSSPrimitiveValue> m_numberZero;
-    IntegerValueCache m_pixelValueCache;
-    IntegerValueCache m_percentValueCache;
-    IntegerValueCache m_numberValueCache;
+    static const int maximumCacheableIntegerValue = 255;
+
+    RefPtr<CSSPrimitiveValue> m_pixelValueCache[maximumCacheableIntegerValue + 1];
+    RefPtr<CSSPrimitiveValue> m_percentValueCache[maximumCacheableIntegerValue + 1];
+    RefPtr<CSSPrimitiveValue> m_numberValueCache[maximumCacheableIntegerValue + 1];
 
     typedef HashMap<AtomicString, RefPtr<CSSValueList> > FontFaceValueCache;
     FontFaceValueCache m_fontFaceValueCache;
 
     typedef HashMap<String, RefPtr<CSSPrimitiveValue> > FontFamilyValueCache;
     FontFamilyValueCache m_fontFamilyValueCache;
+
+    friend CSSValuePool& cssValuePool();
 };
+
+CSSValuePool& cssValuePool();
 
 }
 

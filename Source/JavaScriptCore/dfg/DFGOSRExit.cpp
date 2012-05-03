@@ -33,17 +33,28 @@
 
 namespace JSC { namespace DFG {
 
+static unsigned computeNumVariablesForCodeOrigin(
+    CodeBlock* codeBlock, const CodeOrigin& codeOrigin)
+{
+    if (!codeOrigin.inlineCallFrame)
+        return codeBlock->m_numCalleeRegisters;
+    return
+        codeOrigin.inlineCallFrame->stackOffset +
+        baselineCodeBlockForInlineCallFrame(codeOrigin.inlineCallFrame)->m_numCalleeRegisters;
+}
+
 OSRExit::OSRExit(ExitKind kind, JSValueSource jsValueSource, MethodOfGettingAValueProfile valueProfile, MacroAssembler::Jump check, SpeculativeJIT* jit, unsigned recoveryIndex)
     : m_jsValueSource(jsValueSource)
     , m_valueProfile(valueProfile)
     , m_check(check)
     , m_nodeIndex(jit->m_compileIndex)
     , m_codeOrigin(jit->m_codeOriginForOSR)
+    , m_codeOriginForExitProfile(m_codeOrigin)
     , m_recoveryIndex(recoveryIndex)
     , m_kind(kind)
     , m_count(0)
     , m_arguments(jit->m_arguments.size())
-    , m_variables(jit->m_variables.size())
+    , m_variables(computeNumVariablesForCodeOrigin(jit->m_jit.graph().m_profiledBlock, jit->m_codeOriginForOSR))
     , m_lastSetOperand(jit->m_lastSetOperand)
 {
     ASSERT(m_codeOrigin.isSet());
@@ -67,7 +78,7 @@ bool OSRExit::considerAddingAsFrequentExitSiteSlow(CodeBlock* dfgCodeBlock, Code
     if (static_cast<double>(m_count) / dfgCodeBlock->speculativeFailCounter() <= Options::osrExitProminenceForFrequentExitSite)
         return false;
     
-    return baselineCodeBlockForOriginAndBaselineCodeBlock(m_codeOrigin, profiledCodeBlock)->addFrequentExitSite(FrequentExitSite(m_codeOrigin.bytecodeIndex, m_kind));
+    return baselineCodeBlockForOriginAndBaselineCodeBlock(m_codeOriginForExitProfile, profiledCodeBlock)->addFrequentExitSite(FrequentExitSite(m_codeOriginForExitProfile.bytecodeIndex, m_kind));
 }
 
 } } // namespace JSC::DFG

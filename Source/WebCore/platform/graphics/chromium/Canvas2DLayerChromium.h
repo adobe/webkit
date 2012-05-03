@@ -35,6 +35,7 @@
 #if USE(ACCELERATED_COMPOSITING)
 
 #include "CanvasLayerChromium.h"
+#include "ImageBuffer.h"
 #include "ManagedTexture.h"
 
 class SkCanvas;
@@ -47,38 +48,41 @@ class Region;
 // A layer containing an accelerated 2d canvas
 class Canvas2DLayerChromium : public CanvasLayerChromium {
 public:
-    static PassRefPtr<Canvas2DLayerChromium> create(PassRefPtr<GraphicsContext3D>, const IntSize&);
+    enum WillDrawCondition {
+        WillDrawUnconditionally,
+        WillDrawIfLayerNotDeferred,
+    };
+
+    static PassRefPtr<Canvas2DLayerChromium> create(PassRefPtr<GraphicsContext3D>, const IntSize&, DeferralMode);
     virtual ~Canvas2DLayerChromium();
 
     void setTextureId(unsigned);
 
-    virtual void setNeedsDisplayRect(const FloatRect&);
+    virtual void setNeedsDisplayRect(const FloatRect&) OVERRIDE;
 
-    virtual bool drawsContent() const;
-    virtual void paintContentsIfDirty(const CCOcclusionTracker*);
-
-    virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
-    virtual void pushPropertiesTo(CCLayerImpl*);
-    virtual void unreserveContentsTexture();
+    virtual bool drawsContent() const OVERRIDE;
+    virtual void update(CCTextureUpdater&, const CCOcclusionTracker*) OVERRIDE;
+    virtual void pushPropertiesTo(CCLayerImpl*) OVERRIDE;
 
     void setCanvas(SkCanvas*);
+    void layerWillDraw(WillDrawCondition) const;
 
 private:
-    Canvas2DLayerChromium(PassRefPtr<GraphicsContext3D>, const IntSize&);
-
-    friend class Canvas2DLayerChromiumTest;
+    Canvas2DLayerChromium(PassRefPtr<GraphicsContext3D>, const IntSize&, DeferralMode);
+    bool drawingIntoImplThreadTexture() const;
 
     RefPtr<GraphicsContext3D> m_context;
     bool m_contextLost;
     IntSize m_size;
     unsigned m_backTextureId;
-    Platform3DObject m_fbo;
     // When m_useDoubleBuffering is true, the compositor will draw using a copy of the
     // canvas' backing texture. This option should be used with the compositor doesn't
     // synchronize its draws with the canvas updates.
     bool m_useDoubleBuffering;
     OwnPtr<ManagedTexture> m_frontTexture;
     SkCanvas* m_canvas;
+    bool m_useRateLimiter;
+    DeferralMode m_deferralMode;
 };
 
 }

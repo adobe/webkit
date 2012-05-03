@@ -25,18 +25,20 @@
 #include "Document.h"
 #include "Element.h"
 #include "FloatQuad.h"
+#include "FlowThreadController.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HitTestResult.h"
 #include "Page.h"
-#include "RenderFlowThread.h"
 #include "RenderLayer.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderSelectionInfo.h"
 #include "RenderWidget.h"
 #include "RenderWidgetProtector.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -54,12 +56,12 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_maximalOutlineSize(0)
     , m_pageLogicalHeight(0)
     , m_pageLogicalHeightChanged(false)
-    , m_isRenderFlowThreadOrderDirty(false)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
-    , m_currentRenderFlowThread(0)
     , m_inFirstLayoutPhaseOfRegionsAutoHeight(false)
     , m_autoHeightRegionsCount(0)
+    , m_inFirstLayoutPhaseOfExclusionsPositioning(false)
+    , m_cssExclusionsCount(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
     // any renderer with document as the node is anonymous.
@@ -71,13 +73,18 @@ RenderView::RenderView(Node* node, FrameView* view)
     m_minPreferredLogicalWidth = 0;
     m_maxPreferredLogicalWidth = 0;
 
-    setPreferredLogicalWidthsDirty(true, false);
+    setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
     
     setPositioned(true); // to 0,0 :)
 }
 
 RenderView::~RenderView()
 {
+}
+
+bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
+{
+    return layer()->hitTest(request, result);
 }
 
 void RenderView::computeLogicalHeight()
@@ -117,13 +124,13 @@ void RenderView::layout()
     // Use calcWidth/Height to get the new width/height, since this will take the full page zoom factor into account.
     bool relayoutChildren = !printing() && (!m_frameView || width() != viewWidth() || height() != viewHeight());
     if (relayoutChildren) {
-        setChildNeedsLayout(true, false);
+        setChildNeedsLayout(true, MarkOnlyThis);
         for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
             if ((child->isBox() && toRenderBox(child)->hasRelativeLogicalHeight())
                     || child->style()->logicalHeight().isPercent()
                     || child->style()->logicalMinHeight().isPercent()
                     || child->style()->logicalMaxHeight().isPercent())
-                child->setChildNeedsLayout(true, false);
+                child->setChildNeedsLayout(true, MarkOnlyThis);
         }
     }
 
@@ -140,23 +147,35 @@ void RenderView::layout()
     // If one of the render flow threads has a region with auto-height
     // then we need a second pass layout.
     if (needsLayout()) {
+        m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
-        if (document()->cssRegionsAutoHeightEnabled() && hasRenderFlowThreads() && hasAutoHeightRegions() && resetAutoHeightRegionsForFirstLayoutPhase())
+        if (document()->cssRegionsAutoHeightEnabled() && hasRenderNamedFlowThreads() && hasAutoHeightRegions() && flowThreadController()->resetAutoHeightRegionsForFirstLayoutPhase())
             m_inFirstLayoutPhaseOfRegionsAutoHeight = true;
+        if (hasCSSExclusions()) {
+            m_inFirstLayoutPhaseOfExclusionsPositioning = true;
+            resetCSSExclusionsForFirstLayoutPass();
+        }
         RenderBlock::layout();
-        if (hasRenderFlowThreads())
-            layoutRenderFlowThreads();
+        if (hasRenderNamedFlowThreads())
+            flowThreadController()->layoutRenderNamedFlowThreads();
     }
     
-    if (m_inFirstLayoutPhaseOfRegionsAutoHeight) {
+    if (m_inFirstLayoutPhaseOfRegionsAutoHeight || m_inFirstLayoutPhaseOfExclusionsPositioning) {
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
-        // Regions should decide for themselves whether they need a second layout.
+        m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         setNeedsLayout(false);
-        markAutoHeightRegionsForSecondLayoutPhase();
+        if (hasCSSExclusions()) {
+            // Exclusions are first, because we must not have any "needsLayout == true" in the tree.
+            m_layoutState = 0;
+            markCSSExclusionDependentBlocksForLayout();
+            m_layoutState = &state;
+        }
+        if (document()->cssRegionsAutoHeightEnabled() && hasRenderNamedFlowThreads() && hasAutoHeightRegions())
+            flowThreadController()->markAutoHeightRegionsForSecondLayoutPhase();
         if (needsLayout()) {
             RenderBlock::layout();
-            ASSERT(hasRenderFlowThreads());
-            layoutRenderFlowThreads();
+            if (hasRenderNamedFlowThreads())
+                flowThreadController()->layoutRenderNamedFlowThreads();
         }
     }
 
@@ -236,6 +255,8 @@ void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     // If we ever require layout but receive a paint anyway, something has gone horribly wrong.
     ASSERT(!needsLayout());
+    // RenderViews should never be called to paint with an offset not on device pixels.
+    ASSERT(LayoutPoint(IntPoint(paintOffset.x(), paintOffset.y())) == paintOffset);
     paintObject(paintInfo, paintOffset);
 }
 
@@ -268,8 +289,8 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
         }
 
 #if USE(ACCELERATED_COMPOSITING)
-        if (RenderLayer* compositingLayer = layer->enclosingCompositingLayer()) {
-            if (!compositingLayer->backing()->paintingGoesToWindow()) {
+        if (RenderLayer* compositingLayer = layer->enclosingCompositingLayerForRepaint()) {
+            if (!compositingLayer->backing()->paintsIntoWindow()) {
                 frameView()->setCannotBlitToWindow();
                 break;
             }
@@ -313,7 +334,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
     }
 }
 
-bool RenderView::shouldRepaint(const IntRect& r) const
+bool RenderView::shouldRepaint(const LayoutRect& r) const
 {
     if (printing() || r.width() == 0 || r.height() == 0)
         return false;
@@ -327,7 +348,7 @@ bool RenderView::shouldRepaint(const IntRect& r) const
     return true;
 }
 
-void RenderView::repaintViewRectangle(const IntRect& ur, bool immediate)
+void RenderView::repaintViewRectangle(const LayoutRect& ur, bool immediate)
 {
     if (!shouldRepaint(ur))
         return;
@@ -336,23 +357,22 @@ void RenderView::repaintViewRectangle(const IntRect& ur, bool immediate)
     // or even invisible.
     Element* elt = document()->ownerElement();
     if (!elt)
-        m_frameView->repaintContentRectangle(ur, immediate);
+        m_frameView->repaintContentRectangle(pixelSnappedIntRect(ur), immediate);
     else if (RenderBox* obj = elt->renderBox()) {
-        IntRect vr = viewRect();
-        IntRect r = intersection(ur, vr);
+        LayoutRect vr = viewRect();
+        LayoutRect r = intersection(ur, vr);
         
         // Subtract out the contentsX and contentsY offsets to get our coords within the viewing
         // rectangle.
         r.moveBy(-vr.location());
-        
+
         // FIXME: Hardcoded offsets here are not good.
-        r.move(obj->borderLeft() + obj->paddingLeft(),
-               obj->borderTop() + obj->paddingTop());
+        r.moveBy(obj->contentBoxRect().location());
         obj->repaintRectangle(r, immediate);
     }
 }
 
-void RenderView::repaintRectangleInViewAndCompositedLayers(const IntRect& ur, bool immediate)
+void RenderView::repaintRectangleInViewAndCompositedLayers(const LayoutRect& ur, bool immediate)
 {
     if (!shouldRepaint(ur))
         return;
@@ -361,11 +381,11 @@ void RenderView::repaintRectangleInViewAndCompositedLayers(const IntRect& ur, bo
     
 #if USE(ACCELERATED_COMPOSITING)
     if (compositor()->inCompositingMode())
-        compositor()->repaintCompositedLayersAbsoluteRect(ur);
+        compositor()->repaintCompositedLayersAbsoluteRect(pixelSnappedIntRect(ur));
 #endif
 }
 
-void RenderView::computeRectForRepaint(RenderBoxModelObject* repaintContainer, IntRect& rect, bool fixed) const
+void RenderView::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
 {
     // If a container was specified, and was not 0 or the RenderView,
     // then we should have found it by now.
@@ -439,12 +459,12 @@ IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
     }
 
     // Now create a single bounding box rect that encloses the whole selection.
-    IntRect selRect;
+    LayoutRect selRect;
     SelectionMap::iterator end = selectedObjects.end();
     for (SelectionMap::iterator i = selectedObjects.begin(); i != end; ++i) {
         RenderSelectionInfo* info = i->second;
         // RenderSelectionInfo::rect() is in the coordinates of the repaintContainer, so map to page coordinates.
-        IntRect currRect = info->rect();
+        LayoutRect currRect = info->rect();
         if (RenderBoxModelObject* repaintContainer = info->repaintContainer()) {
             FloatQuad absQuad = repaintContainer->localToAbsoluteQuad(FloatRect(currRect));
             currRect = absQuad.enclosingBoundingBox(); 
@@ -452,7 +472,7 @@ IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
         selRect.unite(currRect);
         delete info;
     }
-    return selRect;
+    return pixelSnappedIntRect(selRect);
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -725,21 +745,21 @@ void RenderView::notifyWidgets(WidgetNotification notification)
     releaseWidgets(renderWidgets);
 }
 
-IntRect RenderView::viewRect() const
+LayoutRect RenderView::viewRect() const
 {
     if (printing())
-        return IntRect(IntPoint(), size());
+        return LayoutRect(LayoutPoint(), size());
     if (m_frameView)
         return m_frameView->visibleContentRect();
-    return IntRect();
+    return LayoutRect();
 }
 
 
 IntRect RenderView::unscaledDocumentRect() const
 {
-    IntRect overflowRect(layoutOverflowRect());
+    LayoutRect overflowRect(layoutOverflowRect());
     flipForWritingMode(overflowRect);
-    return overflowRect;
+    return pixelSnappedIntRect(overflowRect);
 }
 
 LayoutRect RenderView::backgroundRect(RenderBox* backgroundRenderer) const
@@ -907,83 +927,24 @@ void RenderView::styleDidChange(StyleDifference diff, const RenderStyle* oldStyl
     RenderBlock::styleDidChange(diff, oldStyle);
     
     for (RenderObject* renderer = firstChild(); renderer; renderer = renderer->nextSibling()) {
-        if (renderer->isRenderFlowThread()) {
-            RenderFlowThread* flowRenderer = toRenderFlowThread(renderer);
+        if (renderer->isRenderNamedFlowThread()) {
+            RenderNamedFlowThread* flowRenderer = toRenderNamedFlowThread(renderer);
             flowRenderer->setStyle(RenderFlowThread::createFlowThreadStyle(style()));
         }
     }
 }
 
-RenderFlowThread* RenderView::ensureRenderFlowThreadWithName(const AtomicString& flowThread)
+bool RenderView::hasRenderNamedFlowThreads() const
 {
-    if (!m_renderFlowThreadList)
-        m_renderFlowThreadList = adoptPtr(new RenderFlowThreadList());
-    else {
-        for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-            RenderFlowThread* flowRenderer = *iter;
-            if (flowRenderer->flowThread() == flowThread)
-                return flowRenderer;
-        }
-    }
-
-    RenderFlowThread* flowRenderer = new (renderArena()) RenderFlowThread(document(), flowThread);
-    flowRenderer->setStyle(RenderFlowThread::createFlowThreadStyle(style()));
-    addChild(flowRenderer);
-
-    m_renderFlowThreadList->add(flowRenderer);
-    setIsRenderFlowThreadOrderDirty(true);
-
-    return flowRenderer;
+    return m_flowThreadController && m_flowThreadController->hasRenderNamedFlowThreads();
 }
 
-void RenderView::layoutRenderFlowThreads()
+FlowThreadController* RenderView::flowThreadController()
 {
-    ASSERT(m_renderFlowThreadList);
+    if (!m_flowThreadController)
+        m_flowThreadController = FlowThreadController::create(this);
 
-    if (isRenderFlowThreadOrderDirty()) {
-        // Arrange the thread list according to dependencies.
-        RenderFlowThreadList sortedList;
-        for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-            RenderFlowThread* flowRenderer = *iter;
-            if (sortedList.contains(flowRenderer))
-                continue;
-            flowRenderer->pushDependencies(sortedList);
-            sortedList.add(flowRenderer);
-        }
-        m_renderFlowThreadList->swap(sortedList);
-        setIsRenderFlowThreadOrderDirty(false);
-    }
-
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-        RenderFlowThread* flowRenderer = *iter;
-        flowRenderer->layoutIfNeeded();
-    }
-}
-
-bool RenderView::resetAutoHeightRegionsForFirstLayoutPhase()
-{
-    if (!document()->cssRegionsAutoHeightEnabled())
-        return false;
-
-    bool hadFlowsWithAutoHeightRegions = false;
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-        RenderFlowThread* flowRenderer = *iter;
-        if (flowRenderer->resetAutoHeightRegionsForFirstLayoutPhase())
-            hadFlowsWithAutoHeightRegions = true;
-    }
-    
-    return hadFlowsWithAutoHeightRegions;
-}
-
-void RenderView::markAutoHeightRegionsForSecondLayoutPhase()
-{
-    if (!document()->cssRegionsAutoHeightEnabled())
-        return;
-
-    for (RenderFlowThreadList::iterator iter = m_renderFlowThreadList->begin(); iter != m_renderFlowThreadList->end(); ++iter) {
-        RenderFlowThread* flowRenderer = *iter;
-        flowRenderer->markAutoHeightRegionsForSecondLayoutPhase();
-    }
+    return m_flowThreadController.get();
 }
 
 RenderBlock::IntervalArena* RenderView::intervalArena()
@@ -992,5 +953,58 @@ RenderBlock::IntervalArena* RenderView::intervalArena()
         m_intervalArena = IntervalArena::create();
     return m_intervalArena.get();
 }
+
+void RenderView::setFixedPositionedObjectsNeedLayout()
+{
+    ASSERT(m_frameView);
+
+    PositionedObjectsListHashSet* positionedObjects = this->positionedObjects();
+    if (!positionedObjects)
+        return;
+
+    PositionedObjectsListHashSet::const_iterator end = positionedObjects->end();
+    for (PositionedObjectsListHashSet::const_iterator it = positionedObjects->begin(); it != end; ++it) {
+        RenderBox* currBox = *it;
+        currBox->setNeedsLayout(true);
+    }
+}
+
+void RenderView::insertFixedPositionedObject(RenderBox* object)
+{
+    if (!m_positionedObjects)
+        m_positionedObjects = adoptPtr(new PositionedObjectsListHashSet);
+
+    m_positionedObjects->add(object);
+}
+
+void RenderView::removeFixedPositionedObject(RenderBox* object)
+{
+    if (!m_positionedObjects)
+        return;
+
+    m_positionedObjects->remove(object);
+}
+
+void RenderView::resetCSSExclusionsForFirstLayoutPass()
+{
+    ASSERT(layer());
+    if (layer()->hasWrappingContext())
+        layer()->wrappingContext()->resetExclusionsForFirstLayoutPass();
+}
+    
+void RenderView::markCSSExclusionDependentBlocksForLayout()
+{
+    ASSERT(layer());
+    if (layer()->hasWrappingContext())
+        layer()->wrappingContext()->markDescendantsForSecondLayoutPass();
+}
+
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+HostWindow* RenderView::customFiltersHostWindow() const
+{
+    return frameView()->root()->hostWindow();
+}
+#endif
+
 
 } // namespace WebCore

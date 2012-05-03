@@ -24,6 +24,7 @@
 #define RenderText_h
 
 #include "RenderObject.h"
+#include "RenderView.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -82,23 +83,25 @@ public:
                            float& beginMaxW, float& endMaxW,
                            float& minW, float& maxW, bool& stripFrontSpaces);
 
-    virtual LayoutRect linesBoundingBox() const;
+    virtual IntRect linesBoundingBox() const;
     LayoutRect linesVisualOverflowBoundingBox() const;
 
     FloatPoint firstRunOrigin() const;
     float firstRunX() const;
     float firstRunY() const;
 
-    void setText(PassRefPtr<StringImpl>, bool force = false);
+    virtual void setText(PassRefPtr<StringImpl>, bool force = false);
     void setTextWithOffset(PassRefPtr<StringImpl>, unsigned offset, unsigned len, bool force = false);
+
+    virtual void transformText();
 
     virtual bool canBeSelectionLeaf() const { return true; }
     virtual void setSelectionState(SelectionState s);
     virtual LayoutRect selectionRectForRepaint(RenderBoxModelObject* repaintContainer, bool clipToVisibleContent = true);
     virtual LayoutRect localCaretRect(InlineBox*, int caretOffset, LayoutUnit* extraWidthToEndOfLine = 0);
 
-    virtual LayoutUnit marginLeft() const { return miminumValueForLength(style()->marginLeft(), 0); }
-    virtual LayoutUnit marginRight() const { return miminumValueForLength(style()->marginRight(), 0); }
+    virtual LayoutUnit marginLeft() const { return minimumValueForLength(style()->marginLeft(), 0, view()); }
+    virtual LayoutUnit marginRight() const { return minimumValueForLength(style()->marginRight(), 0, view()); }
 
     virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
 
@@ -126,7 +129,8 @@ public:
 
     virtual void computePreferredLogicalWidths(float leadWidth);
     bool isAllCollapsibleWhitespace();
-    
+
+    bool canUseSimpleFontCodePath() const { return m_canUseSimpleFontCodePath; }
     bool knownToHaveNoOverflowAndNoFallbackFonts() const { return m_knownToHaveNoOverflowAndNoFallbackFonts; }
 
     void removeAndDestroyTextBoxes();
@@ -145,6 +149,8 @@ protected:
 private:
     void computePreferredLogicalWidths(float leadWidth, HashSet<const SimpleFontData*>& fallbackFonts, GlyphOverflow&);
 
+    bool computeCanUseSimpleFontCodePath() const;
+    
     // Make length() private so that callers that have a RenderText*
     // will use the more efficient textLength() instead, while
     // callers with a RenderObject* can continue to use length().
@@ -160,20 +166,9 @@ private:
     bool isAllASCII() const { return m_isAllASCII; }
     void updateNeedsTranscoding();
 
-    inline void transformText(String&) const;
     void secureText(UChar mask);
 
-    float m_minWidth; // here to minimize padding in 64-bit.
-
-    String m_text;
-
-    InlineTextBox* m_firstTextBox;
-    InlineTextBox* m_lastTextBox;
-
-    float m_maxWidth;
-    float m_beginMinWidth;
-    float m_endMinWidth;
-
+    // We put the bitfield first to minimize padding on 64-bit.
     bool m_hasBreakableChar : 1; // Whether or not we can be broken into multiple lines.
     bool m_hasBreak : 1; // Whether or not we have a hard break (e.g., <pre> with '\n').
     bool m_hasTab : 1; // Whether or not we have a variable width tab character (e.g., <pre> with '\t').
@@ -185,8 +180,19 @@ private:
                            // or removed).
     bool m_containsReversedText : 1;
     bool m_isAllASCII : 1;
+    bool m_canUseSimpleFontCodePath : 1;
     mutable bool m_knownToHaveNoOverflowAndNoFallbackFonts : 1;
     bool m_needsTranscoding : 1;
+    
+    float m_minWidth;
+    float m_maxWidth;
+    float m_beginMinWidth;
+    float m_endMinWidth;
+
+    String m_text;
+
+    InlineTextBox* m_firstTextBox;
+    InlineTextBox* m_lastTextBox;
 };
 
 inline RenderText* toRenderText(RenderObject* object)

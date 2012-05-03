@@ -47,17 +47,20 @@ namespace WebKit {
 class WebGraphicsLayerClient {
 public:
     // TiledBackingStoreRemoteTileClient
-    virtual void createTile(WebLayerID, int tileID, const UpdateInfo&) = 0;
-    virtual void updateTile(WebLayerID, int tileID, const UpdateInfo&) = 0;
+    virtual void createTile(WebLayerID, int tileID, const SurfaceUpdateInfo&, const WebCore::IntRect&) = 0;
+    virtual void updateTile(WebLayerID, int tileID, const SurfaceUpdateInfo&, const WebCore::IntRect&) = 0;
     virtual void removeTile(WebLayerID, int tileID) = 0;
 
     virtual WebCore::IntRect visibleContentsRect() const = 0;
     virtual bool layerTreeTileUpdatesAllowed() const = 0;
     virtual int64_t adoptImageBackingStore(WebCore::Image*) = 0;
     virtual void releaseImageBackingStore(int64_t) = 0;
-    virtual void didSyncCompositingStateForLayer(const WebLayerInfo&) = 0;
+    virtual void syncLayerState(WebLayerID, const WebLayerInfo&) = 0;
+    virtual void syncLayerChildren(WebLayerID, const Vector<WebLayerID>&) = 0;
     virtual void attachLayer(WebCore::WebGraphicsLayer*) = 0;
     virtual void detachLayer(WebCore::WebGraphicsLayer*) = 0;
+    virtual void syncFixedLayers() = 0;
+    virtual PassOwnPtr<WebCore::GraphicsContext> beginContentUpdate(const WebCore::IntSize&, ShareableBitmap::Flags, ShareableSurface::Handle&, WebCore::IntPoint&) = 0;
 };
 }
 
@@ -91,9 +94,6 @@ public:
     void setBackfaceVisibility(bool);
     void setOpacity(float);
     void setContentsRect(const IntRect&);
-    bool addAnimation(const KeyframeValueList&, const IntSize&, const Animation*, const String&, double);
-    void pauseAnimation(const String&, double);
-    void removeAnimation(const String&);
     void setContentsToImage(Image*);
     void setMaskLayer(GraphicsLayer*);
     void setReplicatedByLayer(GraphicsLayer*);
@@ -104,21 +104,22 @@ public:
     void setVisibleContentRectTrajectoryVector(const FloatPoint&);
     virtual void syncCompositingState(const FloatRect&);
     virtual void syncCompositingStateForThisLayerOnly();
+
     void setRootLayer(bool);
 
     WebKit::WebLayerID id() const;
     static WebGraphicsLayer* layerByID(WebKit::WebLayerID);
-    bool isModified() const { return m_modified; }
     void didSynchronize();
     Image* image() { return m_image.get(); }
-    void notifyAnimationStarted(double);
+
+    bool fixedToViewport() const { return m_fixedToViewport; }
+    void setFixedToViewport(bool isFixed) { m_fixedToViewport = isFixed; }
 
     GraphicsLayer* maskTarget() const { return m_maskTarget; }
     void setMaskTarget(GraphicsLayer* layer) { m_maskTarget = layer; }
 
     static void initFactory();
 
-#if USE(TILED_BACKING_STORE)
     // TiledBackingStoreClient
     virtual void tiledBackingStorePaintBegin();
     virtual void tiledBackingStorePaint(GraphicsContext*, const IntRect&);
@@ -129,45 +130,53 @@ public:
     virtual Color tiledBackingStoreBackgroundColor() const;
 
     // TiledBackingStoreRemoteTileClient
-    virtual void createTile(int tileID, const WebKit::UpdateInfo&);
-    virtual void updateTile(int tileID, const WebKit::UpdateInfo&);
+    virtual void createTile(int tileID, const WebKit::SurfaceUpdateInfo&, const WebCore::IntRect&);
+    virtual void updateTile(int tileID, const WebKit::SurfaceUpdateInfo&, const WebCore::IntRect&);
     virtual void removeTile(int tileID);
+    virtual PassOwnPtr<WebCore::GraphicsContext> beginContentUpdate(const WebCore::IntSize&, WebKit::ShareableSurface::Handle&, WebCore::IntPoint&);
 
     void setWebGraphicsLayerClient(WebKit::WebGraphicsLayerClient*);
+    void syncChildren();
+    void syncLayerState();
+    void ensureImageBackingStore();
 
     void adjustVisibleRect();
     bool isReadyForTileBufferSwap() const;
     void updateContentBuffers();
     void purgeBackingStores();
-#endif
 
 private:
+    virtual void willBeDestroyed();
+    WebKit::WebLayerID m_id;
     WebKit::WebLayerInfo m_layerInfo;
     RefPtr<Image> m_image;
     GraphicsLayer* m_maskTarget;
     FloatRect m_needsDisplayRect;
     LayerTransform m_layerTransform;
-    bool m_needsDisplay : 1;
-    bool m_modified : 1;
-    bool m_contentNeedsDisplay : 1;
-    bool m_hasPendingAnimations : 1;
-    bool m_inUpdateMode : 2;
+    bool m_inUpdateMode : 1;
+    bool m_shouldUpdateVisibleRect: 1;
+    bool m_shouldSyncLayerState: 1;
+    bool m_shouldSyncChildren: 1;
+    bool m_fixedToViewport : 1;
 
     void notifyChange();
-    void notifyChangeRecursively();
+    void didChangeGeometry();
+    void didChangeLayerState();
+    void didChangeChildren();
     void createBackingStore();
-    HashSet<String> m_transformAnimations;
 
-    bool selfOrAncestorHasActiveTransformAnimations() const;
-
-#if USE(TILED_BACKING_STORE)
+    bool selfOrAncestorHaveNonAffineTransforms();
+    bool shouldUseTiledBackingStore();
+    void adjustContentsScale();
     void computeTransformedVisibleRect();
+    void syncLayerParameters();
+    void setShouldUpdateVisibleRect();
+    float effectiveContentsScale();
 
     WebKit::WebGraphicsLayerClient* m_webGraphicsLayerClient;
     OwnPtr<WebCore::TiledBackingStore> m_mainBackingStore;
     OwnPtr<WebCore::TiledBackingStore> m_previousBackingStore;
     float m_contentsScale;
-#endif
 };
 
 WebGraphicsLayer* toWebGraphicsLayer(GraphicsLayer*);

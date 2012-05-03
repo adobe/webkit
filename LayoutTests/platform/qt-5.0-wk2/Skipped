@@ -73,6 +73,12 @@ fast/forms/legend-access-key.html
 fast/forms/select-accesskey.html
 fast/loader/policy-delegate-action-hit-test-zoomed.html
 
+# Still failing after implementing layoutTestController.setPageVisibility()
+# https://bugs.webkit.org/show_bug.cgi?id=83263
+fast/events/page-visibility-iframe-move-test.html
+fast/events/page-visibility-iframe-propagation-test.html
+fast/events/page-visibility-transition-test.html
+
 svg/custom/mouse-move-on-svg-container.xhtml
 svg/custom/mouse-move-on-svg-root-standalone.svg
 svg/custom/mouse-move-on-svg-root.xhtml
@@ -98,10 +104,6 @@ fast/history/back-forward-reset-after-error-handling.html
 http/tests/inspector-enabled
 http/tests/inspector
 inspector
-
-# WebKitTestRunner needs layoutTestController.setGeolocationPermission
-# <https://bugs.webkit.org/show_bug.cgi?id=42545>
-fast/dom/Geolocation/page-reload-cancel-permission-requests.html
 
 ########################################
 
@@ -177,9 +179,6 @@ svg/dynamic-updates
 
 # layoutTestController.ignoreDesktopNotificationPermissionRequests is unimplemented
 fast/notifications
-
-# layoutTestController.grantDesktopNotificationPermission is unimplemented
-http/tests/notifications
 
 # layoutTestController.setScrollbarPolicy is unimplemented
 fast/overflow/scrollbar-restored-and-then-locked.html
@@ -341,7 +340,6 @@ editing/text-iterator/findString-selection-disabled.html
 editing/selection/click-in-margins-inside-editable-div.html
 fast/block/basic/020.html
 fast/dom/access-key-iframe.html
-fast/dom/Window/window-properties.html
 fast/forms/basic-selects.html
 fast/history/visited-link-background-color.html
 fast/layers/layer-visibility-sublayer.html
@@ -411,10 +409,6 @@ tables/mozilla_expected_failures/marvin/backgr_border-table-column.html
 tables/mozilla_expected_failures/marvin/backgr_border-table-row-group.html
 tables/mozilla_expected_failures/marvin/backgr_layers-show.html
 tables/mozilla_expected_failures/marvin/backgr_position-table-column.html
-
-# [Qt][WK2] http/tests/navigation/anchor-frames-gbk.html fails
-# https://bugs.webkit.org/show_bug.cgi?id=76896
-http/tests/navigation/anchor-frames-gbk.html
 
 # [Qt][WK2] scrollbars/scroll-rtl-or-bt-layer.html fails
 # https://bugs.webkit.org/show_bug.cgi?id=76986
@@ -556,3 +550,46 @@ http/tests/websocket/tests/hybi/unpaired-surrogates-in-close-reason.html
 fast/repaint/scroll-fixed-reflected-layer.html
 fast/repaint/scroll-in-clipped-layer.html
 fast/repaint/scroll-in-fixed-layer.html
+
+# [Qt][WK2]REGRESSION(r105461): It made 8 tests fail and 30 tests flakey
+# https://bugs.webkit.org/show_bug.cgi?id=76699
+tables/mozilla/marvin/backgr_simple-table-cell.html
+
+# [Qt][WK2] Failing http/tests/plugins tests after reenabled plugins
+# https://bugs.webkit.org/show_bug.cgi?id=82895
+http/tests/plugins/create-v8-script-objects.html
+http/tests/plugins/cross-frame-object-access.html
+http/tests/plugins/get-url.html
+http/tests/plugins/geturlnotify-from-npp-destroystream.html
+http/tests/plugins/interrupted-get-url.html
+http/tests/plugins/local-geturl-from-remote.html
+http/tests/plugins/npapi-response-headers.html
+http/tests/plugins/post-url-file.html
+http/tests/plugins/third-party-cookie-accept-policy.html
+
+# [Qt][WK2] All plugin tests fail on buildbot
+# https://bugs.webkit.org/show_bug.cgi?id=83024
+plugins
+
+# [Qt][WK2] fast/frames/iframe-window-focus.html fails
+# https://bugs.webkit.org/show_bug.cgi?id=83575
+fast/frames/iframe-window-focus.html
+
+# [Qt][WK2] http/tests/navigation/https-in-page-cache.html fails with timeout
+# https://bugs.webkit.org/show_bug.cgi?id=83576
+http/tests/navigation/https-in-page-cache.html
+
+# [Qt][WK2] fast/loader/create-frame-in-DOMContentLoaded.html crashes
+# https://bugs.webkit.org/show_bug.cgi?id=83578
+fast/loader/create-frame-in-DOMContentLoaded.html
+
+# [Qt][WK2] REGRESSION(r113678):After this change fast/text/text-stroke-width-cairo-dos.html makes the next test crash
+# https://bugs.webkit.org/show_bug.cgi?id=83582
+fast/text/text-stroke-width-cairo-dos.html
+
+# Missing layoutTestController.numberOfPendingGeolocationPermissionRequests() implementation
+fast/dom/Geolocation/page-reload-cancel-permission-requests.html
+
+# REGRESSION(r114917) - [Qt][WK2] Convert touch-point area
+# https://bugs.webkit.org/show_bug.cgi?id=84434
+fast/events/touch/basic-single-touch-events.html

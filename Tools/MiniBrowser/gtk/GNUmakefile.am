@@ -17,6 +17,8 @@ Programs_MiniBrowser_CPPFLAGS = \
 Programs_MiniBrowser_SOURCES = \
 	Tools/MiniBrowser/gtk/BrowserCellRendererVariant.h \
 	Tools/MiniBrowser/gtk/BrowserCellRendererVariant.c \
+	Tools/MiniBrowser/gtk/BrowserDownloadsBar.h \
+	Tools/MiniBrowser/gtk/BrowserDownloadsBar.c \
 	Tools/MiniBrowser/gtk/BrowserSettingsDialog.h \
 	Tools/MiniBrowser/gtk/BrowserSettingsDialog.c \
 	Tools/MiniBrowser/gtk/BrowserWindow.h \
@@ -32,7 +34,8 @@ nodist_Programs_MiniBrowser_SOURCES = \
 Programs_MiniBrowser_LDADD = \
 	libwebkit2gtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \
 	$(GLIB_LIBS) \
-	$(GTK_LIBS)
+	$(GTK_LIBS) \
+	$(LIBSOUP_LIBS)
 
 Programs_MiniBrowser_LDFLAGS = \
 	-no-fast-install \

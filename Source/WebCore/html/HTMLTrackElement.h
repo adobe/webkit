@@ -77,7 +77,7 @@ private:
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
 
-    virtual void insertedIntoTree(bool) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
     virtual void willRemove() OVERRIDE;
     virtual bool isURLAttribute(Attribute*) const;
 

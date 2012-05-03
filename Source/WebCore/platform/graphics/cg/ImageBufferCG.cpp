@@ -107,17 +107,27 @@ static void releaseImageData(void*, const void* data, size_t)
     fastFree(const_cast<void*>(data));
 }
 
-ImageBuffer::ImageBuffer(const IntSize& size, ColorSpace imageColorSpace, RenderingMode renderingMode, DeferralMode, bool& success)
+ImageBuffer::ImageBuffer(const IntSize& size, float resolutionScale, ColorSpace imageColorSpace, RenderingMode renderingMode, DeferralMode, bool& success)
     : m_data(size) // NOTE: The input here isn't important as ImageBufferDataCG's constructor just ignores it.
-    , m_size(size)
+    , m_logicalSize(size)
+    , m_resolutionScale(resolutionScale)
 {
-    success = false;  // Make early return mean failure.
-    bool accelerateRendering = renderingMode == Accelerated;
-    if (size.width() <= 0 || size.height() <= 0)
+    float scaledWidth = ceilf(resolutionScale * size.width());
+    float scaledHeight = ceilf(resolutionScale * size.height());
+
+    // FIXME: Should we automatically use a lower resolution?
+    if (!FloatSize(scaledWidth, scaledHeight).isExpressibleAsIntSize())
         return;
 
-    Checked<int, RecordOverflow> width = size.width();
-    Checked<int, RecordOverflow> height = size.height();
+    m_size = IntSize(scaledWidth, scaledHeight);
+
+    success = false;  // Make early return mean failure.
+    bool accelerateRendering = renderingMode == Accelerated;
+    if (m_size.width() <= 0 || m_size.height() <= 0)
+        return;
+
+    Checked<int, RecordOverflow> width = m_size.width();
+    Checked<int, RecordOverflow> height = m_size.height();
 
     // Prevent integer overflows
     m_data.m_bytesPerRow = 4 * width;
@@ -147,7 +157,7 @@ ImageBuffer::ImageBuffer(const IntSize& size, ColorSpace imageColorSpace, Render
     RetainPtr<CGContextRef> cgContext;
     if (accelerateRendering) {
 #if USE(IOSURFACE_CANVAS_BACKING_STORE)
-        m_data.m_surface = createIOSurface(size);
+        m_data.m_surface = createIOSurface(m_size);
         cgContext.adoptCF(wkIOSurfaceContextCreate(m_data.m_surface.get(), width.unsafeGet(), height.unsafeGet(), m_data.m_colorSpace));
 #endif
         if (!cgContext)
@@ -169,8 +179,9 @@ ImageBuffer::ImageBuffer(const IntSize& size, ColorSpace imageColorSpace, Render
         return;
 
     m_context = adoptPtr(new GraphicsContext(cgContext.get()));
+    m_context->applyDeviceScaleFactor(m_resolutionScale);
     m_context->scale(FloatSize(1, -1));
-    m_context->translate(0, -height.unsafeGet());
+    m_context->translate(0, -size.height());
     m_context->setIsAcceleratedContext(accelerateRendering);
 #if defined(BUILDING_ON_LION)
     m_data.m_lastFlushTime = currentTimeMS();
@@ -203,7 +214,16 @@ GraphicsContext* ImageBuffer::context() const
 
 PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior) const
 {
-    RetainPtr<CGImageRef> image = copyNativeImage(copyBehavior);
+    RetainPtr<CGImageRef> image;
+    if (m_resolutionScale == 1)
+        image = copyNativeImage(copyBehavior);
+    else {
+        image.adoptCF(copyNativeImage(DontCopyBackingStore));
+        RetainPtr<CGContextRef> context(AdoptCF, CGBitmapContextCreate(0, logicalSize().width(), logicalSize().height(), 8, 4 * logicalSize().width(), deviceRGBColorSpaceRef(), kCGImageAlphaPremultipliedLast));
+        CGContextSetBlendMode(context.get(), kCGBlendModeCopy);
+        CGContextDrawImage(context.get(), CGRectMake(0, 0, logicalSize().width(), logicalSize().height()), image.get());
+        image = CGBitmapContextCreateImage(context.get());
+    }
 
     if (!image)
         return 0;
@@ -286,7 +306,7 @@ void ImageBuffer::clip(GraphicsContext* contextToClip, const FloatRect& rect) co
     CGContextTranslateCTM(platformContextToClip, -rect.x(), -rect.y() - rect.height());
 }
 
-PassRefPtr<ByteArray> ImageBuffer::getUnmultipliedImageData(const IntRect& rect) const
+PassRefPtr<Uint8ClampedArray> ImageBuffer::getUnmultipliedImageData(const IntRect& rect, CoordinateSystem coordinateSystem) const
 {
     if (m_context->isAcceleratedContext()) {
         CGContextFlush(context()->platformContext());
@@ -294,10 +314,10 @@ PassRefPtr<ByteArray> ImageBuffer::getUnmultipliedImageData(const IntRect& rect)
         m_data.m_lastFlushTime = currentTimeMS();
 #endif
     }
-    return m_data.getData(rect, internalSize(), m_context->isAcceleratedContext(), true);
+    return m_data.getData(rect, internalSize(), m_context->isAcceleratedContext(), true, coordinateSystem == LogicalCoordinateSystem ? m_resolutionScale : 1);
 }
 
-PassRefPtr<ByteArray> ImageBuffer::getPremultipliedImageData(const IntRect& rect) const
+PassRefPtr<Uint8ClampedArray> ImageBuffer::getPremultipliedImageData(const IntRect& rect, CoordinateSystem coordinateSystem) const
 {
     if (m_context->isAcceleratedContext()) {
         CGContextFlush(context()->platformContext());
@@ -305,13 +325,13 @@ PassRefPtr<ByteArray> ImageBuffer::getPremultipliedImageData(const IntRect& rect
         m_data.m_lastFlushTime = currentTimeMS();
 #endif
     }
-    return m_data.getData(rect, internalSize(), m_context->isAcceleratedContext(), false);
+    return m_data.getData(rect, internalSize(), m_context->isAcceleratedContext(), false, coordinateSystem == LogicalCoordinateSystem ? m_resolutionScale : 1);
 }
 
-void ImageBuffer::putByteArray(Multiply multiplied, ByteArray* source, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint)
+void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint, CoordinateSystem coordinateSystem)
 {
     if (!m_context->isAcceleratedContext()) {
-        m_data.putData(source, sourceSize, sourceRect, destPoint, internalSize(), m_context->isAcceleratedContext(), multiplied == Unmultiplied);
+        m_data.putData(source, sourceSize, sourceRect, destPoint, internalSize(), m_context->isAcceleratedContext(), multiplied == Unmultiplied, coordinateSystem == LogicalCoordinateSystem ? m_resolutionScale : 1);
         return;
     }
 
@@ -322,12 +342,15 @@ void ImageBuffer::putByteArray(Multiply multiplied, ByteArray* source, const Int
     if (!sourceCopy)
         return;
 
-    sourceCopy->m_data.putData(source, sourceSize, sourceRect, IntPoint(-sourceRect.x(), -sourceRect.y()), sourceCopy->internalSize(), sourceCopy->context()->isAcceleratedContext(), multiplied == Unmultiplied);
+    sourceCopy->m_data.putData(source, sourceSize, sourceRect, IntPoint(-sourceRect.x(), -sourceRect.y()), sourceCopy->internalSize(), sourceCopy->context()->isAcceleratedContext(), multiplied == Unmultiplied, 1);
 
     // Set up context for using drawImage as a direct bit copy
     CGContextRef destContext = context()->platformContext();
     CGContextSaveGState(destContext);
-    CGContextConcatCTM(destContext, AffineTransform(CGContextGetCTM(destContext)).inverse());
+    if (coordinateSystem == LogicalCoordinateSystem)
+        CGContextConcatCTM(destContext, AffineTransform(wkGetUserToBaseCTM(destContext)).inverse());
+    else
+        CGContextConcatCTM(destContext, AffineTransform(CGContextGetCTM(destContext)).inverse());
     wkCGContextResetClip(destContext);
     CGContextSetInterpolationQuality(destContext, kCGInterpolationNone);
     CGContextSetAlpha(destContext, 1.0);
@@ -335,7 +358,7 @@ void ImageBuffer::putByteArray(Multiply multiplied, ByteArray* source, const Int
     CGContextSetShadowWithColor(destContext, CGSizeZero, 0, 0);
 
     // Draw the image in CG coordinate space
-    IntPoint destPointInCGCoords(destPoint.x() + sourceRect.x(), internalSize().height() - (destPoint.y()+sourceRect.y()) - sourceRect.height());
+    IntPoint destPointInCGCoords(destPoint.x() + sourceRect.x(), (coordinateSystem == LogicalCoordinateSystem ? logicalSize() : internalSize()).height() - (destPoint.y() + sourceRect.y()) - sourceRect.height());
     IntRect destRectInCGCoords(destPointInCGCoords, sourceCopySize);
     RetainPtr<CGImageRef> sourceCopyImage(AdoptCF, sourceCopy->copyNativeImage());
     CGContextDrawImage(destContext, destRectInCGCoords, sourceCopyImage.get());
@@ -410,34 +433,39 @@ static String CGImageToDataURL(CGImageRef image, const String& mimeType, const d
     return "data:" + mimeType + ";base64," + out;
 }
 
-String ImageBuffer::toDataURL(const String& mimeType, const double* quality) const
+String ImageBuffer::toDataURL(const String& mimeType, const double* quality, CoordinateSystem) const
 {
     ASSERT(MIMETypeRegistry::isSupportedImageMIMETypeForEncoding(mimeType));
-    RetainPtr<CGImageRef> image;
+
     RetainPtr<CFStringRef> uti = utiFromMIMEType(mimeType);
     ASSERT(uti);
-    RefPtr<ByteArray> arr;
+
+    RefPtr<Uint8ClampedArray> premultipliedData;
+    RetainPtr<CGImageRef> image;
 
     if (CFEqual(uti.get(), jpegUTI())) {
         // JPEGs don't have an alpha channel, so we have to manually composite on top of black.
-        arr = getPremultipliedImageData(IntRect(IntPoint(0, 0), internalSize()));
-
-        unsigned char *data = arr->data();
-        for (int i = 0; i < internalSize().width() * internalSize().height(); i++)
-            data[i * 4 + 3] = 255; // The image is already premultiplied, so we just need to make it opaque.
+        premultipliedData = getPremultipliedImageData(IntRect(IntPoint(0, 0), logicalSize()));
+        if (!premultipliedData)
+            return "data:,";
 
         RetainPtr<CGDataProviderRef> dataProvider;
-    
-        dataProvider.adoptCF(CGDataProviderCreateWithData(0, data, 4 * internalSize().width() * internalSize().height(), 0));
-    
+        dataProvider.adoptCF(CGDataProviderCreateWithData(0, premultipliedData->data(), 4 * logicalSize().width() * logicalSize().height(), 0));
         if (!dataProvider)
             return "data:,";
 
-        image.adoptCF(CGImageCreate(internalSize().width(), internalSize().height(), 8, 32, 4 * internalSize().width(),
-                                    CGColorSpaceCreateDeviceRGB(), kCGBitmapByteOrderDefault | kCGImageAlphaLast,
+        image.adoptCF(CGImageCreate(logicalSize().width(), logicalSize().height(), 8, 32, 4 * logicalSize().width(),
+                                    deviceRGBColorSpaceRef(), kCGBitmapByteOrderDefault | kCGImageAlphaNoneSkipLast,
                                     dataProvider.get(), 0, false, kCGRenderingIntentDefault));
-    } else
+    } else if (m_resolutionScale == 1)
         image.adoptCF(copyNativeImage(CopyBackingStore));
+    else {
+        image.adoptCF(copyNativeImage(DontCopyBackingStore));
+        RetainPtr<CGContextRef> context(AdoptCF, CGBitmapContextCreate(0, logicalSize().width(), logicalSize().height(), 8, 4 * logicalSize().width(), deviceRGBColorSpaceRef(), kCGImageAlphaPremultipliedLast));
+        CGContextSetBlendMode(context.get(), kCGBlendModeCopy);
+        CGContextDrawImage(context.get(), CGRectMake(0, 0, logicalSize().width(), logicalSize().height()), image.get());
+        image.adoptCF(CGBitmapContextCreateImage(context.get()));
+    }
 
     if (!image)
         return "data:,";
@@ -452,7 +480,7 @@ String ImageDataToDataURL(const ImageData& source, const String& mimeType, const
     RetainPtr<CGImageRef> image;
     RetainPtr<CGDataProviderRef> dataProvider;
 
-    unsigned char* data = source.data()->data()->data();
+    unsigned char* data = source.data()->data();
     RetainPtr<CFStringRef> uti = utiFromMIMEType(mimeType);
     ASSERT(uti);
     Vector<uint8_t> dataVector;
@@ -486,7 +514,7 @@ String ImageDataToDataURL(const ImageData& source, const String& mimeType, const
         return "data:,";
 
     image.adoptCF(CGImageCreate(source.width(), source.height(), 8, 32, 4 * source.width(),
-                                CGColorSpaceCreateDeviceRGB(), kCGBitmapByteOrderDefault | kCGImageAlphaLast,
+                                deviceRGBColorSpaceRef(), kCGBitmapByteOrderDefault | kCGImageAlphaLast,
                                 dataProvider.get(), 0, false, kCGRenderingIntentDefault));
                                 
         

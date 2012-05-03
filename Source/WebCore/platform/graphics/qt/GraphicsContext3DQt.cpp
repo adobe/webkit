@@ -348,6 +348,9 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
 
 GraphicsContext3D::~GraphicsContext3D()
 {
+    // If GraphicsContext3D init failed in constructor, m_private set to nullptr and no buffers are allocated.
+    if (!m_private)
+        return;
     makeContextCurrent();
     glDeleteTextures(1, &m_texture);
     glDeleteFramebuffers(1, &m_fbo);
@@ -387,6 +390,8 @@ PlatformLayer* GraphicsContext3D::platformLayer() const
 
 bool GraphicsContext3D::makeContextCurrent()
 {
+    if (!m_private)
+        return false;
     return m_private->makeCurrentIfNeeded();
 }
 
@@ -1358,6 +1363,39 @@ String GraphicsContext3D::getShaderInfoLog(Platform3DObject shader)
     fastFree(info);
 
     return result;
+}
+
+void GraphicsContext3D::getShaderPrecisionFormat(GC3Denum shaderType, GC3Denum precisionType, GC3Dint* range, GC3Dint* precision)
+{
+    // FIXME: this should be retargeted at the real getShaderPrecisionFormat()
+    // call on true ES 2.0 hardware.
+    UNUSED_PARAM(shaderType);
+    ASSERT(range);
+    ASSERT(precision);
+
+    makeContextCurrent();
+
+    switch (precisionType) {
+    case GraphicsContext3D::LOW_INT:
+    case GraphicsContext3D::MEDIUM_INT:
+    case GraphicsContext3D::HIGH_INT:
+        // These values are for a 32-bit twos-complement integer format.
+        range[0] = 31;
+        range[1] = 30;
+        precision[0] = 0;
+        break;
+    case GraphicsContext3D::LOW_FLOAT:
+    case GraphicsContext3D::MEDIUM_FLOAT:
+    case GraphicsContext3D::HIGH_FLOAT:
+        // These values are for an IEEE single-precision floating-point format.
+        range[0] = 127;
+        range[1] = 127;
+        precision[0] = 23;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
 }
 
 String GraphicsContext3D::getShaderSource(Platform3DObject shader)

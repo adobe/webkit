@@ -40,12 +40,15 @@ class LayerChromium;
 class CCLayerTreeHostCommon {
 public:
     static IntRect calculateVisibleRect(const IntRect& targetSurfaceRect, const IntRect& layerBoundRect, const TransformationMatrix&);
-    template<typename LayerType> static IntRect calculateVisibleLayerRect(LayerType*);
 
     static void calculateDrawTransformsAndVisibility(LayerChromium*, LayerChromium* rootLayer, const TransformationMatrix& parentMatrix, const TransformationMatrix& fullHierarchyMatrix, Vector<RefPtr<LayerChromium> >& renderSurfaceLayerList, Vector<RefPtr<LayerChromium> >& layerList, int maxTextureSize);
     static void calculateDrawTransformsAndVisibility(CCLayerImpl*, CCLayerImpl* rootLayer, const TransformationMatrix& parentMatrix, const TransformationMatrix& fullHierarchyMatrix, Vector<CCLayerImpl*>& renderSurfaceLayerList, Vector<CCLayerImpl*>& layerList, CCLayerSorter*, int maxTextureSize);
 
     template<typename LayerType> static bool renderSurfaceContributesToTarget(LayerType*, int targetSurfaceLayerID);
+
+    // Returns a layer with the given id if one exists in the subtree starting
+    // from the given root layer (including mask and replica layers).
+    template<typename LayerType> static LayerType* findLayerInSubtree(LayerType* rootLayer, int layerId);
 
     struct ScrollUpdateInfo {
         int layerId;
@@ -59,33 +62,6 @@ struct CCScrollAndScaleSet {
 };
 
 template<typename LayerType>
-IntRect CCLayerTreeHostCommon::calculateVisibleLayerRect(LayerType* layer)
-{
-    ASSERT(layer->targetRenderSurface());
-    IntRect targetSurfaceRect = layer->targetRenderSurface()->contentRect();
-
-    if (layer->usesLayerClipping())
-        targetSurfaceRect.intersect(layer->clipRect());
-
-    if (targetSurfaceRect.isEmpty() || layer->contentBounds().isEmpty())
-        return targetSurfaceRect;
-
-    // Note carefully these are aliases
-    const IntSize& bounds = layer->bounds();
-    const IntSize& contentBounds = layer->contentBounds();
-
-    const IntRect layerBoundRect = IntRect(IntPoint(), contentBounds);
-    TransformationMatrix transform = layer->drawTransform();
-
-    transform.scaleNonUniform(bounds.width() / static_cast<double>(contentBounds.width()),
-                              bounds.height() / static_cast<double>(contentBounds.height()));
-    transform.translate(-contentBounds.width() / 2.0, -contentBounds.height() / 2.0);
-
-    IntRect visibleLayerRect = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerBoundRect, transform);
-    return visibleLayerRect;
-}
-
-template<typename LayerType>
 bool CCLayerTreeHostCommon::renderSurfaceContributesToTarget(LayerType* layer, int targetSurfaceLayerID)
 {
     // A layer will either contribute its own content, or its render surface's content, to
@@ -97,6 +73,25 @@ bool CCLayerTreeHostCommon::renderSurfaceContributesToTarget(LayerType* layer, i
     // Otherwise, the layer just contributes itself to the target surface.
 
     return layer->renderSurface() && layer->id() != targetSurfaceLayerID;
+}
+
+template<typename LayerType>
+LayerType* CCLayerTreeHostCommon::findLayerInSubtree(LayerType* rootLayer, int layerId)
+{
+    if (rootLayer->id() == layerId)
+        return rootLayer;
+
+    if (rootLayer->maskLayer() && rootLayer->maskLayer()->id() == layerId)
+        return rootLayer->maskLayer();
+
+    if (rootLayer->replicaLayer() && rootLayer->replicaLayer()->id() == layerId)
+        return rootLayer->replicaLayer();
+
+    for (size_t i = 0; i < rootLayer->children().size(); ++i) {
+        if (LayerType* found = findLayerInSubtree(rootLayer->children()[i].get(), layerId))
+            return found;
+    }
+    return 0;
 }
 
 } // namespace WebCore

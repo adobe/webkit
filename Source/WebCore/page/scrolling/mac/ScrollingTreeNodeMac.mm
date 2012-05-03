@@ -58,19 +58,29 @@ void ScrollingTreeNodeMac::update(ScrollingTreeState* state)
     if (state->changedProperties() & ScrollingTreeState::ScrollLayer)
         m_scrollLayer = state->platformScrollLayer();
 
+    if (state->changedProperties() & ScrollingTreeState::RequestedScrollPosition)
+        setScrollPosition(state->requestedScrollPosition());
+
     if (state->changedProperties() & (ScrollingTreeState::ScrollLayer | ScrollingTreeState::ContentsSize | ScrollingTreeState::ViewportRect))
         updateMainFramePinState(scrollPosition());
 
     if ((state->changedProperties() & ScrollingTreeState::ShouldUpdateScrollLayerPositionOnMainThread) && shouldUpdateScrollLayerPositionOnMainThread()) {
         // We're transitioning to the slow "update scroll layer position on the main thread" mode.
         // Initialize the probable main thread scroll position with the current scroll layer position.
-        CGPoint scrollLayerPosition = m_scrollLayer.get().position;
-        m_probableMainThreadScrollPosition = IntPoint(-scrollLayerPosition.x, -scrollLayerPosition.y);
+        if (state->changedProperties() & ScrollingTreeState::RequestedScrollPosition)
+            m_probableMainThreadScrollPosition = state->requestedScrollPosition();
+        else {
+            CGPoint scrollLayerPosition = m_scrollLayer.get().position;
+            m_probableMainThreadScrollPosition = IntPoint(-scrollLayerPosition.x, -scrollLayerPosition.y);
+        }
     }
 }
 
 void ScrollingTreeNodeMac::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
 {
+    if (!canHaveScrollbars())
+        return;
+
     m_scrollElasticityController.handleWheelEvent(wheelEvent);
     scrollingTree()->handleWheelEventPhase(wheelEvent.phase());
 }

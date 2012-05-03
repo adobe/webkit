@@ -109,6 +109,8 @@ public:
     static PassRefPtr<MediaControlPanelElement> create(Document*);
 
     void setCanBeDragged(bool);
+    void setIsDisplayed(bool);
+
     void resetPosition();
     void makeOpaque();
     void makeTransparent();
@@ -131,8 +133,8 @@ private:
 
     bool m_canBeDragged;
     bool m_isBeingDragged;
+    bool m_isDisplayed;
     bool m_opaque;
-    LayoutPoint m_dragStartPosition;
     LayoutPoint m_dragStartEventLocation;
 
     Timer<MediaControlPanelElement> m_transitionTimer;
@@ -159,7 +161,6 @@ public:
 
 private:
     MediaControlVolumeSliderContainerElement(Document*);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual void defaultEventHandler(Event*);
     virtual MediaControlElementType displayType() const;
     virtual const AtomicString& shadowPseudoId() const;

@@ -29,6 +29,103 @@
  */
 
 /**
+ * @constructor
+ * @param {string} url
+ */
+WebInspector.ParsedURL = function(url)
+{
+    this.isValid = false;
+    this.url = url;
+    this.scheme = "";
+    this.host = "";
+    this.port = "";
+    this.path = "";
+    this.queryParams = "";
+    this.fragment = "";
+    this.folderPathComponents = "";
+    this.lastPathComponent = "";
+
+    // RegExp groups:
+    // 1 - scheme
+    // 2 - hostname
+    // 3 - ?port
+    // 4 - ?path
+    // 5 - ?fragment
+    var match = url.match(/^([^:]+):\/\/([^\/:]*)(?::([\d]+))?(?:(\/[^#]*)(?:#(.*))?)?$/i);
+    if (match) {
+        this.isValid = true;
+        this.scheme = match[1].toLowerCase();
+        this.host = match[2];
+        this.port = match[3];
+        this.path = match[4] || "/";
+        this.fragment = match[5];
+    } else {
+        if (this.url.startsWith("data:")) {
+            this.scheme = "data";
+            return;
+        }
+        if (this.url === "about:blank") {
+            this.scheme = "about";
+            return;
+        }
+        this.path = this.url;
+    }
+
+    if (this.path) {
+        // First cut the query params.
+        var path = this.path;
+        var indexOfQuery = path.indexOf("?");
+        if (indexOfQuery !== -1) {
+            this.queryParams = path.substring(indexOfQuery + 1)
+            path = path.substring(0, indexOfQuery);
+        }
+
+        // Then take last path component.
+        var lastSlashIndex = path.lastIndexOf("/");
+        if (lastSlashIndex !== -1) {
+            this.folderPathComponents = path.substring(0, lastSlashIndex);
+            this.lastPathComponent = path.substring(lastSlashIndex + 1);
+        } else
+            this.lastPathComponent = path;
+    }
+}
+
+WebInspector.ParsedURL.prototype = {
+    get displayName()
+    {
+        if (this._displayName)
+            return this._displayName;
+
+        if (this.scheme === "data") {
+            this._displayName = this.url.trimEnd(20);
+            return this._displayName;
+        }
+
+        if (this.url === "about:blank")
+            return this.url;
+
+        this._displayName = this.lastPathComponent;
+        if (!this._displayName)
+            this._displayName = WebInspector.displayDomain(this.host);
+        if (!this._displayName && this.url)
+            this._displayName = this.url.trimURL(WebInspector.inspectedPageDomain ? WebInspector.inspectedPageDomain : "");
+        if (this._displayName === "/")
+            this._displayName = this.url;
+        return this._displayName;
+    }
+}
+/**
+ * @return {?WebInspector.ParsedURL}
+ */
+String.prototype.asParsedURL = function()
+{
+    var parsedURL = new WebInspector.ParsedURL(this.toString());
+    if (parsedURL.isValid)
+        return parsedURL;
+    return null;
+}
+
+/**
  * @param {string} url
  * @return {?WebInspector.Resource}
  */
@@ -43,6 +140,16 @@ WebInspector.resourceForURL = function(url)
 WebInspector.forAllResources = function(callback)
 {
      WebInspector.resourceTreeModel.forAllResources(callback);
+}
+
+/**
+ * @param {string} host
+ */
+WebInspector.displayDomain = function(host)
+{
+    if (host && (!WebInspector.inspectedPageDomain || (WebInspector.inspectedPageDomain && host !== WebInspector.inspectedPageDomain)))
+        return host;
+    return "";
 }
 
 /**
@@ -66,7 +173,7 @@ WebInspector.displayNameForURL = function(url)
     var index = WebInspector.inspectedPageURL.indexOf(lastPathComponent);
     if (index !== -1 && index + lastPathComponent.length === WebInspector.inspectedPageURL.length) {
         var baseURL = WebInspector.inspectedPageURL.substring(0, index);
-        if (url.indexOf(baseURL) === 0)
+        if (url.startsWith(baseURL))
             return url.substring(index);
     }
 
@@ -95,7 +202,7 @@ WebInspector.linkifyStringAsFragmentWithCustomLinkifier = function(string, linki
         container.appendChild(document.createTextNode(nonLink));
 
         var title = linkString;
-        var realURL = (linkString.indexOf("www.") === 0 ? "http://" + linkString : linkString);
+        var realURL = (linkString.startsWith("www.") ? "http://" + linkString : linkString);
         var lineColumnMatch = lineColumnRegEx.exec(realURL);
         if (lineColumnMatch)
             realURL = realURL.substring(0, realURL.length - lineColumnMatch[0].length);
@@ -127,6 +234,12 @@ WebInspector.registerLinkifierPlugin = function(plugin)
  */
 WebInspector.linkifyStringAsFragment = function(string)
 {
+    /**
+     * @param {string} title
+     * @param {string} url
+     * @param {string=} lineNumber
+     * @return {Node}
+     */
     function linkifier(title, url, lineNumber)
     {
         for (var i = 0; i < WebInspector._linkifierPlugins.length; ++i)
@@ -205,7 +318,7 @@ WebInspector.linkifyResourceAsNode = function(url, lineNumber, classes, tooltipT
 }
 
 /**
- * @param {WebInspector.Resource} request
+ * @param {WebInspector.NetworkRequest} request
  * @param {string=} classes
  * @return {Element}
  */
@@ -225,7 +338,7 @@ WebInspector.resourceURLForRelatedNode = function(node, url)
     if (!url || url.indexOf("://") > 0)
         return url;
 
-    if (url.trim().indexOf("javascript:") === 0)
+    if (url.trim().startsWith("javascript:"))
         return null; // Do not provide a resource URL for security.
 
     for (var frameOwnerCandidate = node; frameOwnerCandidate; frameOwnerCandidate = frameOwnerCandidate.parentNode) {
@@ -241,7 +354,7 @@ WebInspector.resourceURLForRelatedNode = function(node, url)
     var resourceURL = url;
     function callback(resource)
     {
-        if (resource.path === url) {
+        if (resource.parsedURL.path === url) {
             resourceURL = resource.url;
             return true;
         }
@@ -265,7 +378,7 @@ WebInspector.completeURL = function(baseURL, href)
 
         // Return special URLs as-is.
         var trimmedHref = href.trim();
-        if (trimmedHref.indexOf("data:") === 0 || trimmedHref.indexOf("javascript:") === 0)
+        if (trimmedHref.startsWith("data:") || trimmedHref.startsWith("javascript:"))
             return href;
     }
 

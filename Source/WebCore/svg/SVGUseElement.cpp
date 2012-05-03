@@ -29,7 +29,6 @@
 
 #include "Attribute.h"
 #include "CachedResourceLoader.h"
-#include "CSSStyleSelector.h"
 #include "Document.h"
 #include "Event.h"
 #include "EventListener.h"
@@ -49,6 +48,7 @@
 #include "SVGSMILElement.h"
 #include "SVGSVGElement.h"
 #include "SVGSymbolElement.h"
+#include "StyleResolver.h"
 #include "XLinkNames.h"
 #include "XMLDocumentParser.h"
 #include "XMLSerializer.h"
@@ -175,20 +175,25 @@ static inline bool isWellFormedDocument(Document* document)
     return true;
 }
 
-void SVGUseElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGUseElement::insertedInto(Node* rootParent)
 {
     // This functions exists to assure assumptions made in the code regarding SVGElementInstance creation/destruction are satisfied.
-    SVGStyledTransformableElement::insertedIntoDocument();
+    SVGStyledTransformableElement::insertedInto(rootParent);
+    if (!rootParent->inDocument())
+        return InsertionDone;
     ASSERT(!m_targetElementInstance || !isWellFormedDocument(document()));
     ASSERT(!hasPendingResources() || !isWellFormedDocument(document()));
-    buildPendingResource();
+    if (!m_wasInsertedByParser)
+        buildPendingResource();
     SVGExternalResourcesRequired::insertedIntoDocument(this);
+    return InsertionDone;
 }
 
-void SVGUseElement::removedFromDocument()
+void SVGUseElement::removedFrom(Node* rootParent)
 {
-    SVGStyledTransformableElement::removedFromDocument();
-    clearResourceReferences();
+    SVGStyledTransformableElement::removedFrom(rootParent);
+    if (rootParent->inDocument())
+        clearResourceReferences();
 }
 
 Document* SVGUseElement::referencedDocument() const
@@ -252,7 +257,8 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
             m_cachedDocument->removeClient(this);
             m_cachedDocument = 0;
         }
-        buildPendingResource();
+        if (!m_wasInsertedByParser)
+            buildPendingResource();
         return;
     }
 
@@ -270,7 +276,7 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
 
 bool SVGUseElement::willRecalcStyle(StyleChange)
 {
-    if (m_needsShadowTreeRecreation && renderer() && needsStyleRecalc())
+    if (!m_wasInsertedByParser && m_needsShadowTreeRecreation && renderer() && needsStyleRecalc())
         buildPendingResource();
     return true;
 }
@@ -953,6 +959,10 @@ void SVGUseElement::finishParsingChildren()
 {
     SVGStyledTransformableElement::finishParsingChildren();
     SVGExternalResourcesRequired::finishParsingChildren();
+    if (m_wasInsertedByParser) {
+        buildPendingResource();
+        m_wasInsertedByParser = false;
+    }
 }
 
 }

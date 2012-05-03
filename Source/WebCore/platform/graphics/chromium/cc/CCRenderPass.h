@@ -36,6 +36,7 @@ namespace WebCore {
 class CCLayerImpl;
 class CCRenderSurface;
 class CCSharedQuadState;
+class Color;
 
 // A list of CCDrawQuad objects, sorted internally in front-to-back order.
 class CCQuadList : public Vector<OwnPtr<CCDrawQuad> > {
@@ -54,8 +55,9 @@ class CCRenderPass {
 public:
     static PassOwnPtr<CCRenderPass> create(CCRenderSurface*);
 
-    void appendQuadsForLayer(CCLayerImpl*, CCOcclusionTrackerImpl*, bool& usedCheckerboard);
-    void appendQuadsForRenderSurfaceLayer(CCLayerImpl*);
+    void appendQuadsForLayer(CCLayerImpl*, CCOcclusionTrackerImpl*, bool& hadMissingTiles);
+    void appendQuadsForRenderSurfaceLayer(CCLayerImpl*, CCOcclusionTrackerImpl*);
+    void appendQuadsToFillScreen(CCLayerImpl* rootLayer, const Color& screenBackgroundColor, const CCOcclusionTrackerImpl&);
 
     const CCQuadList& quadList() const { return m_quadList; }
     CCRenderSurface* targetSurface() const { return m_targetSurface; }

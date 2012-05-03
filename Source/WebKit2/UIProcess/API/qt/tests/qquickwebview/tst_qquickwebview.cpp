@@ -20,12 +20,11 @@
 #include "../testwindow.h"
 #include "../util.h"
 
-#include <QDeclarativeEngine>
 #include <QScopedPointer>
+#include <QtQml/QQmlEngine>
 #include <QtTest/QtTest>
 #include <private/qquickwebpage_p.h>
 #include <private/qquickwebview_p.h>
-#include <private/qwebloadrequest_p.h>
 
 class tst_QQuickWebView : public QObject {
     Q_OBJECT
@@ -55,6 +54,7 @@ private slots:
     void removeFromCanvas();
     void multipleWebViewWindows();
     void multipleWebViews();
+    void titleUpdate();
     void transparentWebViews();
 
 private:
@@ -62,7 +62,7 @@ private:
     inline QQuickWebView* newWebView();
     inline QQuickWebView* webView() const;
     QScopedPointer<TestWindow> m_window;
-    QScopedPointer<QDeclarativeComponent> m_component;
+    QScopedPointer<QQmlComponent> m_component;
 };
 
 tst_QQuickWebView::tst_QQuickWebView()
@@ -73,10 +73,10 @@ tst_QQuickWebView::tst_QQuickWebView()
 
 void tst_QQuickWebView::prepareWebViewComponent()
 {
-    static QDeclarativeEngine* engine = new QDeclarativeEngine(this);
+    static QQmlEngine* engine = new QQmlEngine(this);
     engine->addImportPath(QString::fromUtf8(IMPORT_DIR));
 
-    m_component.reset(new QDeclarativeComponent(engine, this));
+    m_component.reset(new QQmlComponent(engine, this));
 
     m_component->setData(QByteArrayLiteral("import QtQuick 2.0\n"
                                            "import QtWebKit 3.0\n"
@@ -123,32 +123,6 @@ void tst_QQuickWebView::navigationStatusAtStartup()
 
     QCOMPARE(webView()->loading(), false);
 }
-
-class LoadStartedCatcher : public QObject {
-    Q_OBJECT
-public:
-    LoadStartedCatcher(QQuickWebView* webView)
-        : m_webView(webView)
-    {
-        connect(m_webView, SIGNAL(loadingChanged(QWebLoadRequest*)), this, SLOT(onLoadingChanged(QWebLoadRequest*)));
-    }
-
-public slots:
-    void onLoadingChanged(QWebLoadRequest* loadRequest)
-    {
-        if (loadRequest->status() == QQuickWebView::LoadStartedStatus) {
-            QMetaObject::invokeMethod(this, "finished", Qt::QueuedConnection);
-
-            QCOMPARE(m_webView->loading(), true);
-        }
-    }
-
-signals:
-    void finished();
-
-private:
-    QQuickWebView* m_webView;
-};
 
 void tst_QQuickWebView::stopEnabledAfterLoadStarted()
 {
@@ -344,6 +318,24 @@ void tst_QQuickWebView::multipleWebViews()
     QTest::qWait(200);
 }
 
+void tst_QQuickWebView::titleUpdate()
+{    
+    QSignalSpy titleSpy(webView(), SIGNAL(titleChanged()));
+
+    // Load page with no title
+    webView()->setUrl(QUrl::fromLocalFile(QLatin1String(TESTS_SOURCE_DIR "/html/basic_page2.html")));
+    QVERIFY(waitForLoadSucceeded(webView()));
+    QCOMPARE(titleSpy.size(), 1);
+
+    titleSpy.clear();
+
+    // No titleChanged signal for failed load
+    webView()->setUrl(QUrl::fromLocalFile(QLatin1String(TESTS_SOURCE_DIR "/html/file_that_does_not_exist.html")));
+    QVERIFY(waitForLoadFailed(webView()));
+    QCOMPARE(titleSpy.size(), 0);
+
+}
+
 void tst_QQuickWebView::transparentWebViews()
 {
     showWebView();
@@ -382,7 +374,7 @@ void tst_QQuickWebView::scrollRequest()
     // Use qRound as that is also used when calculating the position
     // in WebKit.
     int y = qRound(50 * webView()->page()->contentsScale());
-    QVERIFY(webView()->experimental()->contentY() == y);
+    QVERIFY(webView()->contentY() == y);
 }
 
 QTEST_MAIN(tst_QQuickWebView)

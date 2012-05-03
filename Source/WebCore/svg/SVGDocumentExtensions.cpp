@@ -213,9 +213,9 @@ void SVGDocumentExtensions::addPendingResource(const AtomicString& id, SVGStyled
 
     // The HashMap add function leaves the map alone and returns a pointer to the element in the
     // map if the element already exists. So we add with a value of 0, and it either finds the
-    // existing element or adds a new one in a single operation. The ".first->second" idiom gets
+    // existing element or adds a new one in a single operation. The ".iterator->second" idiom gets
     // us to the iterator from add's result, and then to the value inside the hash table.
-    SVGPendingElements*& set = m_pendingResources.add(id, 0).first->second;
+    SVGPendingElements*& set = m_pendingResources.add(id, 0).iterator->second;
     if (!set)
         set = new SVGPendingElements;
     set->add(element);
@@ -417,6 +417,19 @@ void SVGDocumentExtensions::removeAllElementReferencesForTarget(SVGElement* refe
     for (Vector<SVGElement*>::iterator vectorIt = toBeNotified.begin(); vectorIt != vectorEnd; ++vectorIt)
         (*vectorIt)->svgAttributeChanged(XLinkNames::hrefAttr);
 }
+
+#if ENABLE(SVG_FONTS)
+void SVGDocumentExtensions::registerSVGFontFaceElement(SVGFontFaceElement* element)
+{
+    m_svgFontFaceElements.add(element);
+}
+
+void SVGDocumentExtensions::unregisterSVGFontFaceElement(SVGFontFaceElement* element)
+{
+    ASSERT(m_svgFontFaceElements.contains(element));
+    m_svgFontFaceElements.remove(element);
+}
+#endif
 
 }
 

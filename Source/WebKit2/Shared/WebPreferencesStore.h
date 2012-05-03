@@ -54,6 +54,7 @@ namespace WebKit {
     macro(LoadsSiteIconsIgnoringImageLoadingPreference, loadsSiteIconsIgnoringImageLoadingPreference, Bool, bool, false) \
     macro(PluginsEnabled, pluginsEnabled, Bool, bool, true) \
     macro(JavaEnabled, javaEnabled, Bool, bool, true) \
+    macro(JavaEnabledForLocalFiles, javaEnabledForLocalFiles, Bool, bool, true) \
     macro(OfflineWebApplicationCacheEnabled, offlineWebApplicationCacheEnabled, Bool, bool, false) \
     macro(LocalStorageEnabled, localStorageEnabled, Bool, bool, true) \
     macro(DatabasesEnabled, databasesEnabled, Bool, bool, true) \
@@ -109,6 +110,7 @@ namespace WebKit {
     macro(ShouldDisplayCaptions, shouldDisplayCaptions, Bool, bool, false) \
     macro(ShouldDisplayTextDescriptions, shouldDisplayTextDescriptions, Bool, bool, false) \
     macro(NotificationsEnabled, notificationsEnabled, Bool, bool, true) \
+    macro(ShouldRespectImageOrientation, shouldRespectImageOrientation, Bool, bool, false) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \

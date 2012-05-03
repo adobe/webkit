@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+#if ENABLE(INSPECTOR)
 #include "ScriptProfiler.h"
 
 #include "DOMWrapperVisitor.h"
@@ -37,12 +38,12 @@
 #include "V8Binding.h"
 #include "V8DOMMap.h"
 #include "V8Node.h"
+#include "WrapperTypeInfo.h"
 
 #include <v8-profiler.h>
 
 namespace WebCore {
 
-#if ENABLE(INSPECTOR)
 void ScriptProfiler::start(ScriptState* state, const String& title)
 {
     v8::HandleScope hs;
@@ -109,6 +110,13 @@ ScriptObject ScriptProfiler::objectByHeapObjectId(unsigned id)
         return ScriptObject();
 
     v8::Handle<v8::Object> object = value.As<v8::Object>();
+    if (object->InternalFieldCount() >= v8DefaultWrapperInternalFieldCount) {
+        v8::Handle<v8::Value> wrapper = object->GetInternalField(v8DOMWrapperObjectIndex);
+        // Skip wrapper boilerplates which are like regular wrappers but don't have
+        // native object.
+        if (!wrapper.IsEmpty() && wrapper->IsUndefined())
+            return ScriptObject();
+    }
     ScriptState* scriptState = ScriptState::forContext(object->CreationContext());
     return ScriptObject(scriptState, object);
 }
@@ -155,13 +163,10 @@ static v8::RetainedObjectInfo* retainedDOMInfo(uint16_t classId, v8::Handle<v8::
     Node* node = V8Node::toNative(wrapper.As<v8::Object>());
     return node ? new RetainedDOMInfo(node) : 0;
 }
-#endif // ENABLE(INSPECTOR)
 
 void ScriptProfiler::initialize()
 {
-#if ENABLE(INSPECTOR)
     v8::HeapProfiler::DefineWrapperClass(v8DOMSubtreeClassId, &retainedDOMInfo);
-#endif // ENABLE(INSPECTOR)
 }
 
 void ScriptProfiler::visitJSDOMWrappers(DOMWrapperVisitor* visitor)
@@ -186,3 +191,5 @@ void ScriptProfiler::visitExternalJSStrings(DOMWrapperVisitor* visitor)
 }
 
 } // namespace WebCore
+
+#endif // ENABLE(INSPECTOR)

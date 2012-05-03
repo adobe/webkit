@@ -737,18 +737,18 @@ intptr_t StringImpl::toIntPtr(bool* ok)
     return charactersToIntPtr(characters16(), m_length, ok);
 }
 
-double StringImpl::toDouble(bool* ok, bool* didReadNumber)
+double StringImpl::toDouble(bool* ok)
 {
     if (is8Bit())
-        return charactersToDouble(characters8(), m_length, ok, didReadNumber);
-    return charactersToDouble(characters16(), m_length, ok, didReadNumber);
+        return charactersToDouble(characters8(), m_length, ok);
+    return charactersToDouble(characters16(), m_length, ok);
 }
 
-float StringImpl::toFloat(bool* ok, bool* didReadNumber)
+float StringImpl::toFloat(bool* ok)
 {
     if (is8Bit())
-        return charactersToFloat(characters8(), m_length, ok, didReadNumber);
-    return charactersToFloat(characters16(), m_length, ok, didReadNumber);
+        return charactersToFloat(characters8(), m_length, ok);
+    return charactersToFloat(characters16(), m_length, ok);
 }
 
 bool equalIgnoringCase(const LChar* a, const LChar* b, unsigned length)
@@ -775,13 +775,6 @@ static inline bool equalIgnoringCase(const UChar* a, const UChar* b, int length)
 {
     ASSERT(length >= 0);
     return umemcasecmp(a, b, length) == 0;
-}
-
-size_t StringImpl::find(UChar c, unsigned start)
-{
-    if (is8Bit())
-        return WTF::find(characters8(), m_length, c, start);
-    return WTF::find(characters16(), m_length, c, start);
 }
 
 size_t StringImpl::find(CharacterMatchFunctionPtr matchFunction, unsigned start)
@@ -901,21 +894,61 @@ ALWAYS_INLINE static size_t findInner(const CharType* searchCharacters, const Ch
     return index + i;        
 }
 
-size_t StringImpl::find(StringImpl* matchString, unsigned index)
+size_t StringImpl::find(StringImpl* matchString)
 {
-    // Check for null or empty string to match against
-    if (!matchString)
+    // Check for null string to match against
+    if (UNLIKELY(!matchString))
         return notFound;
     unsigned matchLength = matchString->length();
-    if (!matchLength)
-        return min(index, length());
 
     // Optimization 1: fast case for strings of length 1.
     if (matchLength == 1) {
-        if (is8Bit() && matchString->is8Bit())
-            return WTF::find(characters8(), length(), matchString->characters8()[0], index);
-        return WTF::find(characters(), length(), matchString->characters()[0], index);
+        if (is8Bit()) {
+            if (matchString->is8Bit())
+                return WTF::find(characters8(), length(), matchString->characters8()[0]);
+            return WTF::find(characters8(), length(), matchString->characters16()[0]);
+        }
+        if (matchString->is8Bit())
+            return WTF::find(characters16(), length(), matchString->characters8()[0]);
+        return WTF::find(characters16(), length(), matchString->characters16()[0]);
     }
+
+    // Check matchLength is in range.
+    if (matchLength > length())
+        return notFound;
+
+    // Check for empty string to match against
+    if (UNLIKELY(!matchLength))
+        return 0;
+
+    if (is8Bit() && matchString->is8Bit())
+        return findInner(characters8(), matchString->characters8(), 0, length(), matchLength);
+
+    return findInner(characters(), matchString->characters(), 0, length(), matchLength);
+}
+
+size_t StringImpl::find(StringImpl* matchString, unsigned index)
+{
+    // Check for null or empty string to match against
+    if (UNLIKELY(!matchString))
+        return notFound;
+
+    unsigned matchLength = matchString->length();
+
+    // Optimization 1: fast case for strings of length 1.
+    if (matchLength == 1) {
+        if (is8Bit()) {
+            if (matchString->is8Bit())
+                return WTF::find(characters8(), length(), matchString->characters8()[0], index);
+            return WTF::find(characters8(), length(), matchString->characters16()[0], index);
+        }
+        if (matchString->is8Bit())
+            return WTF::find(characters16(), length(), matchString->characters8()[0], index);
+        return WTF::find(characters16(), length(), matchString->characters16()[0], index);
+    }
+
+    if (UNLIKELY(!matchLength))
+        return min(index, length());
 
     // Check index & matchLength are in range.
     if (index > length())
@@ -928,7 +961,6 @@ size_t StringImpl::find(StringImpl* matchString, unsigned index)
         return findInner(characters8() + index, matchString->characters8(), index, searchLength, matchLength);
 
     return findInner(characters() + index, matchString->characters(), index, searchLength, matchLength);
-
 }
 
 size_t StringImpl::findIgnoringCase(StringImpl* matchString, unsigned index)

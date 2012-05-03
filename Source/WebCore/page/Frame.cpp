@@ -68,7 +68,6 @@
 #include "Page.h"
 #include "PageGroup.h"
 #include "RegularExpression.h"
-#include "RenderLayer.h"
 #include "RenderPart.h"
 #include "RenderTableCell.h"
 #include "RenderTextControl.h"
@@ -521,7 +520,7 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
     m_doc->setPrinting(printing);
     view()->adjustMediaTypeForPrinting(printing);
 
-    m_doc->styleSelectorChanged(RecalcStyleImmediately);
+    m_doc->styleResolverChanged(RecalcStyleImmediately);
     if (printing)
         view()->forceLayoutForPagination(pageSize, originalPageSize, maximumShrinkRatio, shouldAdjustViewSize);
     else {
@@ -593,8 +592,10 @@ void Frame::injectUserScriptsForWorld(DOMWrapperWorld* world, const UserScriptVe
 
 void Frame::clearDOMWindow()
 {
-    if (m_domWindow)
+    if (m_domWindow) {
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
         m_domWindow->clear();
+    }
     m_domWindow = 0;
 }
 
@@ -659,8 +660,10 @@ void Frame::clearTimers()
 
 void Frame::setDOMWindow(DOMWindow* domWindow)
 {
-    if (m_domWindow)
+    if (m_domWindow) {
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
         m_domWindow->clear();
+    }
     m_domWindow = domWindow;
 }
 
@@ -725,7 +728,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
     return document() ? document()->displayStringModifiedByEncoding(str) : str;
 }
 
-VisiblePosition Frame::visiblePositionForPoint(const LayoutPoint& framePoint)
+VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
 {
     HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, true);
     Node* node = result.innerNonSharedNode();
@@ -745,7 +748,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     if (!view())
         return 0;
 
-    LayoutPoint pt = view()->windowToContents(point);
+    IntPoint pt = view()->windowToContents(point);
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
@@ -753,7 +756,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     return result.innerNode() ? result.innerNode()->document() : 0;
 }
 
-PassRefPtr<Range> Frame::rangeForPoint(const LayoutPoint& framePoint)
+PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
 {
     VisiblePosition position = visiblePositionForPoint(framePoint);
     if (position.isNull())
@@ -1087,7 +1090,7 @@ DragImageRef Frame::nodeImage(Node* node)
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get());
+    return createDragImageFromImage(image.get(), renderer->shouldRespectImageOrientation());
 }
 
 DragImageRef Frame::dragImageForSelection()

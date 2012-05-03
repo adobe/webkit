@@ -69,8 +69,9 @@ public:
 
     virtual void openInNewTab(const String& url);
 
-    virtual bool canSaveAs();
-    virtual void saveAs(const WTF::String& fileName, const WTF::String& content);
+    virtual bool canSave();
+    virtual void save(const WTF::String& urk, const WTF::String& content, bool forceSaveAs);
+    virtual void append(const WTF::String& urk, const WTF::String& content);
 
     virtual void inspectedURLChanged(const WTF::String&);
 

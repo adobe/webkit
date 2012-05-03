@@ -35,6 +35,7 @@ from webkitpy.common.system import logtesting
 from webkitpy.common.system.executive_mock import MockExecutive, MockExecutive2
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.common.system.systemhost_mock import MockSystemHost
+from webkitpy.layout_tests.port.config_mock import MockConfig
 from webkitpy.thirdparty.mock import Mock
 from webkitpy.tool.mocktool import MockOptions
 
@@ -51,9 +52,11 @@ from webkitpy.layout_tests.port.driver import DriverInput
 
 class ChromiumDriverTest(unittest.TestCase):
     def setUp(self):
-        mock_port = Mock()  # FIXME: This should use a tighter mock.
-        mock_port.default_test_timeout_ms = lambda: 1000
-        self.driver = chromium.ChromiumDriver(mock_port, worker_number=0, pixel_tests=True)
+        host = MockSystemHost()
+        options = MockOptions(configuration='Release', additional_drt_flag=['--test-shell'])
+        config = MockConfig(filesystem=host.filesystem, default_configuration='Release')
+        self.port = chromium_mac.ChromiumMacPort(host, 'chromium-mac-snowleopard', options=options, config=config)
+        self.driver = chromium.ChromiumDriver(self.port, worker_number=0, pixel_tests=True)
 
     def test_test_shell_command(self):
         expected_command = "test.html 2 checksum\n"
@@ -103,8 +106,8 @@ class ChromiumDriverTest(unittest.TestCase):
 
         self.driver.test_to_uri = lambda test: 'mocktesturi'
         self.driver._port.driver_name = lambda: 'mockdriver'
-        self.driver._port._get_crash_log = lambda name, pid, out, err: 'mockcrashlog'
-        driver_output = self.driver.run_test(DriverInput(test_name='some/test.html', timeout=1, image_hash=None, is_reftest=False))
+        self.driver._port._get_crash_log = lambda name, pid, out, err, newer_than: 'mockcrashlog'
+        driver_output = self.driver.run_test(DriverInput(test_name='some/test.html', timeout=1, image_hash=None, should_run_pixel_test=False))
         self.assertTrue(driver_output.crash)
         self.assertEqual(driver_output.crashed_process_name, 'mockdriver')
         self.assertEqual(driver_output.crashed_pid, 1234)
@@ -132,28 +135,24 @@ class ChromiumDriverTest(unittest.TestCase):
                 self.driver._proc.poll = lambda: 2
 
         self.driver._port._executive = FakeExecutive()
-        # Override the kill timeout (ms) so the test runs faster.
-        self.driver._port.get_option = lambda name: 1
+        self.driver.KILL_TIMEOUT_DEFAULT = 0.01
         self.driver.stop()
         self.assertTrue(self.wait_called)
         self.assertEquals(self.pid, 1)
 
     def test_two_drivers(self):
-        mock_port = Mock()
 
         class MockDriver(chromium.ChromiumDriver):
-            def __init__(self):
-                chromium.ChromiumDriver.__init__(self, mock_port, worker_number=0, pixel_tests=False)
+            def __init__(self, port):
+                chromium.ChromiumDriver.__init__(self, port, worker_number=0, pixel_tests=False)
 
             def cmd_line(self, pixel_test, per_test_args):
                 return 'python'
 
         # get_option is used to get the timeout (ms) for a process before we kill it.
-        mock_port.get_option = lambda name: 60 * 1000
-        mock_port.default_test_timeout_ms = lambda: 1000
-        driver1 = MockDriver()
+        driver1 = MockDriver(self.port)
         driver1._start(False, [])
-        driver2 = MockDriver()
+        driver2 = MockDriver(self.port)
         driver2._start(False, [])
         # It's possible for driver1 to timeout when stopping if it's sharing stdin with driver2.
         start_time = time.time()
@@ -243,22 +242,6 @@ class ChromiumPortTest(port_testcase.PortTestCase):
         self.assertTrue(ChromiumPortTest.TestLinuxPort()._path_to_image_diff().endswith('/out/default/ImageDiff'))
         self.assertTrue(ChromiumPortTest.TestMacPort()._path_to_image_diff().endswith('/xcodebuild/default/ImageDiff'))
         self.assertTrue(ChromiumPortTest.TestWinPort()._path_to_image_diff().endswith('/default/ImageDiff.exe'))
-
-    def test_skipped_layout_tests(self):
-        mock_options = MockOptions()
-        mock_options.configuration = 'release'
-        port = ChromiumPortTest.TestLinuxPort(options=mock_options)
-
-        fake_test = 'fast/js/not-good.js'
-
-        port.test_expectations = lambda: """BUG_TEST SKIP : fast/js/not-good.js = TEXT
-LINUX WIN : fast/js/very-good.js = TIMEOUT PASS"""
-        port.test_expectations_overrides = lambda: ''
-        port.tests = lambda paths: set()
-        port.test_exists = lambda test: True
-
-        skipped_tests = port.skipped_layout_tests(extra_test_files=[fake_test, ])
-        self.assertTrue("fast/js/not-good.js" in skipped_tests)
 
     def test_default_configuration(self):
         mock_options = MockOptions()

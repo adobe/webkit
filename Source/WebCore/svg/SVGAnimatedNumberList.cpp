@@ -39,90 +39,65 @@ PassOwnPtr<SVGAnimatedType> SVGAnimatedNumberListAnimator::constructFromString(c
     return animtedType.release();
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedNumberListAnimator::startAnimValAnimation(const Vector<SVGAnimatedProperty*>& properties)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedNumberListAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    return SVGAnimatedType::createNumberList(constructFromOneBaseValue<SVGNumberList, SVGAnimatedNumberList>(properties));
+    return SVGAnimatedType::createNumberList(constructFromBaseValue<SVGAnimatedNumberList>(animatedTypes));
 }
 
-void SVGAnimatedNumberListAnimator::stopAnimValAnimation(const Vector<SVGAnimatedProperty*>& properties)
+void SVGAnimatedNumberListAnimator::stopAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    SVGAnimatedTypeAnimator::stopAnimValAnimationForType<SVGAnimatedNumberList>(properties);
+    stopAnimValAnimationForType<SVGAnimatedNumberList>(animatedTypes);
 }
 
-void SVGAnimatedNumberListAnimator::resetAnimValToBaseVal(const Vector<SVGAnimatedProperty*>& properties, SVGAnimatedType* type)
+void SVGAnimatedNumberListAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
 {
-    resetFromOneBaseValue<SVGNumberList, SVGAnimatedNumberList>(properties, type, &SVGAnimatedType::numberList);
+    resetFromBaseValue<SVGAnimatedNumberList>(animatedTypes, type, &SVGAnimatedType::numberList);
 }
 
-void SVGAnimatedNumberListAnimator::animValWillChange(const Vector<SVGAnimatedProperty*>& properties)
+void SVGAnimatedNumberListAnimator::animValWillChange(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    animValWillChangeForType<SVGAnimatedNumberList>(properties);
+    animValWillChangeForType<SVGAnimatedNumberList>(animatedTypes);
 }
 
-void SVGAnimatedNumberListAnimator::animValDidChange(const Vector<SVGAnimatedProperty*>& properties)
+void SVGAnimatedNumberListAnimator::animValDidChange(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    animValDidChangeForType<SVGAnimatedNumberList>(properties);
+    animValDidChangeForType<SVGAnimatedNumberList>(animatedTypes);
 }
 
-void SVGAnimatedNumberListAnimator::calculateFromAndToValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& toString)
+void SVGAnimatedNumberListAnimator::addAnimatedTypes(SVGAnimatedType* from, SVGAnimatedType* to)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    
-    from = constructFromString(fromString);
-    to = constructFromString(toString);
-}
+    ASSERT(from->type() == AnimatedNumberList);
+    ASSERT(from->type() == to->type());
 
-void SVGAnimatedNumberListAnimator::calculateFromAndByValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& byString)
-{
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    
-    from = constructFromString(fromString);
-    to = constructFromString(byString);
-    
     SVGNumberList& fromNumberList = from->numberList();
     SVGNumberList& toNumberList = to->numberList();
-    
-    unsigned size = fromNumberList.size();
-    if (size != toNumberList.size())
+
+    unsigned fromNumberListSize = fromNumberList.size();
+    if (!fromNumberListSize || fromNumberListSize != toNumberList.size())
         return;
 
-    for (unsigned i = 0; i < size; ++i)
+    for (unsigned i = 0; i < fromNumberListSize; ++i)
         toNumberList[i] += fromNumberList[i];
 }
 
-void SVGAnimatedNumberListAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount,
-                                                           OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+void SVGAnimatedNumberListAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
 {
     ASSERT(m_animationElement);
     ASSERT(m_contextElement);
 
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);    
-    AnimationMode animationMode = animationElement->animationMode();
-
-    // To animation uses contributions from the lower priority animations as the base value.
     SVGNumberList& fromNumberList = from->numberList();
-    SVGNumberList& animatedNumberList = animated->numberList();
-    if (animationMode == ToAnimation)
-        fromNumberList = animatedNumberList;
-
     SVGNumberList& toNumberList = to->numberList();
-    unsigned itemsCount = fromNumberList.size();
-    if (itemsCount != toNumberList.size()) {
-        if (percentage < 0.5) {
-            if (animationMode != ToAnimation)
-                animatedNumberList = fromNumberList;
-        } else
-            animatedNumberList = toNumberList;
+    SVGNumberList& animatedNumberList = animated->numberList();
+    if (!m_animationElement->adjustFromToListValues<SVGNumberList>(0, fromNumberList, toNumberList, animatedNumberList, percentage, m_contextElement))
         return;
+
+    unsigned fromNumberListSize = fromNumberList.size();
+    unsigned toNumberListSize = toNumberList.size();
+
+    for (unsigned i = 0; i < toNumberListSize; ++i) {
+        float effectiveFrom = fromNumberListSize ? fromNumberList[i] : 0;
+        m_animationElement->animateAdditiveNumber(percentage, repeatCount, effectiveFrom, toNumberList[i], animatedNumberList[i]);
     }
-
-    if (itemsCount != animatedNumberList.size())
-        animatedNumberList.resize(itemsCount);
-
-    for (unsigned i = 0; i < itemsCount; ++i)
-        SVGAnimatedNumberAnimator::calculateAnimatedNumber(animationElement, percentage, repeatCount, animatedNumberList[i], fromNumberList[i], toNumberList[i]);
 }
 
 float SVGAnimatedNumberListAnimator::calculateDistance(const String&, const String&)

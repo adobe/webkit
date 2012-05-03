@@ -43,8 +43,6 @@
 @class DOMc;
 @class DOMd;
 @class DOMe;
-@class DOMsequence;
-@class DOMsequence<ScriptProfile>;
 @class NSString;
 @protocol DOMEventListener;
 
@@ -84,8 +82,6 @@ enum {
 - (void)setStringAttr:(NSString *)newStringAttr;
 - (DOMTestObj *)testObjAttr;
 - (void)setTestObjAttr:(DOMTestObj *)newTestObjAttr;
-- (DOMsequence<ScriptProfile> *)sequenceAttr;
-- (void)setSequenceAttr:(DOMsequence<ScriptProfile> *)newSequenceAttr;
 - (DOMTestObj *)XMLObjAttr;
 - (void)setXMLObjAttr:(DOMTestObj *)newXMLObjAttr;
 - (BOOL)create;
@@ -177,8 +173,6 @@ enum {
 - (int)intMethodWithArgs:(int)intArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 - (DOMTestObj *)objMethod;
 - (DOMTestObj *)objMethodWithArgs:(int)intArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
-- (void)methodWithSequenceArg:(DOMsequence *);
-- (DOMsequence<ScriptProfile> *)methodReturningSequence:(int)intArg;
 - (DOMTestObj *)methodThatRequiresAllArgsAndThrows:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 - (void)serializedValue:(NSString *)serializedArg;
 - (void)idbKey:(DOMIDBKey *)key;

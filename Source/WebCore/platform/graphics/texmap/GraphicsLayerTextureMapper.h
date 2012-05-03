@@ -94,13 +94,19 @@ public:
     virtual bool setFilters(const FilterOperations&);
 #endif
 
+    void setFixedToViewport(bool fixed) { m_fixedToViewport = fixed; }
+    bool fixedToViewport() const { return m_fixedToViewport; }
+
 private:
+    virtual void willBeDestroyed();
+
     OwnPtr<TextureMapperLayer> m_layer;
     RefPtr<TextureMapperBackingStore> m_compositedImage;
     RefPtr<Image> m_image;
     bool m_syncQueued;
     int m_changeMask;
     bool m_needsDisplay;
+    bool m_fixedToViewport;
     TextureMapperPlatformLayer* m_contentsLayer;
     FloatRect m_needsDisplayRect;
     TextureMapperAnimations m_animations;

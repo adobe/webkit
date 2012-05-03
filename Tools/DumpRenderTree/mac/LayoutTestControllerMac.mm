@@ -952,6 +952,11 @@ unsigned worldIDForWorld(WebScriptWorld *world)
     return 0;
 }
 
+void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+    // FIXME: Implement this.
+}
+
 void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
 {
     RetainPtr<CFStringRef> scriptCF(AdoptCF, JSStringCopyCFString(kCFAllocatorDefault, script));
@@ -963,7 +968,7 @@ void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObj
     if (!worldID)
         world = [WebScriptWorld world];
     else {
-        RetainPtr<WebScriptWorld>& worldSlot = worldMap().add(worldID, 0).first->second;
+        RetainPtr<WebScriptWorld>& worldSlot = worldMap().add(worldID, 0).iterator->second;
         if (!worldSlot)
             worldSlot.adoptNS([[WebScriptWorld alloc] init]);
         world = worldSlot.get();

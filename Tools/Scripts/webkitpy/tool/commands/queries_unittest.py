@@ -28,11 +28,13 @@
 
 import unittest
 
+from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.common.net.bugzilla import Bugzilla
+from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.thirdparty.mock import Mock
 from webkitpy.tool.commands.commandtest import CommandsTest
 from webkitpy.tool.commands.queries import *
-from webkitpy.tool.mocktool import MockTool
+from webkitpy.tool.mocktool import MockTool, MockOptions
 
 
 class MockTestPort1(object):
@@ -89,19 +91,6 @@ class QueryCommandsTest(CommandsTest):
         expected_stdout = "ok   : Builder1\nok   : Builder2\n"
         self.assert_execute_outputs(TreeStatus(), None, expected_stdout)
 
-    def test_skipped_ports(self):
-        tool = MockTool()
-        tool.port_factory = MockPortFactory()
-
-        expected_stdout = "Ports skipping test 'media/foo/bar.html': test_port1, test_port2\n"
-        self.assert_execute_outputs(SkippedPorts(), ("media/foo/bar.html",), expected_stdout, tool=tool)
-
-        expected_stdout = "Ports skipping test 'foo': test_port1\n"
-        self.assert_execute_outputs(SkippedPorts(), ("foo",), expected_stdout, tool=tool)
-
-        expected_stdout = "Test 'media' is not skipped by any port.\n"
-        self.assert_execute_outputs(SkippedPorts(), ("media",), expected_stdout, tool=tool)
-
 
 class FailureReasonTest(unittest.TestCase):
     def test_blame_line_for_revision(self):
@@ -115,3 +104,94 @@ class FailureReasonTest(unittest.TestCase):
             raise Exception("MESSAGE")
         tool.checkout().commit_info_for_revision = raising_mock
         self.assertEquals(command._blame_line_for_revision(None), "FAILED to fetch CommitInfo for rNone, exception: MESSAGE")
+
+
+class PrintExpectationsTest(unittest.TestCase):
+    def run_test(self, tests, expected_stdout, **args):
+        options = MockOptions(all=False, csv=False, full=False, platform='test-win-xp',
+                              include_keyword=[], exclude_keyword=[]).update(**args)
+        tool = MockTool()
+        command = PrintExpectations()
+        command.bind_to_tool(tool)
+
+        oc = OutputCapture()
+        try:
+            oc.capture_output()
+            command.execute(options, tests, tool)
+        finally:
+            stdout, _, _ = oc.restore_output()
+        self.assertEquals(stdout, expected_stdout)
+
+    def test_basic(self):
+        self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
+                      ('// For test-win-xp\n'
+                       'failures/expected/image.html = IMAGE\n'
+                       'failures/expected/text.html = TEXT\n'))
+
+    def test_full(self):
+        self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
+                      ('// For test-win-xp\n'
+                       'WONTFIX : failures/expected/image.html = IMAGE\n'
+                       'WONTFIX : failures/expected/text.html = TEXT\n'),
+                      full=True)
+
+    def test_exclude(self):
+        self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
+                      ('// For test-win-xp\n'
+                       'failures/expected/text.html = TEXT\n'),
+                      exclude_keyword=['image'])
+
+    def test_include(self):
+        self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
+                      ('// For test-win-xp\n'
+                       'failures/expected/image.html\n'),
+                      include_keyword=['image'])
+
+    def test_csv(self):
+        self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
+                      ('test-win-xp,failures/expected/image.html,wontfix,image\n'
+                       'test-win-xp,failures/expected/text.html,wontfix,text\n'),
+                      csv=True)
+
+
+class PrintBaselinesTest(unittest.TestCase):
+    def setUp(self):
+        self.oc = None
+        self.tool = MockTool()
+        self.test_port = self.tool.port_factory.get('test-win-xp')
+        self.tool.port_factory.get = lambda port_name=None: self.test_port
+        self.tool.port_factory.all_port_names = lambda: ['test-win-xp']
+
+    def tearDown(self):
+        if self.oc:
+            self.restore_output()
+
+    def capture_output(self):
+        self.oc = OutputCapture()
+        self.oc.capture_output()
+
+    def restore_output(self):
+        stdout, stderr, logs = self.oc.restore_output()
+        self.oc = None
+        return (stdout, stderr, logs)
+
+    def test_basic(self):
+        command = PrintBaselines()
+        command.bind_to_tool(self.tool)
+        self.capture_output()
+        command.execute(MockOptions(all=False, include_virtual_tests=False, csv=False, platform=None), ['passes/text.html'], self.tool)
+        stdout, _, _ = self.restore_output()
+        self.assertEquals(stdout,
+                          ('// For test-win-xp\n'
+                           'passes/text-expected.png\n'
+                           'passes/text-expected.txt\n'))
+
+    def test_csv(self):
+        command = PrintBaselines()
+        command.bind_to_tool(self.tool)
+        self.capture_output()
+        command.execute(MockOptions(all=False, platform='*xp', csv=True, include_virtual_tests=False), ['passes/text.html'], self.tool)
+        stdout, _, _ = self.restore_output()
+        self.assertEquals(stdout,
+                          ('test-win-xp,passes/text.html,None,png,passes/text-expected.png,None\n'
+                           'test-win-xp,passes/text.html,None,txt,passes/text-expected.txt,None\n'))

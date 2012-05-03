@@ -33,6 +33,12 @@
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 
+#if PLATFORM(MAC)
+#include "LayerHostingContext.h"
+
+OBJC_CLASS PDFDocument;
+#endif
+
 struct NPObject;
 
 namespace CoreIPC {
@@ -64,7 +70,11 @@ public:
         Vector<String> names;
         Vector<String> values;
         String mimeType;
-        bool loadManually;
+        bool isFullFramePlugin;
+        bool shouldUseManualLoader;
+#if PLATFORM(MAC)
+        LayerHostingMode layerHostingMode;
+#endif
 
         void encode(CoreIPC::ArgumentEncoder*) const;
         static bool decode(CoreIPC::ArgumentDecoder*, Parameters&);
@@ -193,6 +203,9 @@ public:
 
     // Send the complex text input to the plug-in.
     virtual void sendComplexTextInput(const String& textInput) = 0;
+
+    // Tells the plug-in about changes to the layer hosting mode.
+    virtual void setLayerHostingMode(LayerHostingMode) = 0;
 #endif
 
     // Tells the plug-in about scale factor changes.
@@ -212,8 +225,8 @@ public:
     virtual WebCore::Scrollbar* horizontalScrollbar() = 0;
     virtual WebCore::Scrollbar* verticalScrollbar() = 0;
 
-#if USE(CG)
-    virtual RetainPtr<CGPDFDocumentRef> pdfDocumentForPrinting() const { return 0; }
+#if PLATFORM(MAC)
+    virtual RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return 0; }
 #endif
 
 protected:

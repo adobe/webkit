@@ -102,12 +102,12 @@ inline void StructureTransitionTable::add(JSGlobalData& globalData, Structure* s
     // Newer versions of the STL have an std::make_pair function that takes rvalue references.
     // When either of the parameters are bitfields, the C++ compiler will try to bind them as lvalues, which is invalid. To work around this, use unary "+" to make the parameter an rvalue.
     // See https://bugs.webkit.org/show_bug.cgi?id=59261 for more details
-    std::pair<TransitionMap::iterator, bool> result = map()->add(globalData, make_pair(structure->m_nameInPrevious, +structure->m_attributesInPrevious), structure);
-    if (!result.second) {
+    TransitionMap::AddResult result = map()->add(globalData, make_pair(structure->m_nameInPrevious, +structure->m_attributesInPrevious), structure);
+    if (!result.isNewEntry) {
         // There already is an entry! - we should only hit this when despecifying.
-        ASSERT(result.first.get().second->m_specificValueInPrevious);
+        ASSERT(result.iterator.get().second->m_specificValueInPrevious);
         ASSERT(!structure->m_specificValueInPrevious);
-        map()->set(result.first, structure);
+        map()->set(globalData, result.iterator.get().first, structure);
     }
 }
 
@@ -265,6 +265,13 @@ void Structure::growPropertyStorageCapacity()
         m_propertyStorageCapacity = JSObject::baseExternalStorageCapacity;
     else
         m_propertyStorageCapacity *= 2;
+}
+
+size_t Structure::suggestedNewPropertyStorageSize()
+{
+    if (isUsingInlineStorage())
+        return JSObject::baseExternalStorageCapacity;
+    return m_propertyStorageCapacity * 2;
 }
 
 void Structure::despecifyDictionaryFunction(JSGlobalData& globalData, const Identifier& propertyName)
@@ -787,6 +794,8 @@ void Structure::visitChildren(JSCell* cell, SlotVisitor& visitor)
                 visitor.append(&ptr->specificValue);
         }
     }
+    if (thisObject->m_objectToStringValue)
+        visitor.append(&thisObject->m_objectToStringValue);
 }
 
 #if DO_PROPERTYMAP_CONSTENCY_CHECK

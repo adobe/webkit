@@ -73,17 +73,18 @@ public:
 private:
     CustomFilterShader(GraphicsContext3D*, const String& vertexShader, const String& fragmentShader);
     
+    bool rewriteShaders();
     Platform3DObject compileShader(GC3Denum shaderType, const String& shaderString);
     Platform3DObject linkProgram(Platform3DObject vertexShader, Platform3DObject fragmentShader);
     void initializeParameterLocations();
-    
-    static String defaultVertexShaderString();
-    static String defaultFragmentShaderString();
     
     RefPtr<GraphicsContext3D> m_context;
     
     String m_vertexShaderString;
     String m_fragmentShaderString;
+    
+    String m_hiddenSuffix;
+    String m_errorLog;
 
     Platform3DObject m_program;
     

@@ -31,7 +31,6 @@
 #include "RenderThemeQStyle.h"
 
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
@@ -54,6 +53,7 @@
 #include "RenderSlider.h"
 #include "ScrollbarThemeQStyle.h"
 #include "SliderThumbElement.h"
+#include "StyleResolver.h"
 #include "UserAgentStyleSheets.h"
 
 #include <QApplication>
@@ -209,7 +209,7 @@ QRect RenderThemeQStyle::inflateButtonRect(const QRect& originalRect) const
 void RenderThemeQStyle::computeSizeBasedOnStyle(RenderStyle* renderStyle) const
 {
     QSize size(0, 0);
-    const QFontMetrics fm(renderStyle->font().font());
+    const QFontMetrics fm(renderStyle->font().syntheticFont());
     QStyle* style = qStyle();
 
     switch (renderStyle->appearance()) {
@@ -289,7 +289,7 @@ void RenderThemeQStyle::computeSizeBasedOnStyle(RenderStyle* renderStyle) const
 
 
 
-void RenderThemeQStyle::adjustButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element*) const
+void RenderThemeQStyle::adjustButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element*) const
 {
     // Ditch the border.
     style->resetBorder();
@@ -317,7 +317,7 @@ void RenderThemeQStyle::adjustButtonStyle(CSSStyleSelector* selector, RenderStyl
     fontFamily.setFamily(m_buttonFontFamily);
     fontDescription.setFamily(fontFamily);
     style->setFontDescription(fontDescription);
-    style->font().update(selector->fontSelector());
+    style->font().update(styleResolver->fontSelector());
     style->setLineHeight(RenderStyle::initialLineHeight());
     setButtonSize(style);
     setButtonPadding(style);
@@ -407,9 +407,9 @@ bool RenderThemeQStyle::paintTextField(RenderObject* o, const PaintInfo& i, cons
     return false;
 }
 
-void RenderThemeQStyle::adjustTextAreaStyle(CSSStyleSelector* selector, RenderStyle* style, Element* element) const
+void RenderThemeQStyle::adjustTextAreaStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
 {
-    adjustTextFieldStyle(selector, style, element);
+    adjustTextFieldStyle(styleResolver, style, element);
 }
 
 bool RenderThemeQStyle::paintTextArea(RenderObject* o, const PaintInfo& i, const IntRect& r)
@@ -463,13 +463,13 @@ bool RenderThemeQStyle::paintMenuList(RenderObject* o, const PaintInfo& i, const
     return false;
 }
 
-void RenderThemeQStyle::adjustMenuListButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeQStyle::adjustMenuListButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
     // WORKAROUND because html.css specifies -webkit-border-radius for <select> so we override it here
     // see also http://bugs.webkit.org/show_bug.cgi?id=18399
     style->resetBorderRadius();
 
-    RenderThemeQt::adjustMenuListButtonStyle(selector, style, e);
+    RenderThemeQt::adjustMenuListButtonStyle(styleResolver, style, e);
 }
 
 bool RenderThemeQStyle::paintMenuListButton(RenderObject* o, const PaintInfo& i,
@@ -499,7 +499,7 @@ double RenderThemeQStyle::animationDurationForProgressBar(RenderProgress* render
         return 0;
 
     QStyleOptionProgressBarV2 option;
-    option.rect.setSize(renderProgress->size());
+    option.rect.setSize(renderProgress->pixelSnappedSize());
     // FIXME: Until http://bugreports.qt.nokia.com/browse/QTBUG-9171 is fixed,
     // we simulate one square animating across the progress bar.
     return (option.rect.width() / qStyle()->pixelMetric(QStyle::PM_ProgressBarChunkWidth, &option)) * animationRepeatIntervalForProgressBar(renderProgress);
@@ -594,7 +594,7 @@ bool RenderThemeQStyle::paintSliderTrack(RenderObject* o, const PaintInfo& pi,
     return false;
 }
 
-void RenderThemeQStyle::adjustSliderTrackStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeQStyle::adjustSliderTrackStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     style->setBoxShadow(nullptr);
 }
@@ -627,9 +627,9 @@ bool RenderThemeQStyle::paintSliderThumb(RenderObject* o, const PaintInfo& pi,
     return false;
 }
 
-void RenderThemeQStyle::adjustSliderThumbStyle(CSSStyleSelector* selector, RenderStyle* style, Element* element) const
+void RenderThemeQStyle::adjustSliderThumbStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
 {
-    RenderTheme::adjustSliderThumbStyle(selector, style, element);
+    RenderTheme::adjustSliderThumbStyle(styleResolver, style, element);
     style->setBoxShadow(nullptr);
 }
 
@@ -639,11 +639,10 @@ bool RenderThemeQStyle::paintSearchField(RenderObject* o, const PaintInfo& pi,
     return paintTextField(o, pi, r);
 }
 
-void RenderThemeQStyle::adjustSearchFieldDecorationStyle(CSSStyleSelector* selector, RenderStyle* style,
-                                                     Element* e) const
+void RenderThemeQStyle::adjustSearchFieldDecorationStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
     notImplemented();
-    RenderTheme::adjustSearchFieldDecorationStyle(selector, style, e);
+    RenderTheme::adjustSearchFieldDecorationStyle(styleResolver, style, e);
 }
 
 bool RenderThemeQStyle::paintSearchFieldDecoration(RenderObject* o, const PaintInfo& pi,
@@ -653,11 +652,10 @@ bool RenderThemeQStyle::paintSearchFieldDecoration(RenderObject* o, const PaintI
     return RenderTheme::paintSearchFieldDecoration(o, pi, r);
 }
 
-void RenderThemeQStyle::adjustSearchFieldResultsDecorationStyle(CSSStyleSelector* selector, RenderStyle* style,
-                                                            Element* e) const
+void RenderThemeQStyle::adjustSearchFieldResultsDecorationStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
     notImplemented();
-    RenderTheme::adjustSearchFieldResultsDecorationStyle(selector, style, e);
+    RenderTheme::adjustSearchFieldResultsDecorationStyle(styleResolver, style, e);
 }
 
 bool RenderThemeQStyle::paintSearchFieldResultsDecoration(RenderObject* o, const PaintInfo& pi,

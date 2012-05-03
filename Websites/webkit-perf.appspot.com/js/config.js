@@ -23,8 +23,8 @@ if ($.color) {
 
 var PLOT_OPTIONS = {
     xaxis: { mode: 'time' },
-    yaxis: { min: 0 },
-    selection: { mode: 'x', color: '#97c6e5' },
+    crosshair: { mode: 'y' },
+    selection: { mode: 'xy', color: '#97c6e5' },
     series: { shadowSize: 0 },
     lines: { show: false },
     points: { show: true },
@@ -40,8 +40,7 @@ var PLOT_OPTIONS = {
 
 var OVERVIEW_OPTIONS = {
     xaxis: { mode: 'time' },
-    yaxis: { min: 0 },
-    selection: { mode: 'x', color: '#97c6e5' },
+    selection: { mode: 'xy', color: '#97c6e5' },
     series: {
         lines: { show: true, lineWidth: 1 },
         shadowSize: 0
@@ -79,6 +78,14 @@ function urlForChangesetList(branch, changesetList, repository)
                '&verbose=on';
 }
 
+function sortProperties(object) {
+    var tests = Object.keys(object).sort();
+    var sortedObject = {};
+    for (var i = 0; i < tests.length; i++)
+        sortedObject[tests[i]] = object[tests[i]];
+    return sortedObject;
+}
+
 // FIXME move this back to dashboard.js once the bug 718925 is fixed
 function fetchDashboardManifest(callback)
 {
@@ -90,12 +97,7 @@ function fetchDashboardManifest(callback)
     });
 
     $.getJSON(SERVER + '/api/test/dashboard', function (dashboardManifest) {
-        var testToId = dashboardManifest['testToId'];
-        var tests = Object.keys(testToId).sort();
-        var sortedTestToId = {};
-        for (var i = 0; i < tests.length; i++)
-            sortedTestToId[tests[i]] = testToId[tests[i]];
-        dashboardManifest['testToId'] = sortedTestToId;
+        dashboardManifest['testToId'] = sortProperties(dashboardManifest['testToId']);
         callback(dashboardManifest);
     });
 }

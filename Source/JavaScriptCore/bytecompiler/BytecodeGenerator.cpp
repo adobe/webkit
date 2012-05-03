@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  * Copyright (C) 2012 Igalia, S.L.
  *
@@ -200,10 +200,10 @@ bool BytecodeGenerator::addVar(const Identifier& ident, bool isConstant, Registe
 {
     int index = m_calleeRegisters.size();
     SymbolTableEntry newEntry(index, isConstant ? ReadOnly : 0);
-    pair<SymbolTable::iterator, bool> result = symbolTable().add(ident.impl(), newEntry);
+    SymbolTable::AddResult result = symbolTable().add(ident.impl(), newEntry);
 
-    if (!result.second) {
-        r0 = &registerFor(result.first->second.getIndex());
+    if (!result.isNewEntry) {
+        r0 = &registerFor(result.iterator->second.getIndex());
         return false;
     }
 
@@ -215,9 +215,9 @@ int BytecodeGenerator::addGlobalVar(const Identifier& ident, bool isConstant)
 {
     int index = symbolTable().size();
     SymbolTableEntry newEntry(index, isConstant ? ReadOnly : 0);
-    pair<SymbolTable::iterator, bool> result = symbolTable().add(ident.impl(), newEntry);
-    if (!result.second)
-        index = result.first->second.getIndex();
+    SymbolTable::AddResult result = symbolTable().add(ident.impl(), newEntry);
+    if (!result.isNewEntry)
+        index = result.iterator->second.getIndex();
     return index;
 }
 
@@ -968,24 +968,24 @@ PassRefPtr<Label> BytecodeGenerator::emitJumpIfNotFunctionApply(RegisterID* cond
 unsigned BytecodeGenerator::addConstant(const Identifier& ident)
 {
     StringImpl* rep = ident.impl();
-    pair<IdentifierMap::iterator, bool> result = m_identifierMap.add(rep, m_codeBlock->numberOfIdentifiers());
-    if (result.second) // new entry
+    IdentifierMap::AddResult result = m_identifierMap.add(rep, m_codeBlock->numberOfIdentifiers());
+    if (result.isNewEntry)
         m_codeBlock->addIdentifier(Identifier(m_globalData, rep));
 
-    return result.first->second;
+    return result.iterator->second;
 }
 
 RegisterID* BytecodeGenerator::addConstantValue(JSValue v)
 {
     int index = m_nextConstantOffset;
 
-    pair<JSValueMap::iterator, bool> result = m_jsValueMap.add(JSValue::encode(v), m_nextConstantOffset);
-    if (result.second) {
+    JSValueMap::AddResult result = m_jsValueMap.add(JSValue::encode(v), m_nextConstantOffset);
+    if (result.isNewEntry) {
         m_constantPoolRegisters.append(FirstConstantRegisterIndex + m_nextConstantOffset);
         ++m_nextConstantOffset;
         m_codeBlock->addConstant(JSValue(v));
     } else
-        index = result.first->second;
+        index = result.iterator->second;
 
     return &m_constantPoolRegisters[index];
 }
@@ -1132,7 +1132,7 @@ RegisterID* BytecodeGenerator::emitLoad(RegisterID* dst, double number)
     // work correctly with NaN as a key.
     if (isnan(number) || number == HashTraits<double>::emptyValue() || HashTraits<double>::isDeletedValue(number))
         return emitLoad(dst, jsNumber(number));
-    JSValue& valueInMap = m_numberMap.add(number, JSValue()).first->second;
+    JSValue& valueInMap = m_numberMap.add(number, JSValue()).iterator->second;
     if (!valueInMap)
         valueInMap = jsNumber(number);
     return emitLoad(dst, valueInMap);
@@ -1140,7 +1140,7 @@ RegisterID* BytecodeGenerator::emitLoad(RegisterID* dst, double number)
 
 RegisterID* BytecodeGenerator::emitLoad(RegisterID* dst, const Identifier& identifier)
 {
-    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).first->second;
+    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).iterator->second;
     if (!stringInMap)
         stringInMap = jsOwnedString(globalData(), identifier.ustring());
     return emitLoad(dst, JSValue(stringInMap));
@@ -1185,7 +1185,7 @@ ResolveResult BytecodeGenerator::resolve(const Identifier& property)
             flags |= ResolveResult::DynamicFlag;
             break;
         }        
-        JSVariableObject* currentVariableObject = static_cast<JSVariableObject*>(currentScope);
+        JSVariableObject* currentVariableObject = jsCast<JSVariableObject*>(currentScope);
         SymbolTableEntry entry = currentVariableObject->symbolTable().get(property.impl());
 
         // Found the property
@@ -1242,7 +1242,7 @@ ResolveResult BytecodeGenerator::resolveConstDecl(const Identifier& property)
         JSObject* currentScope = iter->get();
         if (!currentScope->isVariableObject())
             continue;
-        JSVariableObject* currentVariableObject = static_cast<JSVariableObject*>(currentScope);
+        JSVariableObject* currentVariableObject = jsCast<JSVariableObject*>(currentScope);
         SymbolTableEntry entry = currentVariableObject->symbolTable().get(property.impl());
         if (entry.isNull())
             continue;
@@ -1648,7 +1648,7 @@ unsigned BytecodeGenerator::addConstantBuffer(unsigned length)
 
 JSString* BytecodeGenerator::addStringConstant(const Identifier& identifier)
 {
-    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).first->second;
+    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).iterator->second;
     if (!stringInMap) {
         stringInMap = jsString(globalData(), identifier.ustring());
         addConstantValue(stringInMap);
@@ -1718,10 +1718,10 @@ RegisterID* BytecodeGenerator::emitNewFunction(RegisterID* dst, FunctionBodyNode
 
 RegisterID* BytecodeGenerator::emitLazyNewFunction(RegisterID* dst, FunctionBodyNode* function)
 {
-    std::pair<FunctionOffsetMap::iterator, bool> ptr = m_functionOffsets.add(function, 0);
-    if (ptr.second)
-        ptr.first->second = m_codeBlock->addFunctionDecl(makeFunction(m_globalData, function));
-    return emitNewFunctionInternal(dst, ptr.first->second, true);
+    FunctionOffsetMap::AddResult ptr = m_functionOffsets.add(function, 0);
+    if (ptr.isNewEntry)
+        ptr.iterator->second = m_codeBlock->addFunctionDecl(makeFunction(m_globalData, function));
+    return emitNewFunctionInternal(dst, ptr.iterator->second, true);
 }
 
 RegisterID* BytecodeGenerator::emitNewFunctionInternal(RegisterID* dst, unsigned index, bool doNullCheck)
@@ -2004,11 +2004,19 @@ void BytecodeGenerator::emitDebugHook(DebugHookID debugHookID, int firstLine, in
     instructions().append(lastLine);
 }
 
-void BytecodeGenerator::pushFinallyContext(Label* target, RegisterID* retAddrDst)
+void BytecodeGenerator::pushFinallyContext(StatementNode* finallyBlock)
 {
     ControlFlowContext scope;
     scope.isFinallyBlock = true;
-    FinallyContext context = { target, retAddrDst };
+    FinallyContext context = {
+        finallyBlock,
+        m_scopeContextStack.size(),
+        m_switchContextStack.size(),
+        m_forInContextStack.size(),
+        m_labelScopes.size(),
+        m_finallyDepth,
+        m_dynamicScopeDepth
+    };
     scope.finallyContext = context;
     m_scopeContextStack.append(scope);
     m_finallyDepth++;
@@ -2134,9 +2142,63 @@ PassRefPtr<Label> BytecodeGenerator::emitComplexJumpScopes(Label* target, Contro
             instructions().append(nextInsn->bind(begin, instructions().size()));
             emitLabel(nextInsn.get());
         }
-
+        
+        Vector<ControlFlowContext> savedScopeContextStack;
+        Vector<SwitchInfo> savedSwitchContextStack;
+        Vector<ForInContext> savedForInContextStack;
+        SegmentedVector<LabelScope, 8> savedLabelScopes;
         while (topScope > bottomScope && topScope->isFinallyBlock) {
-            emitJumpSubroutine(topScope->finallyContext.retAddrDst, topScope->finallyContext.finallyAddr);
+            // Save the current state of the world while instating the state of the world
+            // for the finally block.
+            FinallyContext finallyContext = topScope->finallyContext;
+            bool flipScopes = finallyContext.scopeContextStackSize != m_scopeContextStack.size();
+            bool flipSwitches = finallyContext.switchContextStackSize != m_switchContextStack.size();
+            bool flipForIns = finallyContext.forInContextStackSize != m_forInContextStack.size();
+            bool flipLabelScopes = finallyContext.labelScopesSize != m_labelScopes.size();
+            int topScopeIndex = -1;
+            int bottomScopeIndex = -1;
+            if (flipScopes) {
+                topScopeIndex = topScope - m_scopeContextStack.begin();
+                bottomScopeIndex = bottomScope - m_scopeContextStack.begin();
+                savedScopeContextStack = m_scopeContextStack;
+                m_scopeContextStack.shrink(finallyContext.scopeContextStackSize);
+            }
+            if (flipSwitches) {
+                savedSwitchContextStack = m_switchContextStack;
+                m_switchContextStack.shrink(finallyContext.switchContextStackSize);
+            }
+            if (flipForIns) {
+                savedForInContextStack = m_forInContextStack;
+                m_forInContextStack.shrink(finallyContext.forInContextStackSize);
+            }
+            if (flipLabelScopes) {
+                savedLabelScopes = m_labelScopes;
+                while (m_labelScopes.size() > finallyContext.labelScopesSize)
+                    m_labelScopes.removeLast();
+            }
+            int savedFinallyDepth = m_finallyDepth;
+            m_finallyDepth = finallyContext.finallyDepth;
+            int savedDynamicScopeDepth = m_dynamicScopeDepth;
+            m_dynamicScopeDepth = finallyContext.dynamicScopeDepth;
+            
+            // Emit the finally block.
+            emitNode(finallyContext.finallyBlock);
+            
+            // Restore the state of the world.
+            if (flipScopes) {
+                m_scopeContextStack = savedScopeContextStack;
+                topScope = &m_scopeContextStack[topScopeIndex]; // assert it's within bounds
+                bottomScope = m_scopeContextStack.begin() + bottomScopeIndex; // don't assert, since it the index might be -1.
+            }
+            if (flipSwitches)
+                m_switchContextStack = savedSwitchContextStack;
+            if (flipForIns)
+                m_forInContextStack = savedForInContextStack;
+            if (flipLabelScopes)
+                m_labelScopes = savedLabelScopes;
+            m_finallyDepth = savedFinallyDepth;
+            m_dynamicScopeDepth = savedDynamicScopeDepth;
+            
             --topScope;
         }
     }
@@ -2214,23 +2276,6 @@ void BytecodeGenerator::emitThrowReferenceError(const UString& message)
 {
     emitOpcode(op_throw_reference_error);
     instructions().append(addConstantValue(jsString(globalData(), message))->index());
-}
-
-PassRefPtr<Label> BytecodeGenerator::emitJumpSubroutine(RegisterID* retAddrDst, Label* finally)
-{
-    size_t begin = instructions().size();
-
-    emitOpcode(op_jsr);
-    instructions().append(retAddrDst->index());
-    instructions().append(finally->bind(begin, instructions().size()));
-    emitLabel(newLabel().get()); // Record the fact that the next instruction is implicitly labeled, because op_sret will return to it.
-    return finally;
-}
-
-void BytecodeGenerator::emitSubroutineReturn(RegisterID* retAddrSrc)
-{
-    emitOpcode(op_sret);
-    instructions().append(retAddrSrc->index());
 }
 
 void BytecodeGenerator::emitPushNewScope(RegisterID* dst, const Identifier& property, RegisterID* value)

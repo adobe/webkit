@@ -42,31 +42,36 @@ public:
     virtual ~CCSingleThreadProxy();
 
     // CCProxy implementation
-    virtual bool compositeAndReadback(void *pixels, const IntRect&);
-    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double duration);
-    virtual GraphicsContext3D* context();
-    virtual void finishAllRendering();
-    virtual bool isStarted() const;
-    virtual bool initializeContext();
-    virtual bool initializeLayerRenderer();
-    virtual bool recreateContext();
-    virtual int compositorIdentifier() const { return m_compositorIdentifier; }
-    virtual const LayerRendererCapabilities& layerRendererCapabilities() const;
-    virtual void loseContext();
-    virtual void setNeedsAnimate();
-    virtual void setNeedsCommit();
-    virtual void setNeedsRedraw();
-    virtual void setVisible(bool);
-    virtual void start();
-    virtual void stop();
-    virtual size_t maxPartialTextureUpdates() const { return std::numeric_limits<size_t>::max(); }
+    virtual bool compositeAndReadback(void *pixels, const IntRect&) OVERRIDE;
+    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double duration) OVERRIDE;
+    virtual GraphicsContext3D* context() OVERRIDE;
+    virtual void finishAllRendering() OVERRIDE;
+    virtual bool isStarted() const OVERRIDE;
+    virtual bool initializeContext() OVERRIDE;
+    virtual void setSurfaceReady() OVERRIDE;
+    virtual bool initializeLayerRenderer() OVERRIDE;
+    virtual bool recreateContext() OVERRIDE;
+    virtual int compositorIdentifier() const OVERRIDE { return m_compositorIdentifier; }
+    virtual const LayerRendererCapabilities& layerRendererCapabilities() const OVERRIDE;
+    virtual void loseContext() OVERRIDE;
+    virtual void setNeedsAnimate() OVERRIDE;
+    virtual void setNeedsCommit() OVERRIDE;
+    virtual void setNeedsRedraw() OVERRIDE;
+    virtual bool commitRequested() const OVERRIDE;
+    virtual void setVisible(bool) OVERRIDE;
+    virtual void start() OVERRIDE;
+    virtual void stop() OVERRIDE;
+    virtual size_t maxPartialTextureUpdates() const OVERRIDE { return std::numeric_limits<size_t>::max(); }
+    virtual void acquireLayerTextures() OVERRIDE { }
+    virtual void setFontAtlas(PassOwnPtr<CCFontAtlas>) OVERRIDE;
+    virtual void forceSerializeOnSwapBuffers() OVERRIDE;
 
     // CCLayerTreeHostImplClient implementation
-    virtual void didLoseContextOnImplThread() { }
-    virtual void onSwapBuffersCompleteOnImplThread() { ASSERT_NOT_REACHED(); }
-    virtual void setNeedsRedrawOnImplThread() { m_layerTreeHost->setNeedsCommit(); }
-    virtual void setNeedsCommitOnImplThread() { m_layerTreeHost->setNeedsCommit(); }
-    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime);
+    virtual void didLoseContextOnImplThread() OVERRIDE { }
+    virtual void onSwapBuffersCompleteOnImplThread() OVERRIDE { ASSERT_NOT_REACHED(); }
+    virtual void setNeedsRedrawOnImplThread() OVERRIDE { m_layerTreeHost->setNeedsCommit(); }
+    virtual void setNeedsCommitOnImplThread() OVERRIDE { m_layerTreeHost->setNeedsCommit(); }
+    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) OVERRIDE;
 
     // Called by the legacy path where RenderWidget does the scheduling.
     void compositeImmediately();
@@ -74,8 +79,8 @@ public:
 private:
     explicit CCSingleThreadProxy(CCLayerTreeHost*);
 
-    bool commitIfNeeded();
-    void doCommit();
+    bool commitAndComposite();
+    void doCommit(CCTextureUpdater&);
     bool doComposite();
     void didSwapFrame();
 

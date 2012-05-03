@@ -35,7 +35,7 @@ namespace WebCore {
 
 WrapperTypeInfo V8TestCustomNamedGetter::info = { V8TestCustomNamedGetter::GetTemplate, V8TestCustomNamedGetter::derefObject, 0, 0 };
 
-namespace TestCustomNamedGetterInternal {
+namespace TestCustomNamedGetterV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
@@ -43,17 +43,17 @@ static v8::Handle<v8::Value> anotherFunctionCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.TestCustomNamedGetter.anotherFunction");
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
     TestCustomNamedGetter* imp = V8TestCustomNamedGetter::toNative(args.Holder());
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, str, MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined));
     imp->anotherFunction(str);
     return v8::Handle<v8::Value>();
 }
 
-} // namespace TestCustomNamedGetterInternal
+} // namespace TestCustomNamedGetterV8Internal
 
 static const BatchedCallback TestCustomNamedGetterCallbacks[] = {
-    {"anotherFunction", TestCustomNamedGetterInternal::anotherFunctionCallback},
+    {"anotherFunction", TestCustomNamedGetterV8Internal::anotherFunctionCallback},
 };
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestCustomNamedGetterTemplate(v8::Persistent<v8::FunctionTemplate> desc)
@@ -110,7 +110,7 @@ bool V8TestCustomNamedGetter::HasInstance(v8::Handle<v8::Value> value)
 }
 
 
-v8::Handle<v8::Object> V8TestCustomNamedGetter::wrapSlow(PassRefPtr<TestCustomNamedGetter> impl)
+v8::Handle<v8::Object> V8TestCustomNamedGetter::wrapSlow(PassRefPtr<TestCustomNamedGetter> impl, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
     V8Proxy* proxy = 0;
@@ -122,7 +122,7 @@ v8::Handle<v8::Object> V8TestCustomNamedGetter::wrapSlow(PassRefPtr<TestCustomNa
 
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();
-    getDOMObjectMap().set(impl.leakRef(), wrapperHandle);
+    V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapperHandle);
     return wrapper;
 }
 

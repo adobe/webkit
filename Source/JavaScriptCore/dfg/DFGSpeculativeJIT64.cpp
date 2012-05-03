@@ -26,8 +26,6 @@
 #include "config.h"
 #include "DFGSpeculativeJIT.h"
 
-#include "JSByteArray.h"
-
 #if ENABLE(DFG_JIT)
 
 namespace JSC { namespace DFG {
@@ -76,7 +74,7 @@ GPRReg SpeculativeJIT::fillInteger(NodeIndex nodeIndex, DataFormat& returnFormat
         info.fillJSValue(gpr, DataFormatJSInteger);
         unlock(gpr);
     }
-
+    
     switch (info.registerFormat()) {
     case DataFormatNone:
         // Should have filled, above.
@@ -409,7 +407,7 @@ void SpeculativeJIT::nonSpeculativeValueToInt32(Node& node)
     if (isKnownInteger(node.child1().index())) {
         IntegerOperand op1(this, node.child1());
         GPRTemporary result(this, op1);
-        m_jit.move(op1.gpr(), result.gpr());
+        m_jit.zeroExtend32ToPtr(op1.gpr(), result.gpr());
         integerResult(result.gpr(), m_compileIndex);
         return;
     }
@@ -480,14 +478,14 @@ void SpeculativeJIT::nonSpeculativeUInt32ToNumber(Node& node)
 JITCompiler::Call SpeculativeJIT::cachedGetById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg resultGPR, GPRReg scratchGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget, SpillRegistersMode spillMode)
 {
     JITCompiler::DataLabelPtr structureToCompare;
-    JITCompiler::Jump structureCheck = m_jit.branchPtrWithPatch(JITCompiler::NotEqual, JITCompiler::Address(baseGPR, JSCell::structureOffset()), structureToCompare, JITCompiler::TrustedImmPtr(reinterpret_cast<void*>(-1)));
+    JITCompiler::PatchableJump structureCheck = m_jit.patchableBranchPtrWithPatch(JITCompiler::NotEqual, JITCompiler::Address(baseGPR, JSCell::structureOffset()), structureToCompare, JITCompiler::TrustedImmPtr(reinterpret_cast<void*>(-1)));
     
     m_jit.loadPtr(JITCompiler::Address(baseGPR, JSObject::offsetOfPropertyStorage()), resultGPR);
     JITCompiler::DataLabelCompact loadWithPatch = m_jit.loadPtrWithCompactAddressOffsetPatch(JITCompiler::Address(resultGPR, 0), resultGPR);
     
     JITCompiler::Jump done = m_jit.jump();
 
-    structureCheck.link(&m_jit);
+    structureCheck.m_jump.link(&m_jit);
     
     if (slowPathTarget.isSet())
         slowPathTarget.link(&m_jit);
@@ -516,7 +514,7 @@ void SpeculativeJIT::cachedPutById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg
 {
     
     JITCompiler::DataLabelPtr structureToCompare;
-    JITCompiler::Jump structureCheck = m_jit.branchPtrWithPatch(JITCompiler::NotEqual, JITCompiler::Address(baseGPR, JSCell::structureOffset()), structureToCompare, JITCompiler::TrustedImmPtr(reinterpret_cast<void*>(-1)));
+    JITCompiler::PatchableJump structureCheck = m_jit.patchableBranchPtrWithPatch(JITCompiler::NotEqual, JITCompiler::Address(baseGPR, JSCell::structureOffset()), structureToCompare, JITCompiler::TrustedImmPtr(reinterpret_cast<void*>(-1)));
 
     writeBarrier(baseGPR, valueGPR, valueUse, WriteBarrierForPropertyAccess, scratchGPR);
 
@@ -525,7 +523,7 @@ void SpeculativeJIT::cachedPutById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg
 
     JITCompiler::Jump done = m_jit.jump();
 
-    structureCheck.link(&m_jit);
+    structureCheck.m_jump.link(&m_jit);
 
     if (slowPathTarget.isSet())
         slowPathTarget.link(&m_jit);
@@ -713,6 +711,9 @@ void SpeculativeJIT::nonSpeculativePeepholeBranch(Node& node, NodeIndex branchNo
     }
 
     jump(notTaken);
+
+    m_indexInBlock = m_jit.graph().m_blocks[m_block]->size() - 1;
+    m_compileIndex = branchNodeIndex;
 }
 
 void SpeculativeJIT::nonSpeculativeNonPeepholeCompare(Node& node, MacroAssembler::RelationalCondition cond, S_DFGOperation_EJJ helperFunction)
@@ -966,7 +967,7 @@ void SpeculativeJIT::emitCall(Node& node)
     m_jit.addPtr(TrustedImm32(m_jit.codeBlock()->m_numCalleeRegisters * sizeof(Register)), GPRInfo::callFrameRegister);
     
     CodeOrigin codeOrigin = at(m_compileIndex).codeOrigin;
-    CallBeginToken token = m_jit.beginJSCall();
+    CallBeginToken token = m_jit.beginCall();
     JITCompiler::Call fastCall = m_jit.nearCall();
     m_jit.notifyCall(fastCall, codeOrigin, token);
     
@@ -979,7 +980,7 @@ void SpeculativeJIT::emitCall(Node& node)
     JITCompiler::Call slowCall = m_jit.appendCall(slowCallFunction);
     m_jit.addFastExceptionCheck(slowCall, codeOrigin, token);
     m_jit.addPtr(TrustedImm32(m_jit.codeBlock()->m_numCalleeRegisters * sizeof(Register)), GPRInfo::callFrameRegister);
-    token = m_jit.beginJSCall();
+    token = m_jit.beginCall();
     JITCompiler::Call theCall = m_jit.call(GPRInfo::returnValueGPR);
     m_jit.notifyCall(theCall, codeOrigin, token);
     
@@ -1485,6 +1486,145 @@ void SpeculativeJIT::compileObjectEquality(Node& node, const ClassInfo* classInf
     jsValueResult(resultGPR, m_compileIndex, DataFormatJSBoolean);
 }
 
+void SpeculativeJIT::compileObjectToObjectOrOtherEquality(
+    Edge leftChild, Edge rightChild,
+    const ClassInfo* classInfo, PredictionChecker predictionCheck)
+{
+    SpeculateCellOperand op1(this, leftChild);
+    JSValueOperand op2(this, rightChild);
+    GPRTemporary result(this);
+    
+    GPRReg op1GPR = op1.gpr();
+    GPRReg op2GPR = op2.gpr();
+    GPRReg resultGPR = result.gpr();
+    
+    if (!predictionCheck(m_state.forNode(leftChild).m_type)) {
+        speculationCheck(
+            BadType, JSValueRegs(op1GPR), leftChild.index(),
+            m_jit.branchPtr(
+                MacroAssembler::NotEqual,
+                MacroAssembler::Address(op1GPR, JSCell::classInfoOffset()),
+                MacroAssembler::TrustedImmPtr(classInfo)));
+    }
+    
+    // It seems that most of the time when programs do a == b where b may be either null/undefined
+    // or an object, b is usually an object. Balance the branches to make that case fast.
+    MacroAssembler::Jump rightNotCell =
+        m_jit.branchTestPtr(MacroAssembler::NonZero, op2GPR, GPRInfo::tagMaskRegister);
+    
+    // We know that within this branch, rightChild must be a cell. If the CFA can tell us that the
+    // proof, when filtered on cell, demonstrates that we have an object of the desired type
+    // (predictionCheck() will test for FinalObject or Array, currently), then we can skip the
+    // speculation.
+    if (!predictionCheck(m_state.forNode(rightChild).m_type & PredictCell)) {
+        speculationCheck(
+            BadType, JSValueRegs(op2GPR), rightChild.index(),
+            m_jit.branchPtr(
+                MacroAssembler::NotEqual,
+                MacroAssembler::Address(op2GPR, JSCell::classInfoOffset()),
+                MacroAssembler::TrustedImmPtr(classInfo)));
+    }
+    
+    // At this point we know that we can perform a straight-forward equality comparison on pointer
+    // values because both left and right are pointers to objects that have no special equality
+    // protocols.
+    MacroAssembler::Jump falseCase = m_jit.branchPtr(MacroAssembler::NotEqual, op1GPR, op2GPR);
+    MacroAssembler::Jump trueCase = m_jit.jump();
+    
+    rightNotCell.link(&m_jit);
+    
+    // We know that within this branch, rightChild must not be a cell. Check if that is enough to
+    // prove that it is either null or undefined.
+    if (!isOtherPrediction(m_state.forNode(rightChild).m_type & ~PredictCell)) {
+        m_jit.move(op2GPR, resultGPR);
+        m_jit.andPtr(MacroAssembler::TrustedImm32(~TagBitUndefined), resultGPR);
+        
+        speculationCheck(
+            BadType, JSValueRegs(op2GPR), rightChild.index(),
+            m_jit.branchPtr(
+                MacroAssembler::NotEqual, resultGPR,
+                MacroAssembler::TrustedImmPtr(reinterpret_cast<void*>(ValueNull))));
+    }
+    
+    falseCase.link(&m_jit);
+    m_jit.move(TrustedImm32(ValueFalse), resultGPR);
+    MacroAssembler::Jump done = m_jit.jump();
+    trueCase.link(&m_jit);
+    m_jit.move(TrustedImm32(ValueTrue), resultGPR);
+    done.link(&m_jit);
+    
+    jsValueResult(resultGPR, m_compileIndex, DataFormatJSBoolean);
+}
+
+void SpeculativeJIT::compilePeepHoleObjectToObjectOrOtherEquality(
+    Edge leftChild, Edge rightChild, NodeIndex branchNodeIndex,
+    const ClassInfo* classInfo, PredictionChecker predictionCheck)
+{
+    Node& branchNode = at(branchNodeIndex);
+    BlockIndex taken = branchNode.takenBlockIndex();
+    BlockIndex notTaken = branchNode.notTakenBlockIndex();
+    
+    SpeculateCellOperand op1(this, leftChild);
+    JSValueOperand op2(this, rightChild);
+    GPRTemporary result(this);
+    
+    GPRReg op1GPR = op1.gpr();
+    GPRReg op2GPR = op2.gpr();
+    GPRReg resultGPR = result.gpr();
+    
+    if (!predictionCheck(m_state.forNode(leftChild).m_type)) {
+        speculationCheck(
+            BadType, JSValueRegs(op1GPR), leftChild.index(),
+            m_jit.branchPtr(
+                MacroAssembler::NotEqual,
+                MacroAssembler::Address(op1GPR, JSCell::classInfoOffset()),
+                MacroAssembler::TrustedImmPtr(classInfo)));
+    }
+    
+    // It seems that most of the time when programs do a == b where b may be either null/undefined
+    // or an object, b is usually an object. Balance the branches to make that case fast.
+    MacroAssembler::Jump rightNotCell =
+        m_jit.branchTestPtr(MacroAssembler::NonZero, op2GPR, GPRInfo::tagMaskRegister);
+    
+    // We know that within this branch, rightChild must be a cell. If the CFA can tell us that the
+    // proof, when filtered on cell, demonstrates that we have an object of the desired type
+    // (predictionCheck() will test for FinalObject or Array, currently), then we can skip the
+    // speculation.
+    if (!predictionCheck(m_state.forNode(rightChild).m_type & PredictCell)) {
+        speculationCheck(
+            BadType, JSValueRegs(op2GPR), rightChild.index(),
+            m_jit.branchPtr(
+                MacroAssembler::NotEqual,
+                MacroAssembler::Address(op2GPR, JSCell::classInfoOffset()),
+                MacroAssembler::TrustedImmPtr(classInfo)));
+    }
+    
+    // At this point we know that we can perform a straight-forward equality comparison on pointer
+    // values because both left and right are pointers to objects that have no special equality
+    // protocols.
+    branchPtr(MacroAssembler::Equal, op1GPR, op2GPR, taken);
+    
+    // We know that within this branch, rightChild must not be a cell. Check if that is enough to
+    // prove that it is either null or undefined.
+    if (isOtherPrediction(m_state.forNode(rightChild).m_type & ~PredictCell))
+        rightNotCell.link(&m_jit);
+    else {
+        jump(notTaken, ForceJump);
+        
+        rightNotCell.link(&m_jit);
+        m_jit.move(op2GPR, resultGPR);
+        m_jit.andPtr(MacroAssembler::TrustedImm32(~TagBitUndefined), resultGPR);
+        
+        speculationCheck(
+            BadType, JSValueRegs(op2GPR), rightChild.index(),
+            m_jit.branchPtr(
+                MacroAssembler::NotEqual, resultGPR,
+                MacroAssembler::TrustedImmPtr(reinterpret_cast<void*>(ValueNull))));
+    }
+    
+    jump(notTaken);
+}
+
 void SpeculativeJIT::compileIntegerCompare(Node& node, MacroAssembler::RelationalCondition condition)
 {
     SpeculateIntegerOperand op1(this, node.child1());
@@ -1763,7 +1903,7 @@ void SpeculativeJIT::compile(Node& node)
 
         // If we have no prediction for this local, then don't attempt to compile.
         if (prediction == PredictNone || value.isClear()) {
-            terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+            terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
             break;
         }
         
@@ -1824,7 +1964,18 @@ void SpeculativeJIT::compile(Node& node)
         // SetLocal and whatever other DFG Nodes are associated with the same
         // bytecode index as the SetLocal.
         ASSERT(m_codeOriginForOSR == node.codeOrigin);
-        Node& nextNode = at(m_compileIndex + 1);
+        Node* nextNode = &at(block()->at(m_indexInBlock + 1));
+
+        // But even more oddly, we need to be super careful about the following
+        // sequence:
+        //
+        // a: Foo()
+        // b: SetLocal(@a)
+        // c: Flush(@b)
+        //
+        // This next piece of crazy takes care of this.
+        if (nextNode->op() == Flush && nextNode->child1() == m_compileIndex)
+            nextNode = &at(block()->at(m_indexInBlock + 2));
         
         // Oddly, it's possible for the bytecode index for the next node to be
         // equal to ours. This will happen for op_post_inc. And, even more oddly,
@@ -1836,7 +1987,7 @@ void SpeculativeJIT::compile(Node& node)
         // statement) would be dead anyway - so the fact that DFG would have
         // already made the assignment, and baked it into the register file during
         // OSR exit, would not be visible to the old JIT in any way.
-        m_codeOriginForOSR = nextNode.codeOrigin;
+        m_codeOriginForOSR = nextNode->codeOrigin;
         
         if (!m_jit.graph().isCaptured(node.local())) {
             if (node.variableAccessData()->shouldUseDoubleFormat()) {
@@ -1850,7 +2001,7 @@ void SpeculativeJIT::compile(Node& node)
                 break;
             }
         
-            PredictedType predictedType = node.variableAccessData()->prediction();
+            PredictedType predictedType = node.variableAccessData()->argumentAwarePrediction();
             if (isInt32Prediction(predictedType)) {
                 SpeculateIntegerOperand value(this, node.child1());
                 m_jit.store32(value.gpr(), JITCompiler::payloadFor(node.local()));
@@ -1863,16 +2014,6 @@ void SpeculativeJIT::compile(Node& node)
                 GPRReg cellGPR = cell.gpr();
                 if (!isArrayPrediction(m_state.forNode(node.child1()).m_type))
                     speculationCheck(BadType, JSValueRegs(cellGPR), node.child1(), m_jit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(cellGPR, JSCell::classInfoOffset()), MacroAssembler::TrustedImmPtr(&JSArray::s_info)));
-                m_jit.storePtr(cellGPR, JITCompiler::addressFor(node.local()));
-                noResult(m_compileIndex);
-                valueSourceReferenceForOperand(node.local()) = ValueSource(CellInRegisterFile);
-                break;
-            }
-            if (isByteArrayPrediction(predictedType)) {
-                SpeculateCellOperand cell(this, node.child1());
-                GPRReg cellGPR = cell.gpr();
-                if (!isByteArrayPrediction(m_state.forNode(node.child1()).m_type))
-                    speculationCheck(BadType, JSValueRegs(cellGPR), node.child1(), m_jit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(cellGPR, JSCell::classInfoOffset()), MacroAssembler::TrustedImmPtr(&JSByteArray::s_info)));
                 m_jit.storePtr(cellGPR, JITCompiler::addressFor(node.local()));
                 noResult(m_compileIndex);
                 valueSourceReferenceForOperand(node.local()) = ValueSource(CellInRegisterFile);
@@ -1961,6 +2102,11 @@ void SpeculativeJIT::compile(Node& node)
         break;
     }
 
+    case DoubleAsInt32: {
+        compileDoubleAsInt32(node);
+        break;
+    }
+
     case ValueToInt32: {
         compileValueToInt32(node);
         break;
@@ -1968,6 +2114,19 @@ void SpeculativeJIT::compile(Node& node)
         
     case Int32ToDouble: {
         compileInt32ToDouble(node);
+        break;
+    }
+        
+    case CheckNumber: {
+        if (!isNumberPrediction(m_state.forNode(node.child1()).m_type)) {
+            JSValueOperand op1(this, node.child1());
+            JITCompiler::Jump isInteger = m_jit.branchPtr(MacroAssembler::AboveOrEqual, op1.gpr(), GPRInfo::tagTypeNumberRegister);
+            speculationCheck(
+                BadType, JSValueRegs(op1.gpr()), node.child1().index(),
+                m_jit.branchTestPtr(MacroAssembler::Zero, op1.gpr(), GPRInfo::tagTypeNumberRegister));
+            isInteger.link(&m_jit);
+        }
+        noResult(m_compileIndex);
         break;
     }
 
@@ -2155,7 +2314,7 @@ void SpeculativeJIT::compile(Node& node)
 
     case GetByVal: {
         if (!node.prediction() || !at(node.child1()).prediction() || !at(node.child2()).prediction()) {
-            terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+            terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
             break;
         }
         
@@ -2180,13 +2339,6 @@ void SpeculativeJIT::compile(Node& node)
             break;
         }
 
-        if (at(node.child1()).shouldSpeculateByteArray()) {
-            compileGetByValOnByteArray(node);
-            if (!m_compileOkay)
-                return;
-            break;            
-        }
-        
         if (at(node.child1()).shouldSpeculateInt8Array()) {
             compileGetByValOnIntTypedArray(m_jit.globalData()->int8ArrayDescriptor(), node, sizeof(int8_t), isInt8ArrayPrediction(m_state.forNode(node.child1()).m_type) ? NoTypedArrayTypeSpecCheck : AllTypedArraySpecChecks, SignedTypedArray);
             if (!m_compileOkay)
@@ -2280,7 +2432,7 @@ void SpeculativeJIT::compile(Node& node)
 
     case PutByVal: {
         if (!at(node.child1()).prediction() || !at(node.child2()).prediction()) {
-            terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+            terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
             break;
         }
         
@@ -2301,11 +2453,6 @@ void SpeculativeJIT::compile(Node& node)
 
         SpeculateCellOperand base(this, node.child1());
         SpeculateStrictInt32Operand property(this, node.child2());
-        if (at(node.child1()).shouldSpeculateByteArray()) {
-            compilePutByValForByteArray(base.gpr(), property.gpr(), node);
-            break;
-        }
-        
         if (at(node.child1()).shouldSpeculateInt8Array()) {
             compilePutByValForIntTypedArray(m_jit.globalData()->int8ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(int8_t), isInt8ArrayPrediction(m_state.forNode(node.child1()).m_type) ? NoTypedArrayTypeSpecCheck : AllTypedArraySpecChecks, SignedTypedArray);
             if (!m_compileOkay)
@@ -2430,7 +2577,7 @@ void SpeculativeJIT::compile(Node& node)
 
     case PutByValAlias: {
         if (!at(node.child1()).prediction() || !at(node.child2()).prediction()) {
-            terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+            terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
             break;
         }
         
@@ -2439,11 +2586,6 @@ void SpeculativeJIT::compile(Node& node)
 
         SpeculateCellOperand base(this, node.child1());
         SpeculateStrictInt32Operand property(this, node.child2());
-        if (at(node.child1()).shouldSpeculateByteArray()) {
-            compilePutByValForByteArray(base.gpr(), property.gpr(), node);
-            break;
-        }
-
         if (at(node.child1()).shouldSpeculateInt8Array()) {
             compilePutByValForIntTypedArray(m_jit.globalData()->int8ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(int8_t), NoTypedArraySpecCheck, SignedTypedArray);
             if (!m_compileOkay)
@@ -3035,7 +3177,7 @@ void SpeculativeJIT::compile(Node& node)
     }
     case GetById: {
         if (!node.prediction()) {
-            terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+            terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
             break;
         }
         
@@ -3085,7 +3227,7 @@ void SpeculativeJIT::compile(Node& node)
 
     case GetByIdFlush: {
         if (!node.prediction()) {
-            terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+            terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
             break;
         }
         
@@ -3164,22 +3306,6 @@ void SpeculativeJIT::compile(Node& node)
         break;
     }
 
-    case GetByteArrayLength: {
-        SpeculateCellOperand base(this, node.child1());
-        GPRTemporary result(this);
-        
-        GPRReg baseGPR = base.gpr();
-        GPRReg resultGPR = result.gpr();
-        
-        if (!isByteArrayPrediction(m_state.forNode(node.child1()).m_type))
-            speculationCheck(BadType, JSValueRegs(baseGPR), node.child1(), m_jit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(baseGPR, JSCell::classInfoOffset()), MacroAssembler::TrustedImmPtr(&JSByteArray::s_info)));
-        
-        m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSByteArray::offsetOfStorage()), resultGPR);
-        m_jit.load32(MacroAssembler::Address(resultGPR, ByteArray::offsetOfSize()), resultGPR);
-
-        integerResult(resultGPR, m_compileIndex);
-        break;
-    }
     case GetInt8ArrayLength: {
         compileGetTypedArrayLength(m_jit.globalData()->int8ArrayDescriptor(), node, !isInt8ArrayPrediction(m_state.forNode(node.child1()).m_type));
         break;
@@ -3410,6 +3536,90 @@ void SpeculativeJIT::compile(Node& node)
         compileInstanceOf(node);
         break;
     }
+        
+    case IsUndefined: {
+        JSValueOperand value(this, node.child1());
+        GPRTemporary result(this);
+        
+        JITCompiler::Jump isCell = m_jit.branchTestPtr(JITCompiler::Zero, value.gpr(), GPRInfo::tagMaskRegister);
+        
+        m_jit.comparePtr(JITCompiler::Equal, value.gpr(), TrustedImm32(ValueUndefined), result.gpr());
+        JITCompiler::Jump done = m_jit.jump();
+        
+        isCell.link(&m_jit);
+        m_jit.loadPtr(JITCompiler::Address(value.gpr(), JSCell::structureOffset()), result.gpr());
+        m_jit.test8(JITCompiler::NonZero, JITCompiler::Address(result.gpr(), Structure::typeInfoFlagsOffset()), TrustedImm32(MasqueradesAsUndefined), result.gpr());
+        
+        done.link(&m_jit);
+        m_jit.or32(TrustedImm32(ValueFalse), result.gpr());
+        jsValueResult(result.gpr(), m_compileIndex, DataFormatJSBoolean);
+        break;
+    }
+        
+    case IsBoolean: {
+        JSValueOperand value(this, node.child1());
+        GPRTemporary result(this, value);
+        
+        m_jit.move(value.gpr(), result.gpr());
+        m_jit.xorPtr(JITCompiler::TrustedImm32(ValueFalse), result.gpr());
+        m_jit.testPtr(JITCompiler::Zero, result.gpr(), JITCompiler::TrustedImm32(static_cast<int32_t>(~1)), result.gpr());
+        m_jit.or32(TrustedImm32(ValueFalse), result.gpr());
+        jsValueResult(result.gpr(), m_compileIndex, DataFormatJSBoolean);
+        break;
+    }
+        
+    case IsNumber: {
+        JSValueOperand value(this, node.child1());
+        GPRTemporary result(this, value);
+        
+        m_jit.testPtr(JITCompiler::NonZero, value.gpr(), GPRInfo::tagTypeNumberRegister, result.gpr());
+        m_jit.or32(TrustedImm32(ValueFalse), result.gpr());
+        jsValueResult(result.gpr(), m_compileIndex, DataFormatJSBoolean);
+        break;
+    }
+        
+    case IsString: {
+        JSValueOperand value(this, node.child1());
+        GPRTemporary result(this, value);
+        
+        JITCompiler::Jump isNotCell = m_jit.branchTestPtr(JITCompiler::NonZero, value.gpr(), GPRInfo::tagMaskRegister);
+        
+        m_jit.loadPtr(JITCompiler::Address(value.gpr(), JSCell::structureOffset()), result.gpr());
+        m_jit.compare8(JITCompiler::Equal, JITCompiler::Address(result.gpr(), Structure::typeInfoTypeOffset()), TrustedImm32(StringType), result.gpr());
+        m_jit.or32(TrustedImm32(ValueFalse), result.gpr());
+        JITCompiler::Jump done = m_jit.jump();
+        
+        isNotCell.link(&m_jit);
+        m_jit.move(TrustedImm32(ValueFalse), result.gpr());
+        
+        done.link(&m_jit);
+        jsValueResult(result.gpr(), m_compileIndex, DataFormatJSBoolean);
+        break;
+    }
+        
+    case IsObject: {
+        JSValueOperand value(this, node.child1());
+        GPRReg valueGPR = value.gpr();
+        GPRResult result(this);
+        GPRReg resultGPR = result.gpr();
+        flushRegisters();
+        callOperation(operationIsObject, resultGPR, valueGPR);
+        m_jit.or32(TrustedImm32(ValueFalse), resultGPR);
+        jsValueResult(result.gpr(), m_compileIndex, DataFormatJSBoolean);
+        break;
+    }
+
+    case IsFunction: {
+        JSValueOperand value(this, node.child1());
+        GPRReg valueGPR = value.gpr();
+        GPRResult result(this);
+        GPRReg resultGPR = result.gpr();
+        flushRegisters();
+        callOperation(operationIsFunction, resultGPR, valueGPR);
+        m_jit.or32(TrustedImm32(ValueFalse), resultGPR);
+        jsValueResult(result.gpr(), m_compileIndex, DataFormatJSBoolean);
+        break;
+    }
 
     case Flush:
     case Phi:
@@ -3556,7 +3766,7 @@ void SpeculativeJIT::compile(Node& node)
         break;
 
     case ForceOSRExit: {
-        terminateSpeculativeExecution(Uncountable, JSValueRegs(), NoNode);
+        terminateSpeculativeExecution(InadequateCoverage, JSValueRegs(), NoNode);
         break;
     }
 

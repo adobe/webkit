@@ -34,6 +34,7 @@
 #include "JSCSSValue.h"
 #include "JSNode.h"
 #include "PlatformString.h"
+#include "Settings.h"
 #include "StylePropertySet.h"
 #include <runtime/StringPrototype.h>
 #include <wtf/ASCIICType.h>
@@ -60,7 +61,7 @@ void JSCSSStyleDeclaration::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
 class CSSPropertyInfo {
 public:
-    int propertyID;
+    CSSPropertyID propertyID;
     bool hadPixelOrPosPrefix;
 };
 
@@ -70,9 +71,13 @@ enum PropertyNamePrefix
     PropertyNamePrefixCSS,
     PropertyNamePrefixPixel,
     PropertyNamePrefixPos,
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     PropertyNamePrefixApple,
+#endif
     PropertyNamePrefixEpub,
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     PropertyNamePrefixKHTML,
+#endif
     PropertyNamePrefixWebKit
 };
 
@@ -113,18 +118,22 @@ static PropertyNamePrefix getCSSPropertyNamePrefix(const StringImpl& propertyNam
     // First character of the prefix within the property name may be upper or lowercase.
     UChar firstChar = toASCIILower(propertyName[0]);
     switch (firstChar) {
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     case 'a':
         if (matchesCSSPropertyNamePrefix(propertyName, "apple"))
             return PropertyNamePrefixApple;
         break;
+#endif
     case 'c':
         if (matchesCSSPropertyNamePrefix(propertyName, "css"))
             return PropertyNamePrefixCSS;
         break;
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     case 'k':
         if (matchesCSSPropertyNamePrefix(propertyName, "khtml"))
             return PropertyNamePrefixKHTML;
         break;
+#endif
     case 'e':
         if (matchesCSSPropertyNamePrefix(propertyName, "epub"))
             return PropertyNamePrefixEpub;
@@ -169,7 +178,7 @@ static inline void writeEpubPrefix(char*& buffer)
 
 static CSSPropertyInfo cssPropertyIDForJSCSSPropertyName(const Identifier& propertyName)
 {
-    CSSPropertyInfo propertyInfo = {0, false};
+    CSSPropertyInfo propertyInfo = {CSSPropertyInvalid, false};
     bool hadPixelOrPosPrefix = false;
 
     unsigned length = propertyName.length();
@@ -209,11 +218,13 @@ static CSSPropertyInfo cssPropertyIDForJSCSSPropertyName(const Identifier& prope
         i += 3;
         hadPixelOrPosPrefix = true;
         break;
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     case PropertyNamePrefixApple:
     case PropertyNamePrefixKHTML:
         writeWebKitPrefix(bufferPtr);
         i += 5;
         break;
+#endif
     case PropertyNamePrefixEpub:
         writeEpubPrefix(bufferPtr);
         i += 4;
@@ -260,7 +271,7 @@ static CSSPropertyInfo cssPropertyIDForJSCSSPropertyName(const Identifier& prope
     int propertyID = hashTableEntry ? hashTableEntry->id : 0;
     if (propertyID) {
         propertyInfo.hadPixelOrPosPrefix = hadPixelOrPosPrefix;
-        propertyInfo.propertyID = propertyID;
+        propertyInfo.propertyID = static_cast<CSSPropertyID>(propertyID);
         propertyInfoCache.add(stringForCache, propertyInfo);
     }
     return propertyInfo;
@@ -292,7 +303,7 @@ static inline JSValue cssPropertyGetterPixelOrPosPrefix(ExecState* exec, JSCSSSt
 
 static JSValue cssPropertyGetterPixelOrPosPrefixCallback(ExecState* exec, JSValue slotBase, unsigned propertyID)
 {
-    return cssPropertyGetterPixelOrPosPrefix(exec, static_cast<JSCSSStyleDeclaration*>(asObject(slotBase)), propertyID);
+    return cssPropertyGetterPixelOrPosPrefix(exec, jsCast<JSCSSStyleDeclaration*>(asObject(slotBase)), propertyID);
 }
 
 static inline JSValue cssPropertyGetter(ExecState* exec, JSCSSStyleDeclaration* thisObj, unsigned propertyID)
@@ -306,7 +317,7 @@ static inline JSValue cssPropertyGetter(ExecState* exec, JSCSSStyleDeclaration* 
 
 static JSValue cssPropertyGetterCallback(ExecState* exec, JSValue slotBase, unsigned propertyID)
 {
-    return cssPropertyGetter(exec, static_cast<JSCSSStyleDeclaration*>(asObject(slotBase)), propertyID);
+    return cssPropertyGetter(exec, jsCast<JSCSSStyleDeclaration*>(asObject(slotBase)), propertyID);
 }
 
 bool JSCSSStyleDeclaration::getOwnPropertySlotDelegate(ExecState*, const Identifier& propertyIdentifier, PropertySlot& slot)
@@ -346,8 +357,18 @@ bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, const Identifier& prope
     String propValue = valueToStringWithNullCheck(exec, value);
     if (propertyInfo.hadPixelOrPosPrefix)
         propValue += "px";
+
+    bool important = false;
+    if (Settings::shouldRespectPriorityInCSSAttributeSetters()) {
+        size_t importantIndex = propValue.find("!important", 0, false);
+        if (importantIndex != notFound) {
+            important = true;
+            propValue = propValue.left(importantIndex - 1);
+        }
+    }
+
     ExceptionCode ec = 0;
-    impl()->setPropertyInternal(static_cast<CSSPropertyID>(propertyInfo.propertyID), propValue, false, ec);
+    impl()->setPropertyInternal(static_cast<CSSPropertyID>(propertyInfo.propertyID), propValue, important, ec);
     setDOMException(exec, ec);
     return true;
 }

@@ -573,7 +573,6 @@ private:
         case ArithMin:
         case ArithMax:
         case ArithSqrt:
-        case GetByteArrayLength:
         case GetInt8ArrayLength:
         case GetInt16ArrayLength:
         case GetInt32ArrayLength:
@@ -588,6 +587,13 @@ private:
         case StringCharAt:
         case StringCharCodeAt:
         case Int32ToDouble:
+        case IsUndefined:
+        case IsBoolean:
+        case IsNumber:
+        case IsString:
+        case IsObject:
+        case IsFunction:
+        case DoubleAsInt32:
             setReplacement(pureCSE(node));
             break;
             

@@ -37,22 +37,23 @@
 #include "Settings.h"
 #include "TextEncoding.h"
 #include "V8Binding.h"
+#include "V8RecursionScope.h"
 #include "WebKitMutationObserver.h"
-#include "platform/WebKitPlatformSupport.h"
 #include "WebMediaPlayerClientImpl.h"
 #include "WebSocket.h"
-#include "platform/WebThread.h"
 #include "WorkerContextExecutionProxy.h"
+#include "platform/WebKitPlatformSupport.h"
+#include "platform/WebThread.h"
 #include "v8.h"
-
-#if OS(DARWIN)
-#include "WebSystemInterface.h"
-#endif
-
+#include <public/Platform.h>
 #include <wtf/Assertions.h>
 #include <wtf/MainThread.h>
 #include <wtf/Threading.h>
 #include <wtf/text/AtomicString.h>
+
+#if OS(DARWIN)
+#include "WebSystemInterface.h"
+#endif
 
 namespace WebKit {
 
@@ -88,6 +89,13 @@ static bool generateEntropy(unsigned char* buffer, size_t length)
     return false;
 }
 
+#ifndef NDEBUG
+static void assertV8RecursionScope()
+{
+    ASSERT(!isMainThread() || WebCore::V8RecursionScope::properlyUsed());
+}
+#endif
+
 void initialize(WebKitPlatformSupport* webKitPlatformSupport)
 {
     initializeWithoutV8(webKitPlatformSupport);
@@ -99,6 +107,9 @@ void initialize(WebKitPlatformSupport* webKitPlatformSupport)
 #if ENABLE(MUTATION_OBSERVERS)
     // currentThread will always be non-null in production, but can be null in Chromium unit tests.
     if (WebThread* currentThread = webKitPlatformSupport->currentThread()) {
+#ifndef NDEBUG
+        v8::V8::AddCallCompletedCallback(&assertV8RecursionScope);
+#endif
         ASSERT(!s_endOfTaskRunner);
         s_endOfTaskRunner = new EndOfTaskRunner;
         currentThread->addTaskObserver(s_endOfTaskRunner);
@@ -118,6 +129,7 @@ void initializeWithoutV8(WebKitPlatformSupport* webKitPlatformSupport)
     ASSERT(webKitPlatformSupport);
     ASSERT(!s_webKitPlatformSupport);
     s_webKitPlatformSupport = webKitPlatformSupport;
+    Platform::initialize(s_webKitPlatformSupport);
 
     WTF::initializeThreading();
     WTF::initializeMainThread();
@@ -136,8 +148,13 @@ void initializeWithoutV8(WebKitPlatformSupport* webKitPlatformSupport)
 
 void shutdown()
 {
+    // WebKit might have been initialized without V8, so be careful not to invoke
+    // V8 specific functions, if V8 was not properly initialized.
 #if ENABLE(MUTATION_OBSERVERS)
     if (s_endOfTaskRunner) {
+#ifndef NDEBUG
+        v8::V8::RemoveCallCompletedCallback(&assertV8RecursionScope);
+#endif
         ASSERT(s_webKitPlatformSupport->currentThread());
         s_webKitPlatformSupport->currentThread()->removeTaskObserver(s_endOfTaskRunner);
         delete s_endOfTaskRunner;
@@ -145,6 +162,7 @@ void shutdown()
     }
 #endif
     s_webKitPlatformSupport = 0;
+    Platform::shutdown();
 }
 
 WebKitPlatformSupport* webKitPlatformSupport()

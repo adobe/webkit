@@ -19,7 +19,7 @@ import multiprocessing
 import sys
 
 __gtk_tools_directory = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(__gtk_tools_directory)
+sys.path = [__gtk_tools_directory] + sys.path
 import common
 
 build_policy = 'updated'
@@ -35,8 +35,12 @@ modules = [ 'webkitgtk-testing-dependencies', ]
 if __extra_modules != ['']:
     modules.extend(__extra_modules)
 
-checkoutroot = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Source'))
-prefix = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Root'))
+if os.environ.has_key('WEBKITOUTPUTDIR'):
+    checkoutroot = os.path.abspath(os.path.join(os.environ['WEBKITOUTPUTDIR'], 'Dependencies', 'Source'))
+    prefix = os.path.abspath(os.path.join(os.environ['WEBKITOUTPUTDIR'], 'Dependencies', 'Root'))
+else:
+    checkoutroot = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Source'))
+    prefix = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Root'))
 
 nonotify = True
 notrayicon = True

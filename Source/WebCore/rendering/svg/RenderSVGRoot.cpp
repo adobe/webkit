@@ -153,9 +153,9 @@ bool RenderSVGRoot::isEmbeddedThroughFrameContainingSVGDocument() const
     return frame->document()->isSVGDocument();
 }
 
-static inline LayoutUnit resolveLengthAttributeForSVG(const Length& length, float scale, float maxSize)
+static inline LayoutUnit resolveLengthAttributeForSVG(const Length& length, float scale, float maxSize, RenderView* renderView)
 {
-    return static_cast<LayoutUnit>(valueForLength(length, maxSize) * (length.isFixed() ? scale : 1));
+    return static_cast<LayoutUnit>(valueForLength(length, maxSize, renderView) * (length.isFixed() ? scale : 1));
 }
 
 LayoutUnit RenderSVGRoot::computeReplacedLogicalWidth(bool includeMaxWidth) const
@@ -171,7 +171,7 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalWidth(bool includeMaxWidth) cons
         return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
 
     if (svg->widthAttributeEstablishesViewport())
-        return resolveLengthAttributeForSVG(svg->intrinsicWidth(SVGSVGElement::IgnoreCSSProperties), style()->effectiveZoom(), containingBlock()->availableLogicalWidth());
+        return resolveLengthAttributeForSVG(svg->intrinsicWidth(SVGSVGElement::IgnoreCSSProperties), style()->effectiveZoom(), containingBlock()->availableLogicalWidth(), view());
 
     // Only SVGs embedded in <object> reach this point.
     ASSERT(isEmbeddedThroughFrameContainingSVGDocument());
@@ -202,7 +202,7 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalHeight() const
         } else
             RenderBlock::removePercentHeightDescendant(const_cast<RenderSVGRoot*>(this));
 
-        return resolveLengthAttributeForSVG(height, style()->effectiveZoom(), containingBlock()->availableLogicalHeight());
+        return resolveLengthAttributeForSVG(height, style()->effectiveZoom(), containingBlock()->availableLogicalHeight(), view());
     }
 
     // Only SVGs embedded in <object> reach this point.
@@ -256,7 +256,7 @@ void RenderSVGRoot::layout()
 void RenderSVGRoot::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& adjustedPaintOffset)
 {
     // An empty viewport disables rendering.
-    if (borderBoxRect().isEmpty())
+    if (pixelSnappedBorderBoxRect().isEmpty())
         return;
 
     // Don't paint, if the context explicitely disabled it.
@@ -368,7 +368,7 @@ void RenderSVGRoot::computeFloatRectForRepaint(RenderBoxModelObject* repaintCont
     repaintRect = m_localToBorderBoxTransform.mapRect(repaintRect);
 
     // Apply initial viewport clip - not affected by overflow settings    
-    repaintRect.intersect(borderBoxRect());
+    repaintRect.intersect(pixelSnappedBorderBoxRect());
 
     const SVGRenderStyle* svgStyle = style()->svgStyle();
     if (const ShadowData* shadow = svgStyle->shadow())

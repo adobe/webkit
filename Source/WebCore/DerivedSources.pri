@@ -118,7 +118,6 @@ IDL_BINDINGS += \
     $$PWD/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
     $$PWD/Modules/indexeddb/IDBAny.idl \
     $$PWD/Modules/indexeddb/IDBCursor.idl \
-    $$PWD/Modules/indexeddb/IDBDatabaseError.idl \
     $$PWD/Modules/indexeddb/IDBDatabaseException.idl \
     $$PWD/Modules/indexeddb/IDBDatabase.idl \
     $$PWD/Modules/indexeddb/IDBFactory.idl \
@@ -146,9 +145,7 @@ IDL_BINDINGS += \
     $$PWD/Modules/webaudio/ConvolverNode.idl \
     $$PWD/Modules/webaudio/DelayNode.idl \
     $$PWD/Modules/webaudio/DOMWindowWebAudio.idl \
-    $$PWD/Modules/webaudio/HighPass2FilterNode.idl \
     $$PWD/Modules/webaudio/JavaScriptAudioNode.idl \
-    $$PWD/Modules/webaudio/LowPass2FilterNode.idl \
     $$PWD/Modules/webaudio/RealtimeAnalyserNode.idl \
     $$PWD/Modules/webdatabase/DOMWindowWebDatabase.idl \
     $$PWD/Modules/webdatabase/Database.idl \
@@ -297,6 +294,7 @@ IDL_BINDINGS += \
     $$PWD/html/canvas/WebGLRenderbuffer.idl \
     $$PWD/html/canvas/WebGLRenderingContext.idl \
     $$PWD/html/canvas/WebGLShader.idl \
+    $$PWD/html/canvas/WebGLShaderPrecisionFormat.idl \
     $$PWD/html/canvas/Int16Array.idl \
     $$PWD/html/canvas/WebGLTexture.idl \
     $$PWD/html/canvas/WebGLUniformLocation.idl \
@@ -413,6 +411,8 @@ IDL_BINDINGS += \
     $$PWD/page/MemoryInfo.idl \
     $$PWD/page/Navigator.idl \
     $$PWD/page/Performance.idl \
+    $$PWD/page/PerformanceEntry.idl \
+    $$PWD/page/PerformanceEntryList.idl \
     $$PWD/page/PerformanceNavigation.idl \
     $$PWD/page/PerformanceTiming.idl \
     $$PWD/page/Screen.idl \
@@ -457,9 +457,8 @@ IDL_BINDINGS += \
 
 v8 {
   IDL_BINDINGS += \
-    $$PWD/html/canvas/CanvasPixelArray.idl \
-    $$PWD/storage/IDBVersionChangeEvent.idl \
-    $$PWD/storage/IDBVersionChangeRequest.idl
+    $$PWD/Modules/indexeddb/IDBVersionChangeEvent.idl \
+    $$PWD/Modules/indexeddb/IDBVersionChangeRequest.idl
 }
 
 contains(DEFINES, ENABLE_SVG=1) {

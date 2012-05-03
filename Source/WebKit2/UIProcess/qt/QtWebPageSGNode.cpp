@@ -26,6 +26,8 @@
 #include <QtQuick/QSGSimpleRectNode>
 #include <private/qsgrendernode_p.h>
 
+using namespace WebCore;
+
 namespace WebKit {
 
 class ContentsSGNode : public QSGRenderNode {
@@ -33,6 +35,7 @@ public:
     ContentsSGNode(PassRefPtr<WebLayerTreeRenderer> renderer)
         : m_renderer(renderer)
     {
+        layerTreeRenderer()->setActive(true);
     }
 
     virtual StateFlags changedStates()
@@ -40,12 +43,17 @@ public:
         return StateFlags(StencilState) | ColorState | BlendState;
     }
 
-    virtual void render(const RenderState&)
+    virtual void render(const RenderState& state)
     {
         QMatrix4x4 renderMatrix = matrix() ? *matrix() : QMatrix4x4();
 
+        // When rendering to an intermediate surface, Qt will
+        // mirror the projection matrix to fit on the destination coordinate system.
+        const QMatrix4x4* projection = state.projectionMatrix;
+        bool mirrored = projection && (*projection)(0, 0) * (*projection)(1, 1) - (*projection)(0, 1) * (*projection)(1, 0) > 0;
+
         // FIXME: Support non-rectangular clippings.
-        layerTreeRenderer()->paintToCurrentGLContext(renderMatrix, inheritedOpacity(), clipRect());
+        layerTreeRenderer()->paintToCurrentGLContext(renderMatrix, inheritedOpacity(), clipRect(), mirrored ? TextureMapper::PaintingMirrored : 0);
     }
 
     ~ContentsSGNode()
@@ -130,4 +138,4 @@ void QtWebPageSGNode::setRenderer(PassRefPtr<WebLayerTreeRenderer> renderer)
     appendChildNode(m_contentsNode);
 }
 
-}
+} // namespace WebKit

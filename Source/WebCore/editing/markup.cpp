@@ -36,7 +36,6 @@
 #include "CSSRule.h"
 #include "CSSRuleList.h"
 #include "CSSStyleRule.h"
-#include "CSSStyleSelector.h"
 #include "CSSValue.h"
 #include "CSSValueKeywords.h"
 #include "ChildListMutationScope.h"
@@ -55,6 +54,7 @@
 #include "Range.h"
 #include "RenderObject.h"
 #include "StylePropertySet.h"
+#include "StyleResolver.h"
 #include "TextIterator.h"
 #include "VisibleSelection.h"
 #include "XMLNSNames.h"
@@ -70,7 +70,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static bool propertyMissingOrEqualToNone(StylePropertySet*, int propertyID);
+static bool propertyMissingOrEqualToNone(StylePropertySet*, CSSPropertyID);
 
 class AttributeChange {
 public:
@@ -466,7 +466,7 @@ static inline Node* ancestorToRetainStructureAndAppearanceWithNoRenderer(Node* c
     return ancestorToRetainStructureAndAppearanceForBlock(commonAncestorBlock);
 }
 
-static bool propertyMissingOrEqualToNone(StylePropertySet* style, int propertyID)
+static bool propertyMissingOrEqualToNone(StylePropertySet* style, CSSPropertyID propertyID)
 {
     if (!style)
         return false;

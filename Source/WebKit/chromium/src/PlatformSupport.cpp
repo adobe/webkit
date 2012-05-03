@@ -61,7 +61,6 @@
 #include "platform/WebString.h"
 #include "platform/WebURL.h"
 #include "platform/WebVector.h"
-#include <public/WebMimeRegistry.h>
 
 #if USE(CG)
 #include <CoreGraphics/CGContext.h>
@@ -86,12 +85,12 @@
 #include "NativeImageSkia.h"
 #endif
 
+#include "AsyncFileSystemChromium.h"
 #include "BitmapImage.h"
 #include "ClipboardChromium.h"
 #include "Cookie.h"
 #include "Document.h"
 #include "FrameView.h"
-#include "GamepadList.h"
 #include "GraphicsContext.h"
 #include "IDBFactoryBackendProxy.h"
 #include "KURL.h"
@@ -102,6 +101,7 @@
 
 #include "Worker.h"
 #include "WorkerContextProxy.h"
+#include <public/WebMimeRegistry.h>
 #include <wtf/Assertions.h>
 
 // We are part of the WebKit implementation.
@@ -142,13 +142,6 @@ static WebCookieJar* getCookieJar(const Document* document)
     if (!cookieJar)
         cookieJar = webKitPlatformSupport()->cookieJar();
     return cookieJar;
-}
-
-// Cache ----------------------------------------------------------------------
-
-void PlatformSupport::cacheMetadata(const KURL& url, double responseTime, const Vector<char>& data)
-{
-    webKitPlatformSupport()->cacheMetadata(url, responseTime, data.data(), data.size());
 }
 
 // Clipboard ------------------------------------------------------------------
@@ -314,13 +307,6 @@ bool PlatformSupport::cookiesEnabled(const Document* document)
     return result;
 }
 
-// DNS ------------------------------------------------------------------------
-
-void PlatformSupport::prefetchDNS(const String& hostname)
-{
-    webKitPlatformSupport()->prefetchHostName(hostname);
-}
-
 // File ------------------------------------------------------------------------
 
 bool PlatformSupport::fileExists(const String& path)
@@ -416,6 +402,18 @@ int PlatformSupport::writeToFile(PlatformFileHandle handle, const char* data, in
 {
     return webKitPlatformSupport()->fileUtilities()->writeToFile(handle, data, length);
 }
+
+#if ENABLE(FILE_SYSTEM)
+String PlatformSupport::createIsolatedFileSystemName(const String& storageIdentifier, const String& filesystemId)
+{
+    return AsyncFileSystemChromium::createIsolatedFileSystemName(storageIdentifier, filesystemId);
+}
+
+PassOwnPtr<AsyncFileSystem> PlatformSupport::createIsolatedFileSystem(const String& originString, const String& filesystemId)
+{
+    return AsyncFileSystemChromium::createIsolatedFileSystem(originString, filesystemId);
+}
+#endif
 
 // Font -----------------------------------------------------------------------
 
@@ -534,41 +532,6 @@ PassRefPtr<SerializedScriptValue> PlatformSupport::injectIDBKeyIntoSerializedVal
     return webKitPlatformSupport()->injectIDBKeyIntoSerializedValue(key, value, keyPath);
 }
 
-// Gamepad --------------------------------------------------------------------
-
-void PlatformSupport::sampleGamepads(GamepadList* into)
-{
-    WebGamepads gamepads;
-
-    webKitPlatformSupport()->sampleGamepads(gamepads);
-
-    for (unsigned i = 0; i < WebKit::WebGamepads::itemsLengthCap; ++i) {
-        WebGamepad& webGamepad = gamepads.items[i];
-        if (i < gamepads.length && webGamepad.connected) {
-            RefPtr<Gamepad> gamepad = into->item(i);
-            if (!gamepad)
-                gamepad = Gamepad::create();
-            gamepad->id(webGamepad.id);
-            gamepad->index(i);
-            gamepad->timestamp(webGamepad.timestamp);
-            gamepad->axes(webGamepad.axesLength, webGamepad.axes);
-            gamepad->buttons(webGamepad.buttonsLength, webGamepad.buttons);
-            into->set(i, gamepad);
-        } else
-            into->set(i, 0);
-    }
-}
-
-// Keygen ---------------------------------------------------------------------
-
-String PlatformSupport::signedPublicKeyAndChallengeString(
-    unsigned keySizeIndex, const String& challenge, const KURL& url)
-{
-    return webKitPlatformSupport()->signedPublicKeyAndChallengeString(keySizeIndex,
-                                                             WebString(challenge),
-                                                             WebURL(url));
-}
-
 // Language -------------------------------------------------------------------
 
 String PlatformSupport::computedDefaultLanguage()
@@ -581,46 +544,6 @@ String PlatformSupport::computedDefaultLanguage()
 bool PlatformSupport::layoutTestMode()
 {
     return WebKit::layoutTestMode();
-}
-
-// MimeType -------------------------------------------------------------------
-
-bool PlatformSupport::isSupportedImageMIMEType(const String& mimeType)
-{
-    return webKitPlatformSupport()->mimeRegistry()->supportsImageMIMEType(mimeType)
-        != WebMimeRegistry::IsNotSupported;
-}
-
-bool PlatformSupport::isSupportedJavaScriptMIMEType(const String& mimeType)
-{
-    return webKitPlatformSupport()->mimeRegistry()->supportsJavaScriptMIMEType(mimeType)
-        != WebMimeRegistry::IsNotSupported;
-}
-
-bool PlatformSupport::isSupportedNonImageMIMEType(const String& mimeType)
-{
-    return webKitPlatformSupport()->mimeRegistry()->supportsNonImageMIMEType(mimeType)
-        != WebMimeRegistry::IsNotSupported;
-}
-
-String PlatformSupport::mimeTypeForExtension(const String& extension)
-{
-    return webKitPlatformSupport()->mimeRegistry()->mimeTypeForExtension(extension);
-}
-
-String PlatformSupport::wellKnownMimeTypeForExtension(const String& extension)
-{
-    return webKitPlatformSupport()->mimeRegistry()->wellKnownMimeTypeForExtension(extension);
-}
-
-String PlatformSupport::mimeTypeFromFile(const String& path)
-{
-    return webKitPlatformSupport()->mimeRegistry()->mimeTypeFromFile(path);
-}
-
-String PlatformSupport::preferredExtensionForMIMEType(const String& mimeType)
-{
-    return webKitPlatformSupport()->mimeRegistry()->preferredExtensionForMIMEType(mimeType);
 }
 
 // Plugin ---------------------------------------------------------------------
@@ -674,13 +597,6 @@ PassOwnPtr<AudioBus> PlatformSupport::decodeAudioFileData(const char* data, size
 
 #endif // ENABLE(WEB_AUDIO)
 
-// Sandbox --------------------------------------------------------------------
-
-bool PlatformSupport::sandboxEnabled()
-{
-    return webKitPlatformSupport()->sandboxEnabled();
-}
-
 // SharedTimers ---------------------------------------------------------------
 
 void PlatformSupport::setSharedTimerFiredFunction(void (*func)())
@@ -691,40 +607,6 @@ void PlatformSupport::setSharedTimerFiredFunction(void (*func)())
 void PlatformSupport::setSharedTimerFireInterval(double interval)
 {
     webKitPlatformSupport()->setSharedTimerFireInterval(interval);
-}
-
-void PlatformSupport::stopSharedTimer()
-{
-    webKitPlatformSupport()->stopSharedTimer();
-}
-
-// StatsCounters --------------------------------------------------------------
-
-void PlatformSupport::decrementStatsCounter(const char* name)
-{
-    webKitPlatformSupport()->decrementStatsCounter(name);
-}
-
-void PlatformSupport::incrementStatsCounter(const char* name)
-{
-    webKitPlatformSupport()->incrementStatsCounter(name);
-}
-
-void PlatformSupport::histogramCustomCounts(const char* name, int sample, int min, int max, int bucketCount)
-{
-    webKitPlatformSupport()->histogramCustomCounts(name, sample, min, max, bucketCount);
-}
-
-void PlatformSupport::histogramEnumeration(const char* name, int sample, int boundaryValue)
-{
-    webKitPlatformSupport()->histogramEnumeration(name, sample, boundaryValue);
-}
-
-// Sudden Termination ---------------------------------------------------------
-
-void PlatformSupport::suddenTerminationChanged(bool enabled)
-{
-    webKitPlatformSupport()->suddenTerminationChanged(enabled);
 }
 
 // Theming --------------------------------------------------------------------
@@ -1030,31 +912,6 @@ void PlatformSupport::notifyJSOutOfMemory(Frame* frame)
     if (!webFrame->client())
         return;
     webFrame->client()->didExhaustMemoryAvailableForScript(webFrame);
-}
-
-int PlatformSupport::memoryUsageMB()
-{
-    return static_cast<int>(webKitPlatformSupport()->memoryUsageMB());
-}
-
-int PlatformSupport::actualMemoryUsageMB()
-{
-    return static_cast<int>(webKitPlatformSupport()->actualMemoryUsageMB());
-}
-
-int PlatformSupport::lowMemoryUsageMB()
-{
-    return static_cast<int>(webKitPlatformSupport()->lowMemoryUsageMB());
-}
-
-int PlatformSupport::highMemoryUsageMB()
-{
-    return static_cast<int>(webKitPlatformSupport()->highMemoryUsageMB());
-}
-
-int PlatformSupport::highUsageDeltaMB()
-{
-    return static_cast<int>(webKitPlatformSupport()->highUsageDeltaMB());
 }
 
 int PlatformSupport::screenHorizontalDPI(Widget* widget)

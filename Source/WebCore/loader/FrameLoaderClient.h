@@ -63,6 +63,7 @@ namespace WebCore {
     class AuthenticationChallenge;
     class CachedFrame;
     class Color;
+    class DOMWindowExtension;
     class DOMWrapperWorld;
     class DocumentLoader;
     class Element;
@@ -179,7 +180,6 @@ namespace WebCore {
         virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) = 0;
         virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>) = 0;
 
-        virtual void dispatchDidLoadMainResource(DocumentLoader*) = 0;
         virtual void revertToProvisionalState(DocumentLoader*) = 0;
         virtual void setMainDocumentError(DocumentLoader*, const ResourceError&) = 0;
 
@@ -332,6 +332,11 @@ namespace WebCore {
 #endif
 
         virtual void dispatchWillOpenSocketStream(SocketStreamHandle*) { }
+
+        virtual void dispatchGlobalObjectAvailable(DOMWrapperWorld*) { }
+        virtual void dispatchWillDisconnectDOMWindowExtensionFromGlobalObject(DOMWindowExtension*) { }
+        virtual void dispatchDidReconnectDOMWindowExtensionToGlobalObject(DOMWindowExtension*) { }
+        virtual void dispatchWillDestroyGlobalObjectForDOMWindowExtension(DOMWindowExtension*) { }
     };
 
 } // namespace WebCore

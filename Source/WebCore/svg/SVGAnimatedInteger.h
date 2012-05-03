@@ -27,33 +27,35 @@
 
 namespace WebCore {
 
-typedef SVGAnimatedStaticPropertyTearOff<long> SVGAnimatedInteger;
+typedef SVGAnimatedStaticPropertyTearOff<int> SVGAnimatedInteger;
 
 // Helper macros to declare/define a SVGAnimatedInteger object
 #define DECLARE_ANIMATED_INTEGER(UpperProperty, LowerProperty) \
-DECLARE_ANIMATED_PROPERTY(SVGAnimatedInteger, long, UpperProperty, LowerProperty)
+DECLARE_ANIMATED_PROPERTY(SVGAnimatedInteger, int, UpperProperty, LowerProperty)
 
 #define DEFINE_ANIMATED_INTEGER(OwnerType, DOMAttribute, UpperProperty, LowerProperty) \
 DEFINE_ANIMATED_PROPERTY(AnimatedInteger, OwnerType, DOMAttribute, DOMAttribute.localName(), UpperProperty, LowerProperty)
 
-// FIXME: This currently animates as number-optional-number, instead of integer-optional-integer, which is missing.
 #define DEFINE_ANIMATED_INTEGER_MULTIPLE_WRAPPERS(OwnerType, DOMAttribute, SVGDOMAttributeIdentifier, UpperProperty, LowerProperty) \
-DEFINE_ANIMATED_PROPERTY(AnimatedNumberOptionalNumber, OwnerType, DOMAttribute, SVGDOMAttributeIdentifier, UpperProperty, LowerProperty)
+DEFINE_ANIMATED_PROPERTY(AnimatedIntegerOptionalInteger, OwnerType, DOMAttribute, SVGDOMAttributeIdentifier, UpperProperty, LowerProperty)
 
 class SVGAnimationElement;
 
 class SVGAnimatedIntegerAnimator : public SVGAnimatedTypeAnimator {
-    
 public:
     SVGAnimatedIntegerAnimator(SVGAnimationElement*, SVGElement*);
     virtual ~SVGAnimatedIntegerAnimator() { }
-    
-    static void calculateAnimatedNumber(SVGAnimationElement*, float percentage, unsigned repeatCount, float& animatedNumber, float fromNumber, float toNumber);
-    
+
+    static void calculateAnimatedInteger(SVGAnimationElement*, float percentage, unsigned repeatCount, int fromInteger, int toInteger, int& animatedInteger);
+
     virtual PassOwnPtr<SVGAnimatedType> constructFromString(const String&);
-    
-    virtual void calculateFromAndToValues(OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, const String& fromString, const String& toString);
-    virtual void calculateFromAndByValues(OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, const String& fromString, const String& byString);
+    virtual PassOwnPtr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&);
+    virtual void stopAnimValAnimation(const SVGElementAnimatedPropertyList&);
+    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType*);
+    virtual void animValWillChange(const SVGElementAnimatedPropertyList&);
+    virtual void animValDidChange(const SVGElementAnimatedPropertyList&);
+
+    virtual void addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*);
     virtual void calculateAnimatedValue(float percentage, unsigned repeatCount,
                                         OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, OwnPtr<SVGAnimatedType>& animatedValue);
     virtual float calculateDistance(const String& fromString, const String& toString);

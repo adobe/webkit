@@ -27,7 +27,6 @@
 
 #include "ActiveDOMObject.cpp"
 #include "Attr.cpp"
-#include "Attribute.cpp"
 #include "BeforeTextInsertedEvent.cpp"
 #include "BeforeUnloadEvent.cpp"
 #include "CDATASection.cpp"
@@ -43,6 +42,7 @@
 #include "Comment.cpp"
 #include "CompositionEvent.cpp"
 #include "ContainerNode.cpp"
+#include "ContainerNodeAlgorithms.cpp"
 #include "ContextDestructionObserver.cpp"
 #include "CustomEvent.cpp"
 #include "DOMCoreException.cpp"
@@ -133,6 +133,7 @@
 #include "TransformSourceLibxslt.cpp"
 #include "Traversal.cpp"
 #include "TreeScope.cpp"
+#include "TreeScopeAdjuster.cpp"
 #include "TreeScopeAdopter.cpp"
 #include "TreeWalker.cpp"
 #include "UIEvent.cpp"

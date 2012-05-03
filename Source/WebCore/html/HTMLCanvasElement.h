@@ -122,7 +122,7 @@ public:
     void setOriginTainted() { m_originClean = false; }
     bool originClean() const { return m_originClean; }
 
-    CSSStyleSelector* styleSelector();
+    StyleResolver* styleResolver();
 
     AffineTransform baseTransform() const;
 
@@ -134,6 +134,8 @@ public:
     bool hasCreatedImageBuffer() const { return m_hasCreatedImageBuffer; }
 
     bool shouldAccelerate(const IntSize&) const;
+
+    float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
 private:
     HTMLCanvasElement(const QualifiedName&, Document*);

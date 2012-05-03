@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -105,6 +105,7 @@ private:
     virtual void contentsScaleFactorChanged(float);
     virtual uint64_t pluginComplexTextInputIdentifier() const;
     virtual void sendComplexTextInput(const String& textInput);
+    virtual void setLayerHostingMode(LayerHostingMode) OVERRIDE;
 #endif
 
     virtual void privateBrowsingStateChanged(bool);
@@ -113,7 +114,7 @@ private:
     virtual WebCore::Scrollbar* horizontalScrollbar();
     virtual WebCore::Scrollbar* verticalScrollbar();
 
-    virtual RetainPtr<CGPDFDocumentRef> pdfDocumentForPrinting() const OVERRIDE { return m_pdfDocument; }
+    virtual RetainPtr<PDFDocument> pdfDocumentForPrinting() const OVERRIDE { return m_pdfDocument; }
 
     // ScrollableArea methods.
     virtual WebCore::IntRect scrollCornerRect() const;
@@ -150,7 +151,7 @@ private:
     String m_suggestedFilename;
     RetainPtr<CFMutableDataRef> m_dataBuffer;
 
-    RetainPtr<CGPDFDocumentRef> m_pdfDocument;
+    RetainPtr<PDFDocument> m_pdfDocument;
     Vector<WebCore::IntRect> m_pageBoxes;
     WebCore::IntSize m_pdfDocumentSize; // All pages, including gaps.
 

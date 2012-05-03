@@ -31,9 +31,11 @@
 #include "config.h"
 #include "WebInputElement.h"
 
+#include "HTMLDataListElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "TextControlInnerElements.h"
+#include "WebNodeCollection.h"
 #include "platform/WebString.h"
 #include <wtf/PassRefPtr.h>
 
@@ -151,6 +153,16 @@ bool WebInputElement::isChecked() const
     return constUnwrap<HTMLInputElement>()->checked();
 }
 
+WebNodeCollection WebInputElement::dataListOptions() const
+{
+#if ENABLE(DATALIST)
+    HTMLDataListElement* dataList = static_cast<HTMLDataListElement*>(constUnwrap<HTMLInputElement>()->list());
+    if (dataList)
+        return WebNodeCollection(dataList->options());
+#endif
+    return WebNodeCollection();
+}
+
 bool WebInputElement::isSpeechInputEnabled() const
 {
 #if ENABLE(INPUT_SPEECH)
@@ -218,5 +230,4 @@ WebInputElement* toWebInputElement(WebElement* webElement)
 
     return static_cast<WebInputElement*>(webElement);
 }
-
 } // namespace WebKit

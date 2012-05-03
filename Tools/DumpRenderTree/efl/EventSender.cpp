@@ -104,13 +104,13 @@ enum ZoomEvent {
 };
 
 struct KeyEventInfo {
-    KeyEventInfo(const char* keyName, EvasKeyModifier modifiers)
+    KeyEventInfo(const CString& keyName, EvasKeyModifier modifiers)
         : keyName(keyName)
         , modifiers(modifiers)
     {
     }
 
-    const char* keyName;
+    const CString keyName;
     EvasKeyModifier modifiers;
 };
 
@@ -150,8 +150,15 @@ static void sendMouseEvent(Evas* evas, EvasMouseEvent event, int buttonNumber, E
     setEvasModifiers(evas, modifiers);
     if (event & EvasMouseEventMove)
         evas_event_feed_mouse_move(evas, gLastMousePositionX, gLastMousePositionY, timeStamp++, 0);
-    if (event & EvasMouseEventDown)
-        evas_event_feed_mouse_down(evas, buttonNumber, EVAS_BUTTON_NONE, timeStamp++, 0);
+    if (event & EvasMouseEventDown) {
+        unsigned flags = 0;
+        if (gClickCount == 2)
+            flags |= EVAS_BUTTON_DOUBLE_CLICK;
+        else if (gClickCount == 3)
+            flags |= EVAS_BUTTON_TRIPLE_CLICK;
+
+        evas_event_feed_mouse_down(evas, buttonNumber, static_cast<Evas_Button_Flags>(flags), timeStamp++, 0);
+    }
     if (event & EvasMouseEventUp)
         evas_event_feed_mouse_up(evas, buttonNumber, EVAS_BUTTON_NONE, timeStamp++, 0);
 
@@ -322,7 +329,7 @@ static JSValueRef continuousMouseScrollByCallback(JSContextRef context, JSObject
     return JSValueMakeUndefined(context);
 }
 
-static const char* keyPadNameFromJSValue(JSStringRef character)
+static const CString keyPadNameFromJSValue(JSStringRef character)
 {
     if (equals(character, "leftArrow"))
         return "KP_Left";
@@ -345,10 +352,10 @@ static const char* keyPadNameFromJSValue(JSStringRef character)
     if (equals(character, "delete"))
         return "KP_Delete";
 
-    return 0;
+    return character->ustring().utf8();
 }
 
-static const char* keyNameFromJSValue(JSStringRef character)
+static const CString keyNameFromJSValue(JSStringRef character)
 {
     if (equals(character, "leftArrow"))
         return "Left";
@@ -406,8 +413,10 @@ static const char* keyNameFromJSValue(JSStringRef character)
         return "Tab";
     if (charCode == '\x8')
         return "BackSpace";
+    if (charCode == ' ')
+        return "space";
 
-    return 0;
+    return character->ustring().utf8();
 }
 
 static KeyEventInfo* createKeyEventInfo(JSContextRef context, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -431,11 +440,7 @@ static KeyEventInfo* createKeyEventInfo(JSContextRef context, size_t argumentCou
     if (argumentCount >= 2)
         modifiers = modifiersFromJSValue(context, arguments[1]);
 
-    const CString cCharacter = character.get()->ustring().utf8();
-    const char* keyName = (location == DomKeyLocationNumpad) ? keyPadNameFromJSValue(character.get()) : keyNameFromJSValue(character.get());
-    if (!keyName)
-        keyName = cCharacter.data();
-
+    const CString keyName = (location == DomKeyLocationNumpad) ? keyPadNameFromJSValue(character.get()) : keyNameFromJSValue(character.get());
     return new KeyEventInfo(keyName, modifiers);
 }
 
@@ -444,7 +449,7 @@ static void sendKeyDown(Evas* evas, KeyEventInfo* keyEventInfo)
     if (!keyEventInfo)
         return;
 
-    const char* keyName = keyEventInfo->keyName;
+    const char* keyName = keyEventInfo->keyName.data();
     EvasKeyModifier modifiers = keyEventInfo->modifiers;
 
     DumpRenderTreeSupportEfl::layoutFrame(browser->mainFrame());

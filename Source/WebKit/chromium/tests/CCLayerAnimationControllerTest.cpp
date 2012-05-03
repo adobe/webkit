@@ -86,6 +86,33 @@ TEST(CCLayerAnimationControllerTest, createOpacityAnimation)
     EXPECT_EQ(1, curve->getValue(duration));
 }
 
+TEST(CCLayerAnimationControllerTest, ignoreUnsupportedAnimationDirections)
+{
+    FakeLayerAnimationControllerClient dummy;
+    OwnPtr<CCLayerAnimationController> controller(CCLayerAnimationController::create(&dummy));
+    const double duration = 1;
+    WebCore::KeyframeValueList values(AnimatedPropertyOpacity);
+    values.insert(new FloatAnimationValue(0, 0));
+    values.insert(new FloatAnimationValue(duration, 1));
+
+    RefPtr<Animation> animation = Animation::create();
+    animation->setDuration(duration);
+
+    IntSize boxSize;
+
+    animation->setDirection(Animation::AnimationDirectionAlternate);
+    EXPECT_FALSE(controller->addAnimation(values, boxSize, animation.get(), 0, 0, 0));
+
+    animation->setDirection(Animation::AnimationDirectionAlternateReverse);
+    EXPECT_FALSE(controller->addAnimation(values, boxSize, animation.get(), 0, 0, 0));
+
+    animation->setDirection(Animation::AnimationDirectionReverse);
+    EXPECT_FALSE(controller->addAnimation(values, boxSize, animation.get(), 0, 0, 0));
+
+    animation->setDirection(Animation::AnimationDirectionNormal);
+    EXPECT_TRUE(controller->addAnimation(values, boxSize, animation.get(), 0, 0, 0));
+}
+
 TEST(CCLayerAnimationControllerTest, createTransformAnimation)
 {
     FakeLayerAnimationControllerClient dummy;
@@ -141,6 +168,109 @@ TEST(CCLayerAnimationControllerTest, syncNewAnimation)
     EXPECT_EQ(CCActiveAnimation::WaitingForTargetAvailability, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
 }
 
+// If an animation is started on the impl thread before it is ticked on the main
+// thread, we must be sure to respect the synchronized start time.
+TEST(CCLayerAnimationControllerTest, doNotClobberStartTimes)
+{
+    FakeLayerAnimationControllerClient dummyImpl;
+    OwnPtr<CCLayerAnimationController> controllerImpl(CCLayerAnimationController::create(&dummyImpl));
+    FakeLayerAnimationControllerClient dummy;
+    OwnPtr<CCLayerAnimationController> controller(CCLayerAnimationController::create(&dummy));
+
+    EXPECT_FALSE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+
+    addOpacityTransitionToController(*controller, 1, 0, 1, false);
+
+    controller->pushAnimationUpdatesTo(controllerImpl.get());
+
+    EXPECT_TRUE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+    EXPECT_EQ(CCActiveAnimation::WaitingForTargetAvailability, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    CCAnimationEventsVector events;
+    controllerImpl->animate(1, &events);
+
+    // Synchronize the start times.
+    EXPECT_EQ(1u, events.size());
+    controller->notifyAnimationStarted(events[0]);
+    EXPECT_EQ(controller->getActiveAnimation(0, CCActiveAnimation::Opacity)->startTime(), controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->startTime());
+
+    // Start the animation on the main thread. Should not affect the start time.
+    controller->animate(1.5, 0);
+    EXPECT_EQ(controller->getActiveAnimation(0, CCActiveAnimation::Opacity)->startTime(), controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->startTime());
+}
+
+TEST(CCLayerAnimationControllerTest, syncPauseAndResume)
+{
+    FakeLayerAnimationControllerClient dummyImpl;
+    OwnPtr<CCLayerAnimationController> controllerImpl(CCLayerAnimationController::create(&dummyImpl));
+    FakeLayerAnimationControllerClient dummy;
+    OwnPtr<CCLayerAnimationController> controller(CCLayerAnimationController::create(&dummy));
+
+    EXPECT_FALSE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+
+    addOpacityTransitionToController(*controller, 1, 0, 1, false);
+
+    controller->pushAnimationUpdatesTo(controllerImpl.get());
+
+    EXPECT_TRUE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+    EXPECT_EQ(CCActiveAnimation::WaitingForTargetAvailability, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    // Start the animations on each controller.
+    CCAnimationEventsVector events;
+    controllerImpl->animate(0, &events);
+    controller->animate(0, 0);
+    EXPECT_EQ(CCActiveAnimation::Running, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+    EXPECT_EQ(CCActiveAnimation::Running, controller->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    // Pause the main-thread animation.
+    controller->suspendAnimations(1);
+    EXPECT_EQ(CCActiveAnimation::Paused, controller->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    // The pause run state change should make it to the impl thread controller.
+    controller->pushAnimationUpdatesTo(controllerImpl.get());
+    EXPECT_EQ(CCActiveAnimation::Paused, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    // Resume the main-thread animation.
+    controller->resumeAnimations(2);
+    EXPECT_EQ(CCActiveAnimation::Running, controller->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    // The pause run state change should make it to the impl thread controller.
+    controller->pushAnimationUpdatesTo(controllerImpl.get());
+    EXPECT_EQ(CCActiveAnimation::Running, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+}
+
+
+TEST(CCLayerAnimationControllerTest, doNotSyncFinishedAnimation)
+{
+    FakeLayerAnimationControllerClient dummyImpl;
+    OwnPtr<CCLayerAnimationController> controllerImpl(CCLayerAnimationController::create(&dummyImpl));
+    FakeLayerAnimationControllerClient dummy;
+    OwnPtr<CCLayerAnimationController> controller(CCLayerAnimationController::create(&dummy));
+
+    EXPECT_FALSE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+
+    addOpacityTransitionToController(*controller, 1, 0, 1, false);
+
+    controller->pushAnimationUpdatesTo(controllerImpl.get());
+
+    EXPECT_TRUE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+    EXPECT_EQ(CCActiveAnimation::WaitingForTargetAvailability, controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity)->runState());
+
+    // Notify main thread controller that the animation has started.
+    CCAnimationEvent animationStartedEvent(CCAnimationEvent::Started, 0, 0, CCActiveAnimation::Opacity, 0);
+    controller->notifyAnimationStarted(animationStartedEvent);
+
+    // Force animation to complete on impl thread.
+    controllerImpl->removeAnimation(0);
+
+    EXPECT_FALSE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+
+    controller->pushAnimationUpdatesTo(controllerImpl.get());
+
+    // Even though the main thread has a 'new' animation, it should not be pushed because the animation has already completed on the impl thread.
+    EXPECT_FALSE(controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity));
+}
+
 // Tests that transitioning opacity from 0 to 1 works as expected.
 TEST(CCLayerAnimationControllerTest, TrivialTransition)
 {
@@ -156,6 +286,36 @@ TEST(CCLayerAnimationControllerTest, TrivialTransition)
     EXPECT_TRUE(controller->hasActiveAnimation());
     EXPECT_EQ(0, dummy.opacity());
     controller->animate(1, events.get());
+    EXPECT_EQ(1, dummy.opacity());
+    EXPECT_FALSE(controller->hasActiveAnimation());
+}
+
+// Tests animations that are waiting for a synchronized start time do not finish.
+TEST(CCLayerAnimationControllerTest, AnimationsWaitingForStartTimeDoNotFinishIfTheyWaitLongerToStartThanTheirDuration)
+{
+    OwnPtr<CCAnimationEventsVector> events(adoptPtr(new CCAnimationEventsVector));
+    FakeLayerAnimationControllerClient dummy;
+    OwnPtr<CCLayerAnimationController> controller(
+        CCLayerAnimationController::create(&dummy));
+
+    OwnPtr<CCActiveAnimation> toAdd(createActiveAnimation(adoptPtr(new FakeFloatTransition(1, 0, 1)), 1, CCActiveAnimation::Opacity));
+    toAdd->setNeedsSynchronizedStartTime(true);
+
+    // We should pause at the first keyframe indefinitely waiting for that animation to start.
+    controller->add(toAdd.release());
+    controller->animate(0, events.get());
+    EXPECT_TRUE(controller->hasActiveAnimation());
+    EXPECT_EQ(0, dummy.opacity());
+    controller->animate(1, events.get());
+    EXPECT_TRUE(controller->hasActiveAnimation());
+    EXPECT_EQ(0, dummy.opacity());
+    controller->animate(2, events.get());
+    EXPECT_TRUE(controller->hasActiveAnimation());
+    EXPECT_EQ(0, dummy.opacity());
+
+    // Send the synchronized start time.
+    controller->notifyAnimationStarted(CCAnimationEvent(CCAnimationEvent::Started, 0, 1, CCActiveAnimation::Opacity, 2));
+    controller->animate(5, events.get());
     EXPECT_EQ(1, dummy.opacity());
     EXPECT_FALSE(controller->hasActiveAnimation());
 }

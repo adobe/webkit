@@ -25,14 +25,15 @@
 #if USE(TEXTURE_MAPPER)
 namespace WebCore {
 
-void BitmapTextureImageBuffer::updateContents(const void* data, const IntRect& targetRect)
+void BitmapTextureImageBuffer::updateContents(const void* data, const IntRect& targetRect, const IntPoint& sourceOffset, int bytesPerLine)
 {
 #if PLATFORM(QT)
-    QImage image(reinterpret_cast<const uchar*>(data), targetRect.width(), targetRect.height(), targetRect.width() * 4, QImage::Format_ARGB32_Premultiplied);
+    QImage image(reinterpret_cast<const uchar*>(data), targetRect.width(), targetRect.height(), bytesPerLine, QImage::Format_ARGB32_Premultiplied);
+
     QPainter* painter = m_image->context()->platformContext();
     painter->save();
     painter->setCompositionMode(QPainter::CompositionMode_Source);
-    painter->drawImage(targetRect, image);
+    painter->drawImage(targetRect, image, IntRect(sourceOffset, targetRect.size()));
     painter->restore();
 #endif
 }
@@ -42,9 +43,9 @@ void BitmapTextureImageBuffer::didReset()
     m_image = ImageBuffer::create(contentSize());
 }
 
-void BitmapTextureImageBuffer::updateContents(Image* image, const IntRect& targetRect, const IntRect& sourceRect, PixelFormat)
+void BitmapTextureImageBuffer::updateContents(Image* image, const IntRect& targetRect, const IntPoint& offset)
 {
-    m_image->context()->drawImage(image, ColorSpaceDeviceRGB, targetRect, sourceRect, CompositeCopy);
+    m_image->context()->drawImage(image, ColorSpaceDeviceRGB, targetRect, IntRect(offset, targetRect.size()), CompositeCopy);
 }
 
 void TextureMapperImageBuffer::beginClip(const TransformationMatrix& matrix, const FloatRect& rect)
@@ -111,12 +112,12 @@ void TextureMapperImageBuffer::drawTexture(const BitmapTexture& texture, const F
 #if ENABLE(CSS_FILTERS)
 void BitmapTextureImageBuffer::applyFilters(const BitmapTexture& contentTexture, const FilterOperations& filters)
 {
-    RefPtr<FilterEffectRenderer> renderer = FilterEffectRenderer::create(0);
+    RefPtr<FilterEffectRenderer> renderer = FilterEffectRenderer::create();
     renderer->setSourceImageRect(FloatRect(FloatPoint::zero(), contentTexture.size()));
 
     // The document parameter is only needed for CSS shaders.
     renderer->build(0 /*document */, filters);
-    renderer->prepare();
+    renderer->allocateBackingStoreIfNeeded();
     GraphicsContext* context = renderer->inputContext();
     context->drawImageBuffer(static_cast<const BitmapTextureImageBuffer&>(contentTexture).m_image.get(), ColorSpaceDeviceRGB, IntPoint::zero());
     renderer->apply();

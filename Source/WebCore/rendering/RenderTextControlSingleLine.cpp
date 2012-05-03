@@ -25,7 +25,6 @@
 #include "RenderTextControlSingleLine.h"
 
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "Chrome.h"
 #include "Frame.h"
@@ -43,6 +42,7 @@
 #include "SearchPopupMenu.h"
 #include "Settings.h"
 #include "SimpleFontData.h"
+#include "StyleResolver.h"
 #include "TextControlInnerElements.h"
 
 using namespace std;
@@ -228,7 +228,7 @@ void RenderTextControlSingleLine::layout()
     LayoutUnit heightLimit = (inputElement()->isSearchField() || !container) ? height() : contentHeight();
     if (currentHeight > heightLimit) {
         if (desiredHeight != currentHeight)
-            setNeedsLayout(true, false);
+            setNeedsLayout(true, MarkOnlyThis);
 
         innerTextRenderer->style()->setHeight(Length(desiredHeight, Fixed));
         m_desiredInnerTextHeight = desiredHeight;
@@ -241,10 +241,10 @@ void RenderTextControlSingleLine::layout()
         LayoutUnit containerHeight = containerRenderer->height();
         if (containerHeight > heightLimit) {
             containerRenderer->style()->setHeight(Length(heightLimit, Fixed));
-            setNeedsLayout(true, false);
+            setNeedsLayout(true, MarkOnlyThis);
         } else if (containerRenderer->height() < contentHeight()) {
             containerRenderer->style()->setHeight(Length(contentHeight(), Fixed));
-            setNeedsLayout(true, false);
+            setNeedsLayout(true, MarkOnlyThis);
         } else
             containerRenderer->style()->setHeight(Length(containerHeight, Fixed));
     }
@@ -674,7 +674,7 @@ void RenderTextControlSingleLine::setTextFromItem(unsigned listIndex)
 
 FontSelector* RenderTextControlSingleLine::fontSelector() const
 {
-    return document()->styleSelector()->fontSelector();
+    return document()->styleResolver()->fontSelector();
 }
 
 HostWindow* RenderTextControlSingleLine::hostWindow() const

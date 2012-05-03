@@ -28,6 +28,7 @@
 
 #include "ClipboardAccessPolicy.h"
 #include "Color.h"
+#include "DictationAlternative.h"
 #include "DocumentMarker.h"
 #include "EditAction.h"
 #include "EditingBehavior.h"
@@ -61,7 +62,7 @@ class Pasteboard;
 class SimpleFontData;
 class SpellChecker;
 class SpellCheckRequest;
-class SpellingCorrectionController;
+class AlternativeTextController;
 class StylePropertySet;
 class Text;
 class TextCheckerClient;
@@ -136,9 +137,9 @@ public:
     void respondToChangedSelection(const VisibleSelection& oldSelection);
     void respondToChangedContents(const VisibleSelection& endingSelection);
 
-    bool selectionStartHasStyle(int propertyID, const String& value) const;
-    TriState selectionHasStyle(int propertyID, const String& value) const;
-    String selectionStartCSSPropertyValue(int propertyID);
+    bool selectionStartHasStyle(CSSPropertyID, const String& value) const;
+    TriState selectionHasStyle(CSSPropertyID, const String& value) const;
+    String selectionStartCSSPropertyValue(CSSPropertyID);
     
     TriState selectionUnorderedListState() const;
     TriState selectionOrderedListState() const;
@@ -202,6 +203,7 @@ public:
 
     bool insertText(const String&, Event* triggeringEvent);
     bool insertTextForConfirmedComposition(const String& text);
+    bool insertDictatedText(const String&, const Vector<DictationAlternative>& dictationAlternatives, Event* triggeringEvent);
     bool insertTextWithoutSendingTextEvent(const String&, bool selectInsertedText, TextEvent* triggeringEvent);
     bool insertLineBreak();
     bool insertParagraphSeparator();
@@ -300,7 +302,7 @@ public:
 
     void setStartNewKillRingSequence(bool);
 
-    PassRefPtr<Range> rangeForPoint(const LayoutPoint& windowPoint);
+    PassRefPtr<Range> rangeForPoint(const IntPoint& windowPoint);
 
     void clear();
 
@@ -319,9 +321,9 @@ public:
 
     void addToKillRing(Range*, bool prepend);
 
-    void startCorrectionPanelTimer();
+    void startAlternativeTextUITimer();
     // If user confirmed a correction in the correction panel, correction has non-zero length, otherwise it means that user has dismissed the panel.
-    void handleCorrectionPanelResult(const String& correction);
+    void handleAlternativeTextUIResult(const String& correction);
     void dismissCorrectionPanelAsIgnored();
 
     void pasteAsFragment(PassRefPtr<DocumentFragment>, bool smartReplace, bool matchStyle);
@@ -374,6 +376,8 @@ public:
     void takeFindStringFromSelection();
     void writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes);
     void readSelectionFromPasteboard(const String& pasteboardName);
+    String stringSelectionForPasteboard();
+    PassRefPtr<SharedBuffer> dataSelectionForPasteboard(const String& pasteboardName);
 #endif
 
     void replaceSelectionWithFragment(PassRefPtr<DocumentFragment>, bool selectReplacement, bool smartReplace, bool matchStyle);
@@ -381,6 +385,8 @@ public:
     bool selectionStartHasMarkerFor(DocumentMarker::MarkerType, int from, int length) const;
     void updateMarkersForWordsAffectedByEditing(bool onlyHandleWordsContainingSelection);
     void deletedAutocorrectionAtPosition(const Position&, const String& originalString);
+    
+    void simplifyMarkup(Node* startNode, Node* endNode);
 
     void deviceScaleFactorChanged();
 
@@ -401,7 +407,7 @@ private:
     bool m_shouldStyleWithCSS;
     OwnPtr<KillRing> m_killRing;
     OwnPtr<SpellChecker> m_spellChecker;
-    OwnPtr<SpellingCorrectionController> m_spellingCorrector;
+    OwnPtr<AlternativeTextController> m_alternativeTextController;
     VisibleSelection m_mark;
     bool m_areMarkedTextMatchesHighlighted;
     EditorParagraphSeparator m_defaultParagraphSeparator;

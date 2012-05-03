@@ -54,9 +54,21 @@ static void installLayoutTestColorProfile()
     
     if (!sUserColorProfileURL) {
         CFDictionaryRef deviceInfo = ColorSyncDeviceCopyDeviceInfo(kColorSyncDisplayDeviceClass, mainDisplayID);
+
+        if (!deviceInfo) {
+            NSLog(@"No display attached to system; not setting main display's color profile.");
+            CFRelease(mainDisplayID);
+            return;
+        }
+
         CFDictionaryRef profileInfo = (CFDictionaryRef)CFDictionaryGetValue(deviceInfo, kColorSyncCustomProfiles);
         if (profileInfo) {
             sUserColorProfileURL = (CFURLRef)CFDictionaryGetValue(profileInfo, CFSTR("1"));
+            CFRetain(sUserColorProfileURL);
+        } else {
+            profileInfo = (CFDictionaryRef)CFDictionaryGetValue(deviceInfo, kColorSyncFactoryProfiles);
+            CFDictionaryRef factoryProfile = (CFDictionaryRef)CFDictionaryGetValue(profileInfo, CFSTR("1"));
+            sUserColorProfileURL = (CFURLRef)CFDictionaryGetValue(factoryProfile, kColorSyncDeviceProfileURL);
             CFRetain(sUserColorProfileURL);
         }
         
@@ -83,7 +95,7 @@ static void installLayoutTestColorProfile()
     CFDictionarySetValue(profileInfo, kColorSyncDeviceDefaultProfileID, profileURL);
     
     if (!ColorSyncDeviceSetCustomProfiles(kColorSyncDisplayDeviceClass, mainDisplayID, profileInfo)) {
-        fprintf(stderr, "Failed to set color profile for main display! Many pixel tests may fail as a result.\n");
+        NSLog(@"Failed to set color profile for main display! Many pixel tests may fail as a result.");
         
         if (sUserColorProfileURL) {
             CFRelease(sUserColorProfileURL);

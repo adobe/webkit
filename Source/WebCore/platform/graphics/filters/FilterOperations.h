@@ -64,11 +64,14 @@ public:
     bool operationsMatch(const FilterOperations&) const;
 
     bool hasOutsets() const;
-    void getOutsets(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const;
+    void getOutsets(int& top, int& right, int& bottom, int& left) const;
 
     bool hasFilterThatAffectsOpacity() const;
     bool hasFilterThatMovesPixels() const;
 
+#if ENABLE(CSS_SHADERS)
+    bool hasCustomFilter() const;
+#endif
 private:
     Vector<RefPtr<FilterOperation> > m_operations;
 };

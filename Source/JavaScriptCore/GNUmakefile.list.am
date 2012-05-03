@@ -122,7 +122,6 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/PolymorphicPutByIdList.h \
 	Source/JavaScriptCore/bytecode/PredictedType.cpp \
 	Source/JavaScriptCore/bytecode/PredictedType.h \
-	Source/JavaScriptCore/bytecode/PredictionTracker.h \
 	Source/JavaScriptCore/bytecode/PutByIdStatus.cpp \
 	Source/JavaScriptCore/bytecode/PutByIdStatus.h \
 	Source/JavaScriptCore/bytecode/PutKind.h \
@@ -143,6 +142,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGAbstractState.cpp \
 	Source/JavaScriptCore/dfg/DFGAbstractState.h \
 	Source/JavaScriptCore/dfg/DFGAbstractValue.h \
+	Source/JavaScriptCore/dfg/DFGArgumentPosition.h \
 	Source/JavaScriptCore/dfg/DFGAssemblyHelpers.cpp \
 	Source/JavaScriptCore/dfg/DFGAssemblyHelpers.h \
 	Source/JavaScriptCore/dfg/DFGBasicBlock.h \
@@ -159,6 +159,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGCorrectableJumpPoint.h \
 	Source/JavaScriptCore/dfg/DFGCSEPhase.cpp \
 	Source/JavaScriptCore/dfg/DFGCSEPhase.h \
+	Source/JavaScriptCore/dfg/DFGDoubleFormatState.h \
 	Source/JavaScriptCore/dfg/DFGDriver.cpp \
 	Source/JavaScriptCore/dfg/DFGDriver.h \
 	Source/JavaScriptCore/dfg/DFGFPRInfo.h \
@@ -218,13 +219,14 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/heap/DFGCodeBlocks.h \
 	Source/JavaScriptCore/heap/GCAssertions.h \
 	Source/JavaScriptCore/heap/Handle.h \
-	Source/JavaScriptCore/heap/HandleHeap.cpp \
-	Source/JavaScriptCore/heap/HandleHeap.h \
+	Source/JavaScriptCore/heap/HandleSet.cpp \
+	Source/JavaScriptCore/heap/HandleSet.h \
 	Source/JavaScriptCore/heap/HeapBlock.h \
 	Source/JavaScriptCore/heap/SlotVisitor.h \
 	Source/JavaScriptCore/heap/HandleStack.cpp \
 	Source/JavaScriptCore/heap/HandleStack.h \
 	Source/JavaScriptCore/heap/HandleTypes.h \
+	Source/JavaScriptCore/heap/BlockAllocator.cpp \
 	Source/JavaScriptCore/heap/Heap.cpp \
 	Source/JavaScriptCore/heap/Heap.h \
 	Source/JavaScriptCore/heap/ListableHandler.h \
@@ -250,6 +252,14 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/heap/VTableSpectrum.cpp \
 	Source/JavaScriptCore/heap/VTableSpectrum.h \
 	Source/JavaScriptCore/heap/Weak.h \
+	Source/JavaScriptCore/heap/WeakBlock.cpp \
+	Source/JavaScriptCore/heap/WeakBlock.h \
+	Source/JavaScriptCore/heap/WeakHandleOwner.cpp \
+	Source/JavaScriptCore/heap/WeakHandleOwner.h \
+	Source/JavaScriptCore/heap/WeakImpl.h \
+	Source/JavaScriptCore/heap/WeakSet.cpp \
+	Source/JavaScriptCore/heap/WeakSet.h \
+	Source/JavaScriptCore/heap/WeakSetInlines.h \
 	Source/JavaScriptCore/heap/WeakReferenceHarvester.h \
 	Source/JavaScriptCore/heap/WriteBarrierSupport.cpp \
 	Source/JavaScriptCore/heap/WriteBarrierSupport.h \
@@ -442,8 +452,6 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/runtime/JSAPIValueWrapper.h \
 	Source/JavaScriptCore/runtime/JSArray.cpp \
 	Source/JavaScriptCore/runtime/JSArray.h \
-	Source/JavaScriptCore/runtime/JSByteArray.cpp \
-	Source/JavaScriptCore/runtime/JSByteArray.h \
 	Source/JavaScriptCore/runtime/JSCell.cpp \
 	Source/JavaScriptCore/runtime/JSCell.h \
 	Source/JavaScriptCore/runtime/JSDateMath.cpp \
@@ -474,6 +482,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/runtime/JSStaticScopeObject.cpp \
 	Source/JavaScriptCore/runtime/JSStaticScopeObject.h \
 	Source/JavaScriptCore/runtime/JSStringBuilder.h \
+	Source/JavaScriptCore/runtime/JSStringJoiner.cpp \
+	Source/JavaScriptCore/runtime/JSStringJoiner.h \
 	Source/JavaScriptCore/runtime/JSString.cpp \
 	Source/JavaScriptCore/runtime/JSString.h \
 	Source/JavaScriptCore/runtime/JSType.h \
@@ -489,6 +499,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/runtime/LiteralParser.h \
 	Source/JavaScriptCore/runtime/Lookup.cpp \
 	Source/JavaScriptCore/runtime/Lookup.h \
+	Source/JavaScriptCore/runtime/MatchResult.h \
 	Source/JavaScriptCore/runtime/MathObject.cpp \
 	Source/JavaScriptCore/runtime/MathObject.h \
 	Source/JavaScriptCore/runtime/MemoryStatistics.h \
@@ -578,6 +589,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/tools/ProfileTreeNode.h \
 	Source/JavaScriptCore/tools/TieredMMapArray.h \
 	Source/JavaScriptCore/yarr/Yarr.h \
+	Source/JavaScriptCore/yarr/YarrCanonicalizeUCS2.cpp \
+	Source/JavaScriptCore/yarr/YarrCanonicalizeUCS2.h \
 	Source/JavaScriptCore/yarr/YarrInterpreter.cpp \
 	Source/JavaScriptCore/yarr/YarrInterpreter.h \
 	Source/JavaScriptCore/yarr/YarrJIT.cpp \

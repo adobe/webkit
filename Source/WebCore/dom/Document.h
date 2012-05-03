@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
  *           (C) 2006 Alexey Proskuryakov (ap@webkit.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2011 Google Inc. All rights reserved.
@@ -42,8 +42,8 @@
 #include "PageVisibilityState.h"
 #include "PlatformScreen.h"
 #include "QualifiedName.h"
+#include "ReferrerPolicy.h"
 #include "ScriptExecutionContext.h"
-#include "SecurityPolicy.h"
 #include "StringWithDirection.h"
 #include "Timer.h"
 #include "TreeScope.h"
@@ -61,9 +61,7 @@ class AXObjectCache;
 class Attr;
 class CDATASection;
 class CSSStyleDeclaration;
-class CSSStyleSelector;
 class CSSStyleSheet;
-class CSSValuePool;
 class CachedCSSStyleSheet;
 class CachedResourceLoader;
 class CachedScript;
@@ -127,7 +125,9 @@ class SecurityOrigin;
 class SerializedScriptValue;
 class SegmentedString;
 class Settings;
+class StyleResolver;
 class StyleSheet;
+class StyleSheetInternal;
 class StyleSheetList;
 class Text;
 class TextResourceDecoder;
@@ -213,7 +213,7 @@ enum PageshowEventPersistence {
     PageshowEventPersisted = 1
 };
 
-enum StyleSelectorUpdateFlag { RecalcStyleImmediately, DeferRecalcStyle, RecalcStyleIfNeeded };
+enum StyleResolverUpdateFlag { RecalcStyleImmediately, DeferRecalcStyle, RecalcStyleIfNeeded };
 
 class Document : public ContainerNode, public TreeScope, public ScriptExecutionContext {
 public:
@@ -326,7 +326,7 @@ public:
 
     ViewportArguments viewportArguments() const { return m_viewportArguments; }
 
-    SecurityPolicy::ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
+    ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
 
     DocumentType* doctype() const { return m_docType.get(); }
 
@@ -353,7 +353,12 @@ public:
 
     bool cssRegionsEnabled() const;
     bool cssRegionsAutoHeightEnabled() const;
+    enum FlowNameCheck {
+        CheckFlowNameForInvalidValues,
+        DoNotCheckFlowNameForInvalidValues
+    };
     PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
+    PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&, FlowNameCheck);
 
     bool regionBasedColumnsEnabled() const;
 
@@ -371,7 +376,7 @@ public:
      *        If false, this method returns null for coordinates outside of the viewport.
      */
     PassRefPtr<NodeList> nodesFromRect(int centerX, int centerY, unsigned topPadding, unsigned rightPadding,
-                                       unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping) const;
+                                       unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent) const;
     Element* elementFromPoint(int x, int y) const;
     PassRefPtr<Range> caretRangeFromPoint(int x, int y);
 
@@ -396,11 +401,15 @@ public:
 
     String xmlEncoding() const { return m_xmlEncoding; }
     String xmlVersion() const { return m_xmlVersion; }
-    bool xmlStandalone() const { return m_xmlStandalone; }
+    enum StandaloneStatus { StandaloneUnspecified, Standalone, NotStandalone };
+    bool xmlStandalone() const { return m_xmlStandalone == Standalone; }
+    StandaloneStatus xmlStandaloneStatus() const { return static_cast<StandaloneStatus>(m_xmlStandalone); }
+    bool hasXMLDeclaration() const { return m_hasXMLDeclaration; }
 
     void setXMLEncoding(const String& encoding) { m_xmlEncoding = encoding; } // read-only property, only to be set from XMLDocumentParser
     void setXMLVersion(const String&, ExceptionCode&);
     void setXMLStandalone(bool, ExceptionCode&);
+    void setHasXMLDeclaration(bool hasXMLDeclaration) { m_hasXMLDeclaration = hasXMLDeclaration ? 1 : 0; }
 
     String documentURI() const { return m_documentURI; }
     void setDocumentURI(const String&);
@@ -443,21 +452,21 @@ public:
     virtual bool isPluginDocument() const { return false; }
     virtual bool isMediaDocument() const { return false; }
     virtual bool isFrameSet() const { return false; }
-    
-    PassRefPtr<CSSValuePool> cssValuePool() const;
-    
-    CSSStyleSelector* styleSelectorIfExists() const { return m_styleSelector.get(); }
+
+    bool isSrcdocDocument() const { return m_isSrcdocDocument; }
+
+    StyleResolver* styleResolverIfExists() const { return m_styleResolver.get(); }
 
     bool isViewSource() const { return m_isViewSource; }
     void setIsViewSource(bool);
 
     bool sawElementsInKnownNamespaces() const { return m_sawElementsInKnownNamespaces; }
 
-    CSSStyleSelector* styleSelector()
+    StyleResolver* styleResolver()
     { 
-        if (!m_styleSelector)
-            createStyleSelector();
-        return m_styleSelector.get();
+        if (!m_styleResolver)
+            createStyleResolver();
+        return m_styleResolver.get();
     }
 
     /**
@@ -489,13 +498,15 @@ public:
     /**
      * Called when one or more stylesheets in the document may have been added, removed or changed.
      *
-     * Creates a new style selector and assign it to this document. This is done by iterating through all nodes in
+     * Creates a new style resolver and assign it to this document. This is done by iterating through all nodes in
      * document (or those before <BODY> in a HTML document), searching for stylesheets. Stylesheets can be contained in
      * <LINK>, <STYLE> or <BODY> elements, as well as processing instructions (XML documents only). A list is
      * constructed from these which is used to create the a new style selector which collates all of the stylesheets
      * found and is used to calculate the derived styles for all rendering objects.
      */
-    void styleSelectorChanged(StyleSelectorUpdateFlag);
+    void styleResolverChanged(StyleResolverUpdateFlag);
+
+    void evaluateMediaQueryList();
 
     bool usesSiblingRules() const { return m_usesSiblingRules || m_usesSiblingRulesOverride; }
     void setUsesSiblingRules(bool b) { m_usesSiblingRulesOverride = b; }
@@ -505,7 +516,6 @@ public:
     bool usesBeforeAfterRules() const { return m_usesBeforeAfterRules || m_usesBeforeAfterRulesOverride; }
     void setUsesBeforeAfterRules(bool b) { m_usesBeforeAfterRulesOverride = b; }
     bool usesRemUnits() const { return m_usesRemUnits; }
-    void setUsesRemUnits(bool b) { m_usesRemUnits = b; }
     bool usesLinkRules() const { return linkColor() != visitedLinkColor() || m_usesLinkRules; }
     void setUsesLinkRules(bool b) { m_usesLinkRules = b; }
 
@@ -622,6 +632,9 @@ public:
 
     virtual void disableEval();
 
+    bool canNavigate(Frame* targetFrame);
+    Frame* findUnsafeParentScrollPropagationBoundary();
+
     CSSStyleSheet* pageUserSheet();
     void clearPageUserSheet();
     void updatePageUserSheet();
@@ -630,10 +643,10 @@ public:
     void clearPageGroupUserSheets();
     void updatePageGroupUserSheets();
 
-    void addUserSheet(PassRefPtr<CSSStyleSheet> userSheet);
+    const Vector<RefPtr<CSSStyleSheet> >* documentUserSheets() const { return m_userSheets.get(); }
+    void addUserSheet(PassRefPtr<StyleSheetInternal> userSheet);
 
     CSSStyleSheet* elementSheet();
-    CSSStyleSheet* mappedElementSheet();
     
     virtual PassRefPtr<DocumentParser> createParser();
     DocumentParser* parser() const { return m_parser.get(); }
@@ -1102,9 +1115,9 @@ public:
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>, Element*);
+    int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
     void webkitCancelAnimationFrame(int id);
-    void serviceScriptedAnimations(DOMTimeStamp);
+    void serviceScriptedAnimations(double monotonicAnimationStartTime);
 #endif
 
     virtual EventTarget* errorEventTarget();
@@ -1120,7 +1133,7 @@ public:
     void didAddTouchEventHandler();
     void didRemoveTouchEventHandler();
 
-    bool visualUpdatesAllowed() const;
+    bool visualUpdatesAllowed() const { return m_visualUpdatesAllowed; }
 
 #if ENABLE(MICRODATA)
     PassRefPtr<NodeList> getItems(const String& typeNames);
@@ -1129,8 +1142,10 @@ public:
     
     bool isInDocumentWrite() { return m_writeRecursionDepth > 0; }
 
-    void suspendScheduledTasks();
+    void suspendScheduledTasks(ActiveDOMObject::ReasonForSuspension);
     void resumeScheduledTasks();
+
+    IntSize viewportSize() const;
 
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
@@ -1171,15 +1186,15 @@ private:
 
     void buildAccessKeyMap(TreeScope* root);
 
-    void createStyleSelector();
-    void clearStyleSelector();
+    void createStyleResolver();
+    void clearStyleResolver();
     void combineCSSFeatureFlags();
     void resetCSSFeatureFlags();
     
-    bool updateActiveStylesheets(StyleSelectorUpdateFlag);
+    bool updateActiveStylesheets(StyleResolverUpdateFlag);
     void collectActiveStylesheets(Vector<RefPtr<StyleSheet> >&);
-    bool testAddedStylesheetRequiresStyleRecalc(CSSStyleSheet*);
-    void analyzeStylesheetChange(StyleSelectorUpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleSelectorReset, bool& requiresFullStyleRecalc);
+    bool testAddedStylesheetRequiresStyleRecalc(StyleSheetInternal*);
+    void analyzeStylesheetChange(StyleResolverUpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleResolverReset, bool& requiresFullStyleRecalc);
 
     void deleteCustomFonts();
 
@@ -1204,14 +1219,16 @@ private:
     void addDocumentToFullScreenChangeEventQueue(Document*);
 #endif
 
+    void setVisualUpdatesAllowed(ReadyState);
+    void setVisualUpdatesAllowed(bool);
+    void visualUpdatesSuppressionTimerFired(Timer<Document>*);
+
     int m_guardRefCount;
 
-    OwnPtr<CSSStyleSelector> m_styleSelector;
-    bool m_didCalculateStyleSelector;
-    bool m_hasDirtyStyleSelector;
+    OwnPtr<StyleResolver> m_styleResolver;
+    bool m_didCalculateStyleResolver;
+    bool m_hasDirtyStyleResolver;
     Vector<OwnPtr<FontData> > m_customFonts;
-
-    mutable RefPtr<CSSValuePool> m_cssValuePool;
 
     Frame* m_frame;
     OwnPtr<CachedResourceLoader> m_cachedResourceLoader;
@@ -1256,7 +1273,6 @@ private:
     bool m_hasNodesWithPlaceholderStyle;
 
     RefPtr<CSSStyleSheet> m_elemSheet;
-    RefPtr<CSSStyleSheet> m_mappedElementSheet;
     RefPtr<CSSStyleSheet> m_pageUserSheet;
     mutable OwnPtr<Vector<RefPtr<CSSStyleSheet> > > m_pageGroupUserSheets;
     OwnPtr<Vector<RefPtr<CSSStyleSheet> > > m_userSheets;
@@ -1373,7 +1389,8 @@ private:
 
     String m_xmlEncoding;
     String m_xmlVersion;
-    bool m_xmlStandalone;
+    unsigned m_xmlStandalone : 2;
+    unsigned m_hasXMLDeclaration : 1;
 
     String m_contentLanguage;
 
@@ -1424,6 +1441,7 @@ private:
 
     bool m_isViewSource;
     bool m_sawElementsInKnownNamespaces;
+    bool m_isSrcdocDocument;
 
     RefPtr<DocumentEventQueue> m_eventQueue;
 
@@ -1451,7 +1469,7 @@ private:
 
     ViewportArguments m_viewportArguments;
 
-    SecurityPolicy::ReferrerPolicy m_referrerPolicy;
+    ReferrerPolicy m_referrerPolicy;
 
     bool m_directionSetOnDocumentElement;
     bool m_writingModeSetOnDocumentElement;
@@ -1469,7 +1487,11 @@ private:
 #endif
 
     Timer<Document> m_pendingTasksTimer;
-    Vector<OwnPtr<Task> > m_pendingTasks;    
+    Vector<OwnPtr<Task> > m_pendingTasks;
+    bool m_scheduledTasksAreSuspended;
+    
+    bool m_visualUpdatesAllowed;
+    Timer<Document> m_visualUpdatesSuppressionTimer;
 };
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
@@ -1493,6 +1515,8 @@ inline Node::Node(Document* document, ConstructionType type)
 #endif
     InspectorCounters::incrementCounter(InspectorCounters::NodeCounter);
 }
+
+Node* eventTargetNodeForDocument(Document*);
 
 } // namespace WebCore
 

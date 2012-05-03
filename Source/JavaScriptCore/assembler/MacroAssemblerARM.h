@@ -687,6 +687,12 @@ public:
         m_assembler.mov_r(dest, ARMAssembler::getOp2(1), ARMCondition(cond));
     }
 
+    void compare8(RelationalCondition cond, Address left, TrustedImm32 right, RegisterID dest)
+    {
+        load8(left, ARMRegisters::S1);
+        compare32(cond, ARMRegisters::S1, right, dest);
+    }
+
     void test32(ResultCondition cond, RegisterID reg, TrustedImm32 mask, RegisterID dest)
     {
         if (mask.m_value == -1)

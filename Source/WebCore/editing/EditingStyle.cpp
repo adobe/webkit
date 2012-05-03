@@ -32,7 +32,6 @@
 #include "CSSParser.h"
 #include "CSSRuleList.h"
 #include "CSSStyleRule.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 #include "Frame.h"
@@ -45,6 +44,7 @@
 #include "QualifiedName.h"
 #include "RenderStyle.h"
 #include "StylePropertySet.h"
+#include "StyleResolver.h"
 #include "StyleRule.h"
 #include "StyledElement.h"
 #include "htmlediting.h"
@@ -55,7 +55,7 @@ namespace WebCore {
 
 // Editing style properties must be preserved during editing operation.
 // e.g. when a user inserts a new paragraph, all properties listed here must be copied to the new paragraph.
-static const int editingProperties[] = {
+static const CSSPropertyID editingProperties[] = {
     CSSPropertyBackgroundColor,
     CSSPropertyTextDecoration,
 
@@ -134,7 +134,7 @@ protected:
     HTMLElementEquivalent(CSSPropertyID);
     HTMLElementEquivalent(CSSPropertyID, const QualifiedName& tagName);
     HTMLElementEquivalent(CSSPropertyID, int primitiveValue, const QualifiedName& tagName);
-    const int m_propertyID;
+    const CSSPropertyID m_propertyID;
     const RefPtr<CSSPrimitiveValue> m_primitiveValue;
     const QualifiedName* m_tagName; // We can store a pointer because HTML tag names are const global.
 };
@@ -332,7 +332,7 @@ EditingStyle::EditingStyle(const CSSStyleDeclaration* style)
     extractFontSizeDelta();
 }
 
-EditingStyle::EditingStyle(int propertyID, const String& value)
+EditingStyle::EditingStyle(CSSPropertyID propertyID, const String& value)
     : m_mutableStyle(0)
     , m_shouldUseFixedDefaultFontSize(false)
     , m_fontSizeDelta(NoFontDelta)
@@ -411,7 +411,7 @@ void EditingStyle::removeTextFillAndStrokeColorsIfNeeded(RenderStyle* renderStyl
         m_mutableStyle->removeProperty(CSSPropertyWebkitTextStrokeColor);
 }
 
-void EditingStyle::setProperty(int propertyID, const String& value, bool important)
+void EditingStyle::setProperty(CSSPropertyID propertyID, const String& value, bool important)
 {
     if (!m_mutableStyle)
         m_mutableStyle = StylePropertySet::create();
@@ -603,7 +603,7 @@ void EditingStyle::collapseTextDecorationProperties()
 }
 
 // CSS properties that create a visual difference only when applied to text.
-static const int textOnlyProperties[] = {
+static const CSSPropertyID textOnlyProperties[] = {
     CSSPropertyTextDecoration,
     CSSPropertyWebkitTextDecorationsInEffect,
     CSSPropertyFontStyle,
@@ -671,7 +671,7 @@ bool EditingStyle::conflictsWithInlineStyleOfElement(StyledElement* element, Edi
 
     unsigned propertyCount = m_mutableStyle->propertyCount();
     for (unsigned i = 0; i < propertyCount; ++i) {
-        CSSPropertyID propertyID = static_cast<CSSPropertyID>(m_mutableStyle->propertyAt(i).id());
+        CSSPropertyID propertyID = m_mutableStyle->propertyAt(i).id();
 
         // We don't override whitespace property of a tab span because that would collapse the tab into a space.
         if (propertyID == CSSPropertyWhiteSpace && isTabSpanNode(element))
@@ -1030,7 +1030,7 @@ void EditingStyle::mergeStyle(const StylePropertySet* style, CSSPropertyOverride
 static PassRefPtr<StylePropertySet> styleFromMatchedRulesForElement(Element* element, unsigned rulesToInclude)
 {
     RefPtr<StylePropertySet> style = StylePropertySet::create();
-    RefPtr<CSSRuleList> matchedRules = element->document()->styleSelector()->styleRulesForElement(element, rulesToInclude);
+    RefPtr<CSSRuleList> matchedRules = element->document()->styleResolver()->styleRulesForElement(element, rulesToInclude);
     if (matchedRules) {
         for (unsigned i = 0; i < matchedRules->length(); i++) {
             if (matchedRules->item(i)->type() == CSSRule::STYLE_RULE) {
@@ -1046,7 +1046,7 @@ static PassRefPtr<StylePropertySet> styleFromMatchedRulesForElement(Element* ele
 void EditingStyle::mergeStyleFromRules(StyledElement* element)
 {
     RefPtr<StylePropertySet> styleFromMatchedRules = styleFromMatchedRulesForElement(element,
-        CSSStyleSelector::AuthorCSSRules | CSSStyleSelector::CrossOriginCSSRules);
+        StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
     // Styles from the inline style declaration, held in the variable "style", take precedence 
     // over those from matched rules.
     if (m_mutableStyle)
@@ -1084,7 +1084,7 @@ void EditingStyle::mergeStyleFromRulesForSerialization(StyledElement* element)
 static void removePropertiesInStyle(StylePropertySet* styleToRemovePropertiesFrom, StylePropertySet* style)
 {
     unsigned propertyCount = style->propertyCount();
-    Vector<int> propertiesToRemove(propertyCount);
+    Vector<CSSPropertyID> propertiesToRemove(propertyCount);
     for (unsigned i = 0; i < propertyCount; ++i)
         propertiesToRemove[i] = style->propertyAt(i).id();
 
@@ -1098,7 +1098,7 @@ void EditingStyle::removeStyleFromRulesAndContext(StyledElement* element, Node* 
         return;
 
     // 1. Remove style from matched rules because style remain without repeating it in inline style declaration
-    RefPtr<StylePropertySet> styleFromMatchedRules = styleFromMatchedRulesForElement(element, CSSStyleSelector::AllButEmptyCSSRules);
+    RefPtr<StylePropertySet> styleFromMatchedRules = styleFromMatchedRulesForElement(element, StyleResolver::AllButEmptyCSSRules);
     if (styleFromMatchedRules && !styleFromMatchedRules->isEmpty())
         m_mutableStyle = getPropertiesNotIn(m_mutableStyle.get(), styleFromMatchedRules->ensureCSSStyleDeclaration());
 
@@ -1127,7 +1127,7 @@ void EditingStyle::removePropertiesInElementDefaultStyle(Element* element)
     if (!m_mutableStyle || m_mutableStyle->isEmpty())
         return;
 
-    RefPtr<StylePropertySet> defaultStyle = styleFromMatchedRulesForElement(element, CSSStyleSelector::UAAndUserCSSRules);
+    RefPtr<StylePropertySet> defaultStyle = styleFromMatchedRulesForElement(element, StyleResolver::UAAndUserCSSRules);
 
     removePropertiesInStyle(m_mutableStyle.get(), defaultStyle.get());
 }
@@ -1319,7 +1319,7 @@ StyleChange::StyleChange(EditingStyle* style, const Position& position)
     m_cssStyle = mutableStyle->asText().stripWhiteSpace();
 }
 
-static void setTextDecorationProperty(StylePropertySet* style, const CSSValueList* newTextDecoration, int propertyID)
+static void setTextDecorationProperty(StylePropertySet* style, const CSSValueList* newTextDecoration, CSSPropertyID propertyID)
 {
     if (newTextDecoration->length())
         style->setProperty(propertyID, newTextDecoration->cssText(), style->propertyIsImportant(propertyID));
@@ -1395,7 +1395,7 @@ void StyleChange::extractTextStyles(Document* document, StylePropertySet* style,
     }
 }
 
-static void diffTextDecorations(StylePropertySet* style, int propertID, CSSValue* refTextDecoration)
+static void diffTextDecorations(StylePropertySet* style, CSSPropertyID propertID, CSSValue* refTextDecoration)
 {
     RefPtr<CSSValue> textDecoration = style->getPropertyCSSValue(propertID);
     if (!textDecoration || !textDecoration->isValueList() || !refTextDecoration || !refTextDecoration->isValueList())
@@ -1534,10 +1534,10 @@ int legacyFontSizeFromCSSValue(Document* document, CSSPrimitiveValue* value, boo
 {
     if (isCSSValueLength(value)) {
         int pixelFontSize = value->getIntValue(CSSPrimitiveValue::CSS_PX);
-        int legacyFontSize = CSSStyleSelector::legacyFontSize(document, pixelFontSize, shouldUseFixedFontDefaultSize);
+        int legacyFontSize = StyleResolver::legacyFontSize(document, pixelFontSize, shouldUseFixedFontDefaultSize);
         // Use legacy font size only if pixel value matches exactly to that of legacy font size.
         int cssPrimitiveEquivalent = legacyFontSize - 1 + CSSValueXSmall;
-        if (mode == AlwaysUseLegacyFontSize || CSSStyleSelector::fontSizeForKeyword(document, cssPrimitiveEquivalent, shouldUseFixedFontDefaultSize) == pixelFontSize)
+        if (mode == AlwaysUseLegacyFontSize || StyleResolver::fontSizeForKeyword(document, cssPrimitiveEquivalent, shouldUseFixedFontDefaultSize) == pixelFontSize)
             return legacyFontSize;
 
         return 0;

@@ -81,22 +81,27 @@ public:
     PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
     Element* getElementByIdInShadowRoot(Node* shadowRoot, const String& id, ExceptionCode&);
     bool isValidContentSelect(Element* insertionPoint, ExceptionCode&);
+    Node* treeScopeRootNode(Node*, ExceptionCode&);
 
     bool attached(Node*, ExceptionCode&);
 
-    Node* nextSiblingInReifiedTree(Node*, ExceptionCode&);
-    Node* firstChildInReifiedTree(Node*, ExceptionCode&);
-    Node* lastChildInReifiedTree(Node*, ExceptionCode&);
-    Node* traverseNextNodeInReifiedTree(Node*, ExceptionCode&);
-    Node* traversePreviousNodeInReifiedTree(Node*, ExceptionCode&);
+    // FIXME: Rename these functions if walker is prefered.
+    Node* nextSiblingByWalker(Node*, ExceptionCode&);
+    Node* firstChildByWalker(Node*, ExceptionCode&);
+    Node* lastChildByWalker(Node*, ExceptionCode&);
+    Node* nextNodeByWalker(Node*, ExceptionCode&);
+    Node* previousNodeByWalker(Node*, ExceptionCode&);
 
-#if ENABLE(INPUT_COLOR)
+    String visiblePlaceholder(Element*);
+#if ENABLE(INPUT_TYPE_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);
 #endif
 
     PassRefPtr<ClientRect> boundingBox(Element*, ExceptionCode&);
 
     PassRefPtr<ClientRectList> inspectorHighlightRects(Document*, ExceptionCode&);
+
+    void setBackgroundBlurOnNode(Node*, int blurLength, ExceptionCode&);
 
     unsigned markerCountForNode(Node*, const String&, ExceptionCode&);
     PassRefPtr<Range> markerRangeForNode(Node*, const String& markerType, unsigned index, ExceptionCode&);
@@ -118,16 +123,16 @@ public:
     unsigned lengthFromRange(Element* scope, const Range*, ExceptionCode&);
     String rangeAsText(const Range*, ExceptionCode&);
 
+    void setDelegatesScrolling(bool enabled, Document*, ExceptionCode&);
 #if ENABLE(TOUCH_ADJUSTMENT)
     PassRefPtr<WebKitPoint> touchPositionAdjustedToBestClickableNode(long x, long y, long width, long height, Document*, ExceptionCode&);
     Node* touchNodeAdjustedToBestClickableNode(long x, long y, long width, long height, Document*, ExceptionCode&);
+    PassRefPtr<ClientRect> bestZoomableAreaForTouchPoint(long x, long y, long width, long height, Document*, ExceptionCode&);
 #endif
 
     int lastSpellCheckRequestSequence(Document*, ExceptionCode&);
     int lastSpellCheckProcessedSequence(Document*, ExceptionCode&);
     
-    void setMediaPlaybackRequiresUserGesture(Document*, bool enabled, ExceptionCode&);
-
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
 
@@ -138,7 +143,7 @@ public:
     unsigned touchEventHandlerCount(Document*, ExceptionCode&);
 
     PassRefPtr<NodeList> nodesFromRect(Document*, int x, int y, unsigned topPadding, unsigned rightPadding,
-        unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, ExceptionCode&) const;
+        unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, ExceptionCode&) const;
 
     void emitInspectorDidBeginFrame();
     void emitInspectorDidCancelFrame();
@@ -146,15 +151,27 @@ public:
     bool hasSpellingMarker(Document*, int from, int length, ExceptionCode&);
     bool hasGrammarMarker(Document*, int from, int length, ExceptionCode&);
 
+    unsigned numberOfScrollableAreas(Document*, ExceptionCode&);
+
     static const char* internalsId;
 
     InternalSettings* settings() const { return m_settings.get(); }
 
     void setBatteryStatus(Document*, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode&);
 
+    void setNetworkInformation(Document*, const String& eventType, long bandwidth, bool metered, ExceptionCode&);
+
 #if ENABLE(INSPECTOR)
     unsigned numberOfLiveNodes() const;
     unsigned numberOfLiveDocuments() const;
+    Vector<String> consoleMessageArgumentCounts(Document*) const;
+#endif
+
+#if ENABLE(FULLSCREEN_API)
+    void webkitWillEnterFullScreenForElement(Document*, Element*);
+    void webkitDidEnterFullScreenForElement(Document*, Element*);
+    void webkitWillExitFullScreenForElement(Document*, Element*);
+    void webkitDidExitFullScreenForElement(Document*, Element*);
 #endif
 
 private:

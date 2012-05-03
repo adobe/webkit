@@ -26,7 +26,8 @@
 module window {
   interface [
       Conditional=WEB_INTENTS,
-      Constructor(in DOMString action, in DOMString type, in [Optional=DefaultIsNullString] SerializedScriptValue data),
+      CustomConstructor,
+      Constructor(in DOMString action, in DOMString type, in [Optional=DefaultIsNullString, TransferList=transferList] SerializedScriptValue data, in [Optional=DefaultIsUndefined] Array transferList),
       ConstructorRaisesException
   ] Intent {
         readonly attribute DOMString action;

@@ -51,6 +51,7 @@
 #include "NetworkManager.h"
 #include "NodeList.h"
 #include "Page.h"
+#include "PluginDatabase.h"
 #include "PluginView.h"
 #include "ProgressTracker.h"
 #include "ProtectionSpace.h"
@@ -72,6 +73,7 @@
 using WTF::String;
 using namespace WebCore;
 using namespace BlackBerry::WebKit;
+using BlackBerry::Platform::NetworkRequest;
 
 // This was copied from file "WebKit/Source/WebKit/mac/Misc/WebKitErrors.h".
 enum {
@@ -99,13 +101,10 @@ FrameLoaderClientBlackBerry::FrameLoaderClientBlackBerry()
     , m_hasSentResponseToPlugin(false)
     , m_cancelLoadOnNextData(false)
 {
-    m_deferredJobsTimer = new Timer<FrameLoaderClientBlackBerry>(this, &FrameLoaderClientBlackBerry::deferredJobsTimerFired);
 }
 
 FrameLoaderClientBlackBerry::~FrameLoaderClientBlackBerry()
 {
-    delete m_deferredJobsTimer;
-    m_deferredJobsTimer = 0;
 }
 
 int FrameLoaderClientBlackBerry::playerId() const
@@ -209,8 +208,11 @@ void FrameLoaderClientBlackBerry::dispatchDecidePolicyForNavigationAction(FrameP
 
         // Let the client have a chance to say whether this navigation should
         // be ignored or not.
-        BlackBerry::Platform::NetworkRequest platformRequest;
+        NetworkRequest platformRequest;
         request.initializePlatformRequest(platformRequest, cookiesEnabled());
+        if (platformRequest.getTargetType() == NetworkRequest::TargetIsUnknown)
+            platformRequest.setTargetType(isMainFrame() ? NetworkRequest::TargetIsMainFrame : NetworkRequest::TargetIsSubframe);
+
         if (isMainFrame() && !m_webPagePrivate->m_client->acceptNavigationRequest(
             platformRequest, BlackBerry::Platform::NavigationType(action.type()))) {
             if (action.type() == NavigationTypeFormSubmitted
@@ -323,7 +325,7 @@ PassRefPtr<Widget> FrameLoaderClientBlackBerry::createPlugin(const IntSize& plug
             mimeType = mimeTypeIn;
     }
 
-    if (mimeType == "application/x-shockwave-flash" || mimeType == "application/jnext-scriptable-plugin")
+    if (PluginDatabase::installedPlugins()->isMIMETypeRegistered(mimeType))
         return PluginView::create(m_frame, pluginSize, element, url, paramNames, paramValues, mimeType, loadManually);
 
     // If it's not the plugin type we support, try load directly from browser.
@@ -931,12 +933,16 @@ void FrameLoaderClientBlackBerry::dispatchWillSendRequest(DocumentLoader* docLoa
     // it is a new top level request which has not been commited.
     bool isMainResourceLoad = docLoader && docLoader == docLoader->frameLoader()->provisionalDocumentLoader();
 
+    // TargetType for subresource loads should have been set in CachedResource::load().
+    if (isMainResourceLoad && request.targetType() == ResourceRequest::TargetIsUnspecified)
+        request.setTargetType(isMainFrame() ? ResourceRequest::TargetIsMainFrame : ResourceRequest::TargetIsSubframe);
+
     // Any processing which is done for all loads (both main and subresource) should go here.
-    BlackBerry::Platform::NetworkRequest platformRequest;
+    NetworkRequest platformRequest;
     request.initializePlatformRequest(platformRequest, cookiesEnabled());
     m_webPagePrivate->m_client->populateCustomHeaders(platformRequest);
-    const BlackBerry::Platform::NetworkRequest::HeaderList& headerLists = platformRequest.getHeaderListRef();
-    for (BlackBerry::Platform::NetworkRequest::HeaderList::const_iterator it = headerLists.begin(); it != headerLists.end(); ++it) {
+    const NetworkRequest::HeaderList& headerLists = platformRequest.getHeaderListRef();
+    for (NetworkRequest::HeaderList::const_iterator it = headerLists.begin(); it != headerLists.end(); ++it) {
         std::string headerString = it->first;
         std::string headerValueString = it->second;
         request.setHTTPHeaderField(String::fromUTF8WithLatin1Fallback(headerString.data(), headerString.length()), String::fromUTF8WithLatin1Fallback(headerValueString.data(), headerValueString.length()));
@@ -1091,8 +1097,11 @@ PolicyAction FrameLoaderClientBlackBerry::decidePolicyForExternalLoad(const Reso
             && isMainFrame()
             && !request.mustHandleInternally()
             && !isFragmentScroll) {
-        BlackBerry::Platform::NetworkRequest platformRequest;
+        NetworkRequest platformRequest;
         request.initializePlatformRequest(platformRequest, cookiesEnabled());
+        if (platformRequest.getTargetType() == NetworkRequest::TargetIsUnknown)
+            platformRequest.setTargetType(isMainFrame() ? NetworkRequest::TargetIsMainFrame : NetworkRequest::TargetIsSubframe);
+
         m_webPagePrivate->m_client->handleExternalLink(platformRequest, request.anchorText().characters(), request.anchorText().length(), m_clientRedirectIsPending);
         return PolicyIgnore;
     }
@@ -1102,8 +1111,6 @@ PolicyAction FrameLoaderClientBlackBerry::decidePolicyForExternalLoad(const Reso
 
 void FrameLoaderClientBlackBerry::willDeferLoading()
 {
-    m_deferredJobsTimer->stop();
-
     if (!isMainFrame())
         return;
 
@@ -1112,34 +1119,10 @@ void FrameLoaderClientBlackBerry::willDeferLoading()
 
 void FrameLoaderClientBlackBerry::didResumeLoading()
 {
-    if (!m_deferredManualScript.isNull())
-        m_deferredJobsTimer->startOneShot(0);
-
     if (!isMainFrame())
         return;
 
     m_webPagePrivate->didResumeLoading();
-}
-
-void FrameLoaderClientBlackBerry::setDeferredManualScript(const KURL& script)
-{
-    ASSERT(!m_deferredJobsTimer->isActive());
-    m_deferredManualScript = script;
-}
-
-void FrameLoaderClientBlackBerry::deferredJobsTimerFired(Timer<FrameLoaderClientBlackBerry>*)
-{
-    ASSERT(!m_frame->page()->defersLoading());
-
-    if (!m_deferredManualScript.isNull()) {
-        // Executing the script will set deferred loading, which could trigger this timer again if a script is set. So clear the script first.
-        KURL script = m_deferredManualScript;
-        m_deferredManualScript = KURL();
-
-        m_frame->script()->executeIfJavaScriptURL(script);
-    }
-
-    ASSERT(!m_frame->page()->defersLoading());
 }
 
 void FrameLoaderClientBlackBerry::readyToRender(bool pageIsVisuallyNonEmpty)
@@ -1159,7 +1142,7 @@ PassRefPtr<FrameNetworkingContext> FrameLoaderClientBlackBerry::createNetworking
 void FrameLoaderClientBlackBerry::startDownload(const ResourceRequest& request, const String& /*suggestedName*/)
 {
     // FIXME: use the suggestedName?
-    m_webPagePrivate->load(request.url().string().utf8().data(), 0, "GET", BlackBerry::Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, true, "");
+    m_webPagePrivate->load(request.url().string().utf8().data(), 0, "GET", NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, true, "");
 }
 
 void FrameLoaderClientBlackBerry::download(ResourceHandle* handle, const ResourceRequest&, const ResourceRequest&, const ResourceResponse& r)
@@ -1188,7 +1171,7 @@ void FrameLoaderClientBlackBerry::dispatchDidReceiveIcon()
 
 bool FrameLoaderClientBlackBerry::canCachePage() const
 {
-    // We won't cache pages containing video or audio.
+    // We won't cache pages containing video, audio or multipart with "multipart/x-mixed-replace".
     ASSERT(m_frame->document());
     RefPtr<NodeList> nodeList = m_frame->document()->getElementsByTagName(HTMLNames::videoTag.localName());
     if (nodeList.get()->length() > 0)
@@ -1197,6 +1180,13 @@ bool FrameLoaderClientBlackBerry::canCachePage() const
     if (nodeList.get()->length() > 0)
         return false;
 
+    ASSERT(m_frame->loader()->documentLoader());
+    const ResponseVector& responses = m_frame->loader()->documentLoader()->responses();
+    size_t count = responses.size();
+    for (size_t i = 0; i < count; i++) {
+        if (responses[i].isMultipartPayload())
+            return false;
+    }
     return true;
 }
 

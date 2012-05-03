@@ -31,10 +31,12 @@
 #include "Frame.h"
 #include "FrameView.h"
 #include "GStreamerGWorld.h"
+#include "GStreamerUtilities.h"
 #include "GStreamerVersioning.h"
 #include "GraphicsContext.h"
 #include "GraphicsTypes.h"
 #include "ImageGStreamer.h"
+#include "ImageOrientation.h"
 #include "IntRect.h"
 #include "KURL.h"
 #include "MIMETypeRegistry.h"
@@ -174,35 +176,25 @@ void MediaPlayerPrivateGStreamer::registerMediaEngine(MediaEngineRegistrar regis
         registrar(create, getSupportedTypes, supportsType, 0, 0, 0);
 }
 
-static bool gstInitialized = false;
-
-static bool doGstInit()
+bool initializeGStreamerAndRegisterWebKitElements()
 {
-    // FIXME: We should pass the arguments from the command line
-    if (!gstInitialized) {
-        GOwnPtr<GError> error;
-        gstInitialized = gst_init_check(0, 0, &error.outPtr());
-        if (!gstInitialized)
-            LOG_VERBOSE(Media, "Could not initialize GStreamer: %s",
-                        error ? error->message : "unknown error occurred");
-        else
-            gst_element_register(0, "webkitwebsrc", GST_RANK_PRIMARY + 100,
-                                 WEBKIT_TYPE_WEB_SRC);
-    }
-    return gstInitialized;
+    if (!initializeGStreamer())
+        return false;
+
+    GRefPtr<GstElementFactory> srcFactory = gst_element_factory_find("webkitwebsrc");
+    if (!srcFactory)
+        return gst_element_register(0, "webkitwebsrc", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_WEB_SRC);
+
+    return true;
 }
 
 bool MediaPlayerPrivateGStreamer::isAvailable()
 {
-    if (!doGstInit())
+    if (!initializeGStreamerAndRegisterWebKitElements())
         return false;
 
-    GstElementFactory* factory = gst_element_factory_find(gPlaybinName);
-    if (factory) {
-        gst_object_unref(GST_OBJECT(factory));
-        return true;
-    }
-    return false;
+    GRefPtr<GstElementFactory> factory = gst_element_factory_find(gPlaybinName);
+    return factory;
 }
 
 MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
@@ -243,7 +235,7 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
     , m_videoTimerHandler(0)
     , m_webkitAudioSink(0)
 {
-    if (doGstInit())
+    if (initializeGStreamerAndRegisterWebKitElements())
         createGSTPlayBin();
 }
 
@@ -1365,10 +1357,10 @@ void MediaPlayerPrivateGStreamer::timeChanged()
 void MediaPlayerPrivateGStreamer::didEnd()
 {
     // EOS was reached but in case of reverse playback the position is
-    // not always 0. So to not confuse the HTMLMediaElement we
-    // synchronize position and duration values.
+    // not always 0. So to not confuse the HTMLMediaElement, if we're
+    // doing reverse playback, we synchronize position and duration values.
     float now = currentTime();
-    if (now > 0) {
+    if (now > 0 && m_playbackRate < 0) {
         m_mediaDuration = now;
         m_mediaDurationKnown = true;
         m_player->durationChanged();
@@ -1497,13 +1489,13 @@ void MediaPlayerPrivateGStreamer::paint(GraphicsContext* context, const IntRect&
         return;
 
     context->drawImage(reinterpret_cast<Image*>(gstImage->image().get()), ColorSpaceSRGB,
-                       rect, CompositeCopy, false);
+                       rect, CompositeCopy, DoNotRespectImageOrientation, false);
 }
 
 static HashSet<String> mimeTypeCache()
 {
 
-    doGstInit();
+    initializeGStreamerAndRegisterWebKitElements();
 
     DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
     static bool typeListInitialized = false;

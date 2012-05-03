@@ -29,7 +29,7 @@
 #include "SVGFontElement.h"
 #include "SVGFontFaceElement.h"
 #include "SVGNames.h"
-#include "SVGPathParserFactory.h"
+#include "SVGPathUtilities.h"
 
 namespace WebCore {
 
@@ -61,16 +61,17 @@ void SVGGlyphElement::parseAttribute(Attribute* attr)
         SVGStyledElement::parseAttribute(attr);
 }
 
-void SVGGlyphElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGGlyphElement::insertedInto(Node* rootParent)
 {
     invalidateGlyphCache();
-    SVGStyledElement::insertedIntoDocument();
+    return SVGStyledElement::insertedInto(rootParent);
 }
 
-void SVGGlyphElement::removedFromDocument()
+void SVGGlyphElement::removedFrom(Node* rootParent)
 {
-    invalidateGlyphCache();
-    SVGStyledElement::removedFromDocument();
+    if (rootParent->inDocument())
+        invalidateGlyphCache();
+    SVGStyledElement::removedFrom(rootParent);
 }
 
 static inline SVGGlyph::ArabicForm parseArabicForm(const AtomicString& value)
@@ -95,14 +96,6 @@ static inline SVGGlyph::Orientation parseOrientation(const AtomicString& value)
         return SVGGlyph::Vertical;
 
     return SVGGlyph::Both;
-}
-
-static inline Path parsePathData(const AtomicString& value)
-{
-    Path result;
-    SVGPathParserFactory* factory = SVGPathParserFactory::self();
-    factory->buildPathFromString(value, result);
-    return result;
 }
 
 void SVGGlyphElement::inheritUnspecifiedAttributes(SVGGlyph& identifier, const SVGFontData* svgFontData)
@@ -132,7 +125,7 @@ static inline float parseSVGGlyphAttribute(const SVGElement* element, const WebC
 SVGGlyph SVGGlyphElement::buildGenericGlyphIdentifier(const SVGElement* element)
 {
     SVGGlyph identifier;
-    identifier.pathData = parsePathData(element->fastGetAttribute(SVGNames::dAttr));
+    buildPathFromString(element->fastGetAttribute(SVGNames::dAttr), identifier.pathData);
  
     // Spec: The horizontal advance after rendering the glyph in horizontal orientation.
     // If the attribute is not specified, the effect is as if the attribute were set to the

@@ -71,13 +71,13 @@ public:
     // metrics and defaults given the contents of the style.  This includes sophisticated operations like
     // selection of control size based off the font, the disabling of appearance when certain other properties like
     // "border" are set, or if the appearance is not supported by the theme.
-    void adjustStyle(CSSStyleSelector*, RenderStyle*, Element*,  bool UAHasAppearance,
+    void adjustStyle(StyleResolver*, RenderStyle*, Element*,  bool UAHasAppearance,
                      const BorderData&, const FillLayer&, const Color& backgroundColor);
 
     // This method is called to paint the widget as a background of the RenderObject.  A widget's foreground, e.g., the
     // text of a button, is always rendered by the engine itself.  The boolean return value indicates
     // whether the CSS border/background should also be painted.
-    bool paint(RenderObject*, const PaintInfo&, const LayoutRect&);
+    bool paint(RenderObject*, const PaintInfo&, const IntRect&);
     bool paintBorderOnly(RenderObject*, const PaintInfo&, const IntRect&);
     bool paintDecorations(RenderObject*, const PaintInfo&, const IntRect&);
 
@@ -115,7 +115,7 @@ public:
 
     // Some controls may spill out of their containers (e.g., the check on an OS X checkbox).  When these controls repaint,
     // the theme needs to communicate this inflated rect to the engine so that it can invalidate the whole control.
-    virtual void adjustRepaintRect(const RenderObject*, LayoutRect&);
+    virtual void adjustRepaintRect(const RenderObject*, IntRect&);
 
     // This method is called whenever a relevant state changes on a particular themed object, e.g., the mouse becomes pressed
     // or a control becomes disabled.
@@ -177,7 +177,7 @@ public:
     virtual ScrollbarControlSize scrollbarControlSizeForPart(ControlPart) { return RegularScrollbar; }
 
     // Method for painting the caps lock indicator
-    virtual bool paintCapsLockIndicator(RenderObject*, const PaintInfo&, const LayoutRect&) { return 0; };
+    virtual bool paintCapsLockIndicator(RenderObject*, const PaintInfo&, const IntRect&) { return 0; };
 
 #if ENABLE(PROGRESS_TAG)
     // Returns the repeat interval of the animation for the progress bar.
@@ -199,11 +199,11 @@ public:
     virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
     
     // Returns the media volume slider container's offset from the mute button.
-    virtual LayoutPoint volumeSliderOffsetFromMuteButton(RenderBox*, const LayoutSize&) const;
+    virtual IntPoint volumeSliderOffsetFromMuteButton(RenderBox*, const IntSize&) const;
 #endif
 
 #if ENABLE(METER_TAG)
-    virtual LayoutSize meterSizeForBounds(const RenderMeter*, const LayoutRect&) const;
+    virtual IntSize meterSizeForBounds(const RenderMeter*, const IntRect&) const;
     virtual bool supportsMeter(ControlPart) const;
 #endif
     
@@ -235,68 +235,68 @@ protected:
 
 #if !USE(NEW_THEME)
     // Methods for each appearance value.
-    virtual void adjustCheckboxStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustCheckboxStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintCheckbox(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual void setCheckboxSize(RenderStyle*) const { }
 
-    virtual void adjustRadioStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustRadioStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintRadio(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual void setRadioSize(RenderStyle*) const { }
 
-    virtual void adjustButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual void setButtonSize(RenderStyle*) const { }
 
-    virtual void adjustInnerSpinButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintInnerSpinButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 #endif
 
-    virtual void adjustTextFieldStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustTextFieldStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintTextField(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustTextAreaStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustTextAreaStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintTextArea(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustMenuListStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustMenuListStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustMenuListButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintMenuListButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
 #if ENABLE(METER_TAG)
-    virtual void adjustMeterStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustMeterStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintMeter(RenderObject*, const PaintInfo&, const IntRect&);
 #endif
 
 #if ENABLE(PROGRESS_TAG)
-    virtual void adjustProgressBarStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustProgressBarStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 #endif
 
 #if ENABLE(INPUT_SPEECH)
-    virtual void adjustInputFieldSpeechButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustInputFieldSpeechButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintInputFieldSpeechButton(RenderObject*, const PaintInfo&, const IntRect&);
 #endif
 
-    virtual void adjustSliderTrackStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSliderTrackStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSliderThumbStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSliderThumbStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSearchFieldStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSearchField(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldCancelButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSearchFieldCancelButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSearchFieldCancelButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldDecorationStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSearchFieldDecorationStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSearchFieldDecoration(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldResultsDecorationStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSearchFieldResultsDecorationStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSearchFieldResultsDecoration(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
-    virtual void adjustSearchFieldResultsButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
+    virtual void adjustSearchFieldResultsButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSearchFieldResultsButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
     virtual bool paintMediaFullscreenButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }

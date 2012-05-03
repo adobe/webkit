@@ -106,14 +106,16 @@ void CCLayerTilingData::layerRectToTileIndices(const IntRect& layerRect, int& le
 
 IntRect CCLayerTilingData::tileRect(const Tile* tile) const
 {
-    const int index = m_tilingData.tileIndex(tile->i(), tile->j());
-    IntRect tileRect = m_tilingData.tileBoundsWithBorder(index);
+    IntRect tileRect = m_tilingData.tileBoundsWithBorder(tile->i(), tile->j());
     tileRect.setSize(m_tileSize);
     return tileRect;
 }
 
 Region CCLayerTilingData::opaqueRegionInLayerRect(const IntRect& layerRect) const
 {
+    if (layerRect.isEmpty())
+        return Region();
+
     Region opaqueRegion;
     int left, top, right, bottom;
     layerRectToTileIndices(layerRect, left, top, right, bottom);

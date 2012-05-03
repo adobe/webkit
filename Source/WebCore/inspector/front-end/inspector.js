@@ -53,6 +53,8 @@ var WebInspector = {
             this.panels.network = new WebInspector.NetworkPanel();
         if (hiddenPanels.indexOf("scripts") === -1)
             this.panels.scripts = new WebInspector.ScriptsPanel(this.debuggerPresentationModel);
+        if (hiddenPanels.indexOf("styles") === -1 && WebInspector.experimentsSettings.showStylesPanel.isEnabled())
+            this.panels.styles = new WebInspector.StylesPanel();
         if (hiddenPanels.indexOf("timeline") === -1)
             this.panels.timeline = new WebInspector.TimelinePanel();
         if (hiddenPanels.indexOf("profiles") === -1)
@@ -283,9 +285,13 @@ var WebInspector = {
             errorWarningElement.title = null;
     },
 
-    networkResourceById: function(id)
+    /**
+     * @param {NetworkAgent.RequestId} requestId
+     * @return {?WebInspector.NetworkRequest}
+     */
+    networkRequestById: function(requestId)
     {
-        return this.panels.network.resourceById(id);
+        return this.panels.network.requestById(requestId);
     },
 
     get inspectedPageDomain()
@@ -346,10 +352,18 @@ WebInspector.Events = {
 WebInspector.loaded = function()
 {
     InspectorBackend.loadFromJSONIfNeeded();
-    if ("page" in WebInspector.queryParamsObject) {
+
+    var ws;
+    if ("ws" in WebInspector.queryParamsObject)
+        ws = "ws://" + WebInspector.queryParamsObject.ws;
+    else if ("page" in WebInspector.queryParamsObject) {
         var page = WebInspector.queryParamsObject.page;
         var host = "host" in WebInspector.queryParamsObject ? WebInspector.queryParamsObject.host : window.location.host;
-        WebInspector.socket = new WebSocket("ws://" + host + "/devtools/page/" + page);
+        ws = "ws://" + host + "/devtools/page/" + page;
+    }
+
+    if (ws) {
+        WebInspector.socket = new WebSocket(ws);
         WebInspector.socket.onmessage = function(message) { InspectorBackend.dispatch(message.data); }
         WebInspector.socket.onerror = function(error) { console.error(error); }
         WebInspector.socket.onopen = function() {
@@ -378,7 +392,8 @@ WebInspector.doLoadedDone = function()
     DebuggerAgent.supportsNativeBreakpoints(WebInspector._initializeCapability.bind(WebInspector, "nativeInstrumentationEnabled", null));
     ProfilerAgent.causesRecompilation(WebInspector._initializeCapability.bind(WebInspector, "profilerCausesRecompilation", null));
     ProfilerAgent.isSampling(WebInspector._initializeCapability.bind(WebInspector, "samplingCPUProfiler", null));
-    ProfilerAgent.hasHeapProfiler(WebInspector._initializeCapability.bind(WebInspector, "heapProfilerPresent", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
+    ProfilerAgent.hasHeapProfiler(WebInspector._initializeCapability.bind(WebInspector, "heapProfilerPresent", null));
+    PageAgent.canOverrideDeviceMetrics(WebInspector._initializeCapability.bind(WebInspector, "canOverrideDeviceMetrics", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
 }
 
 WebInspector._doLoadedDoneWithCapabilities = function()
@@ -412,6 +427,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     this.cssModel = new WebInspector.CSSStyleModel();
     this.timelineManager = new WebInspector.TimelineManager();
+    this.userAgentSupport = new WebInspector.UserAgentSupport();
     InspectorBackend.registerDatabaseDispatcher(new WebInspector.DatabaseDispatcher());
     InspectorBackend.registerDOMStorageDispatcher(new WebInspector.DOMStorageDispatcher());
 
@@ -425,6 +441,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     if (this._zoomLevel)
         this._requestZoom();
 
+    WebInspector.CSSCompletions.requestCSSNameCompletions();
     this._createPanels();
     this._createGlobalStatusBarItems();
 
@@ -464,7 +481,11 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     if (WebInspector.settings.showPaintRects.get())
         PageAgent.setShowPaintRects(true);
 
-    WebInspector.CSSCompletions.requestCSSNameCompletions();
+    if (WebInspector.settings.javaScriptDisabled.get())
+        PageAgent.setScriptExecutionDisabled(true);
+
+    this.domAgent._emulateTouchEventsChanged();
+
     WebInspector.WorkerManager.loadCompleted();
     InspectorFrontendAPI.loadCompleted();
 }
@@ -588,7 +609,7 @@ WebInspector.documentClick = function(event)
         return;
 
     // Prevent the link from navigating, since we don't do any navigation by following links normally.
-    event.consume();
+    event.consume(true);
 
     function followLink()
     {
@@ -638,10 +659,10 @@ WebInspector.openResource = function(resourceURL, inResourcesPanel)
         InspectorFrontendHost.openInNewTab(resourceURL);
 }
 
-WebInspector.openRequestInNetworkPanel = function(resource)
+WebInspector.openRequestInNetworkPanel = function(request)
 {
     WebInspector.showPanel("network");
-    WebInspector.panels.network.revealAndHighlightResource(resource);
+    WebInspector.panels.network.revealAndHighlightRequest(request);
 }
 
 WebInspector._registerShortcuts = function()
@@ -652,7 +673,14 @@ WebInspector._registerShortcuts = function()
         shortcut.shortcutToString("]", shortcut.Modifiers.CtrlOrMeta),
         shortcut.shortcutToString("[", shortcut.Modifiers.CtrlOrMeta)
     ];
-    section.addRelatedKeys(keys, WebInspector.UIString("Next/previous panel"));
+    section.addRelatedKeys(keys, WebInspector.UIString("Go to the panel to the left/right"));
+
+    var keys = [
+        shortcut.shortcutToString("[", shortcut.Modifiers.CtrlOrMeta | shortcut.Modifiers.Alt),
+        shortcut.shortcutToString("]", shortcut.Modifiers.CtrlOrMeta | shortcut.Modifiers.Alt)
+    ];
+    section.addRelatedKeys(keys, WebInspector.UIString("Go back/forward in panel history"));
+
     section.addKey(shortcut.shortcutToString(shortcut.Keys.Esc), WebInspector.UIString("Toggle console"));
     section.addKey(shortcut.shortcutToString("f", shortcut.Modifiers.CtrlOrMeta), WebInspector.UIString("Search"));
     
@@ -668,7 +696,7 @@ WebInspector._registerShortcuts = function()
     }
 
     var goToShortcut = WebInspector.GoToLineDialog.createShortcut();
-    section.addKey(goToShortcut.name, WebInspector.UIString("Go to Line"));
+    section.addKey(goToShortcut.name, WebInspector.UIString("Go to line"));
 }
 
 WebInspector.documentKeyDown = function(event)
@@ -678,14 +706,14 @@ WebInspector.documentKeyDown = function(event)
     if (event.keyIdentifier === "F1" ||
         (event.keyIdentifier === helpKey && event.shiftKey && (!WebInspector.isBeingEdited(event.target) || event.metaKey))) {
         WebInspector.shortcutsScreen.show();
-        event.consume();
+        event.consume(true);
         return;
     }
 
     if (WebInspector.currentFocusElement() && WebInspector.currentFocusElement().handleKeyEvent) {
         WebInspector.currentFocusElement().handleKeyEvent(event);
         if (event.handled) {
-            event.consume();
+            event.consume(true);
             return;
         }
     }
@@ -693,7 +721,7 @@ WebInspector.documentKeyDown = function(event)
     if (WebInspector.inspectorView.currentPanel()) {
         WebInspector.inspectorView.currentPanel().handleShortcut(event);
         if (event.handled) {
-            event.consume();
+            event.consume(true);
             return;
         }
     }
@@ -701,7 +729,7 @@ WebInspector.documentKeyDown = function(event)
     WebInspector.searchController.handleShortcut(event);
     WebInspector.advancedSearchController.handleShortcut(event);
     if (event.handled) {
-        event.consume();
+        event.consume(true);
         return;
     }
 
@@ -710,13 +738,13 @@ WebInspector.documentKeyDown = function(event)
         case "U+0052": // R key
             if ((event.metaKey && isMac) || (event.ctrlKey && !isMac)) {
                 PageAgent.reload(event.shiftKey);
-                event.consume();
+                event.consume(true);
             }
             break;
         case "F5":
             if (!isMac) {
                 PageAgent.reload(event.ctrlKey || event.shiftKey);
-                event.consume();
+                event.consume(true);
             }
             break;
     }
@@ -730,20 +758,20 @@ WebInspector.documentKeyDown = function(event)
         case 187: // +
             if (isValidZoomShortcut) {
                 WebInspector._zoomIn();
-                event.consume();
+                event.consume(true);
             }
             break;
         case 109: // -
         case 189: // -
             if (isValidZoomShortcut) {
                 WebInspector._zoomOut();
-                event.consume();
+                event.consume(true);
             }
             break;
         case 48: // 0
             if (isValidZoomShortcut) {
                 WebInspector._resetZoom();
-                event.consume();
+                event.consume(true);
             }
             break;
     }
@@ -951,7 +979,7 @@ WebInspector._showAnchorLocation = function(anchor)
 
 WebInspector._showAnchorLocationInPanel = function(anchor, panel)
 {
-    if (!panel.canShowAnchorLocation(anchor))
+    if (!panel || !panel.canShowAnchorLocation(anchor))
         return false;
 
     // FIXME: support webkit-html-external-link links here.
@@ -1002,4 +1030,27 @@ WebInspector._toolbarItemClicked = function(event)
 {
     var toolbarItem = event.currentTarget;
     WebInspector.inspectorView.setCurrentPanel(toolbarItem.panel);
+}
+
+WebInspector.save = function(url, content, forceSaveAs)
+{
+    // Remove this url from the saved URLs while it is being saved.
+    var savedURLs = WebInspector.settings.savedURLs.get();
+    delete savedURLs[url];
+    WebInspector.settings.savedURLs.set(savedURLs);
+
+    InspectorFrontendHost.save(url, content, forceSaveAs);
+}
+
+WebInspector.savedURL = function(url)
+{
+    var savedURLs = WebInspector.settings.savedURLs.get();
+    savedURLs[url] = true;
+    WebInspector.settings.savedURLs.set(savedURLs);
+}
+
+WebInspector.isURLSaved = function(url)
+{
+    var savedURLs = WebInspector.settings.savedURLs.get();
+    return savedURLs[url];
 }

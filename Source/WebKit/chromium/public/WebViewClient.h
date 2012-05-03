@@ -48,6 +48,7 @@
 namespace WebKit {
 
 class WebAccessibilityObject;
+class WebBatteryStatusClient;
 class WebColorChooser;
 class WebColorChooserClient;
 class WebDeviceOrientationClient;
@@ -68,6 +69,7 @@ class WebNotificationPresenter;
 class WebRange;
 class WebSpeechInputController;
 class WebSpeechInputListener;
+class WebSpeechRecognizer;
 class WebStorageNamespace;
 class WebURL;
 class WebURLRequest;
@@ -316,11 +318,18 @@ public:
     virtual WebSpeechInputController* speechInputController(
         WebSpeechInputListener*) { return 0; }
 
+    // Access the embedder API for speech recognition services.
+    virtual WebSpeechRecognizer* speechRecognizer() { return 0; }
+
     // Device Orientation --------------------------------------------------
 
     // Access the embedder API for device orientation services.
     virtual WebDeviceOrientationClient* deviceOrientationClient() { return 0; }
 
+    // Battery Status ------------------------------------------------------
+
+    // Access the embedder API for battery status services.
+    virtual WebBatteryStatusClient* batteryStatusClient() { return 0; }
 
     // Zoom ----------------------------------------------------------------
 

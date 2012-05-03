@@ -21,12 +21,16 @@
 #ifndef QtWebPageLoadClient_h
 #define QtWebPageLoadClient_h
 
-#include "QtWebError.h"
-#include <QtCore/QString>
-#include <QtCore/QUrl>
+#include <QtGlobal>
 #include <WKPage.h>
 
+QT_BEGIN_NAMESPACE
+class QUrl;
+QT_END_NAMESPACE
+
 class QQuickWebView;
+
+namespace WebKit {
 
 class QtWebPageLoadClient {
 public:
@@ -36,6 +40,7 @@ public:
 
 private:
     void didStartProvisionalLoadForFrame(const QUrl&);
+    void didReceiveServerRedirectForProvisionalLoadForFrame(const QUrl&);
     void didCommitLoadForFrame();
     void didSameDocumentNavigationForFrame();
     void didReceiveTitleForFrame();
@@ -43,11 +48,12 @@ private:
     void didChangeBackForwardList();
 
     void dispatchLoadSucceeded();
-    void dispatchLoadFailed(WKErrorRef);
+    void dispatchLoadFailed(WKFrameRef, WKErrorRef);
     void setLoadProgress(int);
 
     // WKPageLoadClient callbacks.
     static void didStartProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+    static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
     static void didFailProvisionalLoadWithErrorForFrame(WKPageRef, WKFrameRef, WKErrorRef, WKTypeRef userData, const void* clientInfo);
     static void didCommitLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
     static void didFinishLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
@@ -63,5 +69,7 @@ private:
     QQuickWebView* m_webView;
     int m_loadProgress;
 };
+
+} // namespace Webkit
 
 #endif // QtWebPageLoadClient_h

@@ -35,14 +35,14 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "KURL.h"
-#include <wtf/OwnPtr.h>
 #include "WebCore/plugins/PluginView.h"
-#include "RefCounted.h"
 #include "ResourceError.h"
 #include "ResourceResponse.h"
 #include <QUrl>
 #include <qobject.h>
 #include <wtf/Forward.h>
+#include <wtf/OwnPtr.h>
+#include <wtf/RefCounted.h>
 
 QT_BEGIN_NAMESPACE
 class QNetworkReply;
@@ -138,7 +138,6 @@ public:
     virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) { }
     virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>);
 
-    virtual void dispatchDidLoadMainResource(DocumentLoader*);
     virtual void revertToProvisionalState(DocumentLoader*);
     virtual void setMainDocumentError(DocumentLoader*, const ResourceError&);
 
@@ -221,7 +220,7 @@ public:
 
 #if USE(V8)
     // A frame's V8 context was created or destroyed.
-    virtual void didCreateScriptContext(v8::Handle<v8::Context>, int);
+    virtual void didCreateScriptContext(v8::Handle<v8::Context>, int, int);
     virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int);
 
     // A context untied to a frame was created (through evaluateInIsolatedWorld).
@@ -231,7 +230,7 @@ public:
 
     // Returns true if we should allow the given V8 extension to be added to
     // the script context at the currently loading page and given extension group.
-    virtual bool allowScriptExtension(const String& extensionName, int extensionGroup) { return false; }
+    virtual bool allowScriptExtension(const String& extensionName, int extensionGroup, int worldID) { return false; }
 #endif
 
     virtual void registerForIconNotification(bool);

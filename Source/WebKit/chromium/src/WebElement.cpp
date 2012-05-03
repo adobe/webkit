@@ -39,7 +39,6 @@
 #include "RenderObject.h"
 #include <wtf/PassRefPtr.h>
 
-#include "WebNamedNodeMap.h"
 
 using namespace WebCore;
 
@@ -83,9 +82,25 @@ bool WebElement::setAttribute(const WebString& attrName, const WebString& attrVa
     return !exceptionCode;
 }
 
-WebNamedNodeMap WebElement::attributes() const
+unsigned WebElement::attributeCount() const
 {
-    return WebNamedNodeMap(m_private->attributes());
+    if (!constUnwrap<Element>()->hasAttributes())
+        return 0;
+    return constUnwrap<Element>()->attributeCount();
+}
+
+WebString WebElement::attributeLocalName(unsigned index) const
+{
+    if (index >= attributeCount())
+        return WebString();
+    return constUnwrap<Element>()->attributeItem(index)->localName();
+}
+
+WebString WebElement::attributeValue(unsigned index) const
+{
+    if (index >= attributeCount())
+        return WebString();
+    return constUnwrap<Element>()->attributeItem(index)->value();
 }
 
 WebString WebElement::innerText()

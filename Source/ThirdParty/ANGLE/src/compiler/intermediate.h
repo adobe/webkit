@@ -257,13 +257,8 @@ public:
     const char* getQualifierString() const { return type.getQualifierString(); }
     TString getCompleteString() const { return type.getCompleteString(); }
 
-    void setDirtyFlag(bool flag) { dirtyFlag = flag; }
-    bool getDirtyFlag() { return dirtyFlag; }
-
 protected:
     TType type;
-    
-    bool dirtyFlag;
 };
 
 //

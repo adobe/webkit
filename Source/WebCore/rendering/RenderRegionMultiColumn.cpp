@@ -32,6 +32,7 @@
 
 #include "LayoutRepainter.h"
 #include "LayoutTypes.h"
+#include "RenderFlowThread.h"
 #include "RenderRegion.h"
 #include "RenderStyle.h"
 #include "RenderView.h"
@@ -46,6 +47,9 @@ RenderRegionMultiColumn::RenderRegionMultiColumn(Node* node, RenderFlowThread* f
     : RenderBlock(node)
     , m_flowThread(flowThread)
     , m_columnCount(0)
+    , m_computedAutoHeight(0)
+    , m_hasComputedAutoHeight(false)
+    , m_usesAutoHeight(false)
 {
 }
 
@@ -66,8 +70,10 @@ void RenderRegionMultiColumn::updateColumnCount(unsigned newColumnCount)
         newStyle->setRegionOverflow(BreakRegionOverflow);
         newStyle->setOverflowX(OHIDDEN);
         newStyle->setOverflowY(OHIDDEN);
+        newStyle->setWidth(Length(0, Intrinsic));
+        newStyle->setHeight(Length(0, Intrinsic));
         newStyle->font().update(0);
-        region->setUsedForMultiColumn(true);
+        region->setParentMultiColumnRegion(this);
         region->setStyle(newStyle.release());
         
         addChild(region);
@@ -163,6 +169,63 @@ void RenderRegionMultiColumn::layoutBlock(bool relayoutChildren, int, BlockLayou
 
     setNeedsLayout(false);
 }
+
+void RenderRegionMultiColumn::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
+{
+    RenderBlock::styleDidChange(diff, oldStyle);
+    
+    if (!oldStyle) {
+        // make sure we have at least a column
+        updateColumnCount(1);
+    }
+    
+    bool didUseAutoHeight = m_usesAutoHeight;
+    m_usesAutoHeight = hasAutoHeightStyle();
+    if (m_flowThread && didUseAutoHeight != m_usesAutoHeight) {
+        if (m_usesAutoHeight)
+            view()->incrementAutoHeightRegions();
+        else
+            view()->decrementAutoHeightRegions();
+        setNeedsLayout(true);
+        m_flowThread->setNeedsLayout(true);
+    }
+}
+
+void RenderRegionMultiColumn::computeLogicalHeight()
+{
+    RenderBlock::computeLogicalHeight();
+    if (document()->cssRegionsAutoHeightEnabled() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight()
+        && usesAutoHeight() && hasComputedAutoHeight()) {
+        LayoutUnit newLogicalHeight = computedAutoHeight() + borderAndPaddingLogicalHeight();
+        if (newLogicalHeight > logicalHeight())
+            setLogicalHeight(newLogicalHeight);
+    }
+}
+
+LayoutUnit RenderRegionMultiColumn::minPreferredLogicalWidth() const
+{
+    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() : RenderBlock::minPreferredLogicalWidth();
+}
+
+LayoutUnit RenderRegionMultiColumn::maxPreferredLogicalWidth() const
+{
+    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() : RenderBlock::maxPreferredLogicalWidth();
+}
+
+void RenderRegionMultiColumn::setComputedAutoHeight(LayoutUnit computedAutoHeight)
+{
+    ASSERT(document()->cssRegionsAutoHeightEnabled());
+    m_computedAutoHeight = computedAutoHeight;
+    m_hasComputedAutoHeight = true;
+}
+    
+bool RenderRegionMultiColumn::hasAutoHeightStyle() const
+{
+    RenderStyle* styleToUse = style();
+    bool hasAnchoredTopAndBottom = (isPositioned() || isRelPositioned()) && styleToUse->logicalTop().isSpecified() && styleToUse->logicalBottom().isSpecified();
+    return !hasAnchoredTopAndBottom && styleToUse->logicalHeight().isAuto();
+}
+
 
 const char* RenderRegionMultiColumn::renderName() const
 {

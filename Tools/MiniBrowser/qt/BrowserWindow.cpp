@@ -32,7 +32,7 @@
 #include "private/qquickwebview_p.h"
 #include "utils.h"
 
-#include <QDeclarativeEngine>
+#include <QQmlEngine>
 #include <QDir>
 #include <QPointF>
 
@@ -52,7 +52,7 @@ BrowserWindow::BrowserWindow(WindowOptions* options)
     engine()->rootContext()->setContextProperty("utils", utils);
     engine()->rootContext()->setContextProperty("options", options);
     setSource(QUrl("qrc:/qml/BrowserWindow.qml"));
-    connect(rootObject(), SIGNAL(pageTitleChanged(QString)), this, SLOT(setWindowTitle(QString)));
+    connect(rootObject(), SIGNAL(pageTitleChanged(QString)), this, SLOT(onTitleChanged(QString)));
     connect(rootObject(), SIGNAL(newWindow(QString)), this, SLOT(newWindow(QString)));
     if (options->startFullScreen())
         showFullScreen();
@@ -66,6 +66,13 @@ BrowserWindow::BrowserWindow(WindowOptions* options)
 
     if (!options->userAgent().isNull())
         webViewExperimental()->setUserAgent(options->userAgent());
+
+    // Zoom values are chosen to be like in Mozilla Firefox 3.
+    m_zoomLevels << 0.3 << 0.5 << 0.67 << 0.8 << 0.9
+                 << 1
+                 << 1.11 << 1.22 << 1.33 << 1.5 << 1.7 << 2 << 2.4 << 3;
+
+    m_currentZoomLevel = m_zoomLevels.indexOf(1);
 }
 
 QQuickWebView* BrowserWindow::webView() const
@@ -108,7 +115,7 @@ void BrowserWindow::updateVisualMockTouchPoints(const QList<QTouchEvent::TouchPo
         QQuickItem* mockTouchPointItem = rootObject()->findChild<QQuickItem*>(mockTouchPointIdentifier, Qt::FindDirectChildrenOnly);
 
         if (!mockTouchPointItem) {
-            QDeclarativeComponent touchMockPointComponent(engine(), QUrl("qrc:/qml/MockTouchPoint.qml"));
+            QQmlComponent touchMockPointComponent(engine(), QUrl("qrc:/qml/MockTouchPoint.qml"));
             mockTouchPointItem = qobject_cast<QQuickItem*>(touchMockPointComponent.create());
             mockTouchPointItem->setObjectName(mockTouchPointIdentifier);
             mockTouchPointItem->setProperty("pointId", QVariant(touchPoint.id()));
@@ -131,4 +138,57 @@ void BrowserWindow::screenshot()
 
 BrowserWindow::~BrowserWindow()
 {
+}
+
+void BrowserWindow::onTitleChanged(QString title)
+{
+    if (title.isEmpty())
+        title = QLatin1String("MiniBrowser");
+    setWindowTitle(title);
+}
+
+void BrowserWindow::zoomIn()
+{
+    if (m_currentZoomLevel < m_zoomLevels.size() - 1)
+        ++m_currentZoomLevel;
+    webView()->setZoomFactor(m_zoomLevels[m_currentZoomLevel]);
+}
+
+void BrowserWindow::zoomOut()
+{
+    if (m_currentZoomLevel > 0)
+        --m_currentZoomLevel;
+    webView()->setZoomFactor(m_zoomLevels[m_currentZoomLevel]);
+}
+
+void BrowserWindow::keyPressEvent(QKeyEvent* event)
+{
+
+    if (event->modifiers() & Qt::ControlModifier) {
+        bool handled;
+        if ((handled = event->key() == Qt::Key_Plus))
+            zoomIn();
+        else if ((handled = event->key() == Qt::Key_Minus))
+            zoomOut();
+
+        if (handled) {
+            event->accept();
+            return;
+        }
+    }
+    QQuickView::keyPressEvent(event);
+}
+
+void BrowserWindow::wheelEvent(QWheelEvent* event)
+{
+    if (event->modifiers() & Qt::ControlModifier && event->orientation() == Qt::Vertical) {
+        if (event->delta() > 0)
+            zoomIn();
+        else
+            zoomOut();
+
+        event->accept();
+        return;
+    }
+    QQuickView::wheelEvent(event);
 }

@@ -73,6 +73,7 @@ public:
     virtual bool isNativeImage() const;
     virtual bool isPasswordField() const;
     virtual bool isNativeTextControl() const;
+    virtual bool isSearchField() const;
     virtual bool isWebArea() const;
     virtual bool isFileUploadButton() const;
     virtual bool isInputImage() const;
@@ -165,7 +166,6 @@ public:
     
     virtual LayoutRect boundingBoxRect() const;
     virtual LayoutRect elementRect() const;
-    virtual LayoutSize size() const;
     virtual IntPoint clickPoint();
     
     void setRenderer(RenderObject* renderer) { m_renderer = renderer; }
@@ -306,8 +306,10 @@ private:
     void addTextFieldChildren();
     void addImageMapChildren();
     void addAttachmentChildren();
+#if PLATFORM(MAC)
     void updateAttachmentViewParents();
-    
+#endif
+
     void ariaSelectedRows(AccessibilityChildrenVector&);
     
     bool elementAttributeValue(const QualifiedName&) const;

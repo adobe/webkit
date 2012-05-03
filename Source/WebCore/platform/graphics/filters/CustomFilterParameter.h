@@ -45,14 +45,20 @@ public:
     // 3d-transforms: https://bugs.webkit.org/show_bug.cgi?id=71443
     // mat2, mat3, mat4: https://bugs.webkit.org/show_bug.cgi?id=71444
     enum ParameterType {
-        NUMBER
+        NUMBER,
+        TRANSFORM
     };
     
     virtual ~CustomFilterParameter() { }
     
     ParameterType parameterType() const { return m_type; }
     const String& name() const { return m_name; }
-
+    
+    bool isSameType(const CustomFilterParameter& other) const { return parameterType() == other.parameterType(); }
+    
+    virtual PassRefPtr<CustomFilterParameter> blend(const CustomFilterParameter*, double progress) = 0;
+    virtual bool operator==(const CustomFilterParameter&) const = 0;
+    bool operator!=(const CustomFilterParameter& o) const { return !(*this == o); }
 protected:
     CustomFilterParameter(ParameterType type, const String& name)
         : m_name(name)

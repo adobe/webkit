@@ -62,7 +62,7 @@ v8::Handle<v8::Value> V8WebSocket::constructorCallback(const v8::Arguments& args
         return args.Holder();
 
     if (args.Length() == 0)
-        return throwError("Not enough arguments", V8Proxy::SyntaxError);
+        return throwError("Not enough arguments", V8Proxy::TypeError);
 
     v8::TryCatch tryCatch;
     v8::Handle<v8::String> urlstring = args[0]->ToString();
@@ -107,13 +107,8 @@ v8::Handle<v8::Value> V8WebSocket::constructorCallback(const v8::Arguments& args
     if (ec)
         return throwError(ec);
 
-    // Setup the standard wrapper object internal fields.
     V8DOMWrapper::setDOMWrapper(args.Holder(), &info, webSocket.get());
-
-    // Add object to the wrapper map.
-    webSocket->ref();
-    V8DOMWrapper::setJSWrapperForActiveDOMObject(webSocket.get(), v8::Persistent<v8::Object>::New(args.Holder()));
-
+    V8DOMWrapper::setJSWrapperForActiveDOMObject(webSocket.release(), v8::Persistent<v8::Object>::New(args.Holder()));
     return args.Holder();
 }
 
@@ -122,7 +117,7 @@ v8::Handle<v8::Value> V8WebSocket::sendCallback(const v8::Arguments& args)
     INC_STATS("DOM.WebSocket.send()");
 
     if (!args.Length())
-        return throwError("Not enough arguments", V8Proxy::SyntaxError);
+        return throwError("Not enough arguments", V8Proxy::TypeError);
 
     WebSocket* webSocket = V8WebSocket::toNative(args.Holder());
     v8::Handle<v8::Value> message = args[0];

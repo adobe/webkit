@@ -105,9 +105,9 @@ namespace WebCore {
             return static_cast<V8BindingPerIsolateData*>(isolate->GetData()); 
         }
 
-        static V8BindingPerIsolateData* current()
+        static V8BindingPerIsolateData* current(v8::Isolate* isolate = 0)
         {
-            return get(v8::Isolate::GetCurrent());
+            return isolate ? static_cast<V8BindingPerIsolateData*>(isolate->GetData()) : get(v8::Isolate::GetCurrent());
         }
         static void dispose(v8::Isolate*);
 
@@ -124,8 +124,9 @@ namespace WebCore {
         }
 
         StringCache* stringCache() { return &m_stringCache; }
+#if ENABLE(INSPECTOR)
         void visitJSExternalStrings(DOMWrapperVisitor*);
-
+#endif
         DOMDataList& allStores() { return m_domDataList; }
 
         V8HiddenPropertyName* hiddenPropertyName() { return &m_hiddenPropertyName; }
@@ -153,6 +154,10 @@ namespace WebCore {
 
 #ifndef NDEBUG
         GlobalHandleMap& globalHandleMap() { return m_globalHandleMap; }
+
+        int internalScriptRecursionLevel() const { return m_internalScriptRecursionLevel; }
+        int incrementInternalScriptRecursionLevel() { return ++m_internalScriptRecursionLevel; }
+        int decrementInternalScriptRecursionLevel() { return --m_internalScriptRecursionLevel; }
 #endif
 
     private:
@@ -179,6 +184,7 @@ namespace WebCore {
 
 #ifndef NDEBUG
         GlobalHandleMap m_globalHandleMap;
+        int m_internalScriptRecursionLevel;
 #endif
     };
 
@@ -207,38 +213,6 @@ namespace WebCore {
     private:
         bool m_previous;
     };
-
-    class SafeAllocation {
-    public:
-        static inline v8::Local<v8::Object> newInstance(v8::Handle<v8::Function>);
-        static inline v8::Local<v8::Object> newInstance(v8::Handle<v8::ObjectTemplate>);
-        static inline v8::Local<v8::Object> newInstance(v8::Handle<v8::Function>, int argc, v8::Handle<v8::Value> argv[]);
-    };
-
-    v8::Local<v8::Object> SafeAllocation::newInstance(v8::Handle<v8::Function> function)
-    {
-        if (function.IsEmpty())
-            return v8::Local<v8::Object>();
-        ConstructorMode constructorMode;
-        return function->NewInstance();
-    }
-
-    v8::Local<v8::Object> SafeAllocation::newInstance(v8::Handle<v8::ObjectTemplate> objectTemplate)
-    {
-        if (objectTemplate.IsEmpty())
-            return v8::Local<v8::Object>();
-        ConstructorMode constructorMode;
-        return objectTemplate->NewInstance();
-    }
-
-    v8::Local<v8::Object> SafeAllocation::newInstance(v8::Handle<v8::Function> function, int argc, v8::Handle<v8::Value> argv[])
-    {
-        if (function.IsEmpty())
-            return v8::Local<v8::Object>();
-        ConstructorMode constructorMode;
-        return function->NewInstance(argc, argv);
-    }
-
 
 
     enum ExternalMode {
@@ -270,31 +244,42 @@ namespace WebCore {
     // Return a V8 external string that shares the underlying buffer with the given
     // WebCore string. The reference counting mechanism is used to keep the
     // underlying buffer alive while the string is still live in the V8 engine.
-    inline v8::Local<v8::String> v8ExternalString(const String& string)
+    inline v8::Local<v8::String> v8ExternalString(const String& string, v8::Isolate* isolate = 0)
     {
         StringImpl* stringImpl = string.impl();
         if (!stringImpl)
             return v8::String::Empty();
 
-        V8BindingPerIsolateData* data = V8BindingPerIsolateData::current();
+        V8BindingPerIsolateData* data = V8BindingPerIsolateData::current(isolate);
         return data->stringCache()->v8ExternalString(stringImpl);
     }
 
     // Convert a string to a V8 string.
-    inline v8::Handle<v8::String> v8String(const String& string)
+    inline v8::Handle<v8::String> v8String(const String& string, v8::Isolate* isolate = 0)
     {
-        return v8ExternalString(string);
+        return v8ExternalString(string, isolate);
     }
 
-    template<typename Iterable>
-    v8::Handle<v8::Value> v8Array(const Iterable& iterator)
+    template<typename T>
+    v8::Handle<v8::Value> v8Array(const Vector<T>& iterator, v8::Isolate* isolate)
     {
         v8::Local<v8::Array> result = v8::Array::New(iterator.size());
         int index = 0;
-        typename Iterable::const_iterator end = iterator.end();
-        for (typename Iterable::const_iterator iter = iterator.begin(); iter != end; ++iter)
-            result->Set(v8::Integer::New(index++), toV8(WTF::getPtr(*iter)));
+        typename Vector<T>::const_iterator end = iterator.end();
+        for (typename Vector<T>::const_iterator iter = iterator.begin(); iter != end; ++iter)
+            result->Set(v8::Integer::New(index++), toV8(WTF::getPtr(*iter), isolate));
         return result;
+    }
+
+    template<>
+    inline v8::Handle<v8::Value> v8Array(const Vector<String>& iterator, v8::Isolate* isolate)
+    {
+        v8::Local<v8::Array> array = v8::Array::New(iterator.size());
+        Vector<String>::const_iterator end = iterator.end();
+        int index = 0;
+        for (Vector<String>::const_iterator iter = iterator.begin(); iter != end; ++iter)
+            array->Set(v8::Integer::New(index++), v8String(*iter, isolate));
+        return array;
     }
 
     template <class T>
@@ -309,8 +294,7 @@ namespace WebCore {
         size_t length = array->Length();
 
         for (size_t i = 0; i < length; ++i) {
-            String indexedValue = v8StringToWebCoreString(array->Get(i));
-            result.append(indexedValue);
+            result.append(v8ValueToWebCoreString(array->Get(i)));
         }
         return result;
     }
@@ -382,9 +366,8 @@ namespace WebCore {
         // If the object has any internal fields, then we won't be able to serialize or deserialize
         // them; conveniently, this is also a quick way to detect DOM wrapper objects, because
         // the mechanism for these relies on data stored in these fields. We should
-        // catch external array data and external pixel data as a special case (noting that CanvasPixelArrays
-        // can't be serialized without being wrapped by ImageData according to the standard).
-        return object->InternalFieldCount() || object->HasIndexedPropertiesInPixelData() || object->HasIndexedPropertiesInExternalArrayData();
+        // catch external array data as a special case.
+        return object->InternalFieldCount() || object->HasIndexedPropertiesInExternalArrayData();
     }
 
     inline v8::Handle<v8::Boolean> v8Boolean(bool value)
@@ -412,19 +395,19 @@ namespace WebCore {
         return v8::String::NewUndetectable(fromWebCoreString(str), str.length());
     }
 
-    inline v8::Handle<v8::Value> v8StringOrNull(const String& str)
+    inline v8::Handle<v8::Value> v8StringOrNull(const String& str, v8::Isolate* isolate = 0)
     {
-        return str.isNull() ? v8::Handle<v8::Value>(v8::Null()) : v8::Handle<v8::Value>(v8String(str));
+        return str.isNull() ? v8::Handle<v8::Value>(v8::Null()) : v8::Handle<v8::Value>(v8String(str, isolate));
     }
 
-    inline v8::Handle<v8::Value> v8StringOrUndefined(const String& str)
+    inline v8::Handle<v8::Value> v8StringOrUndefined(const String& str, v8::Isolate* isolate = 0)
     {
-        return str.isNull() ? v8::Handle<v8::Value>(v8::Undefined()) : v8::Handle<v8::Value>(v8String(str));
+        return str.isNull() ? v8::Handle<v8::Value>(v8::Undefined()) : v8::Handle<v8::Value>(v8String(str, isolate));
     }
 
-    inline v8::Handle<v8::Value> v8StringOrFalse(const String& str)
+    inline v8::Handle<v8::Value> v8StringOrFalse(const String& str, v8::Isolate* isolate = 0)
     {
-        return str.isNull() ? v8::Handle<v8::Value>(v8::False()) : v8::Handle<v8::Value>(v8String(str));
+        return str.isNull() ? v8::Handle<v8::Value>(v8::False()) : v8::Handle<v8::Value>(v8String(str, isolate));
     }
 
     template <class T> v8::Handle<v8::Value> v8NumberArray(const Vector<T>& values)

@@ -37,6 +37,7 @@
 namespace WebCore {
 
 class Document;
+class DOMSelection;
 class HTMLContentElement;
 class HTMLContentSelector;
 class InsertionPoint;
@@ -76,6 +77,8 @@ public:
     void setInnerHTML(const String&, ExceptionCode&);
 
     Element* activeElement() const;
+
+    DOMSelection* selection();
 
     ShadowRoot* youngerShadowRoot() const { return prev(); }
     ShadowRoot* olderShadowRoot() const { return next(); }
@@ -137,18 +140,6 @@ inline const ShadowRoot* toShadowRoot(const Node* node)
 inline ShadowRoot* toShadowRoot(Node* node)
 {
     return const_cast<ShadowRoot*>(toShadowRoot(static_cast<const Node*>(node)));
-}
-
-inline ShadowRoot* toShadowRoot(TreeScope* scope)
-{
-    ASSERT(!scope || scope->isShadowRoot());
-    return static_cast<ShadowRoot*>(scope);
-}
-
-// Put this TreeScope method here to inline it.
-inline bool TreeScope::isShadowRoot() const
-{
-    return m_rootNode->isShadowRoot();
 }
 
 } // namespace

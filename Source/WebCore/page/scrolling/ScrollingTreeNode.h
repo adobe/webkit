@@ -47,6 +47,8 @@ public:
     virtual void handleWheelEvent(const PlatformWheelEvent&) = 0;
     virtual void setScrollPosition(const IntPoint&) = 0;
 
+    bool shouldUpdateScrollLayerPositionOnMainThread() const { return m_shouldUpdateScrollLayerPositionOnMainThread; }
+
 protected:
     explicit ScrollingTreeNode(ScrollingTree*);
 
@@ -55,13 +57,13 @@ protected:
     const IntRect& viewportRect() const { return m_viewportRect; }
     const IntSize& contentsSize() const { return m_contentsSize; }
 
-    bool shouldUpdateScrollLayerPositionOnMainThread() const { return m_shouldUpdateScrollLayerPositionOnMainThread; }
-
     ScrollElasticity horizontalScrollElasticity() const { return m_horizontalScrollElasticity; }
     ScrollElasticity verticalScrollElasticity() const { return m_verticalScrollElasticity; }
 
     bool hasEnabledHorizontalScrollbar() const { return m_hasEnabledHorizontalScrollbar; }
     bool hasEnabledVerticalScrollbar() const { return m_hasEnabledVerticalScrollbar; }
+
+    bool canHaveScrollbars() const { return m_horizontalScrollbarMode != ScrollbarAlwaysOff || m_verticalScrollbarMode != ScrollbarAlwaysOff; }
 
 private:
     ScrollingTree* m_scrollingTree;
@@ -76,6 +78,9 @@ private:
     
     bool m_hasEnabledHorizontalScrollbar;
     bool m_hasEnabledVerticalScrollbar;
+
+    ScrollbarMode m_horizontalScrollbarMode;
+    ScrollbarMode m_verticalScrollbarMode;
 };
 
 } // namespace WebCore

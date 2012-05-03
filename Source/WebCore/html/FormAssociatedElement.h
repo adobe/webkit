@@ -58,13 +58,13 @@ public:
 
     void resetFormOwner();
 
+    void formRemovedFromTree(const Node* formRoot);
+
 protected:
     FormAssociatedElement();
 
-    void insertedIntoTree();
-    void removedFromTree();
-    void insertedIntoDocument();
-    void removedFromDocument();
+    void insertedInto(Node*);
+    void removedFrom(Node*);
     void didMoveToNewDocument(Document* oldDocument);
 
     void setForm(HTMLFormElement*);

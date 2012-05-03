@@ -159,8 +159,7 @@ void SerializerMarkupAccumulator::appendCustomAttributes(StringBuilder& out, Ele
 
     // We need to give a fake location to blank frames so they can be referenced by the serialized frame.
     url = m_serializer->urlForBlankFrame(frame);
-    RefPtr<Attribute> attribute = Attribute::create(frameOwnerURLAttributeName(*frameOwner), url.string());
-    appendAttribute(out, element, *attribute, namespaces);
+    appendAttribute(out, element, Attribute(frameOwnerURLAttributeName(*frameOwner), url.string()), namespaces);
 }
 
 void SerializerMarkupAccumulator::appendEndTag(Node* node)
@@ -264,7 +263,7 @@ void PageSerializer::serializeCSSStyleSheet(CSSStyleSheet* styleSheet, const KUR
             if (i < styleSheet->length() - 1)
                 cssText.append("\n\n");
         }
-        Document* document = styleSheet->findDocument();
+        Document* document = styleSheet->ownerDocument();
         // Some rules have resources associated with them that we need to retrieve.
         if (rule->isImportRule()) {
             CSSImportRule* importRule = static_cast<CSSImportRule*>(rule);            
@@ -281,7 +280,7 @@ void PageSerializer::serializeCSSStyleSheet(CSSStyleSheet* styleSheet, const KUR
 
     if (url.isValid() && !m_resourceURLs.contains(url)) {
         // FIXME: We should check whether a charset has been specified and if none was found add one.
-        TextEncoding textEncoding(styleSheet->charset());
+        TextEncoding textEncoding(styleSheet->internal()->charset());
         ASSERT(textEncoding.isValid());
         String textString = cssText.toString();
         CString text = textEncoding.encode(textString.characters(), textString.length(), EntitiesForUnencodables);

@@ -228,7 +228,7 @@ void RenderThemeChromiumSkia::setRadioSize(RenderStyle* style) const
     setCheckboxSize(style);
 }
 
-void RenderThemeChromiumSkia::adjustButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumSkia::adjustButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     if (style->appearance() == PushButtonPart) {
         // Ignore line-height.
@@ -241,7 +241,7 @@ bool RenderThemeChromiumSkia::paintTextArea(RenderObject* o, const PaintInfo& i,
     return paintTextField(o, i, r);
 }
 
-void RenderThemeChromiumSkia::adjustSearchFieldStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumSkia::adjustSearchFieldStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
      // Ignore line-height.
      style->setLineHeight(RenderStyle::initialLineHeight());
@@ -252,7 +252,7 @@ bool RenderThemeChromiumSkia::paintSearchField(RenderObject* o, const PaintInfo&
     return paintTextField(o, i, r);
 }
 
-void RenderThemeChromiumSkia::adjustSearchFieldCancelButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumSkia::adjustSearchFieldCancelButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Scale the button size based on the font size
     float fontScale = style->fontSize() / defaultControlFontPixelSize;
@@ -261,16 +261,16 @@ void RenderThemeChromiumSkia::adjustSearchFieldCancelButtonStyle(CSSStyleSelecto
     style->setHeight(Length(cancelButtonSize, Fixed));
 }
 
-LayoutRect RenderThemeChromiumSkia::convertToPaintingRect(RenderObject* inputRenderer, const RenderObject* partRenderer, LayoutRect partRect, const IntRect& localOffset) const
+IntRect RenderThemeChromiumSkia::convertToPaintingRect(RenderObject* inputRenderer, const RenderObject* partRenderer, LayoutRect partRect, const IntRect& localOffset) const
 {
     // Compute an offset between the part renderer and the input renderer.
-    LayoutSize offsetFromInputRenderer = -(partRenderer->offsetFromAncestorContainer(inputRenderer));
+    LayoutSize offsetFromInputRenderer = -partRenderer->offsetFromAncestorContainer(inputRenderer);
     // Move the rect into partRenderer's coords.
     partRect.move(offsetFromInputRenderer);
     // Account for the local drawing offset.
     partRect.move(localOffset.x(), localOffset.y());
 
-    return partRect;
+    return pixelSnappedIntRect(partRect);
 }
 
 bool RenderThemeChromiumSkia::paintSearchFieldCancelButton(RenderObject* cancelButtonObject, const PaintInfo& paintInfo, const IntRect& r)
@@ -283,14 +283,14 @@ bool RenderThemeChromiumSkia::paintSearchFieldCancelButton(RenderObject* cancelB
     LayoutRect inputContentBox = inputRenderBox->contentBoxRect();
 
     // Make sure the scaled button stays square and will fit in its parent's box.
-    LayoutUnit cancelButtonSize = std::min(inputContentBox.width(), std::min<LayoutUnit>(inputContentBox.height(), r.height()));
+    LayoutUnit cancelButtonSize = std::min(inputContentBox.width(), std::min(inputContentBox.height(), r.height()));
     // Calculate cancel button's coordinates relative to the input element.
     // Center the button vertically.  Round up though, so if it has to be one pixel off-center, it will
     // be one pixel closer to the bottom of the field.  This tends to look better with the text.
     LayoutRect cancelButtonRect(cancelButtonObject->offsetFromAncestorContainer(inputRenderBox).width(),
                                 inputContentBox.y() + (inputContentBox.height() - cancelButtonSize + 1) / 2,
                                 cancelButtonSize, cancelButtonSize);
-    LayoutRect paintingRect = convertToPaintingRect(inputRenderBox, cancelButtonObject, cancelButtonRect, r);
+    IntRect paintingRect = convertToPaintingRect(inputRenderBox, cancelButtonObject, cancelButtonRect, r);
 
     static Image* cancelImage = Image::loadPlatformResource("searchCancel").leakRef();
     static Image* cancelPressedImage = Image::loadPlatformResource("searchCancelPressed").leakRef();
@@ -299,14 +299,14 @@ bool RenderThemeChromiumSkia::paintSearchFieldCancelButton(RenderObject* cancelB
     return false;
 }
 
-void RenderThemeChromiumSkia::adjustSearchFieldDecorationStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumSkia::adjustSearchFieldDecorationStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     IntSize emptySize(1, 11);
     style->setWidth(Length(emptySize.width(), Fixed));
     style->setHeight(Length(emptySize.height(), Fixed));
 }
 
-void RenderThemeChromiumSkia::adjustSearchFieldResultsDecorationStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumSkia::adjustSearchFieldResultsDecorationStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Scale the decoration size based on the font size
     float fontScale = style->fontSize() / defaultControlFontPixelSize;
@@ -326,21 +326,21 @@ bool RenderThemeChromiumSkia::paintSearchFieldResultsDecoration(RenderObject* ma
     LayoutRect inputContentBox = inputRenderBox->contentBoxRect();
 
     // Make sure the scaled decoration stays square and will fit in its parent's box.
-    LayoutUnit magnifierSize = std::min(inputContentBox.width(), std::min<LayoutUnit>(inputContentBox.height(), r.height()));
+    LayoutUnit magnifierSize = std::min(inputContentBox.width(), std::min(inputContentBox.height(), r.height()));
     // Calculate decoration's coordinates relative to the input element.
     // Center the decoration vertically.  Round up though, so if it has to be one pixel off-center, it will
     // be one pixel closer to the bottom of the field.  This tends to look better with the text.
     LayoutRect magnifierRect(magnifierObject->offsetFromAncestorContainer(inputRenderBox).width(),
                              inputContentBox.y() + (inputContentBox.height() - magnifierSize + 1) / 2,
                              magnifierSize, magnifierSize);
-    LayoutRect paintingRect = convertToPaintingRect(inputRenderBox, magnifierObject, magnifierRect, r);
+    IntRect paintingRect = convertToPaintingRect(inputRenderBox, magnifierObject, magnifierRect, r);
 
     static Image* magnifierImage = Image::loadPlatformResource("searchMagnifier").leakRef();
     paintInfo.context->drawImage(magnifierImage, magnifierObject->style()->colorSpace(), paintingRect);
     return false;
 }
 
-void RenderThemeChromiumSkia::adjustSearchFieldResultsButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumSkia::adjustSearchFieldResultsButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Scale the button size based on the font size
     float fontScale = style->fontSize() / defaultControlFontPixelSize;
@@ -361,12 +361,12 @@ bool RenderThemeChromiumSkia::paintSearchFieldResultsButton(RenderObject* magnif
     LayoutRect inputContentBox = inputRenderBox->contentBoxRect();
 
     // Make sure the scaled decoration will fit in its parent's box.
-    LayoutUnit magnifierHeight = std::min<LayoutUnit>(inputContentBox.height(), r.height());
+    LayoutUnit magnifierHeight = std::min(inputContentBox.height(), r.height());
     LayoutUnit magnifierWidth = std::min<LayoutUnit>(inputContentBox.width(), magnifierHeight * defaultSearchFieldResultsButtonWidth / defaultSearchFieldResultsDecorationSize);
     LayoutRect magnifierRect(magnifierObject->offsetFromAncestorContainer(inputRenderBox).width(),
                              inputContentBox.y() + (inputContentBox.height() - magnifierHeight + 1) / 2,
                              magnifierWidth, magnifierHeight);
-    LayoutRect paintingRect = convertToPaintingRect(inputRenderBox, magnifierObject, magnifierRect, r);
+    IntRect paintingRect = convertToPaintingRect(inputRenderBox, magnifierObject, magnifierRect, r);
 
     static Image* magnifierImage = Image::loadPlatformResource("searchMagnifierResults").leakRef();
     paintInfo.context->drawImage(magnifierImage, magnifierObject->style()->colorSpace(), paintingRect);
@@ -466,15 +466,15 @@ bool RenderThemeChromiumSkia::paintMediaMuteButton(RenderObject* object, const P
 #endif
 }
 
-void RenderThemeChromiumSkia::adjustMenuListStyle(CSSStyleSelector* selector, RenderStyle* style, WebCore::Element* e) const
+void RenderThemeChromiumSkia::adjustMenuListStyle(StyleResolver*, RenderStyle* style, WebCore::Element*) const
 {
     // Height is locked to auto on all browsers.
     style->setLineHeight(RenderStyle::initialLineHeight());
 }
 
-void RenderThemeChromiumSkia::adjustMenuListButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeChromiumSkia::adjustMenuListButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
-    adjustMenuListStyle(selector, style, e);
+    adjustMenuListStyle(styleResolver, style, e);
 }
 
 // Used to paint styled menulists (i.e. with a non-default border)

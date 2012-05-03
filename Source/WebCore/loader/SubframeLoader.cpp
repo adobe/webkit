@@ -104,13 +104,21 @@ bool SubframeLoader::resourceWillUsePlugin(const String& url, const String& mime
 bool SubframeLoader::requestPlugin(HTMLPlugInImageElement* ownerElement, const KURL& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues, bool useFallback)
 {
     Settings* settings = m_frame->settings();
-    if ((!allowPlugins(AboutToInstantiatePlugin)
-         // Application plug-ins are plug-ins implemented by the user agent, for example Qt plug-ins,
-         // as opposed to third-party code such as Flash. The user agent decides whether or not they are
-         // permitted, rather than WebKit.
-         && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType))
-        || ((!settings || !settings->isJavaEnabled()) && MIMETypeRegistry::isJavaAppletMIMEType(mimeType)))
+    if (!settings)
         return false;
+
+    // Application plug-ins are plug-ins implemented by the user agent, for example Qt plug-ins,
+    // as opposed to third-party code such as Flash. The user agent decides whether or not they are
+    // permitted, rather than WebKit.
+    if ((!allowPlugins(AboutToInstantiatePlugin) && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
+        return false;
+
+    if (MIMETypeRegistry::isJavaAppletMIMEType(mimeType)) {
+        if (!settings->isJavaEnabled())
+            return false;
+        if (m_frame->document() && m_frame->document()->securityOrigin()->isLocal() && !settings->isJavaEnabledForLocalFiles())
+            return false;
+    }
 
     if (m_frame->document()) {
         if (m_frame->document()->isSandboxed(SandboxPlugins))
@@ -171,7 +179,7 @@ PassRefPtr<Widget> SubframeLoader::loadMediaPlayerProxyPlugin(Node* node, const 
     IntSize size;
 
     if (renderer)
-        size = IntSize(renderer->contentWidth(), renderer->contentHeight());
+        size = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
     else if (mediaElement->isVideo())
         size = RenderVideo::defaultSize();
 
@@ -224,7 +232,7 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const LayoutSize& size
 
     RefPtr<Widget> widget;
     if (allowPlugins(AboutToInstantiatePlugin))
-        widget = m_frame->loader()->client()->createJavaAppletWidget(size, element, baseURL, paramNames, paramValues);
+        widget = m_frame->loader()->client()->createJavaAppletWidget(roundedIntSize(size), element, baseURL, paramNames, paramValues);
     if (!widget)
         return 0;
 
@@ -360,7 +368,7 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
     if (!frameLoader->checkIfRunInsecureContent(document()->securityOrigin(), url))
         return false;
 
-    IntSize contentSize(renderer->contentWidth(), renderer->contentHeight());
+    IntSize contentSize = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
     bool loadManually = document()->isPluginDocument() && !m_containsPlugins && toPluginDocument(document())->shouldLoadPluginManually();
     RefPtr<Widget> widget = frameLoader->client()->createPlugin(contentSize,
         pluginElement, url, paramNames, paramValues, mimeType, loadManually);

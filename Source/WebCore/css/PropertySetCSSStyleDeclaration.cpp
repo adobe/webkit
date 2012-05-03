@@ -118,7 +118,7 @@ bool StyleAttributeMutationScope::s_shouldDeliver = false;
 #endif
 
 } // namespace
-    
+
 void PropertySetCSSStyleDeclaration::ref()
 { 
     m_propertySet->ref();
@@ -138,7 +138,7 @@ String PropertySetCSSStyleDeclaration::item(unsigned i) const
 {
     if (i >= m_propertySet->propertyCount())
         return "";
-    return getPropertyName(static_cast<CSSPropertyID>(m_propertySet->propertyAt(i).id()));
+    return getPropertyName(m_propertySet->propertyAt(i).id());
 }
 
 String PropertySetCSSStyleDeclaration::cssText() const
@@ -155,7 +155,7 @@ void PropertySetCSSStyleDeclaration::setCssText(const String& text, ExceptionCod
     // FIXME: Detect syntax errors and set ec.
     m_propertySet->parseDeclaration(text, contextStyleSheet());
 
-    setNeedsStyleRecalc();
+    didMutate();
 #if ENABLE(MUTATION_OBSERVERS)
     mutationScope.enqueueMutationRecord();    
 #endif
@@ -163,15 +163,15 @@ void PropertySetCSSStyleDeclaration::setCssText(const String& text, ExceptionCod
 
 PassRefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValue(const String& propertyName)
 {
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return 0;
-    return m_propertySet->getPropertyCSSValue(propertyID);
+    return cloneAndCacheForCSSOM(m_propertySet->getPropertyCSSValue(propertyID).get());
 }
 
 String PropertySetCSSStyleDeclaration::getPropertyValue(const String &propertyName)
 {
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return String();
     return m_propertySet->getPropertyValue(propertyID);
@@ -179,7 +179,7 @@ String PropertySetCSSStyleDeclaration::getPropertyValue(const String &propertyNa
 
 String PropertySetCSSStyleDeclaration::getPropertyPriority(const String& propertyName)
 {
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return String();
     return m_propertySet->propertyIsImportant(propertyID) ? "important" : "";
@@ -187,18 +187,18 @@ String PropertySetCSSStyleDeclaration::getPropertyPriority(const String& propert
 
 String PropertySetCSSStyleDeclaration::getPropertyShorthand(const String& propertyName)
 {
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return String();
-    int shorthandID = m_propertySet->getPropertyShorthand(propertyID);
+    CSSPropertyID shorthandID = m_propertySet->getPropertyShorthand(propertyID);
     if (!shorthandID)
         return String();
-    return getPropertyName(static_cast<CSSPropertyID>(shorthandID));
+    return getPropertyName(shorthandID);
 }
 
 bool PropertySetCSSStyleDeclaration::isPropertyImplicit(const String& propertyName)
 {
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return false;
     return m_propertySet->isPropertyImplicit(propertyID);
@@ -209,7 +209,7 @@ void PropertySetCSSStyleDeclaration::setProperty(const String& propertyName, con
 #if ENABLE(MUTATION_OBSERVERS)
     StyleAttributeMutationScope mutationScope(this);
 #endif
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return;
     bool important = priority.find("important", 0, false) != notFound;
@@ -218,7 +218,7 @@ void PropertySetCSSStyleDeclaration::setProperty(const String& propertyName, con
     if (changed) {
         // CSS DOM requires raising SYNTAX_ERR of parsing failed, but this is too dangerous for compatibility,
         // see <http://bugs.webkit.org/show_bug.cgi?id=7296>.
-        setNeedsStyleRecalc();
+        didMutate();
 #if ENABLE(MUTATION_OBSERVERS)
         mutationScope.enqueueMutationRecord();
 #endif
@@ -230,14 +230,14 @@ String PropertySetCSSStyleDeclaration::removeProperty(const String& propertyName
 #if ENABLE(MUTATION_OBSERVERS)
     StyleAttributeMutationScope mutationScope(this);
 #endif
-    int propertyID = cssPropertyID(propertyName);
+    CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return String();
     ec = 0;
     String result;
     bool changes = m_propertySet->removeProperty(propertyID, &result);
     if (changes) {
-        setNeedsStyleRecalc();
+        didMutate();
 #if ENABLE(MUTATION_OBSERVERS)
         mutationScope.enqueueMutationRecord();
 #endif
@@ -246,8 +246,8 @@ String PropertySetCSSStyleDeclaration::removeProperty(const String& propertyName
 }
 
 PassRefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValueInternal(CSSPropertyID propertyID)
-{ 
-    return m_propertySet->getPropertyCSSValue(propertyID); 
+{
+    return m_propertySet->getPropertyCSSValue(propertyID);
 }
 
 String PropertySetCSSStyleDeclaration::getPropertyValueInternal(CSSPropertyID propertyID)
@@ -263,16 +263,39 @@ void PropertySetCSSStyleDeclaration::setPropertyInternal(CSSPropertyID propertyI
     ec = 0;
     bool changed = m_propertySet->setProperty(propertyID, value, important, contextStyleSheet());
     if (changed) {
-        setNeedsStyleRecalc();
+        didMutate();
 #if ENABLE(MUTATION_OBSERVERS)
         mutationScope.enqueueMutationRecord();
 #endif
     }
 }
 
-CSSStyleSheet* PropertySetCSSStyleDeclaration::parentStyleSheet() const
+void PropertySetCSSStyleDeclaration::didMutate()
+{
+    m_cssomCSSValueClones.clear();
+    setNeedsStyleRecalc();
+}
+
+CSSValue* PropertySetCSSStyleDeclaration::cloneAndCacheForCSSOM(CSSValue* internalValue)
+{
+    if (!internalValue)
+        return 0;
+
+    // The map is here to maintain the object identity of the CSSValues over multiple invocations.
+    // FIXME: It is likely that the identity is not important for web compatibility and this code should be removed.
+    if (!m_cssomCSSValueClones)
+        m_cssomCSSValueClones = adoptPtr(new HashMap<CSSValue*, RefPtr<CSSValue> >);
+    
+    RefPtr<CSSValue>& clonedValue = m_cssomCSSValueClones->add(internalValue, RefPtr<CSSValue>()).iterator->second;
+    if (!clonedValue)
+        clonedValue = internalValue->cloneForCSSOM();
+    return clonedValue.get();
+}
+
+StyleSheetInternal* PropertySetCSSStyleDeclaration::contextStyleSheet() const
 { 
-    return contextStyleSheet(); 
+    CSSStyleSheet* cssStyleSheet = parentStyleSheet();
+    return cssStyleSheet ? cssStyleSheet->internal() : 0;
 }
 
 PassRefPtr<StylePropertySet> PropertySetCSSStyleDeclaration::copy() const
@@ -289,16 +312,41 @@ bool PropertySetCSSStyleDeclaration::cssPropertyMatches(const CSSProperty* prope
 {
     return m_propertySet->propertyMatches(property);
 }
-
-void RuleCSSStyleDeclaration::setNeedsStyleRecalc()
+    
+StyleRuleCSSStyleDeclaration::StyleRuleCSSStyleDeclaration(StylePropertySet* propertySet, CSSRule* parentRule)
+    : PropertySetCSSStyleDeclaration(propertySet)
+    , m_refCount(1)
+    , m_parentRule(parentRule) 
 {
-    if (CSSStyleSheet* styleSheet = contextStyleSheet()) {
-        if (Document* document = styleSheet->findDocument())
-            document->styleSelectorChanged(DeferRecalcStyle);
+    m_propertySet->ref();
+}
+
+StyleRuleCSSStyleDeclaration::~StyleRuleCSSStyleDeclaration()
+{
+    m_propertySet->deref();
+}
+
+void StyleRuleCSSStyleDeclaration::ref()
+{ 
+    ++m_refCount;
+}
+
+void StyleRuleCSSStyleDeclaration::deref()
+{ 
+    ASSERT(m_refCount);
+    if (!--m_refCount)
+        delete this;
+}
+
+void StyleRuleCSSStyleDeclaration::setNeedsStyleRecalc()
+{
+    if (CSSStyleSheet* styleSheet = parentStyleSheet()) {
+        if (Document* document = styleSheet->ownerDocument())
+            document->styleResolverChanged(DeferRecalcStyle);
     }
 }
-    
-CSSStyleSheet* RuleCSSStyleDeclaration::contextStyleSheet() const
+
+CSSStyleSheet* StyleRuleCSSStyleDeclaration::parentStyleSheet() const
 {
     return m_parentRule ? m_parentRule->parentStyleSheet() : 0;
 }
@@ -313,7 +361,7 @@ void InlineCSSStyleDeclaration::setNeedsStyleRecalc()
     return;
 }
 
-CSSStyleSheet* InlineCSSStyleDeclaration::contextStyleSheet() const
+CSSStyleSheet* InlineCSSStyleDeclaration::parentStyleSheet() const
 {
     return m_parentElement ? m_parentElement->document()->elementSheet() : 0;
 }

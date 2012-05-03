@@ -242,9 +242,9 @@ void InspectorDebuggerAgent::setBreakpointByUrl(ErrorString* errorString, int li
     for (ScriptsMap::iterator it = m_scripts.begin(); it != m_scripts.end(); ++it) {
         if (!matches(it->second.url, url, isRegex))
             continue;
-        RefPtr<InspectorObject> location = resolveBreakpoint(breakpointId, it->first, breakpoint);
+        RefPtr<TypeBuilder::Debugger::Location> location = resolveBreakpoint(breakpointId, it->first, breakpoint);
         if (location)
-            locations->pushObject(location);
+            locations->addItem(location);
     }
     *outBreakpointId = breakpointId;
 }
@@ -333,7 +333,7 @@ PassRefPtr<TypeBuilder::Debugger::Location> InspectorDebuggerAgent::resolveBreak
 
     BreakpointIdToDebugServerBreakpointIdsMap::iterator debugServerBreakpointIdsIterator = m_breakpointIdToDebugServerBreakpointIds.find(breakpointId);
     if (debugServerBreakpointIdsIterator == m_breakpointIdToDebugServerBreakpointIds.end())
-        debugServerBreakpointIdsIterator = m_breakpointIdToDebugServerBreakpointIds.set(breakpointId, Vector<String>()).first;
+        debugServerBreakpointIdsIterator = m_breakpointIdToDebugServerBreakpointIds.set(breakpointId, Vector<String>()).iterator;
     debugServerBreakpointIdsIterator->second.append(debugServerBreakpointId);
 
     RefPtr<TypeBuilder::Debugger::Location> location = TypeBuilder::Debugger::Location::create()
@@ -476,14 +476,28 @@ void InspectorDebuggerAgent::setPauseOnExceptionsImpl(ErrorString* errorString, 
         m_state->setLong(DebuggerAgentState::pauseOnExceptionsState, pauseState);
 }
 
-void InspectorDebuggerAgent::evaluateOnCallFrame(ErrorString* errorString, const String& callFrameId, const String& expression, const String* const objectGroup, const bool* const includeCommandLineAPI, const bool* const returnByValue, RefPtr<TypeBuilder::Runtime::RemoteObject>& result, TypeBuilder::OptOutput<bool>* wasThrown)
+void InspectorDebuggerAgent::evaluateOnCallFrame(ErrorString* errorString, const String& callFrameId, const String& expression, const String* const objectGroup, const bool* const includeCommandLineAPI, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, RefPtr<TypeBuilder::Runtime::RemoteObject>& result, TypeBuilder::OptOutput<bool>* wasThrown)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(callFrameId);
     if (injectedScript.hasNoValue()) {
         *errorString = "Inspected frame has gone";
         return;
     }
+
+    ScriptDebugServer::PauseOnExceptionsState previousPauseOnExceptionsState = scriptDebugServer().pauseOnExceptionsState();
+    if (doNotPauseOnExceptionsAndMuteConsole ? *doNotPauseOnExceptionsAndMuteConsole : false) {
+        if (previousPauseOnExceptionsState != ScriptDebugServer::DontPauseOnExceptions)
+            scriptDebugServer().setPauseOnExceptionsState(ScriptDebugServer::DontPauseOnExceptions);
+        muteConsole();
+    }
+
     injectedScript.evaluateOnCallFrame(errorString, m_currentCallStack, callFrameId, expression, objectGroup ? *objectGroup : "", includeCommandLineAPI ? *includeCommandLineAPI : false, returnByValue ? *returnByValue : false, &result, wasThrown);
+
+    if (doNotPauseOnExceptionsAndMuteConsole ? *doNotPauseOnExceptionsAndMuteConsole : false) {
+        unmuteConsole();
+        if (scriptDebugServer().pauseOnExceptionsState() != previousPauseOnExceptionsState)
+            scriptDebugServer().setPauseOnExceptionsState(previousPauseOnExceptionsState);
+    }
 }
 
 PassRefPtr<Array<TypeBuilder::Debugger::CallFrame> > InspectorDebuggerAgent::currentCallFrames()
@@ -568,7 +582,8 @@ void InspectorDebuggerAgent::didPause(ScriptState* scriptState, const ScriptValu
         InjectedScript injectedScript = m_injectedScriptManager->injectedScriptFor(scriptState);
         if (!injectedScript.hasNoValue()) {
             m_breakReason = InspectorFrontend::Debugger::Reason::Exception;
-            m_breakAuxData = injectedScript.wrapObject(exception, "backtrace");
+            m_breakAuxData = injectedScript.wrapObject(exception, "backtrace")->openAccessors();
+            // m_breakAuxData might be null after this.
         }
     }
 

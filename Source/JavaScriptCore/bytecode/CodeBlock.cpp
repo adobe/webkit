@@ -1248,17 +1248,6 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             dataLog("[%4d] throw_reference_error\t %s\n", location, constantName(exec, k0, getConstant(k0)).data());
             break;
         }
-        case op_jsr: {
-            int retAddrDst = (++it)->u.operand;
-            int offset = (++it)->u.operand;
-            dataLog("[%4d] jsr\t\t %s, %d(->%d)\n", location, registerName(exec, retAddrDst).data(), offset, location + offset);
-            break;
-        }
-        case op_sret: {
-            int retAddrSrc = (++it)->u.operand;
-            dataLog("[%4d] sret\t\t %s\n", location, registerName(exec, retAddrSrc).data());
-            break;
-        }
         case op_debug: {
             int debugHookID = (++it)->u.operand;
             int firstLine = (++it)->u.operand;
@@ -1443,6 +1432,7 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_symbolTable(symTab)
     , m_speculativeSuccessCounter(0)
     , m_speculativeFailCounter(0)
+    , m_forcedOSRExitCounter(0)
     , m_optimizationDelayCounter(0)
     , m_reoptimizationRetryCounter(0)
 #if ENABLE(JIT)
@@ -1936,7 +1926,7 @@ void CodeBlock::stronglyVisitStrongReferences(SlotVisitor& visitor)
     for (size_t i = 0; i < m_functionDecls.size(); ++i)
         visitor.append(&m_functionDecls[i]);
 #if ENABLE(CLASSIC_INTERPRETER)
-    if (m_globalData->interpreter->classicEnabled()) {
+    if (m_globalData->interpreter->classicEnabled() && !!numberOfInstructions()) {
         for (size_t size = m_propertyAccessInstructions.size(), i = 0; i < size; ++i)
             visitStructures(visitor, &instructions()[m_propertyAccessInstructions[i]]);
         for (size_t size = m_globalResolveInstructions.size(), i = 0; i < size; ++i)

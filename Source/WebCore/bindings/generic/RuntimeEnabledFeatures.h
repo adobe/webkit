@@ -70,6 +70,9 @@ public:
     static bool webkitIDBRequestEnabled() { return isIndexedDBEnabled; }
     static bool webkitIDBTransactionEnabled() { return isIndexedDBEnabled; }
 
+    static void setCSSExclusionsEnabled(bool isEnabled) { isCSSExclusionsEnabled = isEnabled; }
+    static bool cssExclusionsEnabled() { return isCSSExclusionsEnabled; }
+
 #if ENABLE(FULLSCREEN_API)
     // Mozilla version
     static bool webkitFullScreenAPIEnabled() { return isFullScreenAPIEnabled; }
@@ -185,9 +188,12 @@ public:
     static bool mediaStreamEnabled() { return isMediaStreamEnabled; }
     static void setMediaStreamEnabled(bool isEnabled) { isMediaStreamEnabled = isEnabled; }
     static bool webkitGetUserMediaEnabled() { return isMediaStreamEnabled; }
-    static bool webkitDeprecatedPeerConnectionEnabled() { return isMediaStreamEnabled; }
     static bool webkitMediaStreamEnabled() { return isMediaStreamEnabled; }
-    static bool webkitPeerConnection00Enabled() { return isMediaStreamEnabled; }
+
+    static bool peerConnectionEnabled() { return isMediaStreamEnabled && isPeerConnectionEnabled; }
+    static void setPeerConnectionEnabled(bool isEnabled) { isPeerConnectionEnabled = isEnabled; }
+    static bool webkitDeprecatedPeerConnectionEnabled() { return peerConnectionEnabled(); }
+    static bool webkitPeerConnection00Enabled() { return peerConnectionEnabled(); }
 #endif
 
 #if ENABLE(GAMEPAD)
@@ -201,8 +207,13 @@ public:
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
-    static bool webkitMediaSourceEnabled() { return isMediaSourceEnabled; }
-    static void setWebkitMediaSourceEnabled(bool isEnabled) { isMediaSourceEnabled = isEnabled; }
+    static bool mediaSourceEnabled() { return isMediaSourceEnabled; }
+    static void setMediaSourceEnabled(bool isEnabled) { isMediaSourceEnabled = isEnabled; }
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA)
+    static bool encryptedMediaEnabled() { return isEncryptedMediaEnabled; }
+    static void setEncryptedMediaEnabled(bool isEnabled) { isEncryptedMediaEnabled = isEnabled; }
 #endif
 
 #if ENABLE(VIDEO_TRACK)
@@ -218,6 +229,11 @@ public:
 #if ENABLE(STYLE_SCOPED)
     static bool styleScopedEnabled() { return isStyleScopedEnabled; }
     static void setStyleScopedEnabled(bool isEnabled) { isStyleScopedEnabled = isEnabled; }
+#endif
+
+#if ENABLE(INPUT_TYPE_DATE)
+    static bool inputTypeDateEnabled() { return isInputTypeDateEnabled; }
+    static void setInputTypeDateEnabled(bool isEnabled) { isInputTypeDateEnabled = isEnabled; }
 #endif
 
 private:
@@ -237,6 +253,7 @@ private:
     static bool isDeviceMotionEnabled;
     static bool isDeviceOrientationEnabled;
     static bool isSpeechInputEnabled;
+    static bool isCSSExclusionsEnabled;
 #if ENABLE(SCRIPTED_SPEECH)
     static bool isScriptedSpeechEnabled;
 #endif
@@ -254,6 +271,7 @@ private:
 
 #if ENABLE(MEDIA_STREAM)
     static bool isMediaStreamEnabled;
+    static bool isPeerConnectionEnabled;
 #endif
 
 #if ENABLE(GAMEPAD)
@@ -276,6 +294,10 @@ private:
     static bool isMediaSourceEnabled;
 #endif
 
+#if ENABLE(ENCRYPTED_MEDIA)
+    static bool isEncryptedMediaEnabled;
+#endif
+
 #if ENABLE(VIDEO_TRACK)
     static bool isVideoTrackEnabled;
 #endif
@@ -286,6 +308,10 @@ private:
 
 #if ENABLE(STYLE_SCOPED)
     static bool isStyleScopedEnabled;
+#endif
+
+#if ENABLE(INPUT_TYPE_DATE)
+    static bool isInputTypeDateEnabled;
 #endif
 };
 

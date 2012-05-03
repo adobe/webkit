@@ -37,6 +37,8 @@ namespace WebCore {
 class RenderBox;
 class RenderBoxRegionInfo;
 class RenderFlowThread;
+class RenderNamedFlowThread;
+class RenderRegionMultiColumn;
 
 class RenderRegion : public RenderReplaced {
 public:
@@ -56,7 +58,7 @@ public:
     void attachRegion();
     void detachRegion();
 
-    RenderFlowThread* parentFlowThread() const { return m_parentFlowThread; }
+    RenderNamedFlowThread* parentNamedFlowThread() const { return m_parentNamedFlowThread; }
     RenderFlowThread* flowThread() const { return m_flowThread; }
 
     // Valid regions do not create circular dependencies with other flows.
@@ -81,8 +83,6 @@ public:
     bool isFirstRegion() const;
     bool isLastRegion() const;
 
-    void clearBoxStyleInRegion(const RenderBox*);
-
     enum RegionState {
         RegionUndefined,
         RegionEmpty,
@@ -97,9 +97,7 @@ public:
     
     bool updateIntrinsicSizeIfNeeded(const LayoutSize& newSize);
 
-    bool hasAutoHeight() const { return style()->logicalHeight().isAuto(); }
-    bool hasAutoWidth() const { return style()->logicalWidth().isAuto(); }
-    bool hasAutoHeightStyle() const  { return !usedForMultiColumn() && (isHorizontalWritingMode() ? hasAutoHeight() : hasAutoWidth()); }
+    bool hasAutoHeightStyle() const;
     bool usesAutoHeight() const { return m_usesAutoHeight; }
 
     bool hasComputedAutoHeight() const { return document()->cssRegionsAutoHeightEnabled() && m_hasComputedAutoHeight; }
@@ -115,29 +113,43 @@ public:
         m_hasComputedAutoHeight = false;
     }
     
-    virtual LayoutUnit computeReplacedLogicalHeight() const;
-    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual void computeLogicalHeight();
     
-    void setUsedForMultiColumn(bool usedForMultiColumn) { m_usedForMultiColumn = usedForMultiColumn; }
-    bool usedForMultiColumn() const { return m_usedForMultiColumn; }
+    void setParentMultiColumnRegion(RenderRegionMultiColumn* parentRegion) { m_parentMultiColumnRegion = parentRegion; }
+    RenderRegionMultiColumn* parentMultiColumnRegion() const { return m_parentMultiColumnRegion; }
+    bool hasParentMultiColumnRegion() const { return m_parentMultiColumnRegion; }
     
     virtual LayoutUnit minPreferredLogicalWidth() const;
     virtual LayoutUnit maxPreferredLogicalWidth() const;
-    
+    // Fix for inline-block regions with width:auto
+    // (to avoid the computation path for inline replaced elements in RenderBox::computeLogicalWidthInRegion).
+    virtual bool isInlineBlockOrInlineTable() const { return isInline() && isReplaced(); }
+
+    // Do nothing for the moment as styles are computed for every paint.
+    void clearBoxStyleInRegion(const RenderBox*) { }
+
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 
-    PassRefPtr<RenderStyle> renderBoxRegionStyle(const RenderBox*);
-    PassRefPtr<RenderStyle> computeStyleInRegion(const RenderBox*);
-    void setRegionBoxesRegionStyle();
-    void restoreRegionBoxesOriginalStyle();
+    // Compute the style in region for an element.
+    PassRefPtr<RenderStyle> computeStyleInRegion(const RenderObject*);
+
+    // Compute style in region for the children in the tree under the specified object.
+    void computeChildrenStyleInRegion(RenderObject*);
+
+    // paint is called between these functions.
+    void setRegionObjectsRegionStyle();
+    void restoreRegionObjectsOriginalStyle();
+
+    void clearRegionObjectsRegionStyle();
+    void setObjectStyleInRegion(RenderObject*, PassRefPtr<RenderStyle>);
 
     RenderFlowThread* m_flowThread;
 
-    // If this RenderRegion is displayed as part of another flow,
+    // If this RenderRegion is displayed as part of another named flow,
     // we need to create a dependency tree, so that layout of the
     // regions is always done before the regions themselves.
-    RenderFlowThread* m_parentFlowThread;
+    RenderNamedFlowThread* m_parentNamedFlowThread;
     LayoutRect m_regionRect;
 
     // This map holds unique information about a block that is split across regions.
@@ -147,14 +159,15 @@ private:
     typedef HashMap<const RenderBox*, OwnPtr<RenderBoxRegionInfo> > RenderBoxRegionInfoMap;
     RenderBoxRegionInfoMap m_renderBoxRegionInfo;
 
-    typedef HashMap<const RenderBox*, RefPtr<RenderStyle> > RenderBoxRegionStyleMap;
-    RenderBoxRegionStyleMap m_renderBoxRegionStyle;
+    typedef HashMap<const RenderObject*, RefPtr<RenderStyle> > RenderObjectRegionStyleMap;
+    RenderObjectRegionStyleMap m_renderObjectRegionStyle;
 
+    RenderRegionMultiColumn* m_parentMultiColumnRegion; 
+    
     bool m_isValid;
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
     bool m_dispatchRegionLayoutUpdateEvent;
-    bool m_usedForMultiColumn;
 
     // Store the computed region autoheight
     LayoutUnit m_computedAutoHeight;

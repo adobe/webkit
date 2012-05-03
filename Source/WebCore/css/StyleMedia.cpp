@@ -26,12 +26,12 @@
 #include "config.h"
 #include "StyleMedia.h"
 
-#include "CSSStyleSelector.h"
 #include "Document.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "MediaList.h"
 #include "MediaQueryEvaluator.h"
+#include "StyleResolver.h"
 
 namespace WebCore {
 
@@ -60,11 +60,11 @@ bool StyleMedia::matchMedium(const String& query) const
     if (!documentElement)
         return false;
 
-    CSSStyleSelector* styleSelector = document->styleSelector();
-    if (!styleSelector)
+    StyleResolver* styleResolver = document->styleResolver();
+    if (!styleResolver)
         return false;
 
-    RefPtr<RenderStyle> rootStyle = styleSelector->styleForElement(documentElement, 0 /*defaultParent*/, false /*allowSharing*/, true /*resolveForRootDefault*/);
+    RefPtr<RenderStyle> rootStyle = styleResolver->styleForElement(documentElement, 0 /*defaultParent*/, DisallowStyleSharing, MatchOnlyUserAgentRules);
 
     RefPtr<MediaQuerySet> media = MediaQuerySet::create();
     if (!media->parse(query))

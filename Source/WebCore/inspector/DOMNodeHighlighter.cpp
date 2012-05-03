@@ -143,16 +143,10 @@ void drawHighlightForSVGRenderer(GraphicsContext& context, const Vector<FloatQua
         drawOutlinedQuad(context, absoluteQuads[i], highlightData->content, Color::transparent);
 }
 
-inline LayoutSize frameToMainFrameOffset(Frame* frame)
-{
-    LayoutPoint mainFramePoint = frame->page()->mainFrame()->view()->rootViewToContents(frame->view()->contentsToRootView(LayoutPoint()));
-    return toLayoutSize(mainFramePoint);
-}
-
 int drawSubstring(const TextRun& globalTextRun, int offset, int length, const Color& textColor, const Font& font, GraphicsContext& context, const LayoutRect& titleRect)
 {
     context.setFillColor(textColor, ColorSpaceDeviceRGB);
-    context.drawText(font, globalTextRun, LayoutPoint(titleRect.x() + rectInflatePx, titleRect.y() + font.fontMetrics().height()), offset, offset + length);
+    context.drawText(font, globalTextRun, IntPoint(titleRect.pixelSnappedX() + rectInflatePx, titleRect.pixelSnappedY() + font.fontMetrics().height()), offset, offset + length);
     return offset + length;
 }
 
@@ -222,7 +216,7 @@ TOOLTIP_FONT_FAMILIES(1, new AtomicString("dejavu sans mono"))
     }
 }
 
-void drawElementTitle(GraphicsContext& context, Node* node, RenderObject* renderer, const LayoutRect& boundingBox, const LayoutRect& anchorBox, const FloatRect& visibleRect, WebCore::Settings* settings)
+void drawElementTitle(GraphicsContext& context, Node* node, RenderObject* renderer, const IntRect& boundingBox, const IntRect& anchorBox, const FloatRect& visibleRect, WebCore::Settings* settings)
 {
     DEFINE_STATIC_LOCAL(Color, backgroundColor, (255, 255, 194));
     DEFINE_STATIC_LOCAL(Color, tagColor, (136, 18, 128)); // Same as .webkit-html-tag.
@@ -269,11 +263,11 @@ void drawElementTitle(GraphicsContext& context, Node* node, RenderObject* render
 
     RenderBoxModelObject* modelObject = renderer->isBoxModelObject() ? toRenderBoxModelObject(renderer) : 0;
 
-    String widthNumberPart = " " + String::number(modelObject ? adjustForAbsoluteZoom(modelObject->offsetWidth(), modelObject) : boundingBox.width());
+    String widthNumberPart = " " + String::number(modelObject ? adjustForAbsoluteZoom(modelObject->pixelSnappedOffsetWidth(), modelObject) : boundingBox.width());
     nodeTitle.append(widthNumberPart);
     nodeTitle.append(pxString);
     nodeTitle.append(timesString);
-    String heightNumberPart = String::number(modelObject ? adjustForAbsoluteZoom(modelObject->offsetHeight(), modelObject) : boundingBox.height());
+    String heightNumberPart = String::number(modelObject ? adjustForAbsoluteZoom(modelObject->pixelSnappedOffsetHeight(), modelObject) : boundingBox.height());
     nodeTitle.append(heightNumberPart);
     nodeTitle.append(pxString);
 
@@ -283,9 +277,9 @@ void drawElementTitle(GraphicsContext& context, Node* node, RenderObject* render
     font.update(0);
 
     TextRun nodeTitleRun(nodeTitle.toString());
-    LayoutPoint titleBasePoint = LayoutPoint(anchorBox.x(), anchorBox.maxY() - 1);
+    IntPoint titleBasePoint = IntPoint(anchorBox.x(), anchorBox.maxY() - 1);
     titleBasePoint.move(rectInflatePx, rectInflatePx);
-    LayoutRect titleRect = enclosingLayoutRect(font.selectionRectForText(nodeTitleRun, titleBasePoint, fontHeightPx));
+    IntRect titleRect = enclosingIntRect(font.selectionRectForText(nodeTitleRun, titleBasePoint, fontHeightPx));
     titleRect.inflate(rectInflatePx);
 
     // The initial offsets needed to compensate for a 1px-thick border stroke (which is not a part of the rectangle).
@@ -359,6 +353,15 @@ void drawElementTitle(GraphicsContext& context, Node* node, RenderObject* render
     drawSubstring(nodeTitleRun, currentPos, pxString.length(), pxAndBorderColor, font, context, titleRect);
 }
 
+static void contentsQuadToPage(const FrameView* mainView, const FrameView* view, FloatQuad& quad)
+{
+    quad.setP1(view->contentsToRootView(roundedIntPoint(quad.p1())));
+    quad.setP2(view->contentsToRootView(roundedIntPoint(quad.p2())));
+    quad.setP3(view->contentsToRootView(roundedIntPoint(quad.p3())));
+    quad.setP4(view->contentsToRootView(roundedIntPoint(quad.p4())));
+    quad += mainView->scrollOffset();
+}
+
 static void getOrDrawNodeHighlight(GraphicsContext* context, HighlightData* highlightData, Highlight* highlight)
 {
     Node* node = highlightData->node.get();
@@ -368,17 +371,15 @@ static void getOrDrawNodeHighlight(GraphicsContext* context, HighlightData* high
     if (!renderer || !containingFrame)
         return;
 
-    LayoutSize mainFrameOffset = frameToMainFrameOffset(containingFrame);
-    LayoutRect boundingBox = renderer->absoluteBoundingBoxRect();
+    FrameView* containingView = containingFrame->view();
+    FrameView* mainView = containingFrame->page()->mainFrame()->view();
+    IntRect boundingBox = pixelSnappedIntRect(containingView->contentsToRootView(renderer->absoluteBoundingBoxRect()));
+    boundingBox.move(mainView->scrollOffset());
+    IntRect titleAnchorBox = boundingBox;
 
-    boundingBox.move(mainFrameOffset);
-
-    LayoutRect titleAnchorBox = boundingBox;
-
-    FrameView* view = containingFrame->page()->mainFrame()->view();
-    FloatRect visibleRect = view->visibleContentRect();
+    FloatRect visibleRect = mainView->visibleContentRect();
     // Don't translate the context if the frame is rendered in page coordinates.
-    if (context && !view->delegatesScrolling())
+    if (context && !mainView->delegatesScrolling())
         context->translate(-visibleRect.x(), -visibleRect.y());
 
     // RenderSVGRoot should be highlighted through the isBox() code path, all other SVG elements should just dump their absoluteQuads().
@@ -392,7 +393,7 @@ static void getOrDrawNodeHighlight(GraphicsContext* context, HighlightData* high
         highlight->type = HighlightTypeRects;
         renderer->absoluteQuads(highlight->quads);
         for (size_t i = 0; i < highlight->quads.size(); ++i)
-            highlight->quads[i] += mainFrameOffset;
+            contentsQuadToPage(mainView, containingView, highlight->quads[i]);
 
         if (context)
             drawHighlightForSVGRenderer(*context, highlight->quads, highlightData);
@@ -435,10 +436,10 @@ static void getOrDrawNodeHighlight(GraphicsContext* context, HighlightData* high
         FloatQuad absBorderQuad = renderer->localToAbsoluteQuad(FloatRect(borderBox));
         FloatQuad absMarginQuad = renderer->localToAbsoluteQuad(FloatRect(marginBox));
 
-        absContentQuad.move(mainFrameOffset);
-        absPaddingQuad.move(mainFrameOffset);
-        absBorderQuad.move(mainFrameOffset);
-        absMarginQuad.move(mainFrameOffset);
+        contentsQuadToPage(mainView, containingView, absContentQuad);
+        contentsQuadToPage(mainView, containingView, absPaddingQuad);
+        contentsQuadToPage(mainView, containingView, absBorderQuad);
+        contentsQuadToPage(mainView, containingView, absMarginQuad);
 
         titleAnchorBox = absMarginQuad.enclosingBoundingBox();
 
@@ -458,7 +459,7 @@ static void getOrDrawNodeHighlight(GraphicsContext* context, HighlightData* high
         return;
 
     if (context && highlightData->showInfo)
-        drawElementTitle(*context, node, renderer, boundingBox, titleAnchorBox, visibleRect, containingFrame->settings());
+        drawElementTitle(*context, node, renderer, pixelSnappedIntRect(boundingBox), pixelSnappedIntRect(titleAnchorBox), visibleRect, containingFrame->settings());
 }
 
 static void getOrDrawRectHighlight(GraphicsContext* context, Document* document, HighlightData* highlightData, Highlight *highlight)

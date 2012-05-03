@@ -222,7 +222,8 @@ namespace JSC {
         NEVER_INLINE HandlerInfo* throwException(CallFrame*&, JSValue&, unsigned bytecodeOffset);
         NEVER_INLINE void debug(CallFrame*, DebugHookID, int firstLine, int lastLine);
         static const UString getTraceLine(CallFrame*, StackFrameCodeType, const UString&, int);
-        JS_EXPORT_PRIVATE static void getStackTrace(JSGlobalData*, int line, Vector<StackFrame>& results);
+        JS_EXPORT_PRIVATE static void getStackTrace(JSGlobalData*, Vector<StackFrame>& results);
+        static void addStackTraceIfNecessary(CallFrame*, JSObject* error);
 
         void dumpSampleData(ExecState* exec);
         void startSampling();
@@ -293,7 +294,7 @@ namespace JSC {
 
     inline JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue thisValue, ScopeChainNode* scopeChain)
     {
-        return execute(eval, callFrame, thisValue, scopeChain, m_registerFile.size() + 1 + RegisterFile::CallFrameHeaderSize);
+        return execute(eval, callFrame, thisValue, scopeChain, (callFrame->startOfReusableRegisterFile() - m_registerFile.begin()) + 1 + RegisterFile::CallFrameHeaderSize);
     }
 
     JSValue eval(CallFrame*);

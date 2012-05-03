@@ -35,7 +35,12 @@
 #include "CanvasRenderingContext.h"
 #include "Extensions3DChromium.h"
 #include "GraphicsContext3D.h"
-#include "WebGLLayerChromium.h"
+#include "TextureLayerChromium.h"
+#include "cc/CCProxy.h"
+#include "cc/CCTextureUpdater.h"
+#include <algorithm>
+
+using namespace std;
 
 namespace WebCore {
 
@@ -46,8 +51,8 @@ static unsigned generateColorTexture(GraphicsContext3D* context, const IntSize& 
         return 0;
 
     context->bindTexture(GraphicsContext3D::TEXTURE_2D, offscreenColorTexture);
-    context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::NEAREST);
-    context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::NEAREST);
+    context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR);
+    context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR);
     context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE);
     context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE);
     context->texImage2DResourceSafe(GraphicsContext3D::TEXTURE_2D, 0, GraphicsContext3D::RGBA, size.width(), size.height(), 0, GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE);
@@ -59,10 +64,13 @@ DrawingBuffer::DrawingBuffer(GraphicsContext3D* context,
                              const IntSize& size,
                              bool multisampleExtensionSupported,
                              bool packedDepthStencilExtensionSupported,
-                             bool separateBackingTexture)
-    : m_separateBackingTexture(separateBackingTexture)
+                             PreserveDrawingBuffer preserve,
+                             AlphaRequirement alpha)
+    : m_preserveDrawingBuffer(preserve)
+    , m_alpha(alpha)
     , m_scissorEnabled(false)
     , m_texture2DBinding(0)
+    , m_framebufferBinding(0)
     , m_activeTextureUnit(GraphicsContext3D::TEXTURE0)
     , m_context(context)
     , m_size(-1, -1)
@@ -70,7 +78,8 @@ DrawingBuffer::DrawingBuffer(GraphicsContext3D* context,
     , m_packedDepthStencilExtensionSupported(packedDepthStencilExtensionSupported)
     , m_fbo(0)
     , m_colorBuffer(0)
-    , m_backingColorBuffer(0)
+    , m_frontColorBuffer(0)
+    , m_separateFrontTexture(m_preserveDrawingBuffer == Preserve || CCProxy::implThread())
     , m_depthStencilBuffer(0)
     , m_depthBuffer(0)
     , m_stencilBuffer(0)
@@ -82,9 +91,6 @@ DrawingBuffer::DrawingBuffer(GraphicsContext3D* context,
 
 DrawingBuffer::~DrawingBuffer()
 {
-    if (m_platformLayer)
-        m_platformLayer->setDrawingBuffer(0);
-
     if (!m_context)
         return;
 
@@ -95,8 +101,8 @@ void DrawingBuffer::initialize(const IntSize& size)
 {
     m_fbo = m_context->createFramebuffer();
 
-    if (m_separateBackingTexture)
-        m_backingColorBuffer = generateColorTexture(m_context.get(), size);
+    if (m_separateFrontTexture)
+        m_frontColorBuffer = generateColorTexture(m_context.get(), size);
 
     m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_fbo);
     m_colorBuffer = generateColorTexture(m_context.get(), size);
@@ -109,53 +115,90 @@ void DrawingBuffer::initialize(const IntSize& size)
 }
 
 #if USE(ACCELERATED_COMPOSITING)
-void DrawingBuffer::publishToPlatformLayer()
+void DrawingBuffer::prepareBackBuffer()
 {
-    if (!m_context)
-        return;
-
     m_context->makeContextCurrent();
+
     if (multisample())
         commit();
 
-    if (m_separateBackingTexture) {
+    if (m_preserveDrawingBuffer == Discard && m_separateFrontTexture) {
+        swap(m_frontColorBuffer, m_colorBuffer);
+        // It appears safe to overwrite the context's framebuffer binding in the Discard case since there will always be a
+        // WebGLRenderingContext::clearIfComposited() call made before the next draw call which restores the framebuffer binding.
+        // If this stops being true at some point, we should track the current framebuffer binding in the DrawingBuffer and restore
+        // it after attaching the new back buffer here.
         m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_fbo);
-
-        // This path always uses TEXTURE0, and restores its state below.
-        m_context->activeTexture(GraphicsContext3D::TEXTURE0);
-        m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, m_backingColorBuffer);
-
-        unsigned colorFormat = m_context->getContextAttributes().alpha ? GraphicsContext3D::RGBA : GraphicsContext3D::RGB;
-        m_context->copyTexImage2D(GraphicsContext3D::TEXTURE_2D, 0, colorFormat, 0, 0, size().width(), size().height(), 0);
-
-        m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, m_texture2DBinding);
-        m_context->activeTexture(m_activeTextureUnit);
+        m_context->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, m_colorBuffer, 0);
     }
 
     if (multisample())
         bind();
+}
 
-    m_context->flush();
+bool DrawingBuffer::requiresCopyFromBackToFrontBuffer() const
+{
+    return m_separateFrontTexture && m_preserveDrawingBuffer == Preserve;
+}
+
+unsigned DrawingBuffer::frontColorBuffer() const
+{
+    return m_separateFrontTexture ? m_frontColorBuffer : m_colorBuffer;
 }
 #endif
+
+class DrawingBufferPrivate : public TextureLayerChromiumClient {
+    WTF_MAKE_NONCOPYABLE(DrawingBufferPrivate);
+public:
+    explicit DrawingBufferPrivate(DrawingBuffer* drawingBuffer)
+        : m_drawingBuffer(drawingBuffer)
+        , m_layer(TextureLayerChromium::create(this))
+    {
+        GraphicsContext3D::Attributes attributes = m_drawingBuffer->graphicsContext3D()->getContextAttributes();
+        m_layer->setOpaque(!attributes.alpha);
+        m_layer->setPremultipliedAlpha(attributes.premultipliedAlpha);
+    }
+
+    virtual ~DrawingBufferPrivate()
+    {
+        m_layer->clearClient();
+    }
+
+    virtual unsigned prepareTexture(CCTextureUpdater& updater) OVERRIDE
+    {
+        m_drawingBuffer->prepareBackBuffer();
+
+        context()->flush();
+        context()->markLayerComposited();
+
+        unsigned textureId = m_drawingBuffer->frontColorBuffer();
+        if (m_drawingBuffer->requiresCopyFromBackToFrontBuffer())
+            updater.appendCopy(m_drawingBuffer->colorBuffer(), textureId, m_drawingBuffer->size());
+
+        return textureId;
+    }
+
+    virtual GraphicsContext3D* context() OVERRIDE
+    {
+        return m_drawingBuffer->graphicsContext3D();
+    }
+
+    LayerChromium* layer() const { return m_layer.get(); }
+
+private:
+    DrawingBuffer* m_drawingBuffer;
+    RefPtr<TextureLayerChromium> m_layer;
+};
 
 #if USE(ACCELERATED_COMPOSITING)
 PlatformLayer* DrawingBuffer::platformLayer()
 {
-    if (!m_platformLayer) {
-        m_platformLayer = WebGLLayerChromium::create();
-        m_platformLayer->setDrawingBuffer(this);
-        m_platformLayer->setOpaque(!m_context->getContextAttributes().alpha);
-    }
+    if (!m_private)
+        m_private = adoptPtr(new DrawingBufferPrivate(this));
 
-    return m_platformLayer.get();
+    return m_private->layer();
 }
 #endif
-
-Platform3DObject DrawingBuffer::platformColorBuffer() const
-{
-    return m_separateBackingTexture ? m_backingColorBuffer : m_colorBuffer;
-}
 
 Platform3DObject DrawingBuffer::framebuffer() const
 {
@@ -165,8 +208,26 @@ Platform3DObject DrawingBuffer::framebuffer() const
 #if USE(ACCELERATED_COMPOSITING)
 void DrawingBuffer::paintCompositedResultsToCanvas(CanvasRenderingContext* context)
 {
-    if (m_platformLayer)
-        m_platformLayer->paintRenderedResultsToCanvas(context->canvas()->buffer());
+    if (!m_context->makeContextCurrent() || m_context->getExtensions()->getGraphicsResetStatusARB() != GraphicsContext3D::NO_ERROR)
+        return;
+
+    IntSize framebufferSize = m_context->getInternalFramebufferSize();
+
+    // Since we're using the same context as WebGL, we have to restore any state we change (in this case, just the framebuffer binding).
+    // FIXME: The WebGLRenderingContext tracks the current framebuffer binding, it would be slightly more efficient to use this value
+    // rather than querying it off of the context.
+    GC3Dint previousFramebuffer = 0;
+    m_context->getIntegerv(GraphicsContext3D::FRAMEBUFFER_BINDING, &previousFramebuffer);
+
+    Platform3DObject framebuffer = m_context->createFramebuffer();
+    m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, framebuffer);
+    m_context->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, frontColorBuffer(), 0);
+
+    Extensions3DChromium* extensions = static_cast<Extensions3DChromium*>(m_context->getExtensions());
+    extensions->paintFramebufferToCanvas(framebuffer, framebufferSize.width(), framebufferSize.height(), !m_context->getContextAttributes().premultipliedAlpha, context->canvas()->buffer());
+    m_context->deleteFramebuffer(framebuffer);
+
+    m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, previousFramebuffer);
 }
 #endif
 

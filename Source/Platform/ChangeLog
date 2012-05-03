@@ -1,3 +1,648 @@
+2012-04-26  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Separate IOSurface layer type from texture layers
+        https://bugs.webkit.org/show_bug.cgi?id=85030
+
+        Reviewed by Adrienne Walker.
+
+        Adds a new layer type for IOSurface backed layers, instead of sharing that functionality in
+        WebExternalTextureLayer. IOSurface backed layers do not share any other properties with external texture layers.
+
+        * Platform.gypi:
+        * chromium/public/WebExternalTextureLayer.h:
+        (WebExternalTextureLayer):
+        * chromium/public/WebIOSurfaceLayer.h:
+        (WebCore):
+        (WebKit):
+        (WebIOSurfaceLayer):
+        (WebKit::WebIOSurfaceLayer::WebIOSurfaceLayer):
+        (WebKit::WebIOSurfaceLayer::~WebIOSurfaceLayer):
+
+2012-04-25  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Remove guarded virtual methods from WebFilterOperation API
+        https://bugs.webkit.org/show_bug.cgi?id=84926
+
+        Reviewed by James Robinson.
+
+        We remove the virtual methods from the WebFilterOperation class,
+        and use an enum in the base class to distinguish which subclass
+        the object is. Then WebFilterOperations can access the correct
+        subclass to get the filter operation's data and construct a
+        WebCore::FilterOperation to store internally.
+
+        * chromium/public/WebFilterOperation.h:
+        (WebKit::WebFilterOperation::WebFilterOperation):
+        (WebKit::WebBasicColorMatrixFilterOperation::WebBasicColorMatrixFilterOperation):
+        (WebBasicColorMatrixFilterOperation):
+        (WebKit::WebBasicComponentTransferFilterOperation::WebBasicComponentTransferFilterOperation):
+        (WebBasicComponentTransferFilterOperation):
+        (WebKit::WebBlurFilterOperation::WebBlurFilterOperation):
+        (WebKit::WebDropShadowFilterOperation::WebDropShadowFilterOperation):
+
+2012-04-25  Gavin Peters  <gavinp@chromium.org>
+
+        [Chromium] Fix some conditional compilation logic in Platform
+        https://bugs.webkit.org/show_bug.cgi?id=83798
+
+        Reviewed by Darin Fisher.
+
+        * chromium/public/WebURLError.h:
+        (WebURLError):
+        * chromium/public/WebURLRequest.h:
+        (WebURLRequest):
+        * chromium/public/WebURLResponse.h:
+        (WebURLResponse):
+
+2012-04-25  Gavin Peters  <gavinp@chromium.org>
+
+        Move WebReferrerPolicy.h from WebKit to Platform
+        https://bugs.webkit.org/show_bug.cgi?id=84539
+
+        Reviewed by Adam Barth.
+
+        * Platform.gypi:
+        * chromium/public/WebReferrerPolicy.h: Copied from Source/WebKit/chromium/public/WebReferrerPolicy.h.
+        (WebKit):
+
+2012-04-24  Yuzhu Shen  <yzshen@chromium.org>
+
+        [chromium] Add a description field in WebURLError and show failure description in the inspector network tab.
+        https://bugs.webkit.org/show_bug.cgi?id=84566
+
+        Reviewed by Pavel Feldman.
+
+        * chromium/public/WebURLError.h:
+        (WebURLError):
+
+2012-04-18  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Use TextureLayerChromium for WebGL content instead of a dedicated layer type
+        https://bugs.webkit.org/show_bug.cgi?id=84311
+
+        Reviewed by Adrienne Walker.
+
+        Remove some unused getters.
+
+        * chromium/public/WebExternalTextureLayer.h:
+        (WebExternalTextureLayer):
+
+2012-04-20  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] WebFilterOperations API does not compile or dynamically link
+        https://bugs.webkit.org/show_bug.cgi?id=84506
+
+        Reviewed by James Robinson.
+
+        Non-inline functions need WEBKIT_EXPORT in their declarations,
+        and the type used in the WebPrivateOwnPtr needs to be forward-
+        declared even when WEBKIT_IMPLEMENTATION is not defined.
+
+        * chromium/public/WebFilterOperations.h:
+        (WebKit::WebFilterOperations::WebFilterOperations):
+        (WebFilterOperations):
+
+2012-04-20  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Plumb a compositor surface ready notification through to the threaded compositor
+        https://bugs.webkit.org/show_bug.cgi?id=84305
+
+        Reviewed by Adrienne Walker.
+
+        Add a notification for when the compositor surface associated with a given view is ready to use.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebLayerTreeView):
+
+2012-04-16  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Convert WebPluginContainerImpl over to use WebExternalTextureLayer
+        https://bugs.webkit.org/show_bug.cgi?id=84120
+
+        Reviewed by Adrienne Walker.
+
+        This adds support for IO surface backed WebExternalTextureLayer, used by CoreAnimation plugins on OS X and moves
+        some functionality used by multiple WebLayer subclasses up to the base class.
+
+        * chromium/public/WebContentLayer.h:
+        (WebContentLayer):
+        * chromium/public/WebExternalTextureLayer.h:
+        (WebCore):
+        (WebExternalTextureLayer):
+        * chromium/public/WebLayer.h:
+        (WebKit):
+        (WebLayer):
+        (WebKit::WebLayer::unwrap):
+
+2012-04-17  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Fix gyp for WebFilterOperation.h and WebFilterOperations.h
+        https://bugs.webkit.org/show_bug.cgi?id=84182
+
+        Reviewed by James Robinson.
+
+        * Platform.gypi:
+
+2012-04-16  Kent Tamura  <tkent@chromium.org>
+
+        [Chromium] Fix Chromium-Mac build
+        https://bugs.webkit.org/show_bug.cgi?id=80054
+
+        * chromium/public/WebFilterOperations.h:
+        (WebKit): WebFilterOperation is a struct, not a class.
+
+2012-04-16  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Expose compositor filters to Aura through WebLayer
+        https://bugs.webkit.org/show_bug.cgi?id=80054
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebFilterOperation.h: Added.
+        (WebKit):
+        (WebFilterOperation):
+        (WebKit::WebFilterOperation::WebFilterOperation):
+        (WebBasicColorMatrixFilterOperation):
+        (WebKit::WebBasicColorMatrixFilterOperation::WebBasicColorMatrixFilterOperation):
+        (WebBasicComponentTransferFilterOperation):
+        (WebKit::WebBasicComponentTransferFilterOperation::WebBasicComponentTransferFilterOperation):
+        (WebBlurFilterOperation):
+        (WebKit::WebBlurFilterOperation::WebBlurFilterOperation):
+        (WebDropShadowFilterOperation):
+        (WebKit::WebDropShadowFilterOperation::WebDropShadowFilterOperation):
+        * chromium/public/WebFilterOperations.h: Added.
+        (WebKit):
+        (WebFilterOperations):
+        * chromium/public/WebLayer.h:
+        (WebKit):
+        (WebLayer):
+
+2012-04-13  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Expose WebVideoLayer to Platform API and port WebMediaPlayerClientImpl to using it
+        https://bugs.webkit.org/show_bug.cgi?id=83963
+
+        Reviewed by Adrienne Walker.
+
+        Adds a compositor layer type for video, WebVideoLayer, and a WebVideoProvider interface.
+
+        * Platform.gypi:
+        * chromium/public/WebContentLayer.h:
+        (WebContentLayer):
+        * chromium/public/WebLayer.h:
+        (WebLayer):
+        (WebKit::WebLayer::unwrap):
+        * chromium/public/WebVideoFrameProvider.h: Renamed from Source/WebCore/platform/graphics/chromium/VideoFrameProvider.h.
+        (WebKit):
+        (WebVideoFrameProvider):
+        (WebKit::WebVideoFrameProvider::~WebVideoFrameProvider):
+        (Client):
+        * chromium/public/WebVideoLayer.h: Copied from Source/WebKit/chromium/src/WebContentLayer.cpp.
+        (WebCore):
+        (WebKit):
+        (WebVideoLayer):
+        (WebKit::WebVideoLayer::WebVideoLayer):
+        (WebKit::WebVideoLayer::~WebVideoLayer):
+
+2012-04-11  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove unused compositeToTexture / compositeOffscreen setting
+        https://bugs.webkit.org/show_bug.cgi?id=83733
+
+        Reviewed by Adrienne Walker.
+
+        Remove compositeOffscreen setting. This was an experiment that is no longer needed.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+
+2012-04-13  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move WebVideoFrame into Platform and remove WebCore::VideoFrameChromium wrapper API
+        https://bugs.webkit.org/show_bug.cgi?id=83851
+
+        Reviewed by Adam Barth.
+
+        Move WebVideoFrame API into Platform.
+
+        * Platform.gypi:
+        * chromium/public/WebVideoFrame.h: Renamed from Source/WebCore/platform/graphics/chromium/VideoFrameChromium.h.
+        (WebKit):
+        (WebVideoFrame):
+        (WebKit::WebVideoFrame::~WebVideoFrame):
+        (WebKit::WebVideoFrame::format):
+        (WebKit::WebVideoFrame::width):
+        (WebKit::WebVideoFrame::height):
+        (WebKit::WebVideoFrame::planes):
+        (WebKit::WebVideoFrame::stride):
+        (WebKit::WebVideoFrame::data):
+        (WebKit::WebVideoFrame::textureId):
+        (WebKit::WebVideoFrame::textureTarget):
+        * chromium/src/WebVideoFrame.cpp: Renamed from Source/WebCore/platform/graphics/chromium/VideoFrameChromium.cpp.
+        (WebKit):
+
+2012-04-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r114075.
+        http://trac.webkit.org/changeset/114075
+        https://bugs.webkit.org/show_bug.cgi?id=83857
+
+        Breaks compile (Requested by jamesr on #webkit).
+
+        * Platform.gypi:
+
+2012-04-12  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move WebVideoFrame into Platform and remove WebCore::VideoFrameChromium wrapper API
+        https://bugs.webkit.org/show_bug.cgi?id=83851
+
+        Reviewed by Adam Barth.
+
+        Move WebVideoFrame API into Platform.
+
+        * Platform.gypi:
+        * chromium/public/WebVideoFrame.h: Renamed from Source/WebCore/platform/graphics/chromium/VideoFrameChromium.h.
+        (WebKit):
+        (WebVideoFrame):
+        (WebKit::WebVideoFrame::~WebVideoFrame):
+        (WebKit::WebVideoFrame::format):
+        (WebKit::WebVideoFrame::width):
+        (WebKit::WebVideoFrame::height):
+        (WebKit::WebVideoFrame::planes):
+        (WebKit::WebVideoFrame::stride):
+        (WebKit::WebVideoFrame::data):
+        (WebKit::WebVideoFrame::textureId):
+        (WebKit::WebVideoFrame::textureTarget):
+        * chromium/src/WebVideoFrame.cpp: Renamed from Source/WebCore/platform/graphics/chromium/VideoFrameChromium.cpp.
+        (WebKit):
+
+2012-04-11  David Dorwin  <ddorwin@chromium.org>
+
+        Add keySystem attribute to canPlayType() for Encrypted Media Extensions
+        https://bugs.webkit.org/show_bug.cgi?id=82973
+
+        Reviewed by Adam Barth.
+
+        The new attribute is behind the ENABLE(ENCRYPTED_MEDIA) feature define.
+        Implementation is based on v0.1 of the draft proposal at
+        http://dvcs.w3.org/hg/html-media/raw-file/tip/encrypted-media/encrypted-media.html#extensions.
+
+        * chromium/public/WebMimeRegistry.h:
+        (WebKit::WebMimeRegistry::supportsMediaMIMEType):
+
+2012-04-09  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Viewport is not filled when out of texture memory on mac
+        https://bugs.webkit.org/show_bug.cgi?id=83351
+
+        Reviewed by Adrienne Walker.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebLayerTreeView):
+
+2012-04-09  James Robinson  <jamesr@chromium.org>
+
+        [chromium] CCLayerTreeHost / WebLayerTreeView should be single ownership, not RefCounted
+        https://bugs.webkit.org/show_bug.cgi?id=83413
+
+        Reviewed by Adrienne Walker.
+
+        This makes WebLayerTreeView noncopyable to better match the underlying semantics. There is no code currently
+        that attempts to copy WebLayerTreeView instances.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit):
+        (WebLayerTreeView):
+
+2012-04-04  Adam Barth  <abarth@webkit.org>
+
+        figure out how to export webcore symbols from webkit.dll properly
+        https://bugs.webkit.org/show_bug.cgi?id=83105
+
+        Reviewed by Dimitri Glazkov.
+
+        Unwind our ugly, ugly hack to make the Windows component build work.
+
+        * chromium/public/WebMediaStreamSourcesRequest.h:
+        (WebMediaStreamSourcesRequest):
+
+2012-04-03  Adam Barth  <abarth@webkit.org>
+
+        Unreviewed. This patch adds an ugly, ugly hack to bandaid over the
+        Windows component build. See comments in the code for details.
+
+        * chromium/public/WebMediaStreamSourcesRequest.h:
+        (WebMediaStreamSourcesRequest):
+
+2012-04-02  Zhenyao Mo  <zmo@google.com>
+
+        Implement WebGLShaderPrecisionFormat
+        https://bugs.webkit.org/show_bug.cgi?id=75925
+
+        Reviewed by Kenneth Russell.
+
+        * chromium/public/WebGraphicsContext3D.h: Add getShaderPrecisionFormat().
+        (WebGraphicsContext3D):
+
+2012-04-03  Adam Barth  <abarth@webkit.org>
+
+        Attempt to fix the Windows component build by including these headers
+        rather than forward declaring these objects.
+
+        * chromium/public/WebMediaStreamSourcesRequest.h:
+        (WebKit):
+
+2012-04-02  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Move a number of virtual functions from WebKitPlatformSupport.h into Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=82865
+
+        Reviewed by Kent Tamura.
+
+        Moving these functions into Platform.h allows them to be called from
+        Platform (aka WebCore/platform), as discussed in 
+        https://lists.webkit.org/pipermail/webkit-dev/2012-March/020166.html
+
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::mimeRegistry):
+        (WebKit::Platform::audioHardwareSampleRate):
+        (WebKit::Platform::audioHardwareBufferSize):
+        (WebKit::Platform::createAudioDevice):
+        (WebKit::Platform::sampleGamepads):
+        (WebKit::Platform::visitedLinkHash):
+        (WebKit::Platform::isLinkVisited):
+        (WebKit::Platform::signedPublicKeyAndChallengeString):
+        (WebKit::Platform::memoryUsageMB):
+        (WebKit::Platform::actualMemoryUsageMB):
+        (WebKit::Platform::lowMemoryUsageMB):
+        (WebKit::Platform::highMemoryUsageMB):
+        (WebKit::Platform::highUsageDeltaMB):
+        (WebKit::Platform::prefetchHostName):
+        (WebKit::Platform::createSocketStreamHandle):
+        (WebKit::Platform::userAgent):
+        (WebKit::Platform::cacheMetadata):
+        (WebKit::Platform::createThread):
+        (WebKit::Platform::currentThread):
+        (WebKit::Platform::decrementStatsCounter):
+        (WebKit::Platform::incrementStatsCounter):
+        (WebKit::Platform::loadResource):
+        (WebKit::Platform::loadAudioResource):
+        (WebKit::Platform::sandboxEnabled):
+        (WebKit::Platform::suddenTerminationChanged):
+        (WebKit::Platform::defaultLocale):
+        (WebKit::Platform::currentTime):
+        (WebKit::Platform::monotonicallyIncreasingTime):
+        (WebKit::Platform::setSharedTimerFiredFunction):
+        (WebKit::Platform::setSharedTimerFireInterval):
+        (WebKit::Platform::stopSharedTimer):
+        (WebKit::Platform::callOnMainThread):
+        (WebKit::Platform::getTraceCategoryEnabledFlag):
+        (WebKit::Platform::addTraceEvent):
+        (WebKit::Platform::histogramCustomCounts):
+        (WebKit::Platform::histogramEnumeration):
+
+2012-04-02  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Move another block of headers from WebKit/chromium/public/platform to Platform/chromium/public
+        https://bugs.webkit.org/show_bug.cgi?id=82862
+
+        Rubber-stamped by Eric Seidel.
+
+        * Platform.gypi:
+        * chromium/public/WebAudioBus.h: Copied from Source/WebKit/chromium/public/platform/WebAudioBus.h.
+        * chromium/public/WebAudioDevice.h: Copied from Source/WebKit/chromium/public/platform/WebAudioDevice.h.
+        * chromium/public/WebGamepad.h: Copied from Source/WebKit/chromium/public/platform/WebGamepad.h.
+        * chromium/public/WebGamepads.h: Copied from Source/WebKit/chromium/public/platform/WebGamepads.h.
+        * chromium/public/WebSocketStreamError.h: Copied from Source/WebKit/chromium/public/platform/WebSocketStreamError.h.
+        * chromium/public/WebSocketStreamHandle.h: Copied from Source/WebKit/chromium/public/platform/WebSocketStreamHandle.h.
+        * chromium/public/WebSocketStreamHandleClient.h: Copied from Source/WebKit/chromium/public/platform/WebSocketStreamHandleClient.h.
+
+2012-04-01  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Move thread-related APIs from WebKit into Platform
+        https://bugs.webkit.org/show_bug.cgi?id=82858
+
+        Reviewed by Eric Seidel.
+
+        * Platform.gypi:
+        * chromium/public/WebThread.h: Copied from Source/WebKit/chromium/public/platform/WebThread.h.
+        * chromium/public/WebThreadSafeData.h: Copied from Source/WebKit/chromium/public/platform/WebThreadSafeData.h.
+
+2012-03-29  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Delete WebKit/chromium/bridge
+        https://bugs.webkit.org/show_bug.cgi?id=82677
+
+        Reviewed by James Robinson.
+
+        This patch moves all the MediaStream-related platform APIs from
+        WebKit/chromium/public/platform into Platform/chromium/public. This is
+        part of a larger project to more clearly separate the platform and
+        client portions of the Chromium WebKit API.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createPeerConnectionHandler):
+        (WebKit::Platform::createPeerConnection00Handler):
+        (WebKit::Platform::createMediaStreamCenter):
+        * chromium/public/WebICECandidateDescriptor.h: Copied from Source/WebKit/chromium/public/platform/WebICECandidateDescriptor.h.
+        * chromium/public/WebICEOptions.h: Copied from Source/WebKit/chromium/public/platform/WebICEOptions.h.
+        * chromium/public/WebMediaHints.h: Copied from Source/WebKit/chromium/public/platform/WebMediaHints.h.
+        * chromium/public/WebMediaStreamCenter.h: Copied from Source/WebKit/chromium/public/platform/WebMediaStreamCenter.h.
+        * chromium/public/WebMediaStreamCenterClient.h: Copied from Source/WebKit/chromium/public/platform/WebMediaStreamCenterClient.h.
+        * chromium/public/WebMediaStreamComponent.h: Copied from Source/WebKit/chromium/public/platform/WebMediaStreamComponent.h.
+        * chromium/public/WebMediaStreamDescriptor.h: Copied from Source/WebKit/chromium/public/platform/WebMediaStreamDescriptor.h.
+        * chromium/public/WebMediaStreamSource.h: Copied from Source/WebKit/chromium/public/platform/WebMediaStreamSource.h.
+        * chromium/public/WebMediaStreamSourcesRequest.h: Copied from Source/WebKit/chromium/public/platform/WebMediaStreamSourcesRequest.h.
+        * chromium/public/WebPeerConnection00Handler.h: Copied from Source/WebKit/chromium/public/platform/WebPeerConnection00Handler.h.
+        * chromium/public/WebPeerConnection00HandlerClient.h: Copied from Source/WebKit/chromium/public/platform/WebPeerConnection00HandlerClient.h.
+        * chromium/public/WebPeerConnectionHandler.h: Copied from Source/WebKit/chromium/public/platform/WebPeerConnectionHandler.h.
+        (WebPeerConnectionHandler):
+        * chromium/public/WebPeerConnectionHandlerClient.h: Copied from Source/WebKit/chromium/public/platform/WebPeerConnectionHandlerClient.h.
+        * chromium/public/WebSessionDescriptionDescriptor.h: Copied from Source/WebKit/chromium/public/platform/WebSessionDescriptionDescriptor.h.
+        * chromium/public/WebVector.h: Copied from Source/WebKit/chromium/public/platform/WebVector.h.
+
+2012-03-30  David Barr  <davidbarr@chromium.org>
+
+        Split up top-level .gitignore and .gitattributes
+        https://bugs.webkit.org/show_bug.cgi?id=82687
+
+        Reviewed by Tor Arne Vestbø.
+
+        * Platform.gyp/.gitignore: Added.
+
+2012-03-29  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Move createURLLoader() into Platform
+        https://bugs.webkit.org/show_bug.cgi?id=82587
+
+        Reviewed by James Robinson.
+
+        This patch introduces a base class for WebKitPlatformSupport that we
+        can use to incrementally more APIs from WebKit/chromium/public/platform
+        into Platform/chromium/public. Using this technique lets us avoid
+        making changes in the embedder during the transition.
+
+        This patch moves createURLLoader() because it's necessary for
+        ResourceHandle.  This is the third patch in this sequence:
+        https://github.com/abarth/webkit/compare/master...webcore-platform
+
+        * Platform.gypi:
+        * chromium/public/Platform.h: Added.
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createURLLoader):
+        (WebKit::Platform::~Platform):
+        * chromium/src/Platform.cpp: Added.
+        (WebKit):
+        (WebKit::Platform::initialize):
+        (WebKit::Platform::shutdown):
+        (WebKit::Platform::current):
+
+2012-03-28  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Move APIs related to ResourceHandle into Platform
+        https://bugs.webkit.org/show_bug.cgi?id=82553
+
+        Reviewed by James Robinson.
+
+        This patch is the first patch in this series:
+        https://github.com/abarth/webkit/compare/master...webcore-platform
+
+        The goal of these patches is to move WebCore::ResourceHandle out of
+        Chromium's WebKit layer and into WebCore/platform, where it belongs.
+
+        This patch moves the Chromium-WebKit APIs used by ResourceHandle out of
+        the WebKit layer and into the Plaform layer. These are APIs that WebKit
+        uses to call "down" to manipulate the underlying platform (rather than
+        "up" to the client to make decisions). The long-term plan is to move
+        all of the headers in WebKit/chromium/public/platform into
+        Platform/chromium/public (although we'll likely need to clean up some
+        layering violations as we go).
+
+        * Platform.gypi:
+        * chromium/public/WebData.h: Added.
+        (WebKit):
+        (WebData):
+        (WebKit::WebData::~WebData):
+        (WebKit::WebData::WebData):
+        (WebKit::WebData::operator=):
+        (WebKit::WebData::isEmpty):
+        (WebKit::WebData::isNull):
+        * chromium/public/WebHTTPBody.h: Added.
+        (WebKit):
+        (WebHTTPBody):
+        (WebKit::WebHTTPBody::~WebHTTPBody):
+        (WebKit::WebHTTPBody::WebHTTPBody):
+        (WebKit::WebHTTPBody::operator=):
+        (WebKit::WebHTTPBody::isNull):
+        * chromium/public/WebHTTPHeaderVisitor.h: Added.
+        (WebKit):
+        (WebHTTPHeaderVisitor):
+        (WebKit::WebHTTPHeaderVisitor::~WebHTTPHeaderVisitor):
+        * chromium/public/WebHTTPLoadInfo.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebHTTPLoadInfo):
+        (WebKit::WebHTTPLoadInfo::WebHTTPLoadInfo):
+        (WebKit::WebHTTPLoadInfo::~WebHTTPLoadInfo):
+        (WebKit::WebHTTPLoadInfo::operator =):
+        * chromium/public/WebPrivateOwnPtr.h: Added.
+        (WebKit):
+        (WebPrivateOwnPtr):
+        (WebKit::WebPrivateOwnPtr::WebPrivateOwnPtr):
+        (WebKit::WebPrivateOwnPtr::~WebPrivateOwnPtr):
+        (WebKit::WebPrivateOwnPtr::reset):
+        (WebKit::WebPrivateOwnPtr::get):
+        (WebKit::WebPrivateOwnPtr::operator->):
+        * chromium/public/WebURL.h: Added.
+        (WebKit):
+        (WebURL):
+        (WebKit::WebURL::~WebURL):
+        (WebKit::WebURL::WebURL):
+        (WebKit::WebURL::operator=):
+        (WebKit::WebURL::assign):
+        (WebKit::WebURL::spec):
+        (WebKit::WebURL::parsed):
+        (WebKit::WebURL::isValid):
+        (WebKit::WebURL::isEmpty):
+        (WebKit::WebURL::isNull):
+        (WebKit::WebURL::operator GURL):
+        (WebKit::operator<):
+        (WebKit::operator==):
+        (WebKit::operator!=):
+        * chromium/public/WebURLError.h: Added.
+        (WebKit):
+        (WebURLError):
+        (WebKit::WebURLError::WebURLError):
+        * chromium/public/WebURLLoadTiming.h: Added.
+        (WebKit):
+        (WebURLLoadTiming):
+        (WebKit::WebURLLoadTiming::~WebURLLoadTiming):
+        (WebKit::WebURLLoadTiming::WebURLLoadTiming):
+        (WebKit::WebURLLoadTiming::operator=):
+        (WebKit::WebURLLoadTiming::isNull):
+        * chromium/public/WebURLLoader.h: Added.
+        (WebKit):
+        (WebURLLoader):
+        (WebKit::WebURLLoader::~WebURLLoader):
+        * chromium/public/WebURLLoaderClient.h: Added.
+        (WebKit):
+        (WebURLLoaderClient):
+        (WebKit::WebURLLoaderClient::willSendRequest):
+        (WebKit::WebURLLoaderClient::didSendData):
+        (WebKit::WebURLLoaderClient::didReceiveResponse):
+        (WebKit::WebURLLoaderClient::didDownloadData):
+        (WebKit::WebURLLoaderClient::didReceiveData):
+        (WebKit::WebURLLoaderClient::didReceiveCachedMetadata):
+        (WebKit::WebURLLoaderClient::didFinishLoading):
+        (WebKit::WebURLLoaderClient::didFail):
+        (WebKit::WebURLLoaderClient::~WebURLLoaderClient):
+        * chromium/public/WebURLRequest.h: Added.
+        (WebKit):
+        (WebURLRequest):
+        (ExtraData):
+        (WebKit::WebURLRequest::ExtraData::~ExtraData):
+        (WebKit::WebURLRequest::~WebURLRequest):
+        (WebKit::WebURLRequest::WebURLRequest):
+        (WebKit::WebURLRequest::operator=):
+        * chromium/public/WebURLResponse.h: Added.
+        (WebKit):
+        (WebURLResponse):
+        (ExtraData):
+        (WebKit::WebURLResponse::ExtraData::~ExtraData):
+        (WebKit::WebURLResponse::~WebURLResponse):
+        (WebKit::WebURLResponse::WebURLResponse):
+        (WebKit::WebURLResponse::operator=):
+
+2012-03-27  Nat Duca  <nduca@chromium.org>
+
+        [chromium] Route monotonic clock up from compositor
+        https://bugs.webkit.org/show_bug.cgi?id=82154
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebLayerTreeViewClient.h:
+        (WebLayerTreeViewClient):
+
+2012-03-26  Nat Duca  <nduca@chromium.org>
+
+        [chromium] Add isInputThrottled/didBecomeReadyForAdditionalInput to WebWidget
+        https://bugs.webkit.org/show_bug.cgi?id=82265
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebLayerTreeView):
+        * chromium/public/WebLayerTreeViewClient.h:
+        (WebLayerTreeViewClient):
+        (WebKit::WebLayerTreeViewClient::didCommit):
+
 2012-03-25  Nat Duca  <nduca@chromium.org>
 
         [chromium] Route willBeginFrame from compositor to WebWidget

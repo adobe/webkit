@@ -61,7 +61,7 @@ v8::Handle<v8::Value> V8WebKitMutationObserver::constructorCallback(const v8::Ar
         return args.Holder();
 
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
 
     v8::Local<v8::Value> arg = args[0];
     if (!arg->IsObject())
@@ -75,8 +75,7 @@ v8::Handle<v8::Value> V8WebKitMutationObserver::constructorCallback(const v8::Ar
     RefPtr<WebKitMutationObserver> observer = WebKitMutationObserver::create(callback.release());
 
     V8DOMWrapper::setDOMWrapper(args.Holder(), &info, observer.get());
-    observer->ref();
-    V8DOMWrapper::setJSWrapperForDOMObject(observer.get(), v8::Persistent<v8::Object>::New(args.Holder()));
+    V8DOMWrapper::setJSWrapperForDOMObject(observer.release(), v8::Persistent<v8::Object>::New(args.Holder()));
     return args.Holder();
 }
 
@@ -84,7 +83,7 @@ v8::Handle<v8::Value> V8WebKitMutationObserver::observeCallback(const v8::Argume
 {
     INC_STATS("DOM.WebKitMutationObserver.observe");
     if (args.Length() < 2)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
     WebKitMutationObserver* imp = V8WebKitMutationObserver::toNative(args.Holder());
     EXCEPTION_BLOCK(Node*, target, V8Node::HasInstance(args[0]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
 
@@ -113,7 +112,7 @@ v8::Handle<v8::Value> V8WebKitMutationObserver::observeCallback(const v8::Argume
     ExceptionCode ec = 0;
     imp->observe(target, options, attributeFilter, ec);
     if (ec)
-        V8Proxy::setDOMException(ec);
+        V8Proxy::setDOMException(ec, args.GetIsolate());
     return v8::Handle<v8::Value>();
 }
 

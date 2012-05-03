@@ -72,10 +72,14 @@
 #include <QDateTime>
 #endif
 
+#if PLATFORM(IOS)
+#include <fenv.h>
+#include <arm/arch.h>
+#endif
+
 using namespace JSC;
 using namespace WTF;
 
-static void cleanupGlobalData(JSGlobalData*);
 static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer);
 
 static EncodedJSValue JSC_HOST_CALL functionPrint(ExecState*);
@@ -195,8 +199,8 @@ protected:
         addFunction(globalData, "clearSamplingFlags", functionClearSamplingFlags, 1);
 #endif
         
-#if ENABLE(COMMANDLINE_TYPEDARRAYS)
         addConstructableFunction(globalData, "Uint8Array", constructJSUint8Array, 1);
+        addConstructableFunction(globalData, "Uint8ClampedArray", constructJSUint8ClampedArray, 1);
         addConstructableFunction(globalData, "Uint16Array", constructJSUint16Array, 1);
         addConstructableFunction(globalData, "Uint32Array", constructJSUint32Array, 1);
         addConstructableFunction(globalData, "Int8Array", constructJSInt8Array, 1);
@@ -204,7 +208,6 @@ protected:
         addConstructableFunction(globalData, "Int32Array", constructJSInt32Array, 1);
         addConstructableFunction(globalData, "Float32Array", constructJSFloat32Array, 1);
         addConstructableFunction(globalData, "Float64Array", constructJSFloat64Array, 1);
-#endif
 
         JSArray* array = constructEmptyArray(globalExec());
         for (size_t i = 0; i < arguments.size(); ++i)
@@ -277,7 +280,7 @@ EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState* exec)
 {
     String trace = "--> Stack trace:\n";
     Vector<StackFrame> stackTrace;
-    Interpreter::getStackTrace(&exec->globalData(), -1, stackTrace);
+    Interpreter::getStackTrace(&exec->globalData(), stackTrace);
     int i = 0;
 
     for (Vector<StackFrame>::iterator iter = stackTrace.begin(); iter < stackTrace.end(); iter++) {
@@ -321,11 +324,17 @@ EncodedJSValue JSC_HOST_CALL functionRun(ExecState* exec)
 
     GlobalObject* globalObject = GlobalObject::create(exec->globalData(), GlobalObject::createStructure(exec->globalData(), jsNull()), Vector<UString>());
 
+    JSValue exception;
     StopWatch stopWatch;
     stopWatch.start();
-    evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(script.data(), fileName));
+    evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(script.data(), fileName), JSValue(), &exception);
     stopWatch.stop();
 
+    if (!!exception) {
+        throwError(globalObject->globalExec(), exception);
+        return JSValue::encode(jsUndefined());
+    }
+    
     return JSValue::encode(jsNumber(stopWatch.getElapsedMS()));
 }
 
@@ -407,14 +416,8 @@ EncodedJSValue JSC_HOST_CALL functionPreciseTime(ExecState*)
     return JSValue::encode(jsNumber(currentTime()));
 }
 
-EncodedJSValue JSC_HOST_CALL functionQuit(ExecState* exec)
+EncodedJSValue JSC_HOST_CALL functionQuit(ExecState*)
 {
-    // Technically, destroying the heap in the middle of JS execution is a no-no,
-    // but we want to maintain compatibility with the Mozilla test suite, so
-    // we pretend that execution has terminated to avoid ASSERTs, then tear down the heap.
-    exec->globalData().dynamicGlobalObject = 0;
-
-    cleanupGlobalData(&exec->globalData());
     exit(EXIT_SUCCESS);
 
 #if COMPILER(MSVC) && OS(WINCE)
@@ -436,10 +439,18 @@ EncodedJSValue JSC_HOST_CALL functionQuit(ExecState* exec)
 #define EXCEPT(x)
 #endif
 
-int jscmain(int argc, char** argv, JSGlobalData*);
+int jscmain(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
+#if PLATFORM(IOS)
+    // Enabled IEEE754 denormal support.
+    fenv_t env;
+    fegetenv( &env );
+    env.__fpscr &= ~0x01000000u;
+    fesetenv( &env );
+#endif
+
 #if OS(WINDOWS)
 #if !OS(WINCE)
     // Cygwin calls ::SetErrorMode(SEM_FAILCRITICALERRORS), which we will inherit. This is bad for
@@ -473,21 +484,10 @@ int main(int argc, char** argv)
     // We can't use destructors in the following code because it uses Windows
     // Structured Exception Handling
     int res = 0;
-    JSGlobalData* globalData = JSGlobalData::create(ThreadStackTypeLarge, LargeHeap).leakRef();
     TRY
-        res = jscmain(argc, argv, globalData);
+        res = jscmain(argc, argv);
     EXCEPT(res = 3)
-
-    cleanupGlobalData(globalData);
     return res;
-}
-
-static void cleanupGlobalData(JSGlobalData* globalData)
-{
-    JSLock lock(SilenceAssertionsOnly);
-    globalData->clearBuiltinStructures();
-    globalData->heap.destroy();
-    globalData->deref();
 }
 
 static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scripts, bool dump)
@@ -522,11 +522,14 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
         JSValue evaluationException;
         JSValue returnValue = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(script, fileName), JSValue(), &evaluationException);
         success = success && !evaluationException;
-        if (dump) {
-            if (evaluationException)
-                printf("Exception: %s\n", evaluationException.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
-            else
-                printf("End: %s\n", returnValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
+        if (dump && !evaluationException)
+            printf("End: %s\n", returnValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
+        if (evaluationException) {
+            printf("Exception: %s\n", evaluationException.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
+            Identifier stackID(globalObject->globalExec(), "stack");
+            JSValue stackValue = evaluationException.get(globalObject->globalExec(), stackID);
+            if (!stackValue.isUndefinedOrNull())
+                printf("%s\n", stackValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
         }
 
         globalData.stopSampling();
@@ -592,7 +595,7 @@ static void runInteractive(GlobalObject* globalObject)
     printf("\n");
 }
 
-static NO_RETURN void printUsageStatement(JSGlobalData* globalData, bool help = false)
+static NO_RETURN void printUsageStatement(bool help = false)
 {
     fprintf(stderr, "Usage: jsc [options] [files] [-- arguments]\n");
     fprintf(stderr, "  -d         Dumps bytecode (debug builds only)\n");
@@ -604,24 +607,23 @@ static NO_RETURN void printUsageStatement(JSGlobalData* globalData, bool help = 
     fprintf(stderr, "  -s         Installs signal handlers that exit on a crash (Unix platforms only)\n");
 #endif
 
-    cleanupGlobalData(globalData);
     exit(help ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-static void parseArguments(int argc, char** argv, CommandLine& options, JSGlobalData* globalData)
+static void parseArguments(int argc, char** argv, CommandLine& options)
 {
     int i = 1;
     for (; i < argc; ++i) {
         const char* arg = argv[i];
         if (!strcmp(arg, "-f")) {
             if (++i == argc)
-                printUsageStatement(globalData);
+                printUsageStatement();
             options.scripts.append(Script(true, argv[i]));
             continue;
         }
         if (!strcmp(arg, "-e")) {
             if (++i == argc)
-                printUsageStatement(globalData);
+                printUsageStatement();
             options.scripts.append(Script(false, argv[i]));
             continue;
         }
@@ -647,7 +649,7 @@ static void parseArguments(int argc, char** argv, CommandLine& options, JSGlobal
             break;
         }
         if (!strcmp(arg, "-h") || !strcmp(arg, "--help"))
-            printUsageStatement(globalData, true);
+            printUsageStatement(true);
         options.scripts.append(Script(true, argv[i]));
     }
 
@@ -658,12 +660,14 @@ static void parseArguments(int argc, char** argv, CommandLine& options, JSGlobal
         options.arguments.append(argv[i]);
 }
 
-int jscmain(int argc, char** argv, JSGlobalData* globalData)
+int jscmain(int argc, char** argv)
 {
     JSLock lock(SilenceAssertionsOnly);
 
+    RefPtr<JSGlobalData> globalData = JSGlobalData::create(ThreadStackTypeLarge, LargeHeap);
+
     CommandLine options;
-    parseArguments(argc, argv, options, globalData);
+    parseArguments(argc, argv, options);
 
     GlobalObject* globalObject = GlobalObject::create(*globalData, GlobalObject::createStructure(*globalData, jsNull()), options.arguments);
     bool success = runWithScripts(globalObject, options.scripts, options.dump);

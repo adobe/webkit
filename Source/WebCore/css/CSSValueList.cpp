@@ -136,11 +136,25 @@ String CSSValueList::customCssText() const
     return result.toString();
 }
 
-void CSSValueList::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const CSSStyleSheet* styleSheet)
+void CSSValueList::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetInternal* styleSheet)
 {
     size_t size = m_values.size();
     for (size_t i = 0; i < size; ++i)
         m_values[i]->addSubresourceStyleURLs(urls, styleSheet);
+}
+
+CSSValueList::CSSValueList(const CSSValueList& cloneFrom)
+    : CSSValue(cloneFrom.classType(), /* isCSSOMSafe */ true)
+{
+    m_valueListSeparator = cloneFrom.m_valueListSeparator;
+    m_values.resize(cloneFrom.m_values.size());
+    for (unsigned i = 0; i < m_values.size(); ++i)
+        m_values[i] = cloneFrom.m_values[i]->cloneForCSSOM();
+}
+
+PassRefPtr<CSSValueList> CSSValueList::cloneForCSSOM() const
+{
+    return adoptRef(new CSSValueList(*this));
 }
 
 } // namespace WebCore

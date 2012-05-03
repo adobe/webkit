@@ -37,6 +37,7 @@ namespace WebCore {
 class AudioContext;
 class AudioNodeInput;
 class AudioNodeOutput;
+class AudioParam;
 
 typedef int ExceptionCode;
 
@@ -54,16 +55,16 @@ public:
     virtual ~AudioNode();
 
     AudioContext* context() { return m_context.get(); }
+    const AudioContext* context() const { return m_context.get(); }
 
     enum NodeType {
         NodeTypeUnknown,
         NodeTypeDestination,
+        NodeTypeOscillator,
         NodeTypeAudioBufferSource,
         NodeTypeMediaElementAudioSource,
         NodeTypeJavaScript,
         NodeTypeBiquadFilter,
-        NodeTypeLowPass2Filter,
-        NodeTypeHighPass2Filter,
         NodeTypePanner,
         NodeTypeConvolver,
         NodeTypeDelay,
@@ -116,6 +117,7 @@ public:
 
     // Called from main thread by corresponding JavaScript methods.
     void connect(AudioNode*, unsigned outputIndex, unsigned inputIndex, ExceptionCode&);
+    void connect(AudioParam*, unsigned outputIndex, ExceptionCode&);
     void disconnect(unsigned outputIndex, ExceptionCode&);
 
     virtual float sampleRate() const { return m_sampleRate; }
@@ -144,6 +146,13 @@ public:
     // example, a "delay" effect is expected to delay the signal, and thus would not be considered latency.
     virtual double latencyTime() const = 0;
 
+    // propagatesSilence() should return true if the node will generate silent output when given silent input. By default, AudioNode
+    // will take tailTime() and latencyTime() into account when determining whether the node will propagate silence.
+    virtual bool propagatesSilence() const;
+    bool inputsAreSilent();
+    void silenceOutputs();
+    void unsilenceOutputs();
+
 protected:
     // Inputs and outputs must be created before the AudioNode is initialized.
     void addInput(PassOwnPtr<AudioNodeInput>);
@@ -163,6 +172,7 @@ private:
     Vector<OwnPtr<AudioNodeOutput> > m_outputs;
 
     double m_lastProcessingTime;
+    double m_lastNonSilentTime;
 
     // Ref-counting
     volatile int m_normalRefCount;

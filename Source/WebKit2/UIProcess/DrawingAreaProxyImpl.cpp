@@ -127,6 +127,11 @@ void DrawingAreaProxyImpl::deviceScaleFactorDidChange()
     backingStoreStateDidChange(RespondImmediately);
 }
 
+void DrawingAreaProxyImpl::layerHostingModeDidChange()
+{
+    m_webPageProxy->process()->send(Messages::DrawingArea::SetLayerHostingMode(m_webPageProxy->layerHostingMode()), m_webPageProxy->pageID());
+}
+
 void DrawingAreaProxyImpl::visibilityDidChange()
 {
     if (!m_webPageProxy->isViewVisible()) {
@@ -354,17 +359,6 @@ void DrawingAreaProxyImpl::setVisibleContentsRect(const WebCore::IntRect& visibl
         m_layerTreeHostProxy->setVisibleContentsRect(visibleContentsRect, scale, trajectoryVector);
 }
 
-void DrawingAreaProxyImpl::paintLayerTree(BackingStore::PlatformGraphicsContext context)
-{
-    if (m_layerTreeHostProxy)
-        m_layerTreeHostProxy->paintToGraphicsContext(context);
-}
-
-void DrawingAreaProxyImpl::paintToCurrentGLContext(const TransformationMatrix& matrix, float opacity, const FloatRect& clipRect)
-{
-    if (m_layerTreeHostProxy)
-        m_layerTreeHostProxy->paintToCurrentGLContext(matrix, opacity, clipRect);
-}
 #endif
 
 void DrawingAreaProxyImpl::exitAcceleratedCompositingMode()

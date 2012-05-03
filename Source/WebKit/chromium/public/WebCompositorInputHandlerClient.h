@@ -28,6 +28,8 @@
 
 namespace WebKit {
 
+struct WebActiveWheelFlingParameters;
+
 class WebCompositorInputHandlerClient {
 public:
     // Callbacks invoked from the compositor thread.
@@ -41,6 +43,10 @@ public:
     // Called when the WebCompositor did not handle the input event. If sendToWidget is true, the input event
     // should be forwarded to the WebWidget associated with this compositor for further processing.
     virtual void didNotHandleInputEvent(bool sendToWidget) = 0;
+
+    // Transfers an active wheel fling animation initiated by a previously handled input event out to the client.
+    // FIXME: Make pure virtual once implementation lands on Chromium side.
+    virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&) { }
 
 protected:
     virtual ~WebCompositorInputHandlerClient() { }

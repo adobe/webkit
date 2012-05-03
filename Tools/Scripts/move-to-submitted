@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+
+import glob, os, sys
+
+incomingPath = ''
+submittedPath = ''
+
+def usage():
+    print"USAGE: move-to-submitted [incoming_dir_to_move]"
+    sys.exit()
+
+def parseArgs():
+	if (len(sys.argv) < 2):
+	    usage()
+	else:
+		global incomingPath
+		incomingPath = sys.argv[1]
+		if incomingPath.find("incoming") == -1:
+			print "Path to incoming tests must contain the word \"incoming\""
+			sys.exit()
+
+def scanW3CDirectory(directory):
+	## Construct the submitted path as a mirror to the incoming path
+	submittedPath = directory.replace("/incoming/", "/submitted/")
+
+	## Make the directory if needed
+	if not os.path.exists(submittedPath):
+		os.makedirs (submittedPath)
+		
+	for w3cTest in os.listdir(directory):
+		incomingFullPath = os.path.join(directory, w3cTest)
+		submittedFullPath = os.path.join(submittedPath, w3cTest)
+		if os.path.isfile(incomingFullPath) and not(w3cTest.startswith(".")):
+			cmd = "hg rename " + incomingFullPath +" "+ submittedFullPath
+			submittedFullPath = submittedFullPath.replace(".xht", ".html")
+			print cmd
+			os.system(cmd)
+		elif os.path.isdir(incomingFullPath):
+			print "recursing: " + incomingFullPath
+			scanW3CDirectory(incomingFullPath)
+
+parseArgs()
+scanW3CDirectory(incomingPath)
+os.system("hg status")
+print "hg rename has been called on all items in " + incomingPath + ". You can now commit and push these changes."
+
+
+
+

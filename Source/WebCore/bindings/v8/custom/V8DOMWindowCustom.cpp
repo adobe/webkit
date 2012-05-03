@@ -42,6 +42,7 @@
 #include "FrameView.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
+#include "Location.h"
 #include "MediaPlayer.h"
 #include "MessagePort.h"
 #include "Page.h"
@@ -77,7 +78,7 @@ v8::Handle<v8::Value> WindowSetTimeoutImpl(const v8::Arguments& args, bool singl
     ScriptExecutionContext* scriptContext = static_cast<ScriptExecutionContext*>(imp->document());
 
     if (!scriptContext) {
-        V8Proxy::setDOMException(INVALID_ACCESS_ERR);
+        V8Proxy::setDOMException(INVALID_ACCESS_ERR, args.GetIsolate());
         return v8::Undefined();
     }
 
@@ -195,7 +196,8 @@ void V8DOMWindow::locationAccessorSetter(v8::Local<v8::String> name, v8::Local<v
     if (!firstWindow)
       return;
 
-    imp->setLocation(toWebCoreString(value), activeWindow, firstWindow);
+    if (Location* location = imp->location())
+        location->setHref(toWebCoreString(value), activeWindow, firstWindow);
 }
 
 void V8DOMWindow::openerAccessorSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
@@ -334,7 +336,8 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
         SerializedScriptValue::create(args[0],
                                       &portArray,
                                       extendedTransfer ? &arrayBufferArray : 0,
-                                      didThrow);
+                                      didThrow,
+                                      args.GetIsolate());
     if (didThrow)
         return v8::Undefined();
 
@@ -461,7 +464,7 @@ v8::Handle<v8::Value> V8DOMWindow::openCallback(const v8::Arguments& args)
     if (!openedWindow)
         return v8::Undefined();
 
-    return toV8(openedWindow.release());
+    return toV8(openedWindow.release(), args.GetIsolate());
 }
 
 v8::Handle<v8::Value> V8DOMWindow::indexedPropertyGetter(uint32_t index, const v8::AccessorInfo& info)
@@ -478,7 +481,7 @@ v8::Handle<v8::Value> V8DOMWindow::indexedPropertyGetter(uint32_t index, const v
 
     Frame* child = frame->tree()->scopedChild(index);
     if (child)
-        return toV8(child->domWindow());
+        return toV8(child->domWindow(), info.GetIsolate());
 
     return notHandledByInterceptor();
 }
@@ -501,7 +504,7 @@ v8::Handle<v8::Value> V8DOMWindow::namedPropertyGetter(v8::Local<v8::String> nam
     AtomicString propName = v8StringToAtomicWebCoreString(name);
     Frame* child = frame->tree()->scopedChild(propName);
     if (child)
-        return toV8(child->domWindow());
+        return toV8(child->domWindow(), info.GetIsolate());
 
     // Search IDL functions defined in the prototype
     if (!info.Holder()->GetRealNamedProperty(name).IsEmpty())
@@ -515,8 +518,8 @@ v8::Handle<v8::Value> V8DOMWindow::namedPropertyGetter(v8::Local<v8::String> nam
             HTMLCollection* items = doc->windowNamedItems(propName);
             if (items->length() >= 1) {
                 if (items->length() == 1)
-                    return toV8(items->firstItem());
-                return toV8(items);
+                    return toV8(items->firstItem(), info.GetIsolate());
+                return toV8(items, info.GetIsolate());
             }
         }
     }
@@ -596,7 +599,7 @@ bool V8DOMWindow::indexedSecurityCheck(v8::Local<v8::Object> host, uint32_t inde
     return V8BindingSecurity::canAccessFrame(V8BindingState::Only(), target, false);
 }
 
-v8::Handle<v8::Value> toV8(DOMWindow* window)
+v8::Handle<v8::Value> toV8(DOMWindow* window, v8::Isolate* isolate)
 {
     if (!window)
         return v8::Null();

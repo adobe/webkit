@@ -588,7 +588,7 @@ FloatQuad TransformationMatrix::projectQuad(const FloatQuad& q) const
 static float clampEdgeValue(float f)
 {
     ASSERT(!isnan(f));
-    return min<float>(max<float>(f, -numeric_limits<LayoutUnit>::max() / 2), numeric_limits<LayoutUnit>::max() / 2);
+    return min<float>(max<float>(f, -MAX_LAYOUT_UNIT / 2), MAX_LAYOUT_UNIT / 2);
 }
 
 LayoutRect TransformationMatrix::clampedBoundsOfProjectedQuad(const FloatQuad& q) const
@@ -600,13 +600,13 @@ LayoutRect TransformationMatrix::clampedBoundsOfProjectedQuad(const FloatQuad& q
 
     float right;
     if (isinf(mappedQuadBounds.x()) && isinf(mappedQuadBounds.width()))
-        right = numeric_limits<LayoutUnit>::max() / 2;
+        right = MAX_LAYOUT_UNIT / 2;
     else
         right = clampEdgeValue(ceilf(mappedQuadBounds.maxX()));
 
     float bottom;
     if (isinf(mappedQuadBounds.y()) && isinf(mappedQuadBounds.height()))
-        bottom = numeric_limits<LayoutUnit>::max() / 2;
+        bottom = MAX_LAYOUT_UNIT / 2;
     else
         bottom = clampEdgeValue(ceilf(mappedQuadBounds.maxY()));
     
@@ -1222,6 +1222,34 @@ void TransformationMatrix::toColumnMajorFloatArray(FloatMatrix4& result) const
     result[13] = m42();
     result[14] = m43();
     result[15] = m44();
+}
+
+bool TransformationMatrix::isBackFaceVisible() const
+{
+    // Back-face visibility is determined by transforming the normal vector (0, 0, 1) and
+    // checking the sign of the resulting z component. However, normals cannot be
+    // transformed by the original matrix, they require being transformed by the
+    // inverse-transpose.
+    //
+    // Since we know we will be using (0, 0, 1), and we only care about the z-component of
+    // the transformed normal, then we only need the m33() element of the
+    // inverse-transpose. Therefore we do not need the transpose.
+    //
+    // Additionally, if we only need the m33() element, we do not need to compute a full
+    // inverse. Instead, knowing the inverse of a matrix is adjoint(matrix) / determinant,
+    // we can simply compute the m33() of the adjoint (adjugate) matrix, without computing
+    // the full adjoint.
+
+    double determinant = WebCore::determinant4x4(m_matrix);
+
+    // If the matrix is not invertible, then we assume its backface is not visible.
+    if (fabs(determinant) < SMALL_NUMBER)
+        return false;
+
+    double cofactor33 = determinant3x3(m11(), m12(), m14(), m21(), m22(), m24(), m41(), m42(), m44());
+    double zComponentOfTransformedNormal = cofactor33 / determinant;
+
+    return zComponentOfTransformedNormal < 0;
 }
 
 }

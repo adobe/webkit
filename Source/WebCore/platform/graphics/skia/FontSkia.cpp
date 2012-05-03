@@ -54,23 +54,6 @@ bool Font::canExpandAroundIdeographsInComplexText()
     return true;
 }
 
-static bool isCanvasMultiLayered(SkCanvas* canvas)
-{
-    SkCanvas::LayerIter layerIterator(canvas, false);
-    layerIterator.next();
-    return !layerIterator.done();
-}
-
-static void adjustTextRenderMode(SkPaint* paint, PlatformContextSkia* skiaContext)
-{
-    // Our layers only have a single alpha channel. This means that subpixel
-    // rendered text cannot be compositied correctly when the layer is
-    // collapsed. Therefore, subpixel text is disabled when we are drawing
-    // onto a layer or when the compositor is being used.
-    if (isCanvasMultiLayered(skiaContext->canvas()) || skiaContext->isDrawingToImageBuffer())
-        paint->setLCDRenderText(false);
-}
-
 static void setupPaint(SkPaint* paint, const SimpleFontData* fontData, const Font* font, bool shouldAntialias, bool shouldSmoothFonts)
 {
     const FontPlatformData& platformData = fontData->platformData();
@@ -157,7 +140,7 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
         SkPaint paint;
         gc->platformContext()->setupPaintForFilling(&paint);
         setupPaint(&paint, font, this, shouldAntialias, shouldSmoothFonts);
-        adjustTextRenderMode(&paint, gc->platformContext());
+        gc->platformContext()->adjustTextRenderMode(&paint);
         paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 
         canvas->drawPosText(glyphs, numGlyphs * sizeof(uint16_t), pos, paint);
@@ -170,7 +153,7 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
         SkPaint paint;
         gc->platformContext()->setupPaintForStroking(&paint, 0, 0);
         setupPaint(&paint, font, this, shouldAntialias, shouldSmoothFonts);
-        adjustTextRenderMode(&paint, gc->platformContext());
+        gc->platformContext()->adjustTextRenderMode(&paint);
         paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 
         if (textMode & TextModeFill) {

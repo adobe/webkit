@@ -24,6 +24,7 @@
 #define Length_h
 
 #include "AnimationUtilities.h"
+#include "LayoutTypes.h"
 #include <wtf/Assertions.h>
 #include <wtf/FastAllocBase.h>
 #include <wtf/Forward.h>
@@ -33,7 +34,7 @@
 
 namespace WebCore {
 
-enum LengthType { Auto, Relative, Percent, Fixed, Intrinsic, MinIntrinsic, Calculated, Undefined };
+enum LengthType { Auto, Relative, Percent, Fixed, Intrinsic, MinIntrinsic, Calculated, ViewportPercentageWidth, ViewportPercentageHeight, ViewportPercentageMin, Undefined };
  
 class CalculationValue;    
     
@@ -52,6 +53,11 @@ public:
 
     Length(int v, LengthType t, bool q = false)
         : m_intValue(v), m_quirk(q), m_type(t), m_isFloat(false)
+    {
+    }
+    
+    Length(FractionalLayoutUnit v, LengthType t, bool q = false)
+        : m_floatValue(v.toFloat()), m_quirk(q), m_type(t), m_isFloat(true)
     {
     }
     
@@ -103,8 +109,13 @@ public:
         return *this;
     }
     
-    int value() const
+    inline float value() const
     {
+        return getFloatValue();
+    }
+
+     int intValue() const
+     {
         if (isCalculated()) {
             ASSERT_NOT_REACHED();
             return 0;
@@ -145,6 +156,13 @@ public:
     }
 
     void setValue(LengthType t, float value)
+    {
+        m_type = t;
+        m_floatValue = value;
+        m_isFloat = true;    
+    }
+
+    void setValue(LengthType t, FractionalLayoutUnit value)
     {
         m_type = t;
         m_floatValue = value;
@@ -192,7 +210,7 @@ public:
     bool isPercent() const { return type() == Percent || type() == Calculated; }
     bool isFixed() const { return type() == Fixed; }
     bool isIntrinsicOrAuto() const { return type() == Auto || type() == MinIntrinsic || type() == Intrinsic; }
-    bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated; }
+    bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated || isViewportPercentage(); }
     bool isCalculated() const { return type() == Calculated; }
 
     Length blend(const Length& from, double progress) const
@@ -226,6 +244,16 @@ public:
     }
     float nonNanCalculatedValue(int maxValue) const;
 
+    bool isViewportPercentage() const
+    {
+        LengthType lengthType = type();
+        return lengthType >= ViewportPercentageWidth && lengthType <= ViewportPercentageMin;
+    }
+    float viewportPercentageLength() const
+    {
+        ASSERT(isViewportPercentage());
+        return getFloatValue();
+    }
 private:
     int getIntValue() const
     {

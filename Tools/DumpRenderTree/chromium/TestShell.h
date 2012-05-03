@@ -82,8 +82,10 @@ struct TestParams {
 
 class TestShell {
 public:
-    TestShell(bool testShellMode);
+    TestShell();
     ~TestShell();
+
+    void initialize();
 
     // The main WebView.
     WebKit::WebView* webView() const { return m_webView; }
@@ -130,9 +132,9 @@ public:
     bool allowExternalPages() const { return m_allowExternalPages; }
     void setAllowExternalPages(bool allowExternalPages) { m_allowExternalPages = allowExternalPages; }
 
+    void setTestShellMode(bool testShellMode) { m_testShellMode = testShellMode; }
     void setAcceleratedCompositingForVideoEnabled(bool enabled) { m_acceleratedCompositingForVideoEnabled = enabled; }
     void setThreadedCompositingEnabled(bool enabled) { m_threadedCompositingEnabled = enabled; }
-    void setCompositeToTexture(bool enabled) { m_compositeToTexture = enabled; }
     void setForceCompositingMode(bool enabled) { m_forceCompositingMode = enabled; }
     void setAccelerated2dCanvasEnabled(bool enabled) { m_accelerated2dCanvasEnabled = enabled; }
     void setDeferred2dCanvasEnabled(bool enabled) { m_deferred2dCanvasEnabled = enabled; }
@@ -224,7 +226,6 @@ private:
     bool m_allowExternalPages;
     bool m_acceleratedCompositingForVideoEnabled;
     bool m_threadedCompositingEnabled;
-    bool m_compositeToTexture;
     bool m_forceCompositingMode;
     bool m_accelerated2dCanvasEnabled;
     bool m_deferred2dCanvasEnabled;

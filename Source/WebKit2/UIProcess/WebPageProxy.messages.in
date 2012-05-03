@@ -31,7 +31,7 @@ messages -> WebPageProxy {
     ShouldInterruptJavaScript() -> (bool shouldInterupt)
     MouseDidMoveOverElement(WebKit::WebHitTestResult::Data hitTestResultData, uint32_t modifiers, WebKit::InjectedBundleUserMessageEncoder userData);
     MissingPluginButtonClicked(WTF::String mimeType, WTF::String url, WTF::String pluginsPageURL)
-    DidChangeViewportProperties(WebCore::ViewportArguments arguments)
+    DidChangeViewportProperties(WebCore::ViewportAttributes attributes)
     DidReceiveEvent(uint32_t type, bool handled)
     StopResponsivenessTimer()
     SetCursor(WebCore::Cursor cursor)
@@ -166,7 +166,7 @@ messages -> WebPageProxy {
     BackForwardForwardListCount() -> (int32_t count)
     BackForwardClear()
     ShouldGoToBackForwardListItem(uint64_t itemID) -> (bool shouldGoToBackForwardListItem)
-    WillGoToBackForwardListItem(uint64_t itemID)
+    WillGoToBackForwardListItem(uint64_t itemID, WebKit::InjectedBundleUserMessageEncoder userData)
 
     # Undo/Redo messages
     RegisterEditCommandForUndo(uint64_t commandID, uint32_t editAction)
@@ -196,8 +196,10 @@ messages -> WebPageProxy {
     SetPopupMenuSelectedIndex(int32_t selectedIndex)
 #endif
 
+#if ENABLE(CONTEXT_MENUS)
     # ContextMenu messages
     ShowContextMenu(WebCore::IntPoint menuLocation, WebKit::WebHitTestResult::Data hitTestResultData, Vector<WebKit::WebContextMenuItemData> items, WebKit::InjectedBundleUserMessageEncoder userData)
+#endif
 
     # Authentication messages
     CanAuthenticateAgainstProtectionSpaceInFrame(uint64_t frameID, WebCore::ProtectionSpace protectionSpace) -> (bool canAuthenticate)
@@ -211,7 +213,7 @@ messages -> WebPageProxy {
     
     # Notification messages
     RequestNotificationPermission(uint64_t requestID, WTF::String originIdentifier)
-    ShowNotification(WTF::String title, WTF::String body, WTF::String iconURL, WTF::String replaceID, WTF::String originIdentifier, uint64_t notificationID)
+    ShowNotification(WTF::String title, WTF::String body, WTF::String iconURL, WTF::String tag, WTF::String originIdentifier, uint64_t notificationID)
 
     # Spelling and grammar messages
 #if USE(UNIFIED_TEXT_CHECKING)  
@@ -282,6 +284,12 @@ messages -> WebPageProxy {
 
     # Miscellaneous Windows messages
     ScheduleChildWindowGeometryUpdate(WebKit::WindowGeometry geometry)
+#endif
+
+#if PLUGIN_ARCHITECTURE(X11)
+    # X11 windowed plugin messages
+    CreatePluginContainer() -> (uint64_t windowID)
+    WindowedPluginGeometryDidChange(WebCore::IntRect frameRect, WebCore::IntRect clipRect, uint64_t windowID)
 #endif
 
     # Search popup menus

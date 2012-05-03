@@ -35,10 +35,11 @@
 #include "CustomFilterOperation.h"
 #include "Filter.h"
 #include "FilterEffect.h"
+#include "GraphicsTypes3D.h"
 #include <wtf/RefPtr.h>
 
 namespace JSC {
-class ByteArray;
+class Uint8ClampedArray;
 }
 
 namespace WebCore {
@@ -47,16 +48,17 @@ class CachedShader;
 class CustomFilterMesh;
 class CustomFilterNumberParameter;
 class CustomFilterProgram;
+class CustomFilterTransformParameter;
+class CustomFiltersController;
 class CustomFilterShader;
 class DrawingBuffer;
 class GraphicsContext3D;
-class HostWindow;
 class IntSize;
 class Texture;
 
 class FECustomFilter : public FilterEffect {
 public:
-    static PassRefPtr<FECustomFilter> create(Filter*, HostWindow*, PassRefPtr<CustomFilterProgram>, const CustomFilterParameterList&,
+    static PassRefPtr<FECustomFilter> create(Filter*, CustomFiltersController*, PassRefPtr<CustomFilterProgram>, const CustomFilterParameterList&,
                    unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType, 
                    CustomFilterOperation::MeshType);
 
@@ -66,25 +68,33 @@ public:
     virtual TextStream& externalRepresentation(TextStream&, int indention) const;
 
 private:
-    FECustomFilter(Filter*, HostWindow*, PassRefPtr<CustomFilterProgram>, const CustomFilterParameterList&,
+    FECustomFilter(Filter*, CustomFiltersController*, PassRefPtr<CustomFilterProgram>, const CustomFilterParameterList&,
                    unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType, 
                    CustomFilterOperation::MeshType);
+    ~FECustomFilter();
     
-    void initializeContext(const IntSize& contextSize);
+    bool initializeContext();
+    void deleteRenderBuffers();
     void resizeContext(const IntSize& newContextSize);
     void bindVertexAttribute(int attributeLocation, unsigned size, unsigned& offset);
+    void disableVertexAttribute(int attributeLocation);
+    void disableAttributes();
     void bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter*);
+    void bindProgramTransformParameters(int uniformLocation, CustomFilterTransformParameter*);
     void bindProgramParameters();
-    void bindProgramAndBuffers(ByteArray* srcPixelArray);
+    void bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray, const IntSize& boxSize);
     
-    HostWindow* m_hostWindow;
+    CustomFiltersController* m_controller;
     
     RefPtr<GraphicsContext3D> m_context;
-    RefPtr<DrawingBuffer> m_drawingBuffer;
     RefPtr<Texture> m_inputTexture;
     RefPtr<CustomFilterShader> m_shader;
     RefPtr<CustomFilterMesh> m_mesh;
     IntSize m_contextSize;
+
+    Platform3DObject m_frameBuffer;
+    Platform3DObject m_depthBuffer;
+    Platform3DObject m_destTexture;
 
     RefPtr<CustomFilterProgram> m_program;
     CustomFilterParameterList m_parameters;

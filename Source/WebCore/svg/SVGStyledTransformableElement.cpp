@@ -90,52 +90,46 @@ AffineTransform* SVGStyledTransformableElement::supplementalTransform()
     return m_supplementalTransform.get();
 }
 
-bool SVGStyledTransformableElement::isSupportedAttribute(const QualifiedName& attrName)
+CSSPropertyID SVGStyledTransformableElement::cssPropertyIdForSVGAttributeName(const QualifiedName& name)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty())
-        supportedAttributes.add(SVGNames::transformAttr);
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    //DEFINE_STATIC_LOCAL(HashMap<AtomicStringImpl*, int>, supportedAttributes, ());
+    static HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap = 0;
+    if (!propertyNameToIdMap) {
+        propertyNameToIdMap = new HashMap<AtomicStringImpl*, CSSPropertyID>;
+        propertyNameToIdMap->set(SVGNames::transformAttr.localName().impl(), CSSPropertyWebkitTransform);
+    }
+    
+    return propertyNameToIdMap->get(name.localName().impl());
 }
 
-void SVGStyledTransformableElement::parseAttribute(Attribute* attr)
+void SVGStyledTransformableElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
 {
-    if (!isSupportedAttribute(attr->name())) {
-        SVGStyledLocatableElement::parseAttribute(attr);
+    CSSPropertyID propertyID = SVGStyledTransformableElement::cssPropertyIdForSVGAttributeName(attr->name());
+    if (propertyID > 0) {
+        addPropertyToAttributeStyle(style, propertyID, attr->value());
         return;
     }
+    
+    SVGStyledElement::collectStyleForAttribute(attr, style);
+}
 
-    if (attr->name() == SVGNames::transformAttr) {
-        SVGTransformList newList;
-        newList.parse(attr->value());
-        detachAnimatedTransformListWrappers(newList.size());
-        setTransformBaseValue(newList);
-        return;
-    }
-
-    ASSERT_NOT_REACHED();
+bool SVGStyledTransformableElement::isPresentationAttribute(const QualifiedName& name) const
+{
+    CSSPropertyID propertyID = SVGStyledTransformableElement::cssPropertyIdForSVGAttributeName(name);
+    if (propertyID > 0)
+        return true;
+    return SVGStyledElement::isPresentationAttribute(name);
 }
 
 void SVGStyledTransformableElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    if (!isSupportedAttribute(attrName)) {
-        SVGStyledLocatableElement::svgAttributeChanged(attrName);
-        return;
-    }
+    // Leave this function since we need it to update the SVGTransformLists later.
+    
+    // TODO: What do we have to do here?
+    //SVGElementInstance::InvalidationGuard invalidationGuard(this);
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
-
-    RenderObject* object = renderer();
-    if (!object)
-        return;
-
-    if (attrName == SVGNames::transformAttr) {
-        object->setNeedsTransformUpdate();
-        RenderSVGResource::markForLayoutAndParentResourceInvalidation(object);
-        return;
-    }
-
-    ASSERT_NOT_REACHED();
+    SVGStyledLocatableElement::svgAttributeChanged(attrName);
+    return;
 }
 
 SVGElement* SVGStyledTransformableElement::nearestViewportElement() const

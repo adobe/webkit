@@ -58,13 +58,13 @@ class AudioListener;
 class BiquadFilterNode;
 class DelayNode;
 class Document;
-class LowPass2FilterNode;
-class HighPass2FilterNode;
 class ConvolverNode;
 class DynamicsCompressorNode;
 class RealtimeAnalyserNode;
 class WaveShaperNode;
 class JavaScriptAudioNode;
+class Oscillator;
+class WaveTable;
 
 // AudioContext is the cornerstone of the web audio API and all AudioNodes are created from it.
 // For thread safety between the audio thread and the main thread, it has a rendering graph locking mechanism. 
@@ -93,10 +93,10 @@ public:
     bool hasDocument();
 
     AudioDestinationNode* destination() { return m_destinationNode.get(); }
-    size_t currentSampleFrame() { return m_destinationNode->currentSampleFrame(); }
-    double currentTime() { return m_destinationNode->currentTime(); }
-    float sampleRate() { return m_destinationNode->sampleRate(); }
-    unsigned long activeSourceCount() { return static_cast<unsigned long>(m_activeSourceCount); }
+    size_t currentSampleFrame() const { return m_destinationNode->currentSampleFrame(); }
+    double currentTime() const { return m_destinationNode->currentTime(); }
+    float sampleRate() const { return m_destinationNode->sampleRate(); }
+    unsigned long activeSourceCount() const { return static_cast<unsigned long>(m_activeSourceCount); }
 
     void incrementActiveSourceCount();
     void decrementActiveSourceCount();
@@ -119,15 +119,19 @@ public:
     PassRefPtr<WaveShaperNode> createWaveShaper();
     PassRefPtr<DelayNode> createDelayNode();
     PassRefPtr<DelayNode> createDelayNode(double maxDelayTime);
-    PassRefPtr<LowPass2FilterNode> createLowPass2Filter();
-    PassRefPtr<HighPass2FilterNode> createHighPass2Filter();
     PassRefPtr<AudioPannerNode> createPanner();
     PassRefPtr<ConvolverNode> createConvolver();
     PassRefPtr<DynamicsCompressorNode> createDynamicsCompressor();    
     PassRefPtr<RealtimeAnalyserNode> createAnalyser();
-    PassRefPtr<JavaScriptAudioNode> createJavaScriptNode(size_t bufferSize);
-    PassRefPtr<AudioChannelSplitter> createChannelSplitter();
-    PassRefPtr<AudioChannelMerger> createChannelMerger();
+    PassRefPtr<JavaScriptAudioNode> createJavaScriptNode(size_t bufferSize, ExceptionCode&);
+    PassRefPtr<JavaScriptAudioNode> createJavaScriptNode(size_t bufferSize, size_t numberOfInputChannels, ExceptionCode&);
+    PassRefPtr<JavaScriptAudioNode> createJavaScriptNode(size_t bufferSize, size_t numberOfInputChannels, size_t numberOfOutputChannels, ExceptionCode&);
+    PassRefPtr<AudioChannelSplitter> createChannelSplitter(ExceptionCode&);
+    PassRefPtr<AudioChannelSplitter> createChannelSplitter(size_t numberOfOutputs, ExceptionCode&);
+    PassRefPtr<AudioChannelMerger> createChannelMerger(ExceptionCode&);
+    PassRefPtr<AudioChannelMerger> createChannelMerger(size_t numberOfInputs, ExceptionCode&);
+    PassRefPtr<Oscillator> createOscillator();
+    PassRefPtr<WaveTable> createWaveTable(Float32Array* real, Float32Array* imag, ExceptionCode&);
 
     // When a source node has no more processing to do (has finished playing), then it tells the context to dereference it.
     void notifyNodeFinishedProcessing(AudioNode*);

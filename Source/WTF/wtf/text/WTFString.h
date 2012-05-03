@@ -84,12 +84,15 @@ uint64_t charactersToUInt64(const UChar*, size_t, bool* ok = 0); // ignores trai
 intptr_t charactersToIntPtr(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
 intptr_t charactersToIntPtr(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
 
-WTF_EXPORT_PRIVATE double charactersToDouble(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-WTF_EXPORT_PRIVATE double charactersToDouble(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-float charactersToFloat(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-WTF_EXPORT_PRIVATE float charactersToFloatIgnoringJunk(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-WTF_EXPORT_PRIVATE float charactersToFloat(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-WTF_EXPORT_PRIVATE float charactersToFloatIgnoringJunk(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
+// FIXME: Like the strict functions above, these give false for "ok" when there is trailing garbage.
+// Like the non-strict functions above, these return the value when there is trailing garbage.
+// It would be better if these were more consistent with the above functions instead.
+WTF_EXPORT_PRIVATE double charactersToDouble(const LChar*, size_t, bool* ok = 0);
+WTF_EXPORT_PRIVATE double charactersToDouble(const UChar*, size_t, bool* ok = 0);
+float charactersToFloat(const LChar*, size_t, bool* ok = 0);
+WTF_EXPORT_PRIVATE float charactersToFloat(const UChar*, size_t, bool* ok = 0);
+WTF_EXPORT_PRIVATE float charactersToFloat(const LChar*, size_t, size_t& parsedLength);
+WTF_EXPORT_PRIVATE float charactersToFloat(const UChar*, size_t, size_t& parsedLength);
 
 enum FloatConversionFlags {
     ShouldRoundSignificantFigures = 1 << 0,
@@ -186,7 +189,7 @@ public:
     {
         if (!m_impl || index >= m_impl->length())
             return 0;
-        return m_impl->characters()[index];
+        return (*m_impl)[index];
     }
 
     static String number(short);
@@ -202,8 +205,12 @@ public:
     // Find a single character or string, also with match function & latin1 forms.
     size_t find(UChar c, unsigned start = 0) const
         { return m_impl ? m_impl->find(c, start) : notFound; }
-    size_t find(const String& str, unsigned start = 0) const
+
+    size_t find(const String& str) const
+        { return m_impl ? m_impl->find(str.impl()) : notFound; }
+    size_t find(const String& str, unsigned start) const
         { return m_impl ? m_impl->find(str.impl(), start) : notFound; }
+
     size_t find(CharacterMatchFunctionPtr matchFunction, unsigned start = 0) const
         { return m_impl ? m_impl->find(matchFunction, start) : notFound; }
     size_t find(const LChar* str, unsigned start = 0) const
@@ -311,8 +318,12 @@ public:
     int64_t toInt64(bool* ok = 0) const;
     WTF_EXPORT_PRIVATE uint64_t toUInt64(bool* ok = 0) const;
     WTF_EXPORT_PRIVATE intptr_t toIntPtr(bool* ok = 0) const;
-    WTF_EXPORT_PRIVATE double toDouble(bool* ok = 0, bool* didReadNumber = 0) const;
-    WTF_EXPORT_PRIVATE float toFloat(bool* ok = 0, bool* didReadNumber = 0) const;
+
+    // FIXME: Like the strict functions above, these give false for "ok" when there is trailing garbage.
+    // Like the non-strict functions above, these return the value when there is trailing garbage.
+    // It would be better if these were more consistent with the above functions instead.
+    WTF_EXPORT_PRIVATE double toDouble(bool* ok = 0) const;
+    WTF_EXPORT_PRIVATE float toFloat(bool* ok = 0) const;
 
     bool percentage(int& percentage) const;
 
@@ -500,72 +511,6 @@ WTF_EXPORT_PRIVATE int codePointCompare(const String&, const String&);
 inline bool codePointCompareLessThan(const String& a, const String& b)
 {
     return codePointCompare(a.impl(), b.impl()) < 0;
-}
-
-inline size_t find(const LChar* characters, unsigned length, LChar matchCharacter, unsigned index = 0)
-{
-    while (index < length) {
-        if (characters[index] == matchCharacter)
-            return index;
-        ++index;
-    }
-    return notFound;
-}
-
-inline size_t find(const UChar* characters, unsigned length, UChar matchCharacter, unsigned index = 0)
-{
-    while (index < length) {
-        if (characters[index] == matchCharacter)
-            return index;
-        ++index;
-    }
-    return notFound;
-}
-
-inline size_t find(const LChar* characters, unsigned length, CharacterMatchFunctionPtr matchFunction, unsigned index = 0)
-{
-    while (index < length) {
-        if (matchFunction(characters[index]))
-            return index;
-        ++index;
-    }
-    return notFound;
-}
-
-inline size_t find(const UChar* characters, unsigned length, CharacterMatchFunctionPtr matchFunction, unsigned index = 0)
-{
-    while (index < length) {
-        if (matchFunction(characters[index]))
-            return index;
-        ++index;
-    }
-    return notFound;
-}
-
-inline size_t reverseFind(const LChar* characters, unsigned length, LChar matchCharacter, unsigned index = UINT_MAX)
-{
-    if (!length)
-        return notFound;
-    if (index >= length)
-        index = length - 1;
-    while (characters[index] != matchCharacter) {
-        if (!index--)
-            return notFound;
-    }
-    return index;
-}
-
-inline size_t reverseFind(const UChar* characters, unsigned length, UChar matchCharacter, unsigned index = UINT_MAX)
-{
-    if (!length)
-        return notFound;
-    if (index >= length)
-        index = length - 1;
-    while (characters[index] != matchCharacter) {
-        if (!index--)
-            return notFound;
-    }
-    return index;
 }
 
 inline void append(Vector<UChar>& vector, const String& string)

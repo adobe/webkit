@@ -35,6 +35,7 @@
 #include "PageClientImpl.h"
 #include "WebContext.h"
 #include "WebEventFactory.h"
+#include "WebFullScreenClientGtk.h"
 #include "WebKitPrivate.h"
 #include "WebKitWebViewBaseAccessible.h"
 #include "WebKitWebViewBasePrivate.h"
@@ -52,14 +53,24 @@
 #include <WebCore/PasteboardHelper.h>
 #include <WebCore/RefPtrCairo.h>
 #include <WebCore/Region.h>
+#include <gdk/gdk.h>
+#include <gdk/gdkkeysyms.h>
+#include <wtf/HashMap.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
+#if ENABLE(FULLSCREEN_API)
+#include "WebFullScreenManagerProxy.h"
+#endif
+
 using namespace WebKit;
 using namespace WebCore;
 
+typedef HashMap<GtkWidget*, IntRect> WebKitWebViewChildrenMap;
+
 struct _WebKitWebViewBasePrivate {
+    WebKitWebViewChildrenMap children;
     OwnPtr<PageClientImpl> pageClient;
     RefPtr<WebPageProxy> pageProxy;
     bool isPageActive;
@@ -72,6 +83,10 @@ struct _WebKitWebViewBasePrivate {
     IntSize resizerSize;
     GRefPtr<AtkObject> accessible;
     bool needsResizeOnMap;
+#if ENABLE(FULLSCREEN_API)
+    bool fullScreenModeActive;
+    WebFullScreenClientGtk fullScreenClient;
+#endif
 };
 
 G_DEFINE_TYPE(WebKitWebViewBase, webkit_web_view_base, GTK_TYPE_CONTAINER)
@@ -152,7 +167,51 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
 
 static void webkitWebViewBaseContainerAdd(GtkContainer* container, GtkWidget* widget)
 {
+    WebKitWebViewBase* webView = WEBKIT_WEB_VIEW_BASE(container);
+    WebKitWebViewBasePrivate* priv = webView->priv;
+
+    GtkAllocation childAllocation;
+    gtk_widget_get_allocation(widget, &childAllocation);
+    priv->children.set(widget, childAllocation);
+
     gtk_widget_set_parent(widget, GTK_WIDGET(container));
+}
+
+static void webkitWebViewBaseContainerRemove(GtkContainer* container, GtkWidget* widget)
+{
+    WebKitWebViewBase* webView = WEBKIT_WEB_VIEW_BASE(container);
+    WebKitWebViewBasePrivate* priv = webView->priv;
+    GtkWidget* widgetContainer = GTK_WIDGET(container);
+
+    ASSERT(priv->children.contains(widget));
+    gboolean wasVisible = gtk_widget_get_visible(widget);
+    gtk_widget_unparent(widget);
+
+    priv->children.remove(widget);
+    if (wasVisible && gtk_widget_get_visible(widgetContainer))
+        gtk_widget_queue_resize(widgetContainer);
+}
+
+static void webkitWebViewBaseContainerForall(GtkContainer* container, gboolean includeInternals, GtkCallback callback, gpointer callbackData)
+{
+    WebKitWebViewBase* webView = WEBKIT_WEB_VIEW_BASE(container);
+    WebKitWebViewBasePrivate* priv = webView->priv;
+
+    WebKitWebViewChildrenMap children = priv->children;
+    WebKitWebViewChildrenMap::const_iterator end = children.end();
+    for (WebKitWebViewChildrenMap::const_iterator current = children.begin(); current != end; ++current)
+        (*callback)(current->first, callbackData);
+}
+
+void webkitWebViewBaseChildMoveResize(WebKitWebViewBase* webView, GtkWidget* child, const IntRect& childRect)
+{
+    const IntRect& geometry = webView->priv->children.get(child);
+
+    if (geometry == childRect)
+        return;
+
+    webView->priv->children.set(child, childRect);
+    gtk_widget_queue_resize_no_redraw(GTK_WIDGET(webView));
 }
 
 static void webkitWebViewBaseFinalize(GObject* gobject)
@@ -203,10 +262,27 @@ static gboolean webkitWebViewBaseDraw(GtkWidget* widget, cairo_t* cr)
     return FALSE;
 }
 
+static void webkitWebViewBaseChildAllocate(GtkWidget* child, gpointer userData)
+{
+    if (!gtk_widget_get_visible(child))
+        return;
+
+    WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(userData);
+    WebKitWebViewBasePrivate* priv = webViewBase->priv;
+    const IntRect& geometry = priv->children.get(child);
+    if (geometry.isEmpty())
+        return;
+
+    GtkAllocation childAllocation = geometry;
+    gtk_widget_size_allocate(child, &childAllocation);
+    priv->children.set(child, IntRect());
+}
+
 static void resizeWebKitWebViewBaseFromAllocation(WebKitWebViewBase* webViewBase, GtkAllocation* allocation)
 {
-    WebKitWebViewBasePrivate* priv = webViewBase->priv;
+    gtk_container_foreach(GTK_CONTAINER(webViewBase), webkitWebViewBaseChildAllocate, webViewBase);
 
+    WebKitWebViewBasePrivate* priv = webViewBase->priv;
     if (priv->pageProxy->drawingArea())
         priv->pageProxy->drawingArea()->setSize(IntSize(allocation->width, allocation->height), IntSize());
 
@@ -239,7 +315,6 @@ static void webkitWebViewBaseMap(GtkWidget* widget)
     gtk_widget_get_allocation(widget, &allocation);
     resizeWebKitWebViewBaseFromAllocation(webViewBase, &allocation);
     webViewBase->priv->needsResizeOnMap = false;
-
 }
 
 static gboolean webkitWebViewBaseFocusInEvent(GtkWidget* widget, GdkEventFocus* event)
@@ -276,6 +351,20 @@ static gboolean webkitWebViewBaseKeyPressEvent(GtkWidget* widget, GdkEventKey* e
 {
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(widget);
     WebKitWebViewBasePrivate* priv = webViewBase->priv;
+
+#if ENABLE(FULLSCREEN_API)
+    if (priv->fullScreenModeActive) {
+        switch (event->keyval) {
+        case GDK_KEY_Escape:
+        case GDK_KEY_f:
+        case GDK_KEY_F:
+            webkitWebViewBaseExitFullScreen(webViewBase);
+            return TRUE;
+        default:
+            break;
+        }
+    }
+#endif
 
     // Since WebProcess key event handling is not synchronous, handle the event in two passes.
     // When WebProcess processes the input event, it will call PageClientImpl::doneWithKeyEvent
@@ -502,6 +591,8 @@ static void webkit_web_view_base_class_init(WebKitWebViewBaseClass* webkitWebVie
 
     GtkContainerClass* containerClass = GTK_CONTAINER_CLASS(webkitWebViewBaseClass);
     containerClass->add = webkitWebViewBaseContainerAdd;
+    containerClass->remove = webkitWebViewBaseContainerRemove;
+    containerClass->forall = webkitWebViewBaseContainerForall;
 
     g_type_class_add_private(webkitWebViewBaseClass, sizeof(WebKitWebViewBasePrivate));
 }
@@ -529,6 +620,10 @@ void webkitWebViewBaseCreateWebPage(WebKitWebViewBase* webkitWebViewBase, WKCont
 
     priv->pageProxy = toImpl(context)->createWebPage(priv->pageClient.get(), toImpl(pageGroup));
     priv->pageProxy->initializeWebPage();
+
+#if ENABLE(FULLSCREEN_API)
+    priv->pageProxy->fullScreenManager()->setWebView(webkitWebViewBase);
+#endif
 }
 
 void webkitWebViewBaseSetTooltipText(WebKitWebViewBase* webViewBase, const char* tooltip)
@@ -575,4 +670,51 @@ void webkitWebViewBaseStartDrag(WebKitWebViewBase* webViewBase, const DragData& 
 void webkitWebViewBaseForwardNextKeyEvent(WebKitWebViewBase* webkitWebViewBase)
 {
     webkitWebViewBase->priv->shouldForwardNextKeyEvent = TRUE;
+}
+
+void webkitWebViewBaseEnterFullScreen(WebKitWebViewBase* webkitWebViewBase)
+{
+#if ENABLE(FULLSCREEN_API)
+    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
+    if (priv->fullScreenModeActive)
+        return;
+
+    if (!priv->fullScreenClient.willEnterFullScreen())
+        return;
+
+    WebFullScreenManagerProxy* fullScreenManagerProxy = priv->pageProxy->fullScreenManager();
+    fullScreenManagerProxy->willEnterFullScreen();
+
+    GtkWidget* topLevelWindow = gtk_widget_get_toplevel(GTK_WIDGET(webkitWebViewBase));
+    if (gtk_widget_is_toplevel(topLevelWindow))
+        gtk_window_fullscreen(GTK_WINDOW(topLevelWindow));
+    fullScreenManagerProxy->didEnterFullScreen();
+    priv->fullScreenModeActive = true;
+#endif
+}
+
+void webkitWebViewBaseExitFullScreen(WebKitWebViewBase* webkitWebViewBase)
+{
+#if ENABLE(FULLSCREEN_API)
+    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
+    if (!priv->fullScreenModeActive)
+        return;
+
+    if (!priv->fullScreenClient.willExitFullScreen())
+        return;
+
+    WebFullScreenManagerProxy* fullScreenManagerProxy = priv->pageProxy->fullScreenManager();
+    fullScreenManagerProxy->willExitFullScreen();
+
+    GtkWidget* topLevelWindow = gtk_widget_get_toplevel(GTK_WIDGET(webkitWebViewBase));
+    if (gtk_widget_is_toplevel(topLevelWindow))
+        gtk_window_unfullscreen(GTK_WINDOW(topLevelWindow));
+    fullScreenManagerProxy->didExitFullScreen();
+    priv->fullScreenModeActive = false;
+#endif
+}
+
+void webkitWebViewBaseInitializeFullScreenClient(WebKitWebViewBase* webkitWebViewBase, const WKFullScreenClientGtk* wkClient)
+{
+    webkitWebViewBase->priv->fullScreenClient.initialize(wkClient);
 }

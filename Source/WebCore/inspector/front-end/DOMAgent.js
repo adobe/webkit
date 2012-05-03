@@ -242,7 +242,10 @@ WebInspector.DOMNode.prototype = {
      */
     removeAttribute: function(name, callback)
     {
-        function mycallback(error, success)
+        /**
+         *  @param {?Protocol.Error} error
+         */
+        function mycallback(error)
         {
             if (!error) {
                 delete this._attributesMap[name];
@@ -404,13 +407,28 @@ WebInspector.DOMNode.prototype = {
 
     /**
      * @param {Array.<string>} attrs
+     * @return {boolean}
      */
     _setAttributesPayload: function(attrs)
     {
+        var attributesChanged = !this._attributes || attrs.length !== this._attributes.length * 2;
+        var oldAttributesMap = this._attributesMap || {};
+
         this._attributes = [];
         this._attributesMap = {};
-        for (var i = 0; i < attrs.length; i += 2)
-            this._addAttribute(attrs[i], attrs[i + 1]);
+
+        for (var i = 0; i < attrs.length; i += 2) {
+            var name = attrs[i];
+            var value = attrs[i + 1];
+            this._addAttribute(name, value);
+
+            if (attributesChanged)
+                continue;
+
+            if (!oldAttributesMap[name] || oldAttributesMap[name].value !== value)
+              attributesChanged = true;
+        }
+        return attributesChanged;
     },
 
     /**
@@ -741,11 +759,12 @@ WebInspector.DOMAgent.prototype = {
 
     /**
      * @param {RuntimeAgent.RemoteObjectId} objectId
-     * @param {function()=} callback
+     * @param {function(?DOMAgent.NodeId)=} callback
      */
     pushNodeToFrontend: function(objectId, callback)
     {
-        this._dispatchWhenDocumentAvailable(DOMAgent.requestNode.bind(DOMAgent, objectId), callback);
+        var callbackCast = /** @type {function(*)} */ callback;
+        this._dispatchWhenDocumentAvailable(DOMAgent.requestNode.bind(DOMAgent, objectId), callbackCast);
     },
 
     /**
@@ -766,16 +785,19 @@ WebInspector.DOMAgent.prototype = {
     {
         if (!callback)
             return;
+        /**
+         * @param {?Protocol.Error} error
+         * @param {*=} result
+         */
         return function(error, result)
         {
-            if (error)
-                console.error("Error during DOMAgent operation: " + error);
+            // Caller is responsible for handling the actual error.
             callback(error ? null : result);
         }
     },
 
     /**
-     * @param {function(function()=)} func
+     * @param {function(function(?Protocol.Error, *=))} func
      * @param {function(*)=} callback
      */
     _dispatchWhenDocumentAvailable: function(func, callback)
@@ -804,8 +826,12 @@ WebInspector.DOMAgent.prototype = {
         var node = this._idToDOMNode[nodeId];
         if (!node)
             return;
+        var issueStyleInvalidated = name === "style" && value !== node.getAttribute("style");
+
         node._setAttribute(name, value);
         this.dispatchEventToListeners(WebInspector.DOMAgent.Events.AttrModified, { node: node, name: name });
+        if (issueStyleInvalidated)
+          this.dispatchEventToListeners(WebInspector.DOMAgent.Events.StyleInvalidated, node)
     },
 
     /**
@@ -844,14 +870,15 @@ WebInspector.DOMAgent.prototype = {
         function callback(nodeId, error, attributes)
         {
             if (error) {
-                console.error("Error during DOMAgent operation: " + error);
+                // We are calling _loadNodeAttributes asynchronously, it is ok if node is not found.
                 return;
             }
             var node = this._idToDOMNode[nodeId];
             if (node) {
-                node._setAttributesPayload(attributes);
-                this.dispatchEventToListeners(WebInspector.DOMAgent.Events.AttrModified, { node: node, name: "style" });
-                this.dispatchEventToListeners(WebInspector.DOMAgent.Events.StyleInvalidated, node);                
+                if (node._setAttributesPayload(attributes)) {
+                    this.dispatchEventToListeners(WebInspector.DOMAgent.Events.AttrModified, { node: node, name: "style" });
+                    this.dispatchEventToListeners(WebInspector.DOMAgent.Events.StyleInvalidated, node);
+                }
             }
         }
 
@@ -1106,7 +1133,7 @@ WebInspector.DOMAgent.prototype = {
 
     /**
      * @param {boolean} enabled
-     * @param {function()=} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setInspectModeEnabled: function(enabled, callback)
     {
@@ -1155,7 +1182,36 @@ WebInspector.DOMAgent.prototype = {
 
     _emulateTouchEventsChanged: function()
     {
-        DOMAgent.setTouchEmulationEnabled(WebInspector.settings.emulateTouchEvents.get());
+        const injectedFunction = function() {
+            const touchEvents = ["ontouchstart", "ontouchend", "ontouchmove", "ontouchcancel"];
+            for (var i = 0; i < touchEvents.length; ++i) {
+                if (!(touchEvents[i] in window.__proto__))
+                    Object.defineProperty(window.__proto__, touchEvents[i], { value: null, writable: true, configurable: true, enumerable: true });
+                if (!(touchEvents[i] in document.__proto__))
+                    Object.defineProperty(document.__proto__, touchEvents[i], { value: null, writable: true, configurable: true, enumerable: true });
+            }
+        }
+
+        var emulationEnabled = WebInspector.settings.emulateTouchEvents.get();
+        if (emulationEnabled && !this._addTouchEventsScriptInjecting) {
+            this._addTouchEventsScriptInjecting = true;
+            PageAgent.addScriptToEvaluateOnLoad("(" + injectedFunction.toString() + ")", scriptAddedCallback.bind(this));
+        } else {
+            if (typeof this._addTouchEventsScriptId !== "undefined") {
+                PageAgent.removeScriptToEvaluateOnLoad(this._addTouchEventsScriptId);
+                delete this._addTouchEventsScriptId;
+            }
+        }
+
+        function scriptAddedCallback(error, scriptId)
+        {
+            delete this._addTouchEventsScriptInjecting;
+            if (error)
+                return;
+            this._addTouchEventsScriptId = scriptId;
+        }
+
+        DOMAgent.setTouchEmulationEnabled(emulationEnabled);
     },
 
     markUndoableState: function()

@@ -34,7 +34,6 @@
 #include "BeforeUnloadEvent.h"
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSRuleList.h"
-#include "CSSStyleSelector.h"
 #include "Chrome.h"
 #include "Console.h"
 #include "Crypto.h"
@@ -45,6 +44,7 @@
 #include "DOMTimer.h"
 #include "DOMTokenList.h"
 #include "DOMURL.h"
+#include "DOMWindowExtension.h"
 #include "DOMWindowNotifications.h"
 #include "Database.h"
 #include "DatabaseCallback.h"
@@ -90,6 +90,7 @@
 #include "StorageInfo.h"
 #include "StorageNamespace.h"
 #include "StyleMedia.h"
+#include "StyleResolver.h"
 #include "SuddenTermination.h"
 #include "WebKitPoint.h"
 #include "WindowFeatures.h"
@@ -474,9 +475,10 @@ void DOMWindow::willDetachPage()
 {
     InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
 
-    HashSet<DOMWindowProperty*>::iterator stop = m_properties.end();
-    for (HashSet<DOMWindowProperty*>::iterator it = m_properties.begin(); it != stop; ++it)
-        (*it)->willDetachPage();
+    Vector<DOMWindowProperty*> properties;
+    copyToVector(m_properties, properties);
+    for (size_t i = 0; i < properties.size(); ++i)
+        properties[i]->willDetachPage();
 }
 
 void DOMWindow::registerProperty(DOMWindowProperty* property)
@@ -514,17 +516,19 @@ void DOMWindow::resumeFromPageCache()
 
 void DOMWindow::disconnectDOMWindowProperties()
 {
-    HashSet<DOMWindowProperty*>::iterator stop = m_properties.end();
-    for (HashSet<DOMWindowProperty*>::iterator it = m_properties.begin(); it != stop; ++it)
-        (*it)->disconnectFrame();
+    Vector<DOMWindowProperty*> properties;
+    copyToVector(m_properties, properties);
+    for (size_t i = 0; i < properties.size(); ++i)
+        properties[i]->disconnectFrame();
 }
 
 void DOMWindow::reconnectDOMWindowProperties()
 {
     ASSERT(m_suspendedForPageCache);
-    HashSet<DOMWindowProperty*>::iterator stop = m_properties.end();
-    for (HashSet<DOMWindowProperty*>::iterator it = m_properties.begin(); it != stop; ++it)
-        (*it)->reconnectFrame(m_frame);
+    Vector<DOMWindowProperty*> properties;
+    copyToVector(m_properties, properties);
+    for (size_t i = 0; i < properties.size(); ++i)
+        properties[i]->reconnectFrame(m_frame);
 }
 
 void DOMWindow::clearDOMWindowProperties()
@@ -905,11 +909,11 @@ void DOMWindow::close(ScriptExecutionContext* context)
 
     if (context) {
         ASSERT(isMainThread());
-        Frame* activeFrame = static_cast<Document*>(context)->frame();
-        if (!activeFrame)
+        Document* activeDocument = static_cast<Document*>(context);
+        if (!activeDocument)
             return;
 
-        if (!activeFrame->loader()->shouldAllowNavigation(m_frame))
+        if (!activeDocument->canNavigate(m_frame))
             return;
     }
 
@@ -1077,9 +1081,9 @@ int DOMWindow::innerHeight() const
     if (!view)
         return 0;
 
-    long height = view->visibleContentRect(/* includeScrollbars */ true).height();
-    InspectorInstrumentation::applyScreenHeightOverride(m_frame, &height);
-    return view->mapFromLayoutToCSSUnits(static_cast<int>(height));
+    // If the device height is overridden, do not include the horizontal scrollbar into the innerHeight (since it is absent on the real device).
+    bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenHeightOverride(m_frame);
+    return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(includeScrollbars).height()));
 }
 
 int DOMWindow::innerWidth() const
@@ -1091,9 +1095,9 @@ int DOMWindow::innerWidth() const
     if (!view)
         return 0;
 
-    long width = view->visibleContentRect(/* includeScrollbars */ true).width();
-    InspectorInstrumentation::applyScreenWidthOverride(m_frame, &width);
-    return view->mapFromLayoutToCSSUnits(static_cast<int>(width));
+    // If the device width is overridden, do not include the vertical scrollbar into the innerWidth (since it is absent on the real device).
+    bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenWidthOverride(m_frame);
+    return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(includeScrollbars).width()));
 }
 
 int DOMWindow::screenX() const
@@ -1283,17 +1287,22 @@ PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const St
     if (!isCurrentlyDisplayedInFrame())
         return 0;
 
-    unsigned rulesToInclude = CSSStyleSelector::AuthorCSSRules;
+    unsigned colonStart = pseudoElement[0] == ':' ? (pseudoElement[1] == ':' ? 2 : 1) : 0;
+    CSSSelector::PseudoType pseudoType = CSSSelector::parsePseudoType(AtomicString(pseudoElement.substring(colonStart)));
+    if (pseudoType == CSSSelector::PseudoUnknown && !pseudoElement.isEmpty())
+        return 0;
+
+    unsigned rulesToInclude = StyleResolver::AuthorCSSRules;
     if (!authorOnly)
-        rulesToInclude |= CSSStyleSelector::UAAndUserCSSRules;
+        rulesToInclude |= StyleResolver::UAAndUserCSSRules;
     if (Settings* settings = m_frame->settings()) {
         if (settings->crossOriginCheckInGetMatchedCSSRulesDisabled())
-            rulesToInclude |= CSSStyleSelector::CrossOriginCSSRules;
+            rulesToInclude |= StyleResolver::CrossOriginCSSRules;
     }
-    
-    PseudoId pseudoId = CSSSelector::pseudoId(CSSSelector::parsePseudoType(pseudoElement));
- 
-    return m_frame->document()->styleSelector()->pseudoStyleRulesForElement(element, pseudoId, rulesToInclude);
+
+    PseudoId pseudoId = CSSSelector::pseudoId(pseudoType);
+
+    return m_frame->document()->styleResolver()->pseudoStyleRulesForElement(element, pseudoId, rulesToInclude);
 }
 
 PassRefPtr<WebKitPoint> DOMWindow::webkitConvertPointFromNodeToPage(Node* node, const WebKitPoint* p) const
@@ -1349,7 +1358,8 @@ void DOMWindow::scrollBy(int x, int y) const
     if (!view)
         return;
 
-    view->scrollBy(IntSize(x, y));
+    IntSize scaledOffset(view->mapFromCSSToLayoutUnits(x), view->mapFromCSSToLayoutUnits(y));
+    view->scrollBy(scaledOffset);
 }
 
 void DOMWindow::scrollTo(int x, int y) const
@@ -1484,10 +1494,10 @@ void DOMWindow::clearInterval(int timeoutId)
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-int DOMWindow::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback, Element* e)
+int DOMWindow::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
 {
     if (Document* d = document())
-        return d->webkitRequestAnimationFrame(callback, e);
+        return d->webkitRequestAnimationFrame(callback);
     return 0;
 }
 
@@ -1647,11 +1657,11 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
     if (!isCurrentlyDisplayedInFrame())
         return;
 
-    Frame* activeFrame = activeWindow->frame();
-    if (!activeFrame)
+    Document* activeDocument = activeWindow->document();
+    if (!activeDocument)
         return;
 
-    if (!activeFrame->loader()->shouldAllowNavigation(m_frame))
+    if (!activeDocument->canNavigate(m_frame))
         return;
 
     Frame* firstFrame = firstWindow->frame();
@@ -1666,8 +1676,9 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
         return;
 
     // We want a new history item if we are processing a user gesture.
-    m_frame->navigationScheduler()->scheduleLocationChange(activeFrame->document()->securityOrigin(),
-        completedURL, activeFrame->loader()->outgoingReferrer(),
+    m_frame->navigationScheduler()->scheduleLocationChange(activeDocument->securityOrigin(),
+        // FIXME: What if activeDocument()->frame() is 0?
+        completedURL, activeDocument->frame()->loader()->outgoingReferrer(),
         locking != LockHistoryBasedOnGestureState || !ScriptController::processingUserGesture(),
         locking != LockHistoryBasedOnGestureState);
 }
@@ -1774,8 +1785,8 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
 {
     if (!isCurrentlyDisplayedInFrame())
         return 0;
-    Frame* activeFrame = activeWindow->frame();
-    if (!activeFrame)
+    Document* activeDocument = activeWindow->document();
+    if (!activeDocument)
         return 0;
     Frame* firstFrame = firstWindow->frame();
     if (!firstFrame)
@@ -1800,7 +1811,7 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
             targetFrame = m_frame;
     }
     if (targetFrame) {
-        if (!activeFrame->loader()->shouldAllowNavigation(targetFrame))
+        if (!activeDocument->canNavigate(targetFrame))
             return 0;
 
         KURL completedURL = firstFrame->document()->completeURL(urlString);
@@ -1815,7 +1826,7 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
         // determine the outgoing referrer. We replicate that behavior here.
         bool lockHistory = !ScriptController::processingUserGesture();
         targetFrame->navigationScheduler()->scheduleLocationChange(
-            activeFrame->document()->securityOrigin(),
+            activeDocument->securityOrigin(),
             completedURL,
             firstFrame->loader()->outgoingReferrer(),
             lockHistory,

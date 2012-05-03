@@ -29,6 +29,8 @@
 #ifndef AnimationBase_h
 #define AnimationBase_h
 
+#include "Animation.h"
+#include "CSSPropertyNames.h"
 #include "RenderStyleConstants.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -37,7 +39,6 @@
 
 namespace WebCore {
 
-class Animation;
 class AnimationBase;
 class AnimationController;
 class CompositeAnimation;
@@ -49,6 +50,7 @@ class TimingFunction;
 
 class AnimationBase : public RefCounted<AnimationBase> {
     friend class CompositeAnimation;
+    friend class CSSPropertyAnimation;
 
 public:
     AnimationBase(const Animation* transition, RenderObject* renderer, CompositeAnimation* compAnim);
@@ -152,9 +154,9 @@ public:
     virtual bool overridden() const { return false; }
 
     // Does this animation/transition involve the given property?
-    virtual bool affectsProperty(int /*property*/) const { return false; }
+    virtual bool affectsProperty(CSSPropertyID /*property*/) const { return false; }
 
-    bool isAnimatingProperty(int property, bool acceleratedOnly, bool isRunningNow) const
+    bool isAnimatingProperty(CSSPropertyID property, bool acceleratedOnly, bool isRunningNow) const
     {
         if (acceleratedOnly && !m_isAccelerated)
             return false;
@@ -190,12 +192,6 @@ public:
         updateStateMachine(AnimationBase::AnimationStateInputStyleAvailable, -1);
     }
 
-#if USE(ACCELERATED_COMPOSITING)
-    static bool animationOfPropertyIsAccelerated(int prop);
-#endif
-
-    static HashSet<int> animatableShorthandsAffectingProperty(int property);
-
     const Animation* animation() const { return m_animation.get(); }
 
 protected:
@@ -219,13 +215,6 @@ protected:
     void goIntoEndingOrLoopingState();
 
     bool isAccelerated() const { return m_isAccelerated; }
-
-    static bool propertiesEqual(int prop, const RenderStyle* a, const RenderStyle* b);
-    static int getPropertyAtIndex(int, bool& isShorthand);
-    static int getNumProperties();
-
-    // Return true if we need to start software animation timers
-    static bool blendProperties(const AnimationBase* anim, int prop, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress);
 
     static void setNeedsStyleRecalc(Node*);
     
@@ -252,9 +241,6 @@ protected:
 
     RefPtr<Animation> m_animation;
     CompositeAnimation* m_compAnim;
-    
-private:
-    static void ensurePropertyMap();
 };
 
 } // namespace WebCore

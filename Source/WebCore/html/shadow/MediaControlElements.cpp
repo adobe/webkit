@@ -32,7 +32,6 @@
 
 #include "MediaControlElements.h"
 
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "DOMTokenList.h"
 #include "EventNames.h"
@@ -53,6 +52,7 @@
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "Settings.h"
+#include "StyleResolver.h"
 #include "Text.h"
 
 namespace WebCore {
@@ -108,6 +108,7 @@ inline MediaControlPanelElement::MediaControlPanelElement(Document* document)
     : MediaControlElement(document)
     , m_canBeDragged(false)
     , m_isBeingDragged(false)
+    , m_isDisplayed(false)
     , m_opaque(true)
     , m_transitionTimer(this, &MediaControlPanelElement::transitionTimerFired)
 {
@@ -145,7 +146,6 @@ void MediaControlPanelElement::startDrag(const LayoutPoint& eventLocation)
     if (!frame)
         return;
 
-    m_dragStartPosition = toRenderBox(renderer)->location();
     m_dragStartEventLocation = eventLocation;
 
     frame->eventHandler()->setCapturingMouseEventsNode(this);
@@ -159,7 +159,7 @@ void MediaControlPanelElement::continueDrag(const LayoutPoint& eventLocation)
         return;
 
     LayoutSize distanceDragged = eventLocation - m_dragStartEventLocation;
-    setPosition(m_dragStartPosition + distanceDragged);
+    setPosition(LayoutPoint(distanceDragged.width(), distanceDragged.height()));
 }
 
 void MediaControlPanelElement::endDrag()
@@ -242,9 +242,8 @@ void MediaControlPanelElement::makeOpaque()
 
     m_opaque = true;
 
-    // FIXME(BUG 79347): The display:none property should be toggled below only
-    // when display logic is introduced.
-    // show();
+    if (m_isDisplayed)
+        show();
 }
 
 void MediaControlPanelElement::makeTransparent()
@@ -258,9 +257,7 @@ void MediaControlPanelElement::makeTransparent()
 
     m_opaque = false;
 
-    // FIXME(BUG 79347): The display:none property should be toggled below
-    // (through the timer start) when display logic is introduced.
-    // startTimer();
+    startTimer();
 }
 
 void MediaControlPanelElement::defaultEventHandler(Event* event)
@@ -293,6 +290,11 @@ void MediaControlPanelElement::setCanBeDragged(bool canBeDragged)
         endDrag();
 }
 
+void MediaControlPanelElement::setIsDisplayed(bool isDisplayed)
+{
+    m_isDisplayed = isDisplayed;
+}
+
 // ----------------------------
 
 inline MediaControlTimelineContainerElement::MediaControlTimelineContainerElement(Document* document)
@@ -320,34 +322,6 @@ const AtomicString& MediaControlTimelineContainerElement::shadowPseudoId() const
 
 // ----------------------------
 
-class RenderMediaVolumeSliderContainer : public RenderBlock {
-public:
-    RenderMediaVolumeSliderContainer(Node*);
-
-private:
-    virtual void layout();
-};
-
-RenderMediaVolumeSliderContainer::RenderMediaVolumeSliderContainer(Node* node)
-    : RenderBlock(node)
-{
-}
-
-void RenderMediaVolumeSliderContainer::layout()
-{
-    RenderBlock::layout();
-    if (style()->display() == NONE || !previousSibling() || !previousSibling()->isBox())
-        return;
-
-    RenderBox* buttonBox = toRenderBox(previousSibling());
-
-    LayoutStateDisabler layoutStateDisabler(view());
-
-    LayoutPoint offset = theme()->volumeSliderOffsetFromMuteButton(buttonBox, size());
-    setX(offset.x() + buttonBox->offsetLeft());
-    setY(offset.y() + buttonBox->offsetTop());
-}
-
 inline MediaControlVolumeSliderContainerElement::MediaControlVolumeSliderContainerElement(Document* document)
     : MediaControlElement(document)
 {
@@ -358,11 +332,6 @@ PassRefPtr<MediaControlVolumeSliderContainerElement> MediaControlVolumeSliderCon
     RefPtr<MediaControlVolumeSliderContainerElement> element = adoptRef(new MediaControlVolumeSliderContainerElement(document));
     element->hide();
     return element.release();
-}
-
-RenderObject* MediaControlVolumeSliderContainerElement::createRenderer(RenderArena* arena, RenderStyle*)
-{
-    return new (arena) RenderMediaVolumeSliderContainer(this);
 }
 
 void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
@@ -1291,10 +1260,11 @@ void MediaControlTextTrackContainerElement::updateDisplay()
         if (displayTree->hasChildNodes() && !contains(displayTree.get()))
             appendChild(displayTree, ASSERT_NO_EXCEPTION, true);
 
-        // The display tree of a cue is removed when the active flag of the cue is unset.
+        // Note: the display tree of a cue is removed when the active flag of the cue is unset.
 
-        // FIXME(BUG 79750): Render the TextTrackCue when snap-to-lines is set.
-        // FIXME(BUG 79751): Render the TextTrackCue when snap-to-lines is not set.
+        // FIXME(BUG 79751): Render the TextTrackCue when snap-to-lines is set.
+
+        // FIXME(BUG 84296): Implement overlapping detection for cue boxes when snap-to-lines is not set.
     }
 
     // 11. Return output.

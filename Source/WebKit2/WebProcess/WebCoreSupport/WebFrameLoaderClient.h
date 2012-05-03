@@ -109,7 +109,6 @@ private:
     virtual void dispatchWillSendSubmitEvent(WebCore::HTMLFormElement*) OVERRIDE { }
     virtual void dispatchWillSubmitForm(WebCore::FramePolicyFunction, PassRefPtr<WebCore::FormState>) OVERRIDE;
     
-    virtual void dispatchDidLoadMainResource(WebCore::DocumentLoader*) OVERRIDE;
     virtual void revertToProvisionalState(WebCore::DocumentLoader*) OVERRIDE;
     virtual void setMainDocumentError(WebCore::DocumentLoader*, const WebCore::ResourceError&) OVERRIDE;
     
@@ -193,6 +192,11 @@ private:
     virtual String overrideMediaType() const OVERRIDE;
 
     virtual void dispatchDidClearWindowObjectInWorld(WebCore::DOMWrapperWorld*) OVERRIDE;
+    
+    virtual void dispatchGlobalObjectAvailable(WebCore::DOMWrapperWorld*) OVERRIDE;
+    virtual void dispatchWillDisconnectDOMWindowExtensionFromGlobalObject(WebCore::DOMWindowExtension*) OVERRIDE;
+    virtual void dispatchDidReconnectDOMWindowExtensionToGlobalObject(WebCore::DOMWindowExtension*) OVERRIDE;
+    virtual void dispatchWillDestroyGlobalObjectForDOMWindowExtension(WebCore::DOMWindowExtension*) OVERRIDE;
 
     virtual void documentElementAvailable() OVERRIDE;
     virtual void didPerformFirstNavigation() const OVERRIDE; // "Navigation" here means a transition from one page to another that ends up in the back/forward list.
@@ -222,6 +226,7 @@ private:
     RefPtr<PluginView> m_pluginView;
     bool m_hasSentResponseToPluginView;
     bool m_frameHasCustomRepresentation;
+    bool m_frameCameFromPageCache;
 };
 
 } // namespace WebKit

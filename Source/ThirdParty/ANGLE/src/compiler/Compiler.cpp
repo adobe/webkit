@@ -1,19 +1,24 @@
 //
-// Copyright (c) 2002-2011 The ANGLE Project Authors. All rights reserved.
+// Copyright (c) 2002-2012 The ANGLE Project Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
 
 #include "compiler/BuiltInFunctionEmulator.h"
-#include "compiler/DetectTextureAccess.h"
 #include "compiler/DetectRecursion.h"
 #include "compiler/ForLoopUnroll.h"
 #include "compiler/Initialize.h"
-#include "compiler/ParseHelper.h"
-#include "compiler/ShHandle.h"
-#include "compiler/ValidateColorLimitations.h"
-#include "compiler/ValidateLimitations.h"
 #include "compiler/MapLongVariableNames.h"
+#include "compiler/ParseHelper.h"
+#include "compiler/RewriteCSSFragmentShader.h"
+#include "compiler/RewriteCSSVertexShader.h"
+#include "compiler/ShHandle.h"
+#include "compiler/ValidateLimitations.h"
+
+bool isWebGLSpecSubset(ShShaderSpec spec)
+{
+    return spec == SH_WEBGL_SPEC || spec == SH_CSS_SHADERS_SPEC;
+}
 
 namespace {
 bool InitializeSymbolTable(
@@ -93,10 +98,13 @@ TCompiler::TCompiler(ShShaderType type, ShShaderSpec spec)
       shaderSpec(spec),
       builtInFunctionEmulator(type)
 {
+    longNameMap = LongNameMap::GetInstance();
 }
 
 TCompiler::~TCompiler()
 {
+    ASSERT(longNameMap);
+    longNameMap->Release();
 }
 
 bool TCompiler::Init(const ShBuiltInResources& resources)
@@ -122,7 +130,7 @@ bool TCompiler::compile(const char* const shaderStrings[],
         return true;
 
     // If compiling for WebGL, validate loop and indexing as well.
-    if (shaderSpec == SH_WEBGL_SPEC)
+    if (isWebGLSpecSubset(shaderSpec))
         compileOptions |= SH_VALIDATE_LOOP_INDEXING;
 
     // First string is path of source file if flag is set. The actual source follows.
@@ -160,8 +168,12 @@ bool TCompiler::compile(const char* const shaderStrings[],
         if (success && (compileOptions & SH_VALIDATE_LOOP_INDEXING))
             success = validateLimitations(root);
 
-        if (success && (compileOptions & SH_VALIDATE_COLOR_ACCESS))
-            success = validateColorLimitations(root);
+        if (success && shaderSpec == SH_CSS_SHADERS_SPEC) {
+            // The tree root (GlobalParseContext->treeRoot) may change as a side effect
+            // of rewriting the shader according the CSS Shaders spec.
+            root = rewriteCSSShader(root);
+            parseContext.treeRoot = root;
+        }
 
         // Unroll for-loop markup needs to happen after validateLimitations pass.
         if (success && (compileOptions & SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX))
@@ -179,9 +191,6 @@ bool TCompiler::compile(const char* const shaderStrings[],
 
         if (success && (compileOptions & SH_ATTRIBUTES_UNIFORMS))
             collectAttribsUniforms(root);
-
-        if (success && (compileOptions & SH_NO_TEXTURE_ACCESS))
-            success = !detectTextureAccess(root);
 
         if (success && (compileOptions & SH_INTERMEDIATE_TREE))
             intermediate.outputTree(root);
@@ -221,20 +230,6 @@ void TCompiler::clearResults()
     builtInFunctionEmulator.Cleanup();
 }
 
-bool TCompiler::detectTextureAccess(TIntermNode* root)
-{
-    DetectTextureAccess detect;
-    root->traverse(&detect);
-    
-    printf(">>> attribs: %ld\n", attribs.size());
-    printf(">>> uniforms: %ld\n", uniforms.size());
-    for (size_t i = 0; i < uniforms.size(); ++i) {
-        printf(">>> uniform %s\n", uniforms[i].name.c_str());
-    }
-    
-    return detect.detectTextureAccess();
-}
-
 bool TCompiler::detectRecursion(TIntermNode* root)
 {
     DetectRecursion detect;
@@ -254,33 +249,23 @@ bool TCompiler::detectRecursion(TIntermNode* root)
     }
 }
 
+TIntermNode* TCompiler::rewriteCSSShader(TIntermNode* root)
+{
+    if (shaderType == SH_VERTEX_SHADER) {
+        RewriteCSSVertexShader rewriter(root, symbolTable, hiddenSymbolSuffix);
+        rewriter.rewrite();
+        return rewriter.getNewTreeRoot();
+    } else {
+        RewriteCSSFragmentShader rewriter(root, symbolTable, hiddenSymbolSuffix);
+        rewriter.rewrite();
+        return rewriter.getNewTreeRoot();
+    }
+}
+
 bool TCompiler::validateLimitations(TIntermNode* root) {
     ValidateLimitations validate(shaderType, infoSink.info);
     root->traverse(&validate);
     return validate.numErrors() == 0;
-}
-
-bool TCompiler::validateColorLimitations(TIntermNode* root) {
-    printf(">>> Entering validateColorLimitations");
-    ValidateColorLimitations validate(infoSink.info);
-    bool reparse = false;
-    int numReparse = 0;
-    do {
-        reparse = false;
-        root->traverse(&validate);
-        if (validate.foundNewUnsafeSymbols()) {
-            infoSink.info << "Found new unsafe symbols. Reparsing the tree\n\n";
-            validate.setNewUnsafeSymbols(false);
-            reparse = true;
-        }
-        numReparse ++;
-    } while (reparse);
-    infoSink.info << "Tree reparsing: " << numReparse << '\n';
-    if (validate.numErrors() > 0)
-        infoSink.info << "TotalErrors: " << validate.numErrors() << '\n';
-    printf(">>> validateColorLimitations numErrors: %d", validate.numErrors());
-    return validate.numErrors() == 0;
-    //return true;
 }
 
 void TCompiler::collectAttribsUniforms(TIntermNode* root)
@@ -291,7 +276,8 @@ void TCompiler::collectAttribsUniforms(TIntermNode* root)
 
 void TCompiler::mapLongVariableNames(TIntermNode* root)
 {
-    MapLongVariableNames map(varyingLongNameMap);
+    ASSERT(longNameMap);
+    MapLongVariableNames map(longNameMap);
     root->traverse(&map);
 }
 

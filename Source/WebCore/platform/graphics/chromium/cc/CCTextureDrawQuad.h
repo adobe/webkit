@@ -31,31 +31,23 @@
 
 namespace WebCore {
 
-class CCLayerImpl;
 class CCTextureDrawQuad : public CCDrawQuad {
     WTF_MAKE_NONCOPYABLE(CCTextureDrawQuad);
 public:
-    static PassOwnPtr<CCTextureDrawQuad> create(const CCSharedQuadState*, const IntRect&, unsigned textureId, bool hasAlpha, bool premultipliedAlpha, const FloatRect& uvRect, bool flipped, const IntSize& ioSurfaceSize, unsigned ioSurfaceTextureId);
+    static PassOwnPtr<CCTextureDrawQuad> create(const CCSharedQuadState*, const IntRect&, unsigned textureId, bool premultipliedAlpha, const FloatRect& uvRect, bool flipped);
 
     unsigned textureId() const { return  m_textureId; }
-    bool hasAlpha() const { return  m_hasAlpha; }
     bool premultipliedAlpha() const { return  m_premultipliedAlpha; }
     FloatRect uvRect() const { return m_uvRect; }
     bool flipped() const { return m_flipped; }
 
-    const IntSize& ioSurfaceSize() const { return m_ioSurfaceSize; }
-    unsigned ioSurfaceTextureId() const { return m_ioSurfaceTextureId; }
- 
 private:
-    CCTextureDrawQuad(const CCSharedQuadState*, const IntRect&, unsigned texture_id, bool hasAlpha, bool premultipliedAlpha, const FloatRect& uvRect, bool flipped, const IntSize& ioSurfaceSize, unsigned ioSurfaceTextureId);
+    CCTextureDrawQuad(const CCSharedQuadState*, const IntRect&, unsigned texture_id, bool premultipliedAlpha, const FloatRect& uvRect, bool flipped);
     
     unsigned m_textureId;
-    bool m_hasAlpha;
     bool m_premultipliedAlpha;
     FloatRect m_uvRect;
     bool m_flipped;
-    IntSize m_ioSurfaceSize;
-    unsigned m_ioSurfaceTextureId;
 };
 
 }

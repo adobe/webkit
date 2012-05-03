@@ -255,7 +255,7 @@ bool WebProcessProxy::checkURLReceivedFromWebProcess(const KURL& url)
     }
 
     // A Web process that was never asked to load a file URL should not ever ask us to do anything with a file URL.
-    fprintf(stderr, "Received an unexpected URL from the web process: '%s'\n", url.string().utf8().data());
+    WTFLogAlways("Received an unexpected URL from the web process: '%s'\n", url.string().utf8().data());
     return false;
 }
 
@@ -271,18 +271,17 @@ void WebProcessProxy::addBackForwardItem(uint64_t itemID, const String& original
     MESSAGE_CHECK_URL(originalURL);
     MESSAGE_CHECK_URL(url);
 
-    std::pair<WebBackForwardListItemMap::iterator, bool> result = m_backForwardListItemMap.add(itemID, 0);
-    if (result.second) {
-        // New item.
-        result.first->second = WebBackForwardListItem::create(originalURL, url, title, backForwardData.data(), backForwardData.size(), itemID);
+    WebBackForwardListItemMap::AddResult result = m_backForwardListItemMap.add(itemID, 0);
+    if (result.isNewEntry) {
+        result.iterator->second = WebBackForwardListItem::create(originalURL, url, title, backForwardData.data(), backForwardData.size(), itemID);
         return;
     }
 
     // Update existing item.
-    result.first->second->setOriginalURL(originalURL);
-    result.first->second->setURL(url);
-    result.first->second->setTitle(title);
-    result.first->second->setBackForwardData(backForwardData.data(), backForwardData.size());
+    result.iterator->second->setOriginalURL(originalURL);
+    result.iterator->second->setURL(url);
+    result.iterator->second->setTitle(title);
+    result.iterator->second->setBackForwardData(backForwardData.data(), backForwardData.size());
 }
 
 #if ENABLE(PLUGIN_PROCESS)
@@ -315,6 +314,9 @@ void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC
         || messageID.is<CoreIPC::MessageClassWebKeyValueStorageManagerProxy>()
         || messageID.is<CoreIPC::MessageClassWebMediaCacheManagerProxy>()
         || messageID.is<CoreIPC::MessageClassWebNotificationManagerProxy>()
+#if USE(SOUP)
+        || messageID.is<CoreIPC::MessageClassWebSoupRequestManagerProxy>()
+#endif
         || messageID.is<CoreIPC::MessageClassWebResourceCacheManagerProxy>()) {
         m_context->didReceiveMessage(connection, messageID, arguments);
         return;
@@ -378,7 +380,7 @@ void WebProcessProxy::didClose(CoreIPC::Connection*)
 
 void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID)
 {
-    fprintf(stderr, "Received an invalid message from the web process with message ID %x\n", messageID.toInt());
+    WTFLogAlways("Received an invalid message from the web process with message ID %x\n", messageID.toInt());
 
     // Terminate the WebProcesses.
     terminate();
@@ -394,6 +396,14 @@ void WebProcessProxy::didBecomeUnresponsive(ResponsivenessTimer*)
     copyValuesToVector(m_pageMap, pages);
     for (size_t i = 0, size = pages.size(); i < size; ++i)
         pages[i]->processDidBecomeUnresponsive();
+}
+
+void WebProcessProxy::interactionOccurredWhileUnresponsive(ResponsivenessTimer*)
+{
+    Vector<RefPtr<WebPageProxy> > pages;
+    copyValuesToVector(m_pageMap, pages);
+    for (size_t i = 0, size = pages.size(); i < size; ++i)
+        pages[i]->interactionOccurredWhileProcessUnresponsive();
 }
 
 void WebProcessProxy::didBecomeResponsive(ResponsivenessTimer*)

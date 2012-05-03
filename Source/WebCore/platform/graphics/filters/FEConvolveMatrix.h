@@ -40,8 +40,6 @@ enum EdgeModeType {
     EDGEMODE_NONE      = 3
 };
 
-class CanvasPixelArray;
-
 class FEConvolveMatrix : public FilterEffect {
 public:
     static PassRefPtr<FEConvolveMatrix> create(Filter*, const IntSize&,
@@ -82,8 +80,8 @@ public:
 private:
 
     struct PaintingData {
-        ByteArray* srcPixelArray;
-        ByteArray* dstPixelArray;
+        Uint8ClampedArray* srcPixelArray;
+        Uint8ClampedArray* dstPixelArray;
         int width;
         int height;
         float bias;

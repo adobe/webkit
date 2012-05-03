@@ -79,7 +79,7 @@ WebInspector.ScopeChainSidebarPane.prototype = {
                     if (callFrame.this)
                         extraProperties = [ new WebInspector.RemoteObjectProperty("this", WebInspector.RemoteObject.fromPayload(callFrame.this)) ];
                     if (i == 0) {
-                        var details = WebInspector.debuggerModel.debuggerPausedDetails;
+                        var details = WebInspector.debuggerModel.debuggerPausedDetails();
                         var exception = details.reason === WebInspector.DebuggerModel.BreakReason.Exception ? details.auxData : 0;
                         if (exception) {
                             extraProperties = extraProperties || [];
@@ -125,6 +125,7 @@ WebInspector.ScopeChainSidebarPane.prototype.__proto__ = WebInspector.SidebarPan
 /**
  * @constructor
  * @extends {WebInspector.ObjectPropertyTreeElement}
+ * @param {WebInspector.RemoteObjectProperty} property
  */
 WebInspector.ScopeVariableTreeElement = function(property)
 {

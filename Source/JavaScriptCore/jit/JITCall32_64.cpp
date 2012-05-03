@@ -245,6 +245,8 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
 
         store32(TrustedImm32(argCount), payloadFor(RegisterFile::ArgumentCount, regT3));
     } // regT3 holds newCallFrame with ArgumentCount initialized.
+    
+    storePtr(TrustedImmPtr(instruction), tagFor(RegisterFile::ArgumentCount, callFrameRegister));
     emitLoad(callee, regT1, regT0); // regT1, regT0 holds callee.
 
     storePtr(callFrameRegister, Address(regT3, RegisterFile::CallerFrame * static_cast<int>(sizeof(Register))));
@@ -264,7 +266,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     addSlowCase(slowCase);
     addSlowCase(branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag)));
 
-    ASSERT_JIT_OFFSET(differenceBetween(addressOfLinkedFunctionCheck, slowCase), patchOffsetOpCallCompareToJump);
     ASSERT(m_callStructureStubCompilationInfo.size() == callLinkInfoIndex);
     m_callStructureStubCompilationInfo.append(StructureStubCompilationInfo());
     m_callStructureStubCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;

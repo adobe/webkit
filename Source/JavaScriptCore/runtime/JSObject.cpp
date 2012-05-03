@@ -203,7 +203,7 @@ bool JSObject::setPrototypeWithCycleCheck(JSGlobalData& globalData, JSValue prot
 {
     JSValue checkFor = this;
     if (this->isGlobalObject())
-        checkFor = static_cast<JSGlobalObject*>(this)->globalExec()->thisValue();
+        checkFor = jsCast<JSGlobalObject*>(this)->globalExec()->thisValue();
 
     JSValue nextPrototype = prototype;
     while (nextPrototype && nextPrototype.isObject()) {
@@ -217,7 +217,7 @@ bool JSObject::setPrototypeWithCycleCheck(JSGlobalData& globalData, JSValue prot
 
 bool JSObject::allowsAccessFrom(ExecState* exec)
 {
-    JSGlobalObject* globalObject = isGlobalThis() ? static_cast<JSGlobalThis*>(this)->unwrappedObject() : this->globalObject();
+    JSGlobalObject* globalObject = isGlobalThis() ? jsCast<JSGlobalThis*>(this)->unwrappedObject() : this->globalObject();
     return globalObject->globalObjectMethodTable()->allowsAccessFrom(globalObject, exec);
 }
 
@@ -445,13 +445,13 @@ JSString* JSObject::toString(ExecState* exec) const
 
 JSObject* JSObject::toThisObject(JSCell* cell, ExecState*)
 {
-    return static_cast<JSObject*>(cell);
+    return jsCast<JSObject*>(cell);
 }
 
 JSObject* JSObject::unwrappedObject()
 {
     if (isGlobalThis())
-        return static_cast<JSGlobalThis*>(this)->unwrappedObject();
+        return jsCast<JSGlobalThis*>(this)->unwrappedObject();
     return this;
 }
 
@@ -541,12 +541,18 @@ NEVER_INLINE void JSObject::fillGetterPropertySlot(PropertySlot& slot, WriteBarr
 
 Structure* JSObject::createInheritorID(JSGlobalData& globalData)
 {
-    m_inheritorID.set(globalData, this, createEmptyObjectStructure(globalData, structure()->globalObject(), this));
+    JSGlobalObject* globalObject;
+    if (isGlobalThis())
+        globalObject = static_cast<JSGlobalThis*>(this)->unwrappedObject();
+    else
+        globalObject = structure()->globalObject();
+    ASSERT(globalObject);
+    m_inheritorID.set(globalData, this, createEmptyObjectStructure(globalData, globalObject, this));
     ASSERT(m_inheritorID->isEmpty());
     return m_inheritorID.get();
 }
 
-void JSObject::allocatePropertyStorage(JSGlobalData& globalData, size_t oldSize, size_t newSize)
+PropertyStorage JSObject::growPropertyStorage(JSGlobalData& globalData, size_t oldSize, size_t newSize)
 {
     ASSERT(newSize > oldSize);
 
@@ -574,7 +580,7 @@ void JSObject::allocatePropertyStorage(JSGlobalData& globalData, size_t oldSize,
     }
 
     ASSERT(newPropertyStorage);
-    m_propertyStorage.set(globalData, this, newPropertyStorage);
+    return newPropertyStorage;
 }
 
 bool JSObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)

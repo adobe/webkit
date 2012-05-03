@@ -49,6 +49,8 @@ struct PaintInfo;
 class LineInfo;
 class RenderRubyRun;
 
+class WrappingContext;
+
 template <class Iterator, class Run> class BidiResolver;
 template <class Run> class BidiRunList;
 template <class Iterator> struct MidpointState;
@@ -127,6 +129,8 @@ public:
     
     bool containsFloats() const { return m_floatingObjects && !m_floatingObjects->set().isEmpty(); }
     bool containsFloat(RenderBox*) const;
+
+    void setNeedsLayoutForWrappingContextChange();
 
     // Versions that can compute line offsets with the region and page offset passed in. Used for speed to avoid having to
     // compute the region all over again when you already know it.
@@ -210,6 +214,8 @@ public:
     LayoutRect logicalRightSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
                                         RenderObject* selObj, LayoutUnit logicalRight, LayoutUnit logicalTop, LayoutUnit logicalHeight, const PaintInfo*);
     void getSelectionGapInfo(SelectionState, bool& leftGap, bool& rightGap);
+    RenderBlock* blockBeforeWithinSelectionRoot(LayoutSize& offset) const;
+
     LayoutRect logicalRectToPhysicalRect(const LayoutPoint& physicalPosition, const LayoutRect& logicalRect);
         
     // Helper methods for computing line counts and heights for line counts.
@@ -233,12 +239,14 @@ public:
     using RenderBoxModelObject::continuation;
     using RenderBoxModelObject::setContinuation;
 
-    // This function is a convenience helper for creating an anonymous block that inherits its
-    // style from this RenderBlock.
-    RenderBlock* createAnonymousBlock(bool isFlexibleBox = false) const;
-    RenderBlock* createAnonymousColumnsBlock() const;
-    RenderBlock* createAnonymousColumnSpanBlock() const;
-    RenderBlock* createAnonymousBlockWithSameTypeAs(RenderBlock* otherAnonymousBlock) const;
+    static RenderBlock* createAnonymousWithParentRendererAndDisplay(const RenderObject*, EDisplay = BLOCK);
+    static RenderBlock* createAnonymousColumnsWithParentRenderer(const RenderObject*);
+    static RenderBlock* createAnonymousColumnSpanWithParentRenderer(const RenderObject*);
+    RenderBlock* createAnonymousBlock(EDisplay display = BLOCK) const { return createAnonymousWithParentRendererAndDisplay(this, display); }
+    RenderBlock* createAnonymousColumnsBlock() const { return createAnonymousColumnsWithParentRenderer(this); }
+    RenderBlock* createAnonymousColumnSpanBlock() const { return createAnonymousColumnSpanWithParentRenderer(this); }
+
+    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE;
     
     static void appendRunsForObject(BidiRunList<BidiRun>&, int start, int end, RenderObject*, InlineBidiResolver&);
 
@@ -255,12 +263,12 @@ public:
     unsigned columnCount(ColumnInfo*) const;
     LayoutRect columnRectAt(ColumnInfo*, unsigned) const;
 
-    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : zeroLayoutUnit; }
+    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : ZERO_LAYOUT_UNIT; }
     void setPaginationStrut(LayoutUnit);
     
     // The page logical offset is the object's offset from the top of the page in the page progression
     // direction (so an x-offset in vertical text and a y-offset for horizontal text).
-    LayoutUnit pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : zeroLayoutUnit; }
+    LayoutUnit pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : ZERO_LAYOUT_UNIT; }
     void setPageLogicalOffset(LayoutUnit);
 
     RootInlineBox* lineGridBox() const { return m_rareData ? m_rareData->m_lineGridBox : 0; }
@@ -371,8 +379,7 @@ public:
     
     void setStaticInlinePositionForChild(RenderBox*, LayoutUnit blockOffset, LayoutUnit inlinePosition);
 
-    LayoutUnit computeStartPositionDeltaForChildAvoidingFloats(const RenderBox* child, LayoutUnit childMarginStart,
-        LayoutUnit childLogicalWidth, RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = 0);
+    LayoutUnit computeStartPositionDeltaForChildAvoidingFloats(const RenderBox* child, LayoutUnit childMarginStart, RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = 0);
 
 #ifndef NDEBUG
     void showLineTreeAndMark(const InlineBox* = 0, const char* = 0, const InlineBox* = 0, const char* = 0, const RenderObject* = 0) const;
@@ -382,30 +389,6 @@ protected:
     virtual void willBeDestroyed();
 
     void updateScrollInfoAfterLayout();
-
-    // These functions are only used internally to manipulate the render tree structure via remove/insert/appendChildNode.
-    // Since they are typically called only to move objects around within anonymous blocks (which only have layers in
-    // the case of column spans), the default for fullRemoveInsert is false rather than true.
-    void moveChildTo(RenderBlock* to, RenderObject* child, bool fullRemoveInsert = false)
-    {
-        return moveChildTo(to, child, 0, fullRemoveInsert);
-    }
-    void moveChildTo(RenderBlock* toBlock, RenderObject* child, RenderObject* beforeChild, bool fullRemoveInsert = false);
-    void moveAllChildrenTo(RenderBlock* toBlock, bool fullRemoveInsert = false)
-    {
-        return moveAllChildrenTo(toBlock, 0, fullRemoveInsert);
-    }
-    void moveAllChildrenTo(RenderBlock* toBlock, RenderObject* beforeChild, bool fullRemoveInsert = false)
-    {
-        return moveChildrenTo(toBlock, firstChild(), 0, beforeChild, fullRemoveInsert);
-    }
-    // Move all of the kids from |startChild| up to but excluding |endChild|.  0 can be passed as the endChild to denote
-    // that all the kids from |startChild| onwards should be added.
-    void moveChildrenTo(RenderBlock* toBlock, RenderObject* startChild, RenderObject* endChild, bool fullRemoveInsert = false)
-    {
-        return moveChildrenTo(toBlock, startChild, endChild, 0, fullRemoveInsert);
-    }
-    void moveChildrenTo(RenderBlock* toBlock, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
 
     LayoutUnit maxPositiveMarginBefore() const { return m_rareData ? m_rareData->m_margins.positiveMarginBefore() : RenderBlockRareData::positiveMarginBeforeDefault(this); }
     LayoutUnit maxNegativeMarginBefore() const { return m_rareData ? m_rareData->m_margins.negativeMarginBefore() : RenderBlockRareData::negativeMarginBeforeDefault(this); }
@@ -480,6 +463,7 @@ protected:
     {
         LayoutUnit repaintLogicalTop = 0;
         LayoutUnit repaintLogicalBottom = 0;
+        clearFloats(NormalLayoutPass);
         layoutInlineChildren(true, repaintLogicalTop, repaintLogicalBottom);
     }
 #endif
@@ -620,16 +604,23 @@ private:
         void setIsInPlacedTree(bool value) { m_isInPlacedTree = value; }
 #endif
 
+        bool shouldPaint() const { return m_shouldPaint; }
+        void setShouldPaint(bool shouldPaint) { m_shouldPaint = shouldPaint; }
+        bool isDescendant() const { return m_isDescendant; }
+        void setIsDescendant(bool isDescendant) { m_isDescendant = isDescendant; }
+
         RenderBox* m_renderer;
         RootInlineBox* m_originatingLine;
         LayoutRect m_frameRect;
         int m_paginationStrut;
+
+    private:
         unsigned m_type : 3; // Type (left/right aligned or positioned)
-        bool m_shouldPaint : 1;
-        bool m_isDescendant : 1;
-        bool m_isPlaced : 1;
+        unsigned m_shouldPaint : 1;
+        unsigned m_isDescendant : 1;
+        unsigned m_isPlaced : 1;
 #ifndef NDEBUG
-        bool m_isInPlacedTree : 1;
+        unsigned m_isInPlacedTree : 1;
 #endif
     };
 
@@ -816,7 +807,7 @@ private:
                                  LayoutUnit lastLogicalTop, LayoutUnit lastLogicalLeft, LayoutUnit lastLogicalRight, LayoutUnit logicalBottom, const PaintInfo*);
     LayoutUnit logicalLeftSelectionOffset(RenderBlock* rootBlock, LayoutUnit position);
     LayoutUnit logicalRightSelectionOffset(RenderBlock* rootBlock, LayoutUnit position);
-    
+
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const;
 
@@ -846,8 +837,6 @@ private:
 
     bool expandsToEncloseOverhangingFloats() const;
 
-    RenderObject* splitAnonymousBlocksAroundChild(RenderObject* beforeChild);
-    RenderObject* splitTablePartsAroundChild(RenderObject* beforeChild);
     void splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock, RenderBlock* middleBlock,
                      RenderObject* beforeChild, RenderBoxModelObject* oldCont);
     void splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
@@ -943,7 +932,8 @@ private:
     // Helper function for layoutInlineChildren()
     RootInlineBox* createLineBoxesFromBidiRuns(BidiRunList<BidiRun>&, const InlineIterator& end, LineInfo&, VerticalPositionCache&, BidiRun* trailingSpaceRun);
     void layoutRunsAndFloats(LineLayoutState&, bool hasInlineChild);
-    void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines);
+    void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines,
+                                    WrappingContext* wrappingContext, Vector<WrappingContext*>& exclusionList);
     void linkToEndLineIfNeeded(LineLayoutState&);
     static void repaintDirtyFloats(Vector<FloatWithRect>& floats);
 
@@ -956,7 +946,7 @@ protected:
     //
     // For a page height of 800px, the first rule will return 800 if the value passed in is 0. The second rule will simply return 0.
     enum PageBoundaryRule { ExcludePageBoundary, IncludePageBoundary };
-    LayoutUnit nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary) const;
+    LayoutUnit nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary, bool jumpOverMultiColumnRegions = false) const;
     bool hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary) const;
 
     virtual ColumnInfo::PaginationUnit paginationUnit() const;
@@ -967,7 +957,7 @@ protected:
 public:
     LayoutUnit pageLogicalTopForOffset(LayoutUnit offset) const;
     LayoutUnit pageLogicalHeightForOffset(LayoutUnit offset) const;
-    LayoutUnit pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule = IncludePageBoundary) const;
+    LayoutUnit pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule = IncludePageBoundary, bool jumpOverMultiColumnRegions = false) const;
     
 protected:
     bool pushToNextPageWithMinimumLogicalHeight(LayoutUnit& adjustment, LayoutUnit logicalOffset, LayoutUnit minimumLogicalHeight) const;
@@ -1127,9 +1117,9 @@ protected:
     RenderLineBoxList m_lineBoxes;   // All of the root line boxes created for this block flow.  For example, <div>Hello<br>world.</div> will have two total lines for the <div>.
 
     mutable signed m_lineHeight : 29;
-    bool m_beingDestroyed : 1;
-    bool m_hasPositionedFloats : 1;
-    bool m_hasMarkupTruncation : 1;
+    unsigned m_beingDestroyed : 1;
+    unsigned m_hasPositionedFloats : 1;
+    unsigned m_hasMarkupTruncation : 1;
 
     // RenderRubyBase objects need to be able to split and merge, moving their children around
     // (calling moveChildTo, moveAllChildrenTo, and makeChildrenNonInline).

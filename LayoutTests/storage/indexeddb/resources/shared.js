@@ -28,7 +28,6 @@ function removeVendorPrefixes()
 {
     IDBCursor = self.IDBCursor || self.webkitIDBCursor;
     IDBDatabase = self.IDBDatabase || self.webkitIDBDatabase;
-    IDBDatabaseError = self.IDBDatabaseError || self.webkitIDBDatabaseError;
     IDBDatabaseException = self.IDBDatabaseException || self.webkitIDBDatabaseException;
     IDBFactory = self.IDBFactory || self.webkitIDBFactory;
     IDBIndex = self.IDBIndex || self.webkitIDBIndex;
@@ -38,7 +37,7 @@ function removeVendorPrefixes()
     IDBTransaction = self.IDBTransaction || self.webkitIDBTransaction;
 
     indexedDB = evalAndLog("indexedDB = self.indexedDB || self.webkitIndexedDB || self.mozIndexedDB || self.msIndexedDB || self.OIndexedDB;");
-    shouldBeTrue("Boolean(indexedDB && IDBCursor && IDBDatabase && IDBDatabaseError && IDBDatabaseException && IDBFactory && IDBIndex && IDBKeyRange && IDBObjectStore && IDBRequest && IDBTransaction)");
+    shouldBeTrueQuiet("Boolean(indexedDB && IDBCursor && IDBDatabase && IDBDatabaseException && IDBFactory && IDBIndex && IDBKeyRange && IDBObjectStore && IDBRequest && IDBTransaction)");
     debug("");
 }
 
@@ -54,7 +53,7 @@ function unexpectedErrorCallback(event)
     finishJSTest();
 }
 
-function unexpectedAbortCallback()
+function unexpectedAbortCallback(e)
 {
     testFailed("Abort function called unexpectedly!");
     finishJSTest();
@@ -98,6 +97,13 @@ function evalAndExpectExceptionClass(cmd, expected)
 		else
 			testFailed("Expected " + expected + " but saw " + e);
     }
+}
+
+function evalAndLogCallback(cmd) {
+  function callback() {
+    evalAndLog(cmd);
+  }
+  return callback;
 }
 
 function deleteAllObjectStores(db)

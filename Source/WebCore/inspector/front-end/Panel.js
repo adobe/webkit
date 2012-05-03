@@ -79,7 +79,7 @@ WebInspector.Panel.prototype = {
         if ("_toolbarItem" in this)
             this._toolbarItem.addStyleClass("toggled-on");
 
-        WebInspector.setCurrentFocusElement(this.defaultFocusedElement);
+        this.focus();
     },
 
     willHide: function()
@@ -96,7 +96,7 @@ WebInspector.Panel.prototype = {
         this.searchCanceled();
     },
 
-    get defaultFocusedElement()
+    defaultFocusedElement: function()
     {
         return this.sidebarTreeElement || this.element;
     },
@@ -184,14 +184,20 @@ WebInspector.Panel.prototype = {
     {
     },
 
+    /**
+     * @param {Element} anchor
+     * @return {boolean}
+     */
     canShowAnchorLocation: function(anchor)
     {
         return false;
     },
 
+    /**
+     * @param {Element} anchor
+     */
     showAnchorLocation: function(anchor)
     {
-        return false;
     },
 
     elementsToRestoreScrollPositionsFor: function()

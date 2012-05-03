@@ -23,6 +23,7 @@ LIST(APPEND WebCore_SOURCES
   page/efl/EventHandlerEfl.cpp
   platform/Cursor.cpp
   platform/efl/ClipboardEfl.cpp
+  platform/efl/ColorChooserEfl.cpp
   platform/efl/ContextMenuEfl.cpp
   platform/efl/ContextMenuItemEfl.cpp
   platform/efl/CursorEfl.cpp
@@ -118,12 +119,14 @@ IF (WTF_USE_CAIRO)
   )
   LIST(APPEND WebCore_SOURCES
     platform/cairo/WidgetBackingStoreCairo.cpp
+    platform/graphics/cairo/BitmapImageCairo.cpp
     platform/graphics/cairo/CairoUtilities.cpp
     platform/graphics/cairo/FontCairo.cpp
     platform/graphics/cairo/GradientCairo.cpp
     platform/graphics/cairo/GraphicsContextCairo.cpp
     platform/graphics/cairo/ImageBufferCairo.cpp
     platform/graphics/cairo/ImageCairo.cpp
+    platform/graphics/cairo/NativeImageCairo.cpp
     platform/graphics/cairo/OwnPtrCairo.cpp
     platform/graphics/cairo/PathCairo.cpp
     platform/graphics/cairo/PatternCairo.cpp
@@ -187,6 +190,7 @@ IF (ENABLE_VIDEO)
   LIST(APPEND WebCore_SOURCES
     platform/graphics/gstreamer/GRefPtrGStreamer.cpp
     platform/graphics/gstreamer/GStreamerGWorld.cpp
+    platform/graphics/gstreamer/GStreamerUtilities.cpp
     platform/graphics/gstreamer/GStreamerVersioning.cpp
     platform/graphics/gstreamer/ImageGStreamerCairo.cpp
     platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp

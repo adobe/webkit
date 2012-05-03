@@ -240,7 +240,7 @@ static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacem
 
 static inline UString substituteBackreferences(const UString& replacement, const UString& source, const int* ovector, RegExp* reg)
 {
-    size_t i = replacement.find('$', 0);
+    size_t i = replacement.find('$');
     if (UNLIKELY(i != notFound)) {
         if (replacement.is8Bit() && source.is8Bit())
             return substituteBackreferencesSlow<LChar>(replacement, source, ovector, reg, i);
@@ -441,8 +441,9 @@ static NEVER_INLINE EncodedJSValue removeUsingRegExpSearch(ExecState* exec, JSSt
     return JSValue::encode(jsSpliceSubstrings(exec, string, source, sourceRanges.data(), sourceRanges.size()));
 }
 
-static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSString* string, JSValue searchValue, JSValue replaceValue)
+static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSString* string, JSValue searchValue)
 {
+    JSValue replaceValue = exec->argument(1);
     UString replacementString;
     CallData callData;
     CallType callType = getCallData(replaceValue, callData);
@@ -625,22 +626,24 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
     return JSValue::encode(jsSpliceSubstringsWithSeparators(exec, string, source, sourceRanges.data(), sourceRanges.size(), replacements.data(), replacements.size()));
 }
 
-static NEVER_INLINE EncodedJSValue replaceUsingStringSearch(ExecState* exec, JSString* jsString, JSValue searchValue, JSValue replaceValue)
+static inline EncodedJSValue replaceUsingStringSearch(ExecState* exec, JSString* jsString, JSValue searchValue)
 {
     const UString& string = jsString->value(exec);
-    UString searchString = searchValue.toString(exec)->value(exec);
+    UString searchString = searchValue.toUString(exec);
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 
     size_t matchStart = string.find(searchString);
+
     if (matchStart == notFound)
         return JSValue::encode(jsString);
 
+    JSValue replaceValue = exec->argument(1);
     CallData callData;
     CallType callType = getCallData(replaceValue, callData);
     if (callType != CallTypeNone) {
         MarkedArgumentBuffer args;
-        args.append(jsSubstring(exec, string, matchStart, searchString.length()));
+        args.append(jsSubstring(exec, string, matchStart, searchString.impl()->length()));
         args.append(jsNumber(matchStart));
         args.append(jsString);
         replaceValue = call(exec, replaceValue, callType, callData, jsUndefined(), args);
@@ -648,13 +651,20 @@ static NEVER_INLINE EncodedJSValue replaceUsingStringSearch(ExecState* exec, JSS
             return JSValue::encode(jsUndefined());
     }
 
-    UString replaceString = replaceValue.toString(exec)->value(exec);
+    UString replaceString = replaceValue.toUString(exec);
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 
-    size_t matchEnd = matchStart + searchString.length();
+    StringImpl* stringImpl = string.impl();
+    UString leftPart(StringImpl::create(stringImpl, 0, matchStart));
+
+    size_t matchEnd = matchStart + searchString.impl()->length();
     int ovector[2] = { matchStart,  matchEnd};
-    return JSValue::encode(JSC::jsString(exec, string.substringSharingImpl(0, matchStart), substituteBackreferences(replaceString, string, ovector, 0), string.substringSharingImpl(matchEnd)));
+    UString middlePart = substituteBackreferences(replaceString, string, ovector, 0);
+
+    size_t leftLength = stringImpl->length() - matchEnd;
+    UString rightPart(StringImpl::create(stringImpl, matchEnd, leftLength));
+    return JSValue::encode(JSC::jsString(exec, leftPart, middlePart, rightPart));
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
@@ -664,11 +674,10 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
         return throwVMTypeError(exec);
     JSString* string = thisValue.toString(exec);
     JSValue searchValue = exec->argument(0);
-    JSValue replaceValue = exec->argument(1);
 
     if (searchValue.inherits(&RegExpObject::s_info))
-        return replaceUsingRegExpSearch(exec, string, searchValue, replaceValue);
-    return replaceUsingStringSearch(exec, string, searchValue, replaceValue);
+        return replaceUsingRegExpSearch(exec, string, searchValue);
+    return replaceUsingStringSearch(exec, string, searchValue);
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncToString(ExecState* exec)
@@ -745,26 +754,30 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncIndexOf(ExecState* exec)
     if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
         return throwVMTypeError(exec);
     UString s = thisValue.toString(exec)->value(exec);
-    int len = s.length();
 
     JSValue a0 = exec->argument(0);
     JSValue a1 = exec->argument(1);
     UString u2 = a0.toString(exec)->value(exec);
-    int pos;
+
+    size_t result;
     if (a1.isUndefined())
-        pos = 0;
-    else if (a1.isUInt32())
-        pos = min<uint32_t>(a1.asUInt32(), len);
+        result = s.find(u2);
     else {
-        double dpos = a1.toInteger(exec);
-        if (dpos < 0)
-            dpos = 0;
-        else if (dpos > len)
-            dpos = len;
-        pos = static_cast<int>(dpos);
+        unsigned pos;
+        int len = s.length();
+        if (a1.isUInt32())
+            pos = min<uint32_t>(a1.asUInt32(), len);
+        else {
+            double dpos = a1.toInteger(exec);
+            if (dpos < 0)
+                dpos = 0;
+            else if (dpos > len)
+                dpos = len;
+            pos = static_cast<unsigned>(dpos);
+        }
+        result = s.find(u2, pos);
     }
 
-    size_t result = s.find(u2, pos);
     if (result == notFound)
         return JSValue::encode(jsNumber(-1));
     return JSValue::encode(jsNumber(result));
@@ -910,6 +923,35 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSlice(ExecState* exec)
     return JSValue::encode(jsEmptyString(exec));
 }
 
+// Return true in case of early return (resultLength got to limitLength).
+template<typename CharacterType>
+static ALWAYS_INLINE bool splitStringByOneCharacterImpl(ExecState* exec, JSArray* result, const UString& input, StringImpl* string, UChar separatorCharacter, size_t& position, unsigned& resultLength, unsigned limitLength)
+{
+    // 12. Let q = p.
+    size_t matchPosition;
+    const CharacterType* characters = string->getCharacters<CharacterType>();
+    // 13. Repeat, while q != s
+    //   a. Call SplitMatch(S, q, R) and let z be its MatchResult result.
+    //   b. If z is failure, then let q = q+1.
+    //   c. Else, z is not failure
+    while ((matchPosition = WTF::find(characters, string->length(), separatorCharacter, position)) != notFound) {
+        // 1. Let T be a String value equal to the substring of S consisting of the characters at positions p (inclusive)
+        //    through q (exclusive).
+        // 2. Call the [[DefineOwnProperty]] internal method of A with arguments ToString(lengthA),
+        //    Property Descriptor {[[Value]]: T, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
+        result->putDirectIndex(exec, resultLength, jsSubstring(exec, input, position, matchPosition - position), false);
+        // 3. Increment lengthA by 1.
+        // 4. If lengthA == lim, return A.
+        if (++resultLength == limitLength)
+            return true;
+
+        // 5. Let p = e.
+        // 8. Let q = p.
+        position = matchPosition + 1;
+    }
+    return false;
+}
+
 // ES 5.1 - 15.5.4.14 String.prototype.split (separator, limit)
 EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
 {
@@ -963,7 +1005,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             // c. Call the [[DefineOwnProperty]] internal method of A with arguments "0",
             //    Property Descriptor {[[Value]]: S, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
             // d. Return A.
-            if (reg->match(*globalData, input, 0) < 0)
+            if (!reg->match(*globalData, input, 0))
                 result->putDirectIndex(exec, 0, jsStringWithReuse(exec, thisValue, input), false);
             return JSValue::encode(result);
         }
@@ -974,7 +1016,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
         while (matchPosition < input.length()) {
             // a. Call SplitMatch(S, q, R) and let z be its MatchResult result.
             Vector<int, 32> ovector;
-            int mpos = reg->match(*globalData, input, matchPosition, &ovector);
+            int mpos = reg->match(*globalData, input, matchPosition, ovector);
             // b. If z is failure, then let q = q + 1.
             if (mpos < 0)
                 break;
@@ -1063,26 +1105,50 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             return JSValue::encode(result);
         }
 
-        // 12. Let q = p.
-        size_t matchPosition;
-        // 13. Repeat, while q != s
-        //   a. Call SplitMatch(S, q, R) and let z be its MatchResult result.
-        //   b. If z is failure, then let q = q+1.
-        //   c. Else, z is not failure
-        while ((matchPosition = input.find(separator, position)) != notFound) {
-            // 1. Let T be a String value equal to the substring of S consisting of the characters at positions p (inclusive)
-            //    through q (exclusive).
-            // 2. Call the [[DefineOwnProperty]] internal method of A with arguments ToString(lengthA),
-            //    Property Descriptor {[[Value]]: T, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
-            result->putDirectIndex(exec, resultLength, jsSubstring(exec, input, position, matchPosition - position), false);
-            // 3. Increment lengthA by 1.
-            // 4. If lengthA == lim, return A.
-            if (++resultLength == limit)
-                return JSValue::encode(result);
+        // 3 cases:
+        // -separator length == 1, 8 bits
+        // -separator length == 1, 16 bits
+        // -separator length > 1
+        StringImpl* stringImpl = input.impl();
+        StringImpl* separatorImpl = separator.impl();
+        size_t separatorLength = separatorImpl->length();
 
-            // 5. Let p = e.
-            // 8. Let q = p.
-            position = matchPosition + separator.length();
+        if (separatorLength == 1) {
+            UChar separatorCharacter;
+            if (separatorImpl->is8Bit())
+                separatorCharacter = separatorImpl->characters8()[0];
+            else
+                separatorCharacter = separatorImpl->characters16()[0];
+
+            if (stringImpl->is8Bit()) {
+                if (splitStringByOneCharacterImpl<LChar>(exec, result, input, stringImpl, separatorCharacter, position, resultLength, limit))
+                    return JSValue::encode(result);
+            } else {
+                if (splitStringByOneCharacterImpl<UChar>(exec, result, input, stringImpl, separatorCharacter, position, resultLength, limit))
+                    return JSValue::encode(result);
+            }
+        } else {
+            // 12. Let q = p.
+            size_t matchPosition;
+            // 13. Repeat, while q != s
+            //   a. Call SplitMatch(S, q, R) and let z be its MatchResult result.
+            //   b. If z is failure, then let q = q+1.
+            //   c. Else, z is not failure
+            while ((matchPosition = stringImpl->find(separatorImpl, position)) != notFound) {
+                // 1. Let T be a String value equal to the substring of S consisting of the characters at positions p (inclusive)
+                //    through q (exclusive).
+                // 2. Call the [[DefineOwnProperty]] internal method of A with arguments ToString(lengthA),
+                //    Property Descriptor {[[Value]]: T, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
+                result->putDirectIndex(exec, resultLength, jsSubstring(exec, input, position, matchPosition - position), false);
+                // 3. Increment lengthA by 1.
+                // 4. If lengthA == lim, return A.
+                if (++resultLength == limit)
+                    return JSValue::encode(result);
+
+                // 5. Let p = e.
+                // 8. Let q = p.
+                position = matchPosition + separator.length();
+            }
         }
     }
 
@@ -1103,7 +1169,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSubstr(ExecState* exec)
     JSString* jsString = 0;
     UString uString;
     if (thisValue.isString()) {
-        jsString = static_cast<JSString*>(thisValue.asCell());
+        jsString = jsCast<JSString*>(thisValue.asCell());
         len = jsString->length();
     } else if (thisValue.isUndefinedOrNull()) {
         // CheckObjectCoercible

@@ -76,8 +76,12 @@ void DisplayRefreshMonitor::displayLinkFired()
 {
     MutexLocker lock(m_mutex);
 
-    m_scheduled = false;
-    m_timestamp = currentTime();
+    if (!m_scheduled || !m_previousFrameDone)
+        return;
+
+    m_previousFrameDone = false;
+
+    m_monotonicAnimationStartTime = monotonicallyIncreasingTime();
 
     callOnMainThread(refreshDisplayOnMainThread, this);
 }

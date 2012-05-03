@@ -31,10 +31,15 @@
 #include "config.h"
 #include "TextFieldDecorationElement.h"
 
+#include "CSSPropertyNames.h"
+#include "CSSValueKeywords.h"
 #include "Event.h"
 #include "HTMLInputElement.h"
+#include "HTMLShadowElement.h"
 #include "NodeRenderStyle.h"
 #include "RenderImage.h"
+#include "ShadowRoot.h"
+#include "ShadowTree.h"
 
 namespace WebCore {
 
@@ -59,6 +64,43 @@ TextFieldDecorationElement::TextFieldDecorationElement(Document* document, TextF
 PassRefPtr<TextFieldDecorationElement> TextFieldDecorationElement::create(Document* document, TextFieldDecorator* decorator)
 {
     return adoptRef(new TextFieldDecorationElement(document, decorator));
+}
+
+static inline void getDecorationRootAndDecoratedRoot(HTMLInputElement* input, ShadowRoot*& decorationRoot, ShadowRoot*& decoratedRoot)
+{
+    ShadowRoot* existingRoot = input->shadowTree()->youngestShadowRoot();
+    ShadowRoot* newRoot = 0;
+    while (existingRoot->childNodeCount() == 1 && existingRoot->firstChild()->hasTagName(shadowTag)) {
+        newRoot = existingRoot;
+        existingRoot = existingRoot->olderShadowRoot();
+        ASSERT(existingRoot);
+    }
+    if (newRoot)
+        newRoot->removeChild(newRoot->firstChild());
+    else
+        newRoot = ShadowRoot::create(input, ShadowRoot::CreatingUserAgentShadowRoot, ASSERT_NO_EXCEPTION).get();
+    decorationRoot = newRoot;
+    decoratedRoot = existingRoot;
+}
+
+void TextFieldDecorationElement::decorate(HTMLInputElement* input)
+{
+    ASSERT(input);
+    ShadowRoot* existingRoot;
+    ShadowRoot* decorationRoot;
+    getDecorationRootAndDecoratedRoot(input, decorationRoot, existingRoot);
+    ASSERT(decorationRoot);
+    ASSERT(existingRoot);
+    RefPtr<HTMLDivElement> box = HTMLDivElement::create(input->document());
+    decorationRoot->appendChild(box);
+    box->setInlineStyleProperty(CSSPropertyDisplay, CSSValueWebkitBox);
+    box->setInlineStyleProperty(CSSPropertyWebkitBoxAlign, CSSValueCenter);
+    ASSERT(existingRoot->childNodeCount() == 1);
+    toHTMLElement(existingRoot->firstChild())->setInlineStyleProperty(CSSPropertyWebkitBoxFlex, 1.0, CSSPrimitiveValue::CSS_NUMBER);
+    box->appendChild(HTMLShadowElement::create(HTMLNames::shadowTag, input->document()));
+
+    setInlineStyleProperty(CSSPropertyWebkitBoxFlex, 0.0, CSSPrimitiveValue::CSS_NUMBER);
+    box->appendChild(this);
 }
 
 inline HTMLInputElement* TextFieldDecorationElement::hostInput()

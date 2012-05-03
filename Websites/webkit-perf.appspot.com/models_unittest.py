@@ -265,7 +265,15 @@ class TestModelTests(DataStoreTestsBase):
         self.assertTrue(test)
         self.assertEqual(test.branches, [branch.key()])
         self.assertEqual(test.platforms, [platform.key()])
+        self.assertEqual(test.unit, None)
         self.assertOnlyInstance(test)
+
+    def test_update_or_insert_with_unit(self):
+        branch = Branch.create_if_possible('some-branch', 'Some Branch')
+        platform = Platform.create_if_possible('some-platform', 'Some Platform')
+        test = Test.update_or_insert('some-test', branch, platform, 'runs/s')
+        self.assertOnlyInstance(test)
+        self.assertEqualUnorderedList(test.unit, 'runs/s')
 
     def test_update_or_insert_to_update(self):
         branch = Branch.create_if_possible('some-branch', 'Some Branch')
@@ -275,14 +283,11 @@ class TestModelTests(DataStoreTestsBase):
 
         other_branch = Branch.create_if_possible('other-branch', 'Other Branch')
         other_platform = Platform.create_if_possible('other-platform', 'Other Platform')
-        test = Test.update_or_insert('some-test', other_branch, other_platform)
+        test = Test.update_or_insert('some-test', other_branch, other_platform, 'ms')
         self.assertOnlyInstance(test)
         self.assertEqualUnorderedList(test.branches, [branch.key(), other_branch.key()])
         self.assertEqualUnorderedList(test.platforms, [platform.key(), other_platform.key()])
-
-        test = Test.get(test.key())
-        self.assertEqualUnorderedList(test.branches, [branch.key(), other_branch.key()])
-        self.assertEqualUnorderedList(test.platforms, [platform.key(), other_platform.key()])
+        self.assertEqualUnorderedList(test.unit, 'ms')
 
     def test_merge(self):
         branch, platform, builder = _create_some_builder()
@@ -432,6 +437,20 @@ class ReportLogTests(DataStoreTestsBase):
 
         log = self._create_log_with_payload('{"key": "value"}')
         self.assertEqual(log.results(), None)
+
+    def test_results_are_well_formed(self):
+
+        def assert_results_are_well_formed(json, expected):
+            self.assertEqual(self._create_log_with_payload(json).results_are_well_formed(), expected)
+
+        assert_results_are_well_formed('{"results": 123}', False)
+        assert_results_are_well_formed('{"results": {"test": 123}}', True)
+        assert_results_are_well_formed('{"results": {"test": 123, "other-test": 456}}', True)
+        assert_results_are_well_formed('{"results": {"test": 123, "other-test": 456, "bad-test": "hi"}}', False)
+        assert_results_are_well_formed('{"results": {"test": {"avg": 456}}}', True)
+        assert_results_are_well_formed('{"results": {"test": {"avg": 456, "median": "hello"}}}', False)
+        assert_results_are_well_formed('{"results": {"test": {"avg": 456, "median": 789}}}', True)
+        assert_results_are_well_formed('{"results": {"test": {"avg": 456, "unit": "bytes"}}}', True)
 
     def test_builder(self):
         log = self._create_log_with_payload('{"key": "value"}')
@@ -648,6 +667,7 @@ class RunsTest(DataStoreTestsBase):
             'averages': {},
             'min': None,
             'max': None,
+            'unit': None,
             'date_range': None,
             'stat': 'ok'})
 
@@ -659,10 +679,11 @@ class RunsTest(DataStoreTestsBase):
         builds, results = self._create_results(some_branch, some_platform, some_builder, 'some-test', [50.0, 51.0, 52.0, 49.0, 48.0])
 
         value = json.loads(Runs.update_or_insert(some_branch, some_platform, some_test).to_json())
-        self.assertEqualUnorderedList(value.keys(), ['test_runs', 'averages', 'min', 'max', 'date_range', 'stat'])
+        self.assertEqualUnorderedList(value.keys(), ['test_runs', 'averages', 'min', 'max', 'unit', 'date_range', 'stat'])
         self.assertEqual(value['stat'], 'ok')
         self.assertEqual(value['min'], 48.0)
         self.assertEqual(value['max'], 52.0)
+        self.assertEqual(value['unit'], None)
         self.assertEqual(value['date_range'], None)  # date_range is never given
 
         self.assertEqual(len(value['test_runs']), len(results))
@@ -675,6 +696,16 @@ class RunsTest(DataStoreTestsBase):
             self.assertEqual(run[3], result.value)
             self.assertEqual(run[6], some_builder.key().id())
             self.assertEqual(run[7], None)  # Statistics
+
+    def test_to_json_with_unit(self):
+        some_branch = Branch.create_if_possible('some-branch', 'Some Branch')
+        some_platform = Platform.create_if_possible('some-platform', 'Some Platform')
+        some_builder = Builder.get(Builder.create('some-builder', 'Some Builder'))
+        some_test = Test.update_or_insert('some-test', some_branch, some_platform, 'runs/s')
+        builds, results = self._create_results(some_branch, some_platform, some_builder, 'some-test', [50.0, 51.0, 52.0, 49.0, 48.0])
+
+        value = json.loads(Runs.update_or_insert(some_branch, some_platform, some_test).to_json())
+        self.assertEqual(value['unit'], 'runs/s')
 
     def _assert_entry(self, entry, build, result, value, statistics=None, supplementary_revisions=None):
         entry = entry[:]

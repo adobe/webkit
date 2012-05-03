@@ -67,7 +67,10 @@ canvas/philip/tests/2d.drawImage.outsidesource.html
 #       Disabled features.                                                    #
 # =========================================================================== #
 
-# ENABLE(INPUT_COLOR) is disabled.
+# ENABLE_DATALIST is not yet enabled.
+fast/forms/datalist
+
+# ENABLE_INPUT_TYPE_COLOR is disabled.
 fast/forms/color
 
 # ENABLE(INPUT_TYPE_*) are not enabled.
@@ -92,7 +95,6 @@ fast/speech
 fast/events/constructors/speech-recognition-event-constructor.html
 
 # ENABLE(MEDIA_STREAM) is disabled.
-fast/dom/MediaStream
 fast/mediastream
 
 # ENABLE(DIRECTORY_UPLOAD) is disabled.
@@ -160,23 +162,37 @@ fast/css-grid-layout
 
 # <style scoped> is not yet enabled. http://webkit.org/b/49142
 fast/css/style-scoped
+# CSS Regions tests for region styling and scoped styles
+fast/regions/style-scoped-in-flow-override-container-style.html
+fast/regions/style-scoped-in-flow-override-region-styling-multiple-regions.html
+fast/regions/style-scoped-in-flow-override-region-styling.html
+fast/regions/style-scoped-in-flow.html
 
 # ENABLE(SHADOW_DOM) is disabled.
 fast/dom/shadow/access-key.html
+fast/dom/shadow/adopt-node-with-shadow-root.html
+fast/dom/shadow/composed-shadow-tree-walker.html
 fast/dom/shadow/content-element-api.html
 fast/dom/shadow/content-element-move.html
 fast/dom/shadow/content-element-outside-shadow.html
 fast/dom/shadow/content-element-outside-shadow-style.html
 fast/dom/shadow/content-element-in-media-element.html
 fast/dom/shadow/content-element-in-meter-element.html
+fast/dom/shadow/focus-navigation.html
+fast/dom/shadow/form-in-shadow.html
 fast/dom/shadow/get-element-by-id-in-shadow-root.html
 fast/dom/shadow/iframe-shadow.html
+fast/dom/shadow/link-in-shadow-tree.html
 fast/dom/shadow/multiple-shadowroot.html
 fast/dom/shadow/multiple-shadowroot-rendering.html
 fast/dom/shadow/multiple-shadowroot-adopt.html
-fast/dom/shadow/reified-tree-traversal.html
+fast/dom/shadow/selections-in-shadow.html
+fast/dom/shadow/selection-in-shadow.html
+fast/dom/shadow/selection-shouldnt-expose-shadow-dom.html
 fast/dom/shadow/shadow-boundary-events.html
 fast/dom/shadow/shadow-content-crash.html
+fast/dom/shadow/shadow-contents-fallback-dynamic.html
+fast/dom/shadow/shadow-contents-fallback.html
 fast/dom/shadow/shadow-disable.html
 fast/dom/shadow/shadow-element-rendering-single.html
 fast/dom/shadow/shadow-element-rendering-multiple.html
@@ -189,6 +205,7 @@ fast/dom/shadow/shadow-root-innerHTML.html
 fast/dom/shadow/shadow-root-js-api.html
 fast/dom/shadow/shadow-root-new.html
 fast/dom/shadow/shadow-ul-li.html
+fast/dom/shadow/tab-order-iframe-and-shadow.html
 
 # CSS Regions support not yet enabled. http://webkit.org/b/57312
 fast/regions
@@ -239,6 +256,11 @@ inspector/debugger/event-listener-breakpoints.html
 inspector/debugger/step-through-event-listeners.html
 inspector/debugger/xhr-breakpoints.html
 
+# JSC doesn't support heap profiling
+# https://bugs.webkit.org/show_bug.cgi?id=50485
+inspector/profiler/heap-snapshot-inspect-dom-wrapper.html
+inspector/profiler/heap-snapshot-comparison-dom-groups-change.html
+
 # https://bugs.webkit.org/show_bug.cgi?id=40300
 inspector/debugger/live-edit.html
 
@@ -248,6 +270,10 @@ http/tests/inspector/compiler-source-mapping-debug.html
 #[Qt] inspector/styles/svg-style.xhtml fails
 # https://bugs.webkit.org/show_bug.cgi?id=79068
 inspector/styles/svg-style.xhtml
+
+# Web Inspector: Implement support for InspectorClient::overrideDeviceMetrics() in platforms other than Chromium
+# https://bugs.webkit.org/show_bug.cgi?id=82886
+inspector/styles/override-screen-size.html
 
 # Needs rebaseline
 fast/repaint/scale-page-shrink.html
@@ -261,6 +287,7 @@ fast/dom/MicroData
 
 # ENABLE(MUTATION_OBSERVERS) is disabled
 fast/mutation/callback-arguments.html
+fast/mutation/clear-transient-without-delivery.html
 fast/mutation/create-during-delivery.html
 fast/mutation/cross-document.html
 fast/mutation/database-callback-delivery.html
@@ -276,6 +303,8 @@ fast/mutation/observe-characterdata.html
 fast/mutation/observe-childList.html
 fast/mutation/observe-exceptions.html
 fast/mutation/observe-subtree.html
+fast/mutation/takeRecords.html
+fast/mutation/transient-gc-crash.html
 
 # USE(ZLIB) is disabled.
 http/tests/websocket/tests/hybi/compressed-control-frame.html
@@ -291,6 +320,9 @@ http/tests/websocket/tests/hybi/handshake-fail-by-extensions-header.html
 # Tests for MediaSource API. Feature is not yet functional.
 # https://bugs.webkit.org/show_bug.cgi?id=64731
 http/tests/media/media-source/
+
+# Encrypted Media Extensions are not enabled.
+media/encrypted-media/
 
 # Font feature settings is not implemented.
 css3/font-feature-settings-rendering.html
@@ -348,12 +380,6 @@ fast/dom/HTMLAnchorElement/anchor-download.html
 fast/dom/HTMLAnchorElement/anchor-nodownload-set.html
 fast/dom/HTMLAnchorElement/anchor-download-unset.html
 
-# This platform does not support the Page Visibility API.
-fast/events/page-visibility-iframe-delete-test.html
-fast/events/page-visibility-iframe-move-test.html
-fast/events/page-visibility-iframe-propagation-test.html
-fast/events/page-visibility-transition-test.html
-
 # For now, Web Audio API is disabled
 webaudio/
 
@@ -374,6 +400,14 @@ fast/dom/navigator-vibration.html
 
 #Battery Status API is not implemented.
 batterystatus
+
+# Network Information API is not supported yet. http://webkit.org/b/73528
+networkinformation
+
+# EXIF orientation support has not yet been implemented for this platform
+# http://webkit.org/b/19688
+fast/images/exif-orientation.html
+fast/images/exif-orientation-css.html
 
 # =========================================================================== #
 #       Drag and Drop Support in DRT.                                         #
@@ -457,6 +491,7 @@ editing/pasteboard/drag-and-drop-objectimage-contenteditable.html
 # See bug https://bugs.webkit.org/show_bug.cgi?id=60068
 editing/pasteboard/data-transfer-items.html
 editing/pasteboard/data-transfer-items-drag-drop-file.html
+editing/pasteboard/data-transfer-items-drag-drop-entry.html
 editing/pasteboard/data-transfer-items-drag-drop-string.html
 fast/events/clipboard-dataTransferItemList.html
 fast/events/drag-dataTransferItemList.html
@@ -486,14 +521,17 @@ fast/events/drag-parent-node.html
 fast/events/drag-and-drop.html
 fast/events/drag-and-drop-dataTransfer-types-nocrash.html
 fast/events/drag-and-drop-fire-drag-dragover.html
+fast/events/drag-and-drop-subframe-dataTransfer.html
 fast/events/drag-link.html
 fast/events/drag-text-with-clear.html
 fast/events/ondrop-text-html.html
+fast/events/drop-handler-should-not-stop-navigate.html
 fast/events/dropzone-001.html
 fast/events/dropzone-002.html
 fast/events/dropzone-003.html
 fast/events/dropzone-004.html
 fast/events/dropzone-005.html
+fast/events/drop-with-file-paths.html
 fast/events/moving-text-should-fire-drop-and-dragend-events.html
 fast/events/moving-text-should-fire-drop-and-dragend-events-2.html
 
@@ -575,9 +613,6 @@ http/tests/security/XFrameOptions/x-frame-options-parent-same-origin-deny.html
 http/tests/inspector/network/network-size-chunked.html
 http/tests/inspector/network/network-size-sync.html
 
-# https://bugs.webkit.org/show_bug.cgi?id=64097
-http/tests/inspector/network/network-disable-cache-xhrs.html
-
 # https://bugs.webkit.org/show_bug.cgi?id=65911
 http/tests/inspector/resource-main-cookies.php
 
@@ -607,23 +642,13 @@ http/tests/misc/redirect-to-external-url.html
 # JSC does not support setIsolatedWorldSecurityOrigin (http://webkit.org/b/61540)
 http/tests/security/isolatedWorld/cross-origin-xhr.html
 
-# [Qt] http/tests/notifications tests make fast/notifications/notifications-click-event.html fail
-# https://bugs.webkit.org/show_bug.cgi?id=71693
-http/tests/notifications/icon-does-not-exist.html
-http/tests/notifications/icon-exists-show-alert-during-load.html
-
 # [Qt] new test http/tests/misc/xslt-bad-import.html is failing
 # https://bugs.webkit.org/show_bug.cgi?id=72252
 http/tests/misc/xslt-bad-import.html
 
-# [Qt] http/tests/misc/onload-remove-iframe-crash-2.html crashing after r100311
-# https://bugs.webkit.org/show_bug.cgi?id=72491
-http/tests/misc/onload-remove-iframe-crash-2.html
-
-#[Qt] Should raise SYNTAX_ERR when message contains unpaired surrogates fail
-#https://bugs.webkit.org/show_bug.cgi?id=80103
-http/tests/websocket/tests/hybi/unpaired-surrogates-in-close-reason.html
-http/tests/websocket/tests/hybi/unpaired-surrogates-in-message.html
+# [Qt] http/tests/xmlhttprequest/xmlhttprequest-check-head-readystate-for-404.html times out
+# https://bugs.webkit.org/show_bug.cgi?id=84016
+http/tests/xmlhttprequest/xmlhttprequest-check-head-readystate-for-404.html
 
 # =========================================================================== #
 #       Failing xmlhttprequest tests                                          #
@@ -791,6 +816,7 @@ editing/spelling/spelling-attribute-at-child.html
 
 # EditorClient::requestCheckingOfString() is not implemented
 editing/spelling/spellcheck-paste.html
+editing/spelling/spellcheck-paste-disabled.html
 editing/spelling/spellcheck-queue.html
 editing/spelling/spellcheck-sequencenum.html
 editing/spelling/spellcheck-async-mutation.html
@@ -1078,6 +1104,10 @@ svg/repaint/filter-repaint.svg
 # Needs layoutTestController.enableAutoResizeMode()
 fast/autoresize
 
+# Needs layoutTestController.setBackingScaleFactor()
+fast/canvas/2d.backingStorePixelRatio.html
+fast/canvas/2d.imageDataHD.html
+
 # This requires didClearWindowObjectForFrameInIsolatedWorld foo in FrameLoaderClient
 http/tests/security/isolatedWorld/didClearWindowObject.html
 # This needs more investigation
@@ -1154,6 +1184,10 @@ fast/preloader/document-write-2.html
 # ERROR: LayoutTestController::overridePreference() does not support the 'WebKitPageCacheSupportsPluginsPreferenceKey' preference
 # http://trac.webkit.org/changeset/106305
 plugins/crash-restoring-plugin-page-from-page-cache.html
+
+# ReferenceError: Can't find variable: MediaKeyError
+# http://trac.webkit.org/changeset/114067
+fast/events/constructors/media-key-event-constructor.html
 
 # ============================================================================= #
 # Failing SVG tests
@@ -1351,91 +1385,6 @@ svg/custom/svg-fonts-no-latin-glyph.html
 svg/custom/use-font-face-crash.svg
 svg/zoom/text/zoom-coords-viewattr-01-b.svg
 
-# [Qt] Couple of tests have different results on 64 bit and/or in debug mode compared to 32 bit and/or release mode
-# https://bugs.webkit.org/show_bug.cgi?id=52810
-fast/block/float/overhanging-tall-block.html
-fast/repaint/moving-shadow-on-container.html
-fast/repaint/moving-shadow-on-path.html
-svg/as-image/img-preserveAspectRatio-support-1.html
-svg/batik/masking/maskRegions.svg
-svg/clip-path/deep-nested-clip-in-mask-different-unitTypes.svg
-svg/css/stars-with-shadow.html
-svg/custom/circular-marker-reference-1.svg
-svg/custom/circular-marker-reference-2.svg
-svg/custom/circular-marker-reference-3.svg
-svg/custom/circular-marker-reference-4.svg
-svg/custom/embedding-external-svgs.xhtml
-svg/custom/empty-merge.svg
-svg/custom/image-with-transform-clip-filter.svg
-svg/custom/non-circular-marker-reference.svg
-svg/custom/non-scaling-stroke-markers.svg
-svg/custom/object-sizing-explicit-width-height.xhtml
-svg/custom/recursive-filter.svg
-svg/custom/relative-sized-inner-svg.xhtml
-svg/custom/relative-sized-use-on-symbol.xhtml
-svg/custom/relative-sized-use-without-attributes-on-symbol.xhtml
-svg/custom/resource-invalidate-on-target-update.svg
-svg/custom/scrolling-embedded-svg-file-image-repaint-problem.html
-svg/custom/stroked-pattern.svg
-svg/custom/text-rotated-gradient.svg
-svg/custom/use-css-events.svg
-svg/custom/use-detach.svg
-svg/custom/use-on-symbol-inside-pattern.svg
-svg/filters/feColorMatrix-values.svg
-svg/filters/feColorMatrix-saturate.svg
-svg/filters/feImage-preserveAspectratio.svg
-svg/filters/filteredImage.svg
-svg/hixie/links/001.xml
-svg/hixie/perf/007.xml
-svg/hixie/viewbox/preserveAspectRatio/001.xml
-svg/overflow/overflow-on-inner-svg-element.svg
-svg/text/small-fonts-2.svg
-svg/text/text-align-05-b.svg
-svg/W3C-SVG-1.1/animate-elem-06-t.svg
-svg/W3C-SVG-1.1/extend-namespace-01-f.svg
-svg/W3C-SVG-1.1/painting-marker-03-f.svg
-svg/W3C-SVG-1.1/paths-data-03-f.svg
-svg/W3C-SVG-1.1-SE/filters-image-05-f.svg
-svg/W3C-SVG-1.1-SE/types-dom-05-b.svg
-svg/W3C-SVG-1.1/struct-frag-02-t.svg
-svg/W3C-SVG-1.1/struct-frag-03-t.svg
-svg/W3C-SVG-1.1/text-align-04-b.svg
-svg/zoom/page/zoom-mask-with-percentages.svg
-svg/zoom/page/zoom-img-preserveAspectRatio-support-1.html
-svg/dom/css-transforms.xhtml
-svg/carto.net/tabgroup.svg
-
-# [Qt] fast/table/max-width-integer-overflow.html differs on 32- and 64-bit systems
-# https://bugs.webkit.org/show_bug.cgi?id=81509
-fast/table/max-width-integer-overflow.html
-
-# [Qt] New test introduced in r110532 fails on 32 bit
-# https://bugs.webkit.org/show_bug.cgi?id=79068
-svg/transforms/transform-origin-css-property.xhtml
-
-# [Qt] Couple of tests have different results on 64 bit and/or in debug mode compared to 32 bit and/or release mode
-# https://bugs.webkit.org/show_bug.cgi?id=52810
-# new failing tests after r101342 on 64 bit.
-svg/batik/text/textAnchor.svg
-svg/text/select-x-list-with-tspans-1.svg
-svg/text/select-x-list-with-tspans-3.svg
-svg/text/select-textLength-spacing-stretch-3.svg
-svg/text/select-textLength-spacingAndGlyphs-stretch-4.svg
-svg/text/select-x-list-2.svg
-svg/text/select-textLength-spacing-stretch-4.svg
-svg/text/select-textLength-spacing-squeeze-4.svg
-svg/text/select-textLength-spacing-stretch-1.svg
-svg/text/select-textLength-spacing-squeeze-1.svg
-svg/text/select-x-list-3.svg
-svg/text/select-x-list-with-tspans-4.svg
-svg/text/select-textLength-spacing-stretch-2.svg
-svg/text/select-x-list-4.svg
-svg/text/select-x-list-with-tspans-2.svg
-svg/text/select-textLength-spacing-squeeze-3.svg
-svg/text/select-x-list-1.svg
-svg/text/select-textLength-spacing-squeeze-2.svg
-svg/W3C-SVG-1.1/text-text-01-b.svg
-
 # [Qt] fontCache related assertion revealed by r105143
 # https://bugs.webkit.org/show_bug.cgi?id=76534
 svg/carto.net/combobox.svg
@@ -1480,16 +1429,18 @@ svg/zoom/page/zoom-svg-as-relative-image.html
 svg/zoom/page/zoom-svg-float-border-padding.xml
 svg/zoom/page/zoom-svg-through-object-with-absolute-size-2.xhtml
 
-# [Qt] REGRESSION(r111480): It made svg/as-image tests assert
-# https://bugs.webkit.org/show_bug.cgi?id=82052
-svg/as-image/animated-svg-as-image.html
-svg/as-image/img-preserveAspectRatio-support-2.html
-svg/as-image/svg-image-leak-loader.html
-svg/as-image/animated-svg-as-image-same-image.html
-
 # [Qt] svg/animations tests are very flaky
 # https://bugs.webkit.org/show_bug.cgi?id=80703
 svg/animations/animate-elem-08-t-drt.html
+
+# [Qt] Diverging test results on 32/64 bit architectures
+# https://bugs.webkit.org/show_bug.cgi?id=82601
+fast/repaint/moving-shadow-on-container.html
+fast/repaint/moving-shadow-on-path.html
+svg/W3C-SVG-1.1/paths-data-03-f.svg
+svg/css/stars-with-shadow.html
+svg/custom/use-on-symbol-inside-pattern.svg
+svg/transforms/transform-origin-css-property.xhtml
 
 # ============================================================================= #
 # Failing CSS Tests
@@ -1569,7 +1520,6 @@ fast/css/absolute-inline-alignment-2.html
 
 # [Qt] fast/ruby/overhang* tests fail
 # https://bugs.webkit.org/show_bug.cgi?id=57824
-fast/ruby/overhang-horizontal.html
 fast/ruby/overhang-vertical.html
 
 # This test fails because Qt does not support conditionals in unicode special casing.
@@ -1579,6 +1529,10 @@ fast/css/case-transform.html
 # New test hangs QT bot
 # Discussed in https://bugs.webkit.org/show_bug.cgi?id=38928
 fast/loader/recursive-before-unload-crash.html
+
+# New test flakey on Qt Linux Release introduced in r113086
+# https://bugs.webkit.org/show_bug.cgi?id=83057
+fast/dom/inline-event-attributes-release.html
 
 # REGRESSION (r53450) - skipped until fix
 # https://bugs.webkit.org/show_bug.cgi?id=33834
@@ -1622,10 +1576,6 @@ fast/forms/range/slider-padding.html
 fast/forms/range/slider-thumb-shared-style.html
 fast/forms/range/slider-thumb-stylability.html
 fast/forms/range/slider-zoomed.html
-fast/forms/range/slider-mouse-events.html
-
-# For some reason crashes when run with all tests. Passes individually.
-fast/forms/multiple-form-submission-protection-mouse.html
 
 # https://bugs.webkit.org/show_bug.cgi?id=35973
 fast/multicol/hit-test-above-or-below.html
@@ -1649,7 +1599,6 @@ fast/events/keypress-insert-tab.html
 fast/events/ondragenter.html
 fast/events/standalone-image-drag-to-editable.html
 fast/events/updateLayoutForHitTest.html
-fast/forms/input-selectedoption.html
 fast/forms/drag-into-textarea.html
 fast/forms/input-readonly-autoscroll.html
 fast/forms/input-text-click-outside.html
@@ -1665,7 +1614,6 @@ fast/forms/textAreaLineHeight.html
 fast/forms/textarea-scroll-height.html
 fast/forms/textarea-scrollbar.html
 fast/forms/textarea-scrolled-type.html
-fast/frames/iframe-window-focus.html
 fast/invalid/missing-end-tag.xhtml
 fast/invalid/residual-style.html
 fast/js/string-capitalization.html
@@ -1701,7 +1649,6 @@ fast/text/atsui-rtl-override-selection.html
 fast/text/in-rendered-text-rtl.html
 fast/text/large-text-composed-char-dos.html
 fast/text/international/002.html
-fast/block/positioning/absolute-in-inline-rtl-4.html
 fast/canvas/canvas-gradient-addStop-error.html
 fast/css/zoom-body-scroll.html
 fast/dom/Element/getBoundingClientRect.html
@@ -1848,7 +1795,6 @@ fast/css/apple-prefix.html
 fast/css/ex-after-font-variant.html
 fast/css/font-face-download-error.html
 fast/css/font-face-locally-installed.html
-fast/css/font-face-multiple-ranges-for-unicode-range.html
 fast/css/font-face-unicode-range.html
 fast/css/font-weight-1.html
 fast/css/percentage-non-integer.html
@@ -1968,12 +1914,10 @@ fast/xsl/xslt_unicode.xml
 fast/xsl/import-non-document-node.xhtml
 
 fast/forms/drag-out-of-textarea.html
-fast/frames/frame-src-attribute.html
 fast/overflow/003.xml
 fast/text/international/bidi-menulist.html
 fast/text/international/pop-up-button-text-alignment-and-direction.html
 fast/text/international/wrap-CJK-001.html
-fast/xpath/string-value.html
 
 # --- missing test fonts
 fast/repaint/japanese-rl-selection-clear.html
@@ -2002,17 +1946,6 @@ fast/writing-mode/japanese-ruby-vertical-rl.html
 fast/canvas/canvas-toDataURL-webp.html
 fast/images/webp-image-decoding.html
 
-# [Qt] fast/dom/beforeload/script-before-load-dynamic.html is crashy-flakey
-# https://bugs.webkit.org/show_bug.cgi?id=41452
-fast/dom/beforeload/remove-video-in-beforeload-listener.html
-
-# [Qt] fast/text/bidi-explicit-embedding-past-end.html fails
-# https://bugs.webkit.org/show_bug.cgi?id=41241
-fast/text/bidi-explicit-embedding-past-end.html
-
-# https://bugs.webkit.org/show_bug.cgi?id=45194
-fast/text/decomposed-after-stacked-diacritics.html
-
 # [Qt] fast/text/emphasis-overlap.html fails
 # https://bugs.webkit.org/show_bug.cgi?id=51324
 fast/text/emphasis-overlap.html
@@ -2033,16 +1966,35 @@ fast/viewport/viewport-87.html
 fast/viewport/viewport-126.html
 fast/viewport/viewport-127.html
 
-# viewport meta tag tests that fail on the bot for yet unknown reasons
-fast/viewport/viewport-6.html
-fast/viewport/viewport-58.html
-
 fast/writing-mode/border-styles-vertical-lr.html
 fast/writing-mode/border-styles-vertical-rl.html
 
 # [Qt] fast/viewport/viewport-133.html fails
 # https://bugs.webkit.org/show_bug.cgi?id=80689
 fast/viewport/viewport-133.html
+
+# [Qt] fast/dom/shadow/drag-to-meter-in-shadow-crash.html asserts
+# https://bugs.webkit.org/show_bug.cgi?id=82308
+fast/dom/shadow/drag-to-meter-in-shadow-crash.html
+
+# [Qt] REGRESSION(r113511): fast/forms/input-autofilled.html fails
+# https://bugs.webkit.org/show_bug.cgi?id=83418
+fast/forms/input-autofilled.html
+
+# [Qt] REGRESSION(r113520): fast/transforms/scrollIntoView-transformed.html fails
+# https://bugs.webkit.org/show_bug.cgi?id=83419
+fast/transforms/scrollIntoView-transformed.html
+
+# [Qt] REGRESSION(r114059): It made these tests fail
+# https://bugs.webkit.org/show_bug.cgi?id=83432
+fast/dom/dom-parse-serialize-display.html
+fast/dom/dom-parse-serialize-xmldecl.html
+fast/dom/dom-parse-serialize.html
+fast/xmlhttprequest/xmlhttprequest-get.xhtml
+
+# [Qt]REGRESSION(r114217): It broke fast/repaint/line-flow-with-floats-in-regions.html
+# https://bugs.webkit.org/show_bug.cgi?id=84013
+fast/repaint/line-flow-with-floats-in-regions.html
 
 # ============================================================================= #
 # failing fonts tests
@@ -2169,19 +2121,15 @@ transforms/2d/hindi-rotated.html
 # ============================================================================= #
 # failing printing tests
 # ============================================================================= #
-printing/compositing-layer-printing.html
 # Printing related layout test failure has no results, but obvious error message
 # https://bugs.webkit.org/show_bug.cgi?id=27913
-printing/media-queries-print.html
 
 # Need setPrinting. See https://bugs.webkit.org/show_bug.cgi?id=20011
 printing/setPrinting.html
 printing/single-line-must-not-be-split-into-two-pages.html
-printing/width-overflow.html
 
 printing/page-count-relayout-shrink.html
 printing/return-from-printing-mode.html
-printing/simultaneous-position-float-change.html
 
 # ============================================================================= #
 # new tests without expected results
@@ -2245,7 +2193,6 @@ fast/writing-mode/vertical-align-table-baseline.html
 fast/writing-mode/vertical-baseline-alignment.html
 fast/writing-mode/vertical-font-fallback.html
 svg/css/shadow-changes.svg
-svg/custom/path-zero-strokewidth.svg
 svg/custom/use-invalid-pattern.svg
 svg/text/bidi-embedded-direction.svg
 svg/text/select-textLength-spacingAndGlyphs-squeeze-1.svg
@@ -2288,8 +2235,6 @@ svg/custom/clip-path-with-css-transform-1.svg
 svg/stroke/zero-length-path-linecap-rendering.svg
 svg/stroke/zero-length-subpaths-linecap-rendering.svg
 svg/filters/feImage-filterUnits-objectBoundingBox-primitiveUnits-userSpaceOnUse.svg
-css2.1/20110323/outline-color-applies-to-008.htm
-css2.1/20110323/border-collapse-offset-002.htm
 http/tests/misc/willCacheResponse-delegate-callback.html
 fast/borders/scaled-border-image.html
 
@@ -2362,7 +2307,6 @@ platform/qt/http/tests/cookies/strict-third-party-cookie-blocking.html
 
 # Web Timing related bugs
 # https://bugs.webkit.org/show_bug.cgi?id=51245
-fast/dom/webtiming.html
 http/tests/misc/webtiming-origins.html
 
 # [Qt] REGRESSION(63862): animations/play-state.html fails intermittently
@@ -2457,6 +2401,10 @@ editing/text-iterator/basic-iteration.html
 # This test tickles another crasher on Qt.
 fast/loader/reload-zero-byte-plugin.html
 
+# These test -apple- and -khtml- prefixed CSS properties, which we don't support.
+inspector/styles/vendor-prefixes.html
+fast/css/apple-prefix.html
+
 # Failing after http://trac.webkit.org/changeset/92375
 # https://bugs.webkit.org/show_bug.cgi?id=65721
 fast/replaced/table-percent-height.html
@@ -2477,23 +2425,12 @@ fast/loader/form-submission-after-beforeunload-cancel.html
 # This test verifies that a mismatch reftest will fail as intended if both results are same.
 fast/harness/sample-fail-mismatch-reftest.html
 
-# [Qt] Three tests are failed after r93567
-# https://bugs.webkit.org/show_bug.cgi?id=66749
-fast/frames/iframe-onload-remove-self-no-crash.html
-fast/loader/create-frame-in-DOMContentLoaded.html
-fast/loader/frame-creation-removal.html
-
 # [Qt] REGRESSION(r93937): 4 failing and 3 flaky tests
 # https://bugs.webkit.org/show_bug.cgi?id=67118
 # Flaky
 fast/forms/number/input-number-large-padding.html
 fast/forms/number/input-spinbutton-capturing.html
 fast/forms/number/input-number-events.html
-
-# [Qt] Two tests failed after r94037
-# https://bugs.webkit.org/show_bug.cgi?id=67188
-fast/multicol/initial-column-values.html
-fast/multicol/inherit-column-values.html
 
 # [Qt] Incorrect results for new fast/multicol tests added in r94084
 # https://bugs.webkit.org/show_bug.cgi?id=67293
@@ -2548,10 +2485,6 @@ fast/viewport/viewport-warnings-3.html
 fast/events/constructors/track-event-constructor.html
 http/tests/security/text-track-crossorigin.html
 
-# [Qt] fast/canvas/canvas-lineWidth.html timeouts intermittently on 64 bit
-# https://bugs.webkit.org/show_bug.cgi?id=72694
-fast/canvas/canvas-lineWidth.html
-
 # [Qt] fast/forms/select/listbox-in-multi-column.html fails
 # https://bugs.webkit.org/show_bug.cgi?id=73660
 fast/forms/select/listbox-in-multi-column.html
@@ -2563,10 +2496,6 @@ editing/style/iframe-onload-crash-mac.html
 # [Qt] fails fast/inline/nested-text-descendants.html
 # https://bugs.webkit.org/show_bug.cgi?id=75321
 fast/inline/nested-text-descendants.html
-
-# [Qt] REGRESSION(r104267): fast/js/date-constructor.html fails
-# https://bugs.webkit.org/show_bug.cgi?id=75692
-fast/js/date-constructor.html
 
 # [Qt] new test fast/forms/radio/radio-group.html failing after r104668
 # https://bugs.webkit.org/show_bug.cgi?id=76051
@@ -2604,23 +2533,8 @@ fast/text/international/inline-plaintext-is-isolated.html
 # https://bugs.webkit.org/show_bug.cgi?id=78290
 fast/mutation/end-of-task-delivery.html
 
-# [Qt] REGRESSION(r107518): It broke many tests
-# https://bugs.webkit.org/show_bug.cgi?id=78471
-fast/history/timed-refresh-in-cached-frame.html
-fast/images/animated-gif-restored-from-bfcache.html
-fast/events/suspend-timers.html
-fast/overflow/horizontal-scroll-after-back.html
-fast/media/media-query-list-04.html
-fast/events/pagehide-timeout.html
-fast/events/pageshow-pagehide-on-back-cached.html
-fast/events/pageshow-pagehide-on-back-cached-with-frames.html
-
 # Fails on most platforms, probably failing due to an earlier test.
 http/tests/inspector/inspect-element.html
-
-# [Qt] http/tests/navigation/https-in-page-cache.html fails
-# https://bugs.webkit.org/show_bug.cgi?id=78597
-http/tests/navigation/https-in-page-cache.html
 
 # Let MemoryCache reuse cached XHRs (REGRESSION caused by r107672)
 # https://bugs.webkit.org/show_bug.cgi?id=76564
@@ -2633,14 +2547,6 @@ sputnik/Conformance/15_Native_Objects/15.1_The_Global_Object/15.1.3/15.1.3.2_dec
 # New test introduced in r108690 fails
 # https://bugs.webkit.org/show_bug.cgi?id=71266
 fast/ruby/text-decoration-in-descendants-ruby.html
-
-# [Qt] transitions/cancel-transition.html fails
-# https://bugs.webkit.org/show_bug.cgi?id=79564
-transitions/cancel-transition.html
-
-# REGRESSION, r109105 made it fail
-# https://bugs.webkit.org/show_bug.cgi?id=79555
-fast/events/dispatch-message-string-data.html
 
 # Still failing tests - no baseline problem
 # https://bugs.webkit.org/show_bug.cgi?id=75568
@@ -2664,6 +2570,9 @@ editing/selection/move-by-word-visually-single-space-one-element.html
 editing/selection/move-by-word-visually-textarea.html
 editing/selection/move-by-word-visually-wrong-left-right.html
 
+# https://bugs.webkit.org/show_bug.cgi?id=82628
+svg/hittest/svg-ellipse-non-scale-stroke.xhtml
+
 # https://bugs.webkit.org/show_bug.cgi?id=81276
 # Allowed to regress to fix a crash. 
 fast/inline/continuation-outlines-with-layers.html
@@ -2682,3 +2591,38 @@ fast/js/large-expressions.html
 # [Qt] css2.1/20110323/c543-txt-decor-000.html is failing
 # https://bugs.webkit.org/show_bug.cgi?id=82225
 css2.1/20110323/c543-txt-decor-000.html
+
+# This should only be a layer change.
+# http://webkit.org/b/82129
+fast/box-shadow/shadow-buffer-partial.html
+fast/block/lineboxcontain/block-font.html
+fast/block/lineboxcontain/block-glyphs.html
+fast/block/lineboxcontain/font.html
+
+# [Qt] REGRESSION(r113138 ): It made fast/workers/worker-multi-startup.html crash on 32 bit
+# https://bugs.webkit.org/show_bug.cgi?id=83133
+fast/workers/worker-multi-startup.html
+
+# Failing reftests, we skip them until we find out how we have to gardening after them
+fast/block/line-layout/selection-highlight-overlap.html
+fast/multicol/cell-shrinkback.html
+fast/table/td-width-fifty-percent-regression.html
+svg/custom/anchor-on-use.svg
+svg/animations/animateTransform-rotate-around-point.svg
+svg/animations/animateMotion-additive-1.svg
+
+# REGRESSION(114309) - Exception stack traces aren't complete when the exception starts in native code
+# https://bugs.webkit.org/show_bug.cgi?id=84073
+plugins/npruntime/object-from-destroyed-plugin.html
+plugins/npruntime/object-from-destroyed-plugin-in-subframe.html
+
+# [Qt] New inspector/debugger/linkifier.html is flakey from the beginning (r115064).
+# https://bugs.webkit.org/show_bug.cgi?id=84866
+inspector/debugger/linkifier.html
+
+# [Qt] REGRESSION(r115086): inspector/network-status-non-http.html is failing
+# https://bugs.webkit.org/show_bug.cgi?id=84566
+inspector/network-status-non-http.html
+
+# REGRESSION(r115379) - https://bugs.webkit.org/show_bug.cgi?id=85004
+http/tests/inspector/network/network-initiator.html

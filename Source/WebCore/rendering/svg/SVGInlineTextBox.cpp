@@ -128,13 +128,13 @@ FloatRect SVGInlineTextBox::selectionRectForTextFragment(const SVGTextFragment& 
     return selectionRect;
 }
 
-IntRect SVGInlineTextBox::localSelectionRect(int startPosition, int endPosition)
+LayoutRect SVGInlineTextBox::localSelectionRect(int startPosition, int endPosition)
 {
     int boxStart = start();
     startPosition = max(startPosition - boxStart, 0);
     endPosition = min(endPosition - boxStart, static_cast<int>(len()));
     if (startPosition >= endPosition)
-        return IntRect();
+        return LayoutRect();
 
     RenderText* text = textRenderer();
     ASSERT(text);
@@ -274,7 +274,7 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
     ASSERT(svgStyle);
 
     bool hasFill = svgStyle->hasFill();
-    bool hasStroke = svgStyle->hasStroke();
+    bool hasVisibleStroke = svgStyle->hasVisibleStroke();
 
     RenderStyle* selectionStyle = style;
     if (hasSelection) {
@@ -285,15 +285,15 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
 
             if (!hasFill)
                 hasFill = svgSelectionStyle->hasFill();
-            if (!hasStroke)
-                hasStroke = svgSelectionStyle->hasStroke();
+            if (!hasVisibleStroke)
+                hasVisibleStroke = svgSelectionStyle->hasVisibleStroke();
         } else
             selectionStyle = style;
     }
 
     if (textRenderer->frame() && textRenderer->frame()->view() && textRenderer->frame()->view()->paintBehavior() & PaintBehaviorRenderingSVGMask) {
         hasFill = true;
-        hasStroke = false;
+        hasVisibleStroke = false;
     }
 
     AffineTransform fragmentTransform;
@@ -321,7 +321,7 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
         }
 
         // Stroke text
-        if (hasStroke) {
+        if (hasVisibleStroke) {
             m_paintingResourceMode = ApplyToStrokeMode | ApplyToTextMode;
             paintText(paintInfo.context, style, selectionStyle, fragment, hasSelection, paintSelectedTextOnly);
         }
@@ -427,7 +427,7 @@ TextRun SVGInlineTextBox::constructTextRun(RenderStyle* style, const SVGTextFrag
                 , 0 /* padding, only relevant for justified text, not relevant for SVG */
                 , TextRun::AllowTrailingExpansion
                 , direction()
-                , m_dirOverride || style->rtlOrdering() == VisualOrder /* directionalOverride */);
+                , dirOverride() || style->rtlOrdering() == VisualOrder /* directionalOverride */);
 
     if (textRunNeedsRenderingContext(style->font()))
         run.setRenderingContext(SVGTextRunRenderingContext::create(text));
@@ -526,14 +526,14 @@ void SVGInlineTextBox::paintDecoration(GraphicsContext* context, ETextDecoration
     ASSERT(svgDecorationStyle);
 
     bool hasDecorationFill = svgDecorationStyle->hasFill();
-    bool hasDecorationStroke = svgDecorationStyle->hasStroke();
+    bool hasVisibleDecorationStroke = svgDecorationStyle->hasVisibleStroke();
 
     if (hasDecorationFill) {
         m_paintingResourceMode = ApplyToFillMode;
         paintDecorationWithStyle(context, decoration, fragment, decorationRenderer);
     }
 
-    if (hasDecorationStroke) {
+    if (hasVisibleDecorationStroke) {
         m_paintingResourceMode = ApplyToStrokeMode;
         paintDecorationWithStyle(context, decoration, fragment, decorationRenderer);
     }

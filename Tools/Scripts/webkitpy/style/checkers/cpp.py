@@ -2433,8 +2433,8 @@ def check_for_null(clean_lines, line_number, file_state, error):
     if search(r'\bgdk_pixbuf_save_to\w+\b', line):
         return
 
-    # Don't warn about NULL usage in gtk_widget_style_get(). See Bug 51758.
-    if search(r'\bgtk_widget_style_get\(\w+\b', line):
+    # Don't warn about NULL usage in gtk_widget_style_get() or gtk_style_context_get_style. See Bug 51758
+    if search(r'\bgtk_widget_style_get\(\w+\b', line) or search(r'\bgtk_style_context_get_style\(\w+\b', line):
         return
 
     # Don't warn about NULL usage in soup_server_new(). See Bug 77890.
@@ -3109,6 +3109,7 @@ def check_identifier_name_in_declaration(filename, line_number, line, file_state
                 and not (filename.find('gtk') >= 0 and modified_identifier.startswith('webkit_') >= 0)
                 and not modified_identifier.startswith('tst_')
                 and not modified_identifier.startswith('webkit_dom_object_')
+                and not modified_identifier.startswith('webkit_soup')
                 and not modified_identifier.startswith('NPN_')
                 and not modified_identifier.startswith('NPP_')
                 and not modified_identifier.startswith('NP_')

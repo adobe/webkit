@@ -44,6 +44,10 @@ const int intMinForLayoutUnit = -intMaxForLayoutUnit;
 
 class FractionalLayoutUnit {
 public:
+    // FIXME: Ideally we would have size_t versions of the constructor and operators.
+    // However due to compiler and platform differences adding those are non-trivial.
+    // See https://bugs.webkit.org/show_bug.cgi?id=83848 for details.
+    
     FractionalLayoutUnit() : m_value(0) { }
     FractionalLayoutUnit(int value) { ASSERT(isInBounds(value)); m_value = value * kFixedPointDenominator; }
     FractionalLayoutUnit(unsigned short value) { ASSERT(isInBounds(value)); m_value = value * kFixedPointDenominator; }
@@ -71,30 +75,30 @@ public:
         m_value = static_cast<int>(value);
     }
 
-    inline FractionalLayoutUnit abs()
+    inline FractionalLayoutUnit abs() const
     {
         FractionalLayoutUnit returnValue;
         returnValue.setRawValue(::abs(m_value));
         return returnValue;
     }
 #if OS(DARWIN)
-    inline int wtf_ceil()
+    inline int wtf_ceil() const
 #else
-    inline int ceil()
+    inline int ceil() const
 #endif
     {
         if (m_value > 0)
             return (m_value + kFixedPointDenominator - 1) / kFixedPointDenominator;
         return (m_value - kFixedPointDenominator + 1) / kFixedPointDenominator;
     }
-    inline int round()
+    inline int round() const
     {
         if (m_value > 0)
             return (m_value + (kFixedPointDenominator / 2)) / kFixedPointDenominator;
         return (m_value - (kFixedPointDenominator / 2)) / kFixedPointDenominator;
     }
 
-    inline int floor()
+    inline int floor() const
     {
         return toInt();
     }
@@ -116,15 +120,15 @@ public:
 private:
     inline bool isInBounds(int value)
     {
-        return ::abs(value) < std::numeric_limits<int>::max() / kFixedPointDenominator;
+        return ::abs(value) <= std::numeric_limits<int>::max() / kFixedPointDenominator;
     }
     inline bool isInBounds(unsigned value)
     {
-        return value < static_cast<unsigned>(std::numeric_limits<int>::max()) / kFixedPointDenominator;
+        return value <= static_cast<unsigned>(std::numeric_limits<int>::max()) / kFixedPointDenominator;
     }
     inline bool isInBounds(double value)
     {
-        return ::fabs(value) < std::numeric_limits<int>::max() / kFixedPointDenominator;
+        return ::fabs(value) <= std::numeric_limits<int>::max() / kFixedPointDenominator;
     }
 
     int m_value;
@@ -193,6 +197,11 @@ inline bool operator<(const FractionalLayoutUnit& a, int b)
 inline bool operator<(const FractionalLayoutUnit& a, float b)
 {
     return a.toFloat() < b;
+}
+
+inline bool operator<(const FractionalLayoutUnit& a, double b)
+{
+    return a.toDouble() < b;
 }
 
 inline bool operator<(const int a, const FractionalLayoutUnit& b)
@@ -429,6 +438,11 @@ inline FractionalLayoutUnit operator-(const FractionalLayoutUnit& a, const Fract
 }
 
 inline FractionalLayoutUnit operator-(const FractionalLayoutUnit& a, int b)
+{
+    return a - FractionalLayoutUnit(b);
+}
+
+inline FractionalLayoutUnit operator-(const FractionalLayoutUnit& a, unsigned b)
 {
     return a - FractionalLayoutUnit(b);
 }

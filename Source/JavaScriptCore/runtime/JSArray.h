@@ -55,6 +55,7 @@ namespace JSC {
     public:
         typedef Map::iterator iterator;
         typedef Map::const_iterator const_iterator;
+        typedef Map::AddResult AddResult;
 
         SparseArrayValueMap()
             : m_flags(Normal)
@@ -87,7 +88,7 @@ namespace JSC {
         // These methods may mutate the contents of the map
         void put(ExecState*, JSArray*, unsigned, JSValue, bool shouldThrow);
         bool putDirect(ExecState*, JSArray*, unsigned, JSValue, bool shouldThrow);
-        std::pair<iterator, bool> add(JSArray*, unsigned);
+        AddResult add(JSArray*, unsigned);
         iterator find(unsigned i) { return m_map.find(i); }
         // This should ASSERT the remove is valid (check the result of the find).
         void remove(iterator it) { m_map.remove(it); }
@@ -118,7 +119,9 @@ namespace JSC {
         unsigned m_numValuesInVector;
         void* m_allocBase; // Pointer to base address returned by malloc().  Keeping this pointer does eliminate false positives from the leak detector.
 #if CHECK_ARRAY_CONSISTENCY
-        uintptr_t m_inCompactInitialization; // Needs to be a uintptr_t for alignment purposes.
+        // Needs to be a uintptr_t for alignment purposes.
+        uintptr_t m_initializationIndex;
+        uintptr_t m_inCompactInitialization;
 #else
         uintptr_t m_padding;
 #endif
@@ -136,7 +139,13 @@ namespace JSC {
         friend class JIT;
 
     protected:
-        JS_EXPORT_PRIVATE explicit JSArray(JSGlobalData&, Structure*);
+        explicit JSArray(JSGlobalData& globalData, Structure* structure)
+            : JSNonFinalObject(globalData, structure)
+            , m_indexBias(0)
+            , m_storage(0)
+            , m_sparseValueMap(0)
+        {
+        }
 
         JS_EXPORT_PRIVATE void finishCreation(JSGlobalData&, unsigned initialLength = 0);
         JS_EXPORT_PRIVATE JSArray* tryFinishCreationUninitialized(JSGlobalData&, unsigned initialLength);
@@ -218,24 +227,25 @@ namespace JSC {
             ArrayStorage *storage = m_storage;
 #if CHECK_ARRAY_CONSISTENCY
             ASSERT(storage->m_inCompactInitialization);
-#endif
             // Check that we are initializing the next index in sequence.
-            ASSERT_UNUSED(i, i == storage->m_length);
+            ASSERT(i == storage->m_initializationIndex);
             // tryCreateUninitialized set m_numValuesInVector to the initialLength,
             // check we do not try to initialize more than this number of properties.
-            ASSERT(storage->m_length < storage->m_numValuesInVector);
-            // It is improtant that we increment length here, so that all newly added
-            // values in the array still get marked during the initialization phase.
-            storage->m_vector[storage->m_length++].set(globalData, this, v);
+            ASSERT(storage->m_initializationIndex < storage->m_numValuesInVector);
+            storage->m_initializationIndex++;
+#endif
+            ASSERT(i < storage->m_length);
+            ASSERT(i < storage->m_numValuesInVector);
+            storage->m_vector[i].set(globalData, this, v);
         }
 
         inline void completeInitialization(unsigned newLength)
         {
             // Check that we have initialized as meny properties as we think we have.
             ASSERT_UNUSED(newLength, newLength == m_storage->m_length);
-            // Check that the number of propreties initialized matches the initialLength.
-            ASSERT(m_storage->m_length == m_storage->m_numValuesInVector);
 #if CHECK_ARRAY_CONSISTENCY
+            // Check that the number of propreties initialized matches the initialLength.
+            ASSERT(m_storage->m_initializationIndex == m_storage->m_numValuesInVector);
             ASSERT(m_storage->m_inCompactInitialization);
             m_storage->m_inCompactInitialization = false;
 #endif
@@ -313,10 +323,8 @@ namespace JSC {
 
         // FIXME: Maybe SparseArrayValueMap should be put into its own JSCell?
         SparseArrayValueMap* m_sparseValueMap;
-        void* m_subclassData; // A JSArray subclass can use this to fill the vector lazily.
 
         static ptrdiff_t sparseValueMapOffset() { return OBJECT_OFFSETOF(JSArray, m_sparseValueMap); }
-        static ptrdiff_t subclassDataOffset() { return OBJECT_OFFSETOF(JSArray, m_subclassData); }
         static ptrdiff_t indexBiasOffset() { return OBJECT_OFFSETOF(JSArray, m_indexBias); }
     };
 
@@ -338,7 +346,7 @@ namespace JSC {
     inline JSArray* asArray(JSCell* cell)
     {
         ASSERT(cell->inherits(&JSArray::s_info));
-        return static_cast<JSArray*>(cell);
+        return jsCast<JSArray*>(cell);
     }
 
     inline JSArray* asArray(JSValue value)

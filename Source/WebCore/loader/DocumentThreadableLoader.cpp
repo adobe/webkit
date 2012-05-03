@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -74,6 +74,7 @@ DocumentThreadableLoader::DocumentThreadableLoader(Document* document, Threadabl
     , m_document(document)
     , m_options(options)
     , m_sameOriginRequest(securityOrigin()->canRequest(request.url()))
+    , m_simpleRequest(true)
     , m_async(blockingBehavior == LoadAsynchronously)
 #if ENABLE(INSPECTOR)
     , m_preflightRequestIdentifier(0)
@@ -93,7 +94,12 @@ DocumentThreadableLoader::DocumentThreadableLoader(Document* document, Threadabl
         m_client->didFail(ResourceError(errorDomainWebKitInternal, 0, request.url().string(), "Cross origin requests are not supported."));
         return;
     }
-    
+
+    makeCrossOriginAccessRequest(request);
+}
+
+void DocumentThreadableLoader::makeCrossOriginAccessRequest(const ResourceRequest& request)
+{
     ASSERT(m_options.crossOriginRequestPolicy == UseAccessControl);
 
     OwnPtr<ResourceRequest> crossOriginRequest = adoptPtr(new ResourceRequest(request));
@@ -102,6 +108,7 @@ DocumentThreadableLoader::DocumentThreadableLoader(Document* document, Threadabl
     if ((m_options.preflightPolicy == ConsiderPreflight && isSimpleCrossOriginAccessRequest(crossOriginRequest->httpMethod(), crossOriginRequest->httpHeaderFields())) || m_options.preflightPolicy == PreventPreflight)
         makeSimpleCrossOriginAccessRequest(*crossOriginRequest);
     else {
+        m_simpleRequest = false;
         m_actualRequest = crossOriginRequest.release();
 
         if (CrossOriginPreflightResultCache::shared().canSkipPreflight(securityOrigin()->toString(), m_actualRequest->url(), m_options.allowCredentials, m_actualRequest->httpMethod(), m_actualRequest->httpHeaderFields()))
@@ -127,7 +134,7 @@ void DocumentThreadableLoader::makeSimpleCrossOriginAccessRequest(const Resource
 
 void DocumentThreadableLoader::makeCrossOriginAccessRequestWithPreflight(const ResourceRequest& request)
 {
-    ResourceRequest preflightRequest = createAccessControlPreflightRequest(request, securityOrigin(), m_options.allowCredentials);
+    ResourceRequest preflightRequest = createAccessControlPreflightRequest(request, securityOrigin());
     loadRequest(preflightRequest, DoSecurityCheck);
 }
 
@@ -167,14 +174,51 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
     ASSERT(m_client);
     ASSERT_UNUSED(resource, resource == m_resource);
 
-    if (!isAllowedRedirect(request.url())) {
-        RefPtr<DocumentThreadableLoader> protect(this);
-        m_client->didFailRedirectCheck();
-        request = ResourceRequest();
-    } else {
+    RefPtr<DocumentThreadableLoader> protect(this);
+    // Allow same origin requests to continue after allowing clients to audit the redirect.
+    if (isAllowedRedirect(request.url())) {
         if (m_client->isDocumentThreadableLoaderClient())
             static_cast<DocumentThreadableLoaderClient*>(m_client)->willSendRequest(request, redirectResponse);
+        return;
     }
+
+    // When using access control, only simple cross origin requests are allowed to redirect. The new request URL must have a supported
+    // scheme and not contain the userinfo production. In addition, the redirect response must pass the access control check.
+    if (m_options.crossOriginRequestPolicy == UseAccessControl) {
+        bool allowRedirect = false;
+        if (m_simpleRequest) {
+            String accessControlErrorDescription;
+            allowRedirect = SchemeRegistry::shouldTreatURLSchemeAsCORSEnabled(request.url().protocol())
+                            && request.url().user().isEmpty()
+                            && request.url().pass().isEmpty()
+                            && passesAccessControlCheck(redirectResponse, m_options.allowCredentials, securityOrigin(), accessControlErrorDescription);
+        }
+
+        if (allowRedirect) {
+            if (m_resource)
+                clearResource();
+
+            RefPtr<SecurityOrigin> originalOrigin = SecurityOrigin::createFromString(redirectResponse.url());
+            RefPtr<SecurityOrigin> requestOrigin = SecurityOrigin::createFromString(request.url());
+            // If the request URL origin is not same origin with the original URL origin, set source origin to a globally unique identifier.
+            if (!originalOrigin->isSameSchemeHostPort(requestOrigin.get()))
+                m_options.securityOrigin = SecurityOrigin::createUnique();
+            // Force any subsequent requests to use these checks.
+            m_sameOriginRequest = false;
+
+            // Remove any headers that may have been added by the network layer that cause access control to fail.
+            request.clearHTTPContentType();
+            request.clearHTTPReferrer();
+            request.clearHTTPOrigin();
+            request.clearHTTPUserAgent();
+            request.clearHTTPAccept();
+            makeCrossOriginAccessRequest(request);
+            return;
+        }
+    }
+
+    m_client->didFailRedirectCheck();
+    request = ResourceRequest();
 }
 
 void DocumentThreadableLoader::dataSent(CachedResource* resource, unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
@@ -377,9 +421,6 @@ bool DocumentThreadableLoader::isAllowedRedirect(const KURL& url)
     if (m_options.crossOriginRequestPolicy == AllowCrossOriginRequests)
         return true;
 
-    // FIXME: We need to implement access control for each redirect. This will require some refactoring though, because the code
-    // that processes redirects doesn't know about access control and expects a synchronous answer from its client about whether
-    // a redirect should proceed.
     return m_sameOriginRequest && securityOrigin()->canRequest(url);
 }
 

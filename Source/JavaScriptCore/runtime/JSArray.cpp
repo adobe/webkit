@@ -125,15 +125,6 @@ inline void JSArray::checkConsistency(ConsistencyCheckType)
 
 #endif
 
-JSArray::JSArray(JSGlobalData& globalData, Structure* structure)
-    : JSNonFinalObject(globalData, structure)
-    , m_indexBias(0)
-    , m_storage(0)
-    , m_sparseValueMap(0)
-    , m_subclassData(0)
-{
-}
-
 void JSArray::finishCreation(JSGlobalData& globalData, unsigned initialLength)
 {
     Base::finishCreation(globalData);
@@ -176,11 +167,12 @@ JSArray* JSArray::tryFinishCreationUninitialized(JSGlobalData& globalData, unsig
     
     m_storage = static_cast<ArrayStorage*>(newStorage);
     m_storage->m_allocBase = m_storage;
-    m_storage->m_length = 0;
+    m_storage->m_length = initialLength;
     m_vectorLength = initialVectorLength;
     m_storage->m_numValuesInVector = initialLength;
 
 #if CHECK_ARRAY_CONSISTENCY
+    m_storage->m_initializationIndex = 0;
     m_storage->m_inCompactInitialization = true;
 #endif
 
@@ -195,10 +187,12 @@ void JSArray::finalize(JSCell* cell)
     thisObject->deallocateSparseMap();
 }
 
-inline std::pair<SparseArrayValueMap::iterator, bool> SparseArrayValueMap::add(JSArray* array, unsigned i)
+inline SparseArrayValueMap::AddResult SparseArrayValueMap::add(JSArray* array, unsigned i)
 {
     SparseArrayEntry entry;
-    std::pair<iterator, bool> result = m_map.add(i, entry);
+    entry.setWithoutWriteBarrier(jsUndefined());
+
+    AddResult result = m_map.add(i, entry);
     size_t capacity = m_map.capacity();
     if (capacity != m_reportedCapacity) {
         Heap::heap(array)->reportExtraMemoryCost((capacity - m_reportedCapacity) * (sizeof(unsigned) + sizeof(WriteBarrier<Unknown>)));
@@ -209,14 +203,14 @@ inline std::pair<SparseArrayValueMap::iterator, bool> SparseArrayValueMap::add(J
 
 inline void SparseArrayValueMap::put(ExecState* exec, JSArray* array, unsigned i, JSValue value, bool shouldThrow)
 {
-    std::pair<SparseArrayValueMap::iterator, bool> result = add(array, i);
-    SparseArrayEntry& entry = result.first->second;
+    AddResult result = add(array, i);
+    SparseArrayEntry& entry = result.iterator->second;
 
     // To save a separate find & add, we first always add to the sparse map.
     // In the uncommon case that this is a new property, and the array is not
     // extensible, this is not the right thing to have done - so remove again.
-    if (result.second && !array->isExtensible()) {
-        remove(result.first);
+    if (result.isNewEntry && !array->isExtensible()) {
+        remove(result.iterator);
         if (shouldThrow)
             throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
         return;
@@ -252,14 +246,14 @@ inline void SparseArrayValueMap::put(ExecState* exec, JSArray* array, unsigned i
 
 inline bool SparseArrayValueMap::putDirect(ExecState* exec, JSArray* array, unsigned i, JSValue value, bool shouldThrow)
 {
-    std::pair<SparseArrayValueMap::iterator, bool> result = add(array, i);
-    SparseArrayEntry& entry = result.first->second;
+    AddResult result = add(array, i);
+    SparseArrayEntry& entry = result.iterator->second;
 
     // To save a separate find & add, we first always add to the sparse map.
     // In the uncommon case that this is a new property, and the array is not
     // extensible, this is not the right thing to have done - so remove again.
-    if (result.second && !array->isExtensible()) {
-        remove(result.first);
+    if (result.isNewEntry && !array->isExtensible()) {
+        remove(result.iterator);
         return reject(exec, shouldThrow, "Attempting to define property on object that is not extensible.");
     }
 
@@ -355,7 +349,7 @@ void JSArray::enterDictionaryMode(JSGlobalData& globalData)
         // This will always be a new entry in the map, so no need to check we can write,
         // and attributes are default so no need to set them.
         if (value)
-            map->add(this, i).first->second.set(globalData, this, value);
+            map->add(this, i).iterator->second.set(globalData, this, value);
     }
 
     void* newRawStorage = 0;
@@ -430,15 +424,15 @@ bool JSArray::defineOwnNumericProperty(ExecState* exec, unsigned index, Property
     ASSERT(map);
 
     // 1. Let current be the result of calling the [[GetOwnProperty]] internal method of O with property name P.
-    std::pair<SparseArrayValueMap::iterator, bool> result = map->add(this, index);
-    SparseArrayEntry* entryInMap = &result.first->second;
+    SparseArrayValueMap::AddResult result = map->add(this, index);
+    SparseArrayEntry* entryInMap = &result.iterator->second;
 
     // 2. Let extensible be the value of the [[Extensible]] internal property of O.
     // 3. If current is undefined and extensible is false, then Reject.
     // 4. If current is undefined and extensible is true, then
-    if (result.second) {
+    if (result.isNewEntry) {
         if (!isExtensible()) {
-            map->remove(result.first);
+            map->remove(result.iterator);
             return reject(exec, throwException, "Attempting to define property on object that is not extensible.");
         }
 
@@ -543,7 +537,7 @@ void JSArray::setLengthWritable(ExecState* exec, bool writable)
 // Defined in ES5.1 15.4.5.1
 bool JSArray::defineOwnProperty(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor, bool throwException)
 {
-    JSArray* array = static_cast<JSArray*>(object);
+    JSArray* array = jsCast<JSArray*>(object);
 
     // 3. If P is "length", then
     if (propertyName == exec->propertyNames().length) {
@@ -1388,7 +1382,7 @@ void JSArray::visitChildren(JSCell* cell, SlotVisitor& visitor)
         visitor.copyAndAppend(reinterpret_cast<void**>(&baseStorage), storageSize(thisObject->m_vectorLength + thisObject->m_indexBias), storage->m_vector->slot(), thisObject->m_vectorLength);
 
         if (baseStorage != thisObject->m_storage->m_allocBase) {
-            thisObject->m_storage = reinterpret_cast<ArrayStorage*>(static_cast<char*>(baseStorage) + sizeof(JSValue) * thisObject->m_indexBias);
+            thisObject->m_storage = reinterpret_cast_ptr<ArrayStorage*>(static_cast<char*>(baseStorage) + sizeof(JSValue) * thisObject->m_indexBias);
             thisObject->m_storage->m_allocBase = baseStorage;
             ASSERT(thisObject->m_storage->m_allocBase);
         }
@@ -1473,17 +1467,19 @@ void JSArray::sort(ExecState* exec)
     
     Heap::heap(this)->pushTempSortVector(&values);
 
+    bool isSortingPrimitiveValues = true;
     for (size_t i = 0; i < lengthNotIncludingUndefined; i++) {
         JSValue value = m_storage->m_vector[i].get();
         ASSERT(!value.isUndefined());
         values[i].first = value;
+        isSortingPrimitiveValues = isSortingPrimitiveValues && value.isPrimitive();
     }
 
     // FIXME: The following loop continues to call toString on subsequent values even after
     // a toString call raises an exception.
 
     for (size_t i = 0; i < lengthNotIncludingUndefined; i++)
-        values[i].second = values[i].first.toString(exec)->value(exec);
+        values[i].second = values[i].first.toUStringInline(exec);
 
     if (exec->hadException()) {
         Heap::heap(this)->popTempSortVector(&values);
@@ -1494,7 +1490,10 @@ void JSArray::sort(ExecState* exec)
     // than O(N log N).
 
 #if HAVE(MERGESORT)
-    mergesort(values.begin(), values.size(), sizeof(ValueStringPair), compareByStringPairForQSort);
+    if (isSortingPrimitiveValues)
+        qsort(values.begin(), values.size(), sizeof(ValueStringPair), compareByStringPairForQSort);
+    else
+        mergesort(values.begin(), values.size(), sizeof(ValueStringPair), compareByStringPairForQSort);
 #else
     // FIXME: The qsort library function is likely to not be a stable sort.
     // ECMAScript-262 does not specify a stable sort, but in practice, browsers perform a stable sort.
@@ -1802,16 +1801,6 @@ unsigned JSArray::compactForSorting(JSGlobalData& globalData)
     return numDefined;
 }
 
-void* JSArray::subclassData() const
-{
-    return m_subclassData;
-}
-
-void JSArray::setSubclassData(void* d)
-{
-    m_subclassData = d;
-}
-
 #if CHECK_ARRAY_CONSISTENCY
 
 void JSArray::checkConsistency(ConsistencyCheckType type)
@@ -1826,7 +1815,7 @@ void JSArray::checkConsistency(ConsistencyCheckType type)
 
     unsigned numValuesInVector = 0;
     for (unsigned i = 0; i < m_vectorLength; ++i) {
-        if (JSValue value = storage->m_vector[i]) {
+        if (JSValue value = storage->m_vector[i].get()) {
             ASSERT(i < storage->m_length);
             if (type != DestructorConsistencyCheck)
                 value.isUndefined(); // Likely to crash if the object was deallocated.
@@ -1840,15 +1829,15 @@ void JSArray::checkConsistency(ConsistencyCheckType type)
     ASSERT(numValuesInVector <= storage->m_length);
 
     if (m_sparseValueMap) {
-        SparseArrayValueMap::iterator end = m_sparseValueMap->end();
-        for (SparseArrayValueMap::iterator it = m_sparseValueMap->begin(); it != end; ++it) {
+        SparseArrayValueMap::const_iterator end = m_sparseValueMap->end();
+        for (SparseArrayValueMap::const_iterator it = m_sparseValueMap->begin(); it != end; ++it) {
             unsigned index = it->first;
             ASSERT(index < storage->m_length);
-            ASSERT(index >= storage->m_vectorLength);
+            ASSERT(index >= m_vectorLength);
             ASSERT(index <= MAX_ARRAY_INDEX);
             ASSERT(it->second);
             if (type != DestructorConsistencyCheck)
-                it->second.isUndefined(); // Likely to crash if the object was deallocated.
+                it->second.getNonSparseMode().isUndefined(); // Likely to crash if the object was deallocated.
         }
     }
 }

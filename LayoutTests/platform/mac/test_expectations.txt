@@ -21,7 +21,8 @@ BUGWK57688 : fast/text/international/bidi-AN-after-empty-run.html = PASS TEXT
 BUGWK57688 : fast/text/international/bidi-CS-after-AN.html = PASS TEXT
 BUGWK57688 : fast/text/international/thai-line-breaks.html = PASS TEXT
 
-BUGWK58192 : plugins/npp-set-window-called-during-destruction.html = TEXT
+// Fails on WK1, but passes on WK2.  (No syntax available for this situation.)
+BUGWK58192 : plugins/npp-set-window-called-during-destruction.html = TEXT PASS
 
 // Flaky tests when run multi-process
 BUGWK58192 : fast/dom/frame-loading-via-document-write.html = TEXT PASS
@@ -42,52 +43,6 @@ BUGWK69999 RELEASE : http/tests/security/contentSecurityPolicy/media-src-allowed
 BUGWK73766 : css3/unicode-bidi-isolate-aharon-failing.html = FAIL
 
 // Need rebaselining after 71244
-BUGWK74432 : css2.1/20110323/border-conflict-style-079.htm = IMAGE
-BUGWK74432 : css2.1/20110323/floating-replaced-height-008.htm = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-05-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-06-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-07-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-08-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-15-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-16-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-17-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-18-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-51-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-52-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-53-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-54-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-55-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-56-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-57-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-58-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-59-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-61-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-62-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-63-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-64-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-65-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-66-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-67-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-68-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-69-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-71-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-72-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-73-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-74-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-75-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-76-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-77-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-78-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-79-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-81-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-82-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-83-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-84-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-85-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-86-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-87-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-88-d.html = IMAGE
-BUGWK74432 : css2.1/t170602-bdr-conflct-w-89-d.html = IMAGE
 BUGWK74432 : fast/borders/border-antialiasing.html = IMAGE
 
 // Rebaseline after bug 71705. All differences are due to the fact that table captions now
@@ -195,9 +150,6 @@ BUGWK74888 : fast/dom/HTMLTableElement/createCaption.html = TEXT
 BUGWK74888 : fast/repaint/table-section-repaint.html = TEXT
 BUGWK74888 : fast/table/frame-and-rules.html = TEXT
 
-// New test, needs image results added.
-BUGWK75570 : http/tests/media/video-buffering-repaints-controls.html = IMAGE
-
 // Rebaseline required after bug 74874
 BUGWK74874 : fast/table/027.html = TEXT
 BUGWK74874 : fast/table/027-vertical.html = TEXT
@@ -212,9 +164,7 @@ BUGWK69210: fast/repaint/transform-absolute-in-positioned-container.html = TEXT
 
 // Those tests need a text baseline after lazily allocating layers.
 // The change should only be layer removal.
-BUGWK75568 : animations/combo-transform-translate+scale.html = TEXT
 BUGWK75568 : editing/spelling/inline_spelling_markers.html = TEXT
-BUGWK75568 : fast/box-shadow/shadow-buffer-partial.html = TEXT
 BUGWK75568 : fast/forms/form-element-geometry.html = TEXT
 BUGWK75568 : fast/forms/input-value.html = TEXT
 BUGWK75568 : fast/layers/add-layer-with-nested-stacking.html = TEXT
@@ -232,11 +182,9 @@ BUGWK75568 : fast/repaint/subtree-root-skipped.html = TEXT
 BUGWK75568 : fast/replaced/replaced-breaking.html = TEXT
 BUGWK75568 : fast/replaced/width100percent-searchfield.html = TEXT
 BUGWK75568 : fast/text/textIteratorNilRenderer.html = TEXT
-BUGWK75568 : compositing/geometry/object-clip-rects-assertion.html = TEXT
 BUGWK75568 : compositing/overflow/ancestor-overflow.html = TEXT
 BUGWK75568 : editing/inserting/before-after-input-element.html = TEXT
 BUGWK75568 : editing/pasteboard/4806874.html = TEXT
-BUGWK75568 : editing/pasteboard/drop-text-without-selection.html = TEXT
 BUGWK75568 : editing/pasteboard/input-field-1.html = TEXT
 BUGWK75568 : editing/selection/3690703-2.html = TEXT
 BUGWK75568 : editing/selection/3690703.html = TEXT
@@ -258,9 +206,6 @@ BUGWK75568 : fast/block/float/float-overflow-hidden-containing-block-width.html 
 BUGWK75568 : fast/block/float/in-margin.html = TEXT
 BUGWK75568 : fast/block/float/overlapping-floats-with-overflow-hidden.html = TEXT
 BUGWK75568 : fast/block/float/shrink-to-avoid-float-complexity.html = TEXT
-BUGWK75568 : fast/block/lineboxcontain/block-font.html = TEXT
-BUGWK75568 : fast/block/lineboxcontain/block-glyphs.html = TEXT
-BUGWK75568 : fast/block/lineboxcontain/font.html = TEXT
 BUGWK75568 : fast/block/lineboxcontain/parsing-invalid.html = TEXT
 BUGWK75568 : fast/block/margin-collapse/103.html = TEXT
 BUGWK75568 : fast/clip/017.html = TEXT
@@ -290,9 +235,7 @@ BUGWK75568 : fast/forms/input-appearance-default-bkcolor.html = TEXT
 BUGWK75568 : fast/forms/input-appearance-disabled.html = TEXT
 BUGWK75568 : fast/forms/input-appearance-focus.html = TEXT
 BUGWK75568 : fast/forms/input-appearance-height.html = TEXT
-BUGWK75568 : fast/forms/input-appearance-preventDefault.html = TEXT
 BUGWK75568 : fast/forms/input-appearance-readonly.html = TEXT
-BUGWK75568 : fast/forms/input-appearance-selection.html = TEXT
 BUGWK75568 : fast/forms/input-appearance-visibility.html = TEXT
 BUGWK75568 : fast/forms/input-appearance-width.html = TEXT
 BUGWK75568 : fast/forms/input-baseline.html = TEXT
@@ -316,7 +259,6 @@ BUGWK75568 : fast/forms/placeholder-pseudo-style.html = TEXT
 BUGWK75568 : fast/forms/plaintext-mode-2.html = TEXT
 BUGWK75568 : fast/forms/search-cancel-button-style-sharing.html = TEXT
 BUGWK75568 : fast/forms/search-display-none-cancel-button.html = TEXT
-BUGWK75568 : fast/forms/search-rtl.html = TEXT
 BUGWK75568 : fast/forms/search-styled.html = TEXT
 BUGWK75568 : fast/forms/search-vertical-alignment.html = TEXT
 BUGWK75568 : fast/forms/searchfield-heights.html = TEXT
@@ -383,41 +325,31 @@ BUGWK75568 : fast/table/spanOverlapRepaint.html = TEXT
 BUGWK75568 : fast/table/text-field-baseline.html = TEXT
 BUGWK75568 : tables/mozilla/bugs/bug1188.html = TEXT
 
-// Need pixel rebaselines after https://bugs.webkit.org/show_bug.cgi?id=80571 is fixed
-// Changes should be limited to color space changes
-BUGWK80630: css3/filters/add-filter-rendering.html = IMAGE
-BUGWK80630: css3/filters/crash-filter-change.html = IMAGE
-BUGWK80630: css3/filters/crash-hw-sw-switch.html = IMAGE
-BUGWK80630: css3/filters/effect-blur.html = IMAGE
-BUGWK80630: css3/filters/effect-brightness.html = IMAGE
-BUGWK80630: css3/filters/effect-combined.html = IMAGE
-BUGWK80630: css3/filters/effect-contrast.html = IMAGE
-BUGWK80630: css3/filters/effect-drop-shadow.html = IMAGE
-BUGWK80630: css3/filters/effect-grayscale.html = IMAGE
-BUGWK80630: css3/filters/effect-hue-rotate.html = IMAGE
-BUGWK80630: css3/filters/effect-invert.html = IMAGE
-BUGWK80630: css3/filters/effect-opacity.html = IMAGE
-BUGWK80630: css3/filters/effect-saturate.html = IMAGE
-BUGWK80630: css3/filters/effect-sepia.html = IMAGE
-BUGWK80630: css3/filters/filter-region.html = IMAGE
-BUGWK80630: css3/filters/filter-repaint.html = IMAGE
-BUGWK80630: css3/filters/filter-with-transform.html = IMAGE
-BUGWK80630: css3/filters/filtered-inline.html = IMAGE
-BUGWK80630: css3/filters/multiple-filters-invalidation.html = IMAGE
-BUGWK80630: css3/filters/nested-filter.html = IMAGE
-BUGWK80630: css3/filters/regions-expanding.html = IMAGE
-BUGWK80630: css3/filters/simple-filter-rendering.html = IMAGE
+// Tiled-layer compositing tests are flakey.
+BUGWK82546 : compositing/tiling/crash-reparent-tiled-layer.html = PASS TEXT
 
-// Temporary: generate platform specific IETestCenter results, then
-// remove when bots produce reference.
-BUGWK81936 : ietestcenter/css3/text/textshadow-001.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-002.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-003.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-004.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-005.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-006.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-007.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-008.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-009.htm = FAIL MISSING
-BUGWK81936 : ietestcenter/css3/text/textshadow-010.htm = FAIL MISSING
+BUGWK84604 FUTURE : fast/js/global-constructors.html = TEXT
+BUGWK84604 FUTURE : fast/dom/Window/window-properties.html = TEXT
+BUGWK84604 FUTURE : fast/dom/prototype-inheritance-2.html = TEXT
 
+// Requires rebaseline after bug 83978
+BUGWK83978 : tables/mozilla_expected_failures/collapsing_borders/bug41262-5.html = IMAGE+TEXT
+
+BUGWK84759 : ietestcenter/css3/multicolumn/column-containing-block-001.htm = IMAGE
+BUGWK84760 : ietestcenter/css3/multicolumn/column-containing-block-002.htm = IMAGE
+BUGWK84761 : ietestcenter/css3/multicolumn/column-filling-001.htm = IMAGE
+BUGWK84764 : ietestcenter/css3/multicolumn/column-width-applies-to-001.htm = IMAGE
+BUGWK84767 : ietestcenter/css3/multicolumn/column-width-applies-to-002.htm = IMAGE
+BUGWK84768 : ietestcenter/css3/multicolumn/column-width-applies-to-003.htm = IMAGE
+BUGWK84769 : ietestcenter/css3/multicolumn/column-width-applies-to-004.htm = IMAGE
+BUGWK84770 : ietestcenter/css3/multicolumn/column-width-applies-to-007.htm = IMAGE
+BUGWK84771 : ietestcenter/css3/multicolumn/column-width-applies-to-009.htm = IMAGE
+BUGWK84772 : ietestcenter/css3/multicolumn/column-width-applies-to-010.htm = IMAGE
+BUGWK84773 : ietestcenter/css3/multicolumn/column-width-applies-to-012.htm = IMAGE
+BUGWK84775 : ietestcenter/css3/multicolumn/column-width-applies-to-013.htm = IMAGE
+BUGWK84776 : ietestcenter/css3/multicolumn/column-width-applies-to-014.htm = IMAGE
+BUGWK84777 : ietestcenter/css3/multicolumn/column-width-applies-to-015.htm = IMAGE
+BUGWK84778 : ietestcenter/css3/multicolumn/column-width-negative-001.htm = IMAGE
+
+// Fails after r115379
+BUGWK85038 : http/tests/inspector/network/network-initiator.html = TEXT TIMEOUT

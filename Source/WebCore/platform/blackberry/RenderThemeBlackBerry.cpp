@@ -23,6 +23,7 @@
 
 #include "CSSValueKeywords.h"
 #include "Frame.h"
+#include "HTMLMediaElement.h"
 #include "MediaControlElements.h"
 #include "MediaPlayerPrivateBlackBerry.h"
 #include "PaintInfo.h"
@@ -214,13 +215,13 @@ void RenderThemeBlackBerry::setButtonStyle(RenderStyle* style) const
     style->setPaddingBottom(vertPadding);
 }
 
-void RenderThemeBlackBerry::adjustButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     setButtonStyle(style);
     style->setCursor(CURSOR_WEBKIT_GRAB);
 }
 
-void RenderThemeBlackBerry::adjustTextAreaStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustTextAreaStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     setButtonStyle(style);
 }
@@ -230,7 +231,7 @@ bool RenderThemeBlackBerry::paintTextArea(RenderObject* object, const PaintInfo&
     return paintTextFieldOrTextAreaOrSearchField(object, info, rect);
 }
 
-void RenderThemeBlackBerry::adjustTextFieldStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustTextFieldStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     setButtonStyle(style);
 }
@@ -256,7 +257,8 @@ bool RenderThemeBlackBerry::paintTextFieldOrTextAreaOrSearchField(RenderObject* 
     if (object->style()->appearance() == SearchFieldPart) {
         // We force the fill color to White so as to match the background color of the search cancel button graphic.
         context->setFillColor(Color::white, ColorSpaceDeviceRGB);
-        context->drawPath(textFieldRoundedRectangle);
+        context->fillPath(textFieldRoundedRectangle);
+        context->strokePath(textFieldRoundedRectangle);
     } else
         context->strokePath(textFieldRoundedRectangle);
     context->restore();
@@ -268,12 +270,12 @@ bool RenderThemeBlackBerry::paintTextField(RenderObject* object, const PaintInfo
     return paintTextFieldOrTextAreaOrSearchField(object, info, rect);
 }
 
-void RenderThemeBlackBerry::adjustSearchFieldStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustSearchFieldStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     setButtonStyle(style);
 }
 
-void RenderThemeBlackBerry::adjustSearchFieldCancelButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustSearchFieldCancelButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     static const float defaultControlFontPixelSize = 13;
     static const float defaultCancelButtonSize = 9;
@@ -318,7 +320,7 @@ bool RenderThemeBlackBerry::paintSearchFieldCancelButton(RenderObject* object, c
     return false;
 }
 
-void RenderThemeBlackBerry::adjustMenuListButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustMenuListButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // These seem to be reasonable padding values from observation.
     const int paddingLeft = 8;
@@ -405,7 +407,8 @@ bool RenderThemeBlackBerry::paintButton(RenderObject* object, const PaintInfo& i
         FloatSize smallCorner(smallRadius, smallRadius);
         Path path;
         path.addRoundedRect(rect, smallCorner);
-        info.context->drawPath(path);
+        info.context->fillPath(path);
+        info.context->strokePath(path);
 
         if (isChecked(object)) {
             Path checkPath;
@@ -417,7 +420,8 @@ bool RenderThemeBlackBerry::paintButton(RenderObject* object, const PaintInfo& i
             info.context->setLineCap(RoundCap);
             info.context->setStrokeColor(blackPen, ColorSpaceDeviceRGB);
             info.context->setStrokeThickness(rect2.width() / checkboxStrokeThickness);
-            info.context->drawPath(checkPath);
+            info.context->fillPath(checkPath);
+            info.context->strokePath(checkPath);
         }
         break;
     }
@@ -436,13 +440,15 @@ bool RenderThemeBlackBerry::paintButton(RenderObject* object, const PaintInfo& i
         FloatSize largeCorner(largeRadius, largeRadius);
         Path path;
         path.addRoundedRect(rect, largeCorner);
-        info.context->drawPath(path);
+        info.context->fillPath(path);
+        info.context->strokePath(path);
         break;
     }
     case SquareButtonPart: {
         Path path;
         path.addRect(rect);
-        info.context->drawPath(path);
+        info.context->fillPath(path);
+        info.context->strokePath(path);
         break;
     }
     default:
@@ -454,12 +460,12 @@ bool RenderThemeBlackBerry::paintButton(RenderObject* object, const PaintInfo& i
     return false;
 }
 
-void RenderThemeBlackBerry::adjustMenuListStyle(CSSStyleSelector* css, RenderStyle* style, Element* element) const
+void RenderThemeBlackBerry::adjustMenuListStyle(StyleResolver* css, RenderStyle* style, Element* element) const
 {
     adjustMenuListButtonStyle(css, style, element);
 }
 
-void RenderThemeBlackBerry::adjustCheckboxStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustCheckboxStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     setCheckboxSize(style);
     style->setBoxShadow(nullptr);
@@ -469,7 +475,7 @@ void RenderThemeBlackBerry::adjustCheckboxStyle(CSSStyleSelector*, RenderStyle* 
     style->setCursor(CURSOR_WEBKIT_GRAB);
 }
 
-void RenderThemeBlackBerry::adjustRadioStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeBlackBerry::adjustRadioStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     setRadioSize(style);
     style->setBoxShadow(nullptr);

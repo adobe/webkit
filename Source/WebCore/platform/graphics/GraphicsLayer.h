@@ -428,6 +428,9 @@ public:
     // pointers for the layers and timing data will be included in the returned string.
     String layerTreeAsText(LayerTreeAsTextBehavior = LayerTreeAsTextBehaviorNormal) const;
 
+    // Return an estimate of the backing store area (in pixels). May be incorrect for tiled layers.
+    virtual double backingStoreArea() const;
+
     bool usingTiledLayer() const { return m_usingTiledLayer; }
 
     virtual TiledBacking* tiledBacking() { return 0; }
@@ -440,6 +443,9 @@ public:
 #endif
 
 protected:
+    // Should be called from derived class destructors. Should call willBeDestroyed() on super.
+    virtual void willBeDestroyed();
+
 #if ENABLE(CSS_FILTERS)
     // This method is used by platform GraphicsLayer classes to clear the filters
     // when compositing is not done in hardware. It is not virtual, so the caller

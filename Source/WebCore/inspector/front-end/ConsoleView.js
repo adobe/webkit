@@ -109,7 +109,7 @@ WebInspector.ConsoleView = function(hideContextSelector)
     WebInspector.console.addEventListener(WebInspector.ConsoleModel.Events.MessageAdded, this._consoleMessageAdded, this);
     WebInspector.console.addEventListener(WebInspector.ConsoleModel.Events.ConsoleCleared, this._consoleCleared, this);
 
-    this._linkifier = WebInspector.debuggerPresentationModel.createLinkifier();
+    this._linkifier = new WebInspector.Linkifier();
 
     this.prompt = new WebInspector.TextPromptWithHistory(this.completionsForTextPrompt.bind(this), ExpressionStopCharacters + ".");
     this.prompt.setSuggestBoxEnabled("generic-suggest");
@@ -372,8 +372,8 @@ WebInspector.ConsoleView.prototype = {
             return;
         }
 
-        if (!expressionString && WebInspector.debuggerPresentationModel.selectedCallFrame)
-            WebInspector.debuggerPresentationModel.getSelectedCallFrameVariables(receivedPropertyNames.bind(this));
+        if (!expressionString && WebInspector.debuggerModel.selectedCallFrame())
+            WebInspector.debuggerModel.getSelectedCallFrameVariables(receivedPropertyNames.bind(this));
         else
             this.evalInInspectedWindow(expressionString, "completion", true, true, false, evaluated.bind(this));
 
@@ -471,7 +471,7 @@ WebInspector.ConsoleView.prototype = {
 
             if (property.length < prefix.length)
                 continue;
-            if (prefix.length && property.indexOf(prefix) !== 0)
+            if (prefix.length && !property.startsWith(prefix))
                 continue;
 
             results.push(property);
@@ -539,7 +539,7 @@ WebInspector.ConsoleView.prototype = {
 
         var section = WebInspector.shortcutsScreen.section(WebInspector.UIString("Console"));
         var keys = WebInspector.isMac() ? [ shortcutK.name, shortcutL.name ] : [ shortcutL.name ];
-        section.addAlternateKeys(keys, WebInspector.UIString("Clear Console"));
+        section.addAlternateKeys(keys, WebInspector.UIString("Clear console"));
 
         keys = [
             shortcut.shortcutToString(shortcut.Keys.Tab),
@@ -586,14 +586,14 @@ WebInspector.ConsoleView.prototype = {
      * @param {string} expression
      * @param {string} objectGroup
      * @param {boolean} includeCommandLineAPI
-     * @param {boolean} doNotPauseOnExceptions
+     * @param {boolean} doNotPauseOnExceptionsAndMuteConsole
      * @param {boolean} returnByValue
      * @param {function(?WebInspector.RemoteObject, boolean, RuntimeAgent.RemoteObject=)} callback
      */
-    evalInInspectedWindow: function(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptions, returnByValue, callback)
+    evalInInspectedWindow: function(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptionsAndMuteConsole, returnByValue, callback)
     {
-        if (WebInspector.debuggerPresentationModel.selectedCallFrame) {
-            WebInspector.debuggerPresentationModel.evaluateInSelectedCallFrame(expression, objectGroup, includeCommandLineAPI, returnByValue, callback);
+        if (WebInspector.debuggerModel.selectedCallFrame()) {
+            WebInspector.debuggerModel.evaluateOnSelectedCallFrame(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptionsAndMuteConsole, returnByValue, callback);
             return;
         }
 
@@ -602,6 +602,11 @@ WebInspector.ConsoleView.prototype = {
             expression = "this";
         }
 
+        /**
+         * @param {?Protocol.Error} error
+         * @param {RuntimeAgent.RemoteObject} result
+         * @param {boolean=} wasThrown
+         */
         function evalCallback(error, result, wasThrown)
         {
             if (error) {
@@ -611,11 +616,11 @@ WebInspector.ConsoleView.prototype = {
             }
 
             if (returnByValue)
-                callback(null, wasThrown, wasThrown ? null : result);
+                callback(null, !!wasThrown, wasThrown ? null : result);
             else
-                callback(WebInspector.RemoteObject.fromPayload(result), wasThrown);
+                callback(WebInspector.RemoteObject.fromPayload(result), !!wasThrown);
         }
-        RuntimeAgent.evaluate(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptions, this._currentEvaluationContextId(), returnByValue, evalCallback);
+        RuntimeAgent.evaluate(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptionsAndMuteConsole, this._currentEvaluationContextId(), returnByValue, evalCallback);
     },
 
     evaluateUsingTextPrompt: function(expression, showResultOnly)
@@ -628,7 +633,7 @@ WebInspector.ConsoleView.prototype = {
         if (event.altKey || event.ctrlKey || event.shiftKey)
             return;
 
-        event.consume();
+        event.consume(true);
 
         this.prompt.clearAutoComplete(true);
 
@@ -738,7 +743,7 @@ WebInspector.ConsoleCommand.prototype = {
             matchRanges.push({ offset: match.index, length: match[0].length });
             match = regexObject.exec(text);
         }
-        highlightSearchResults(this._formattedCommand, matchRanges);
+        WebInspector.highlightSearchResults(this._formattedCommand, matchRanges);
         this._element.scrollIntoViewIfNeeded();
     },
 
@@ -771,7 +776,7 @@ WebInspector.ConsoleCommand.prototype = {
 /**
  * @extends {WebInspector.ConsoleMessageImpl}
  * @constructor
- * @param {WebInspector.DebuggerPresentationModel.Linkifier} linkifier
+ * @param {WebInspector.Linkifier} linkifier
  */
 WebInspector.ConsoleCommandResult = function(result, wasThrown, originatingCommand, linkifier)
 {
@@ -846,7 +851,7 @@ WebInspector.ConsoleGroup.prototype = {
             groupTitleElement.scrollIntoViewIfNeeded(true);
         }
 
-        event.consume();
+        event.consume(true);
     }
 }
 

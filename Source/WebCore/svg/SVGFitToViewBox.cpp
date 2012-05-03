@@ -24,7 +24,7 @@
 #include "SVGFitToViewBox.h"
 
 #include "AffineTransform.h"
-#include "Attr.h"
+#include "Attribute.h"
 #include "Document.h"
 #include "FloatRect.h"
 #include "SVGDocumentExtensions.h"
@@ -97,7 +97,9 @@ bool SVGFitToViewBox::parseAttribute(Document* document, Attribute* attr)
         setViewBoxBaseValue(viewBox);
         return true;
     } else if (attr->name() == SVGNames::preserveAspectRatioAttr) {
-        SVGPreserveAspectRatio::parsePreserveAspectRatio(this, attr->value());
+        SVGPreserveAspectRatio preserveAspectRatio;
+        preserveAspectRatio.parse(attr->value());
+        setPreserveAspectRatioBaseValue(preserveAspectRatio);
         return true;
     }
 

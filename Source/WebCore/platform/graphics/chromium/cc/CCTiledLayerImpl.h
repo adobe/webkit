@@ -43,11 +43,11 @@ public:
     }
     virtual ~CCTiledLayerImpl();
 
-    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& usedCheckerboard);
+    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& hadMissingTiles) OVERRIDE;
 
-    virtual void bindContentsTexture(LayerRendererChromium*);
+    virtual void bindContentsTexture(LayerRendererChromium*) OVERRIDE;
 
-    virtual void dumpLayerProperties(TextStream&, int indent) const;
+    virtual void dumpLayerProperties(TextStream&, int indent) const OVERRIDE;
 
     void setSkipsDraw(bool skipsDraw) { m_skipsDraw = skipsDraw; }
     void setTilingData(const CCLayerTilingData& tiler);
@@ -56,20 +56,8 @@ public:
     void setContentsSwizzled(bool contentsSwizzled) { m_contentsSwizzled = contentsSwizzled; }
     bool contentsSwizzled() const { return m_contentsSwizzled; }
 
-    virtual Region opaqueContentsRegion() const;
-
-    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexAlpha> Program;
-    // Shader program that swaps red and blue components of texture.
-    // Used when texture format does not match native color format.
-    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexSwizzleAlpha> ProgramSwizzle;
-
-    // Same as above but ignoring alpha and writing out 1.0 for the alpha channel.
-    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexOpaque> ProgramOpaque;
-    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexSwizzleOpaque> ProgramSwizzleOpaque;
-
-    // Shader program that produces anti-aliased layer edges.
-    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexClampAlphaAA> ProgramAA;
-    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexClampSwizzleAlphaAA> ProgramSwizzleAA;
+    virtual Region visibleContentOpaqueRegion() const OVERRIDE;
+    virtual void didLoseContext() OVERRIDE;
 
 protected:
     explicit CCTiledLayerImpl(int id);
@@ -77,11 +65,11 @@ protected:
     bool hasTileAt(int, int) const;
     bool hasTextureIdForTileAt(int, int) const;
 
-    virtual TransformationMatrix quadTransform() const;
+    virtual TransformationMatrix quadTransform() const OVERRIDE;
 
 private:
 
-    virtual const char* layerTypeAsString() const { return "ContentLayer"; }
+    virtual const char* layerTypeAsString() const OVERRIDE { return "ContentLayer"; }
 
     DrawableTile* tileAt(int, int) const;
     DrawableTile* createTile(int, int);

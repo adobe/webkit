@@ -59,7 +59,7 @@ WebInspector.StylesSidebarPane = function(computedStylePane)
     this.settingsSelectElement.appendChild(option);
 
     // Prevent section from collapsing.
-    var muteEventListener = function(event) { event.consume(); };
+    var muteEventListener = function(event) { event.consume(true); };
 
     this.settingsSelectElement.addEventListener("click", muteEventListener, true);
     this.settingsSelectElement.addEventListener("change", this._changeSetting.bind(this), false);
@@ -129,7 +129,7 @@ WebInspector.StylesSidebarPane.PseudoIdNames = [
     "-webkit-media-controls-fullscreen-button", "-webkit-media-controls-rewind-button", "-webkit-media-controls-return-to-realtime-button",
     "-webkit-media-controls-toggle-closed-captions-button", "-webkit-media-controls-status-display", "-webkit-scrollbar-thumb",
     "-webkit-scrollbar-button", "-webkit-scrollbar-track", "-webkit-scrollbar-track-piece", "-webkit-scrollbar-corner",
-    "-webkit-resizer", "-webkit-input-list-button", "-webkit-inner-spin-button", "-webkit-outer-spin-button"
+    "-webkit-resizer", "-webkit-inner-spin-button", "-webkit-outer-spin-button"
 ];
 
 WebInspector.StylesSidebarPane.CSSNumberRegex = /^(-?(?:\d+(?:\.\d+)?|\.\d+))$/;
@@ -959,6 +959,7 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule, editable, 
                 var refElement = mediaDataElement.createChild("div", "subtitle");
                 var lineNumber = media.sourceLine < 0 ? undefined : media.sourceLine;
                 var anchor = WebInspector.linkifyResourceAsNode(media.sourceURL, lineNumber, "subtitle", media.sourceURL + (isNaN(lineNumber) ? "" : (":" + (lineNumber + 1))));
+                anchor.preferredPanel = "styles";
                 anchor.style.float = "right";
                 refElement.appendChild(anchor);
             }
@@ -1212,6 +1213,7 @@ WebInspector.StylePropertiesSection.prototype = {
         function linkifyUncopyable(url, line)
         {
             var link = WebInspector.linkifyResourceAsNode(url, line, "", url + ":" + (line + 1));
+            link.preferredPanel = "styles";
             link.classList.add("webkit-html-resource-link");
             link.setAttribute("data-uncopyable", link.textContent);
             link.textContent = "";
@@ -1257,7 +1259,7 @@ WebInspector.StylePropertiesSection.prototype = {
     _handleSelectorClick: function(event)
     {
         this._startEditingOnMouseEvent();
-        event.consume();
+        event.consume(true);
     },
 
     _startEditingOnMouseEvent: function()
@@ -1805,7 +1807,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
                             scrollerElement.addEventListener("scroll", repositionSpectrum, false);
                         }
                     }
-                    e.consume();
+                    e.consume(true);
                 }
 
                 function getFormat()
@@ -2025,7 +2027,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
     _mouseClick: function(event)
     {
-        event.consume();
+        event.consume(true);
 
         if (event.target === this.listItemElement) {
             if (!this.section.editable) 

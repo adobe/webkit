@@ -32,7 +32,9 @@
 #include "WebIntent.h"
 
 #include "Intent.h"
+#include "PlatformMessagePortChannel.h"
 #include "SerializedScriptValue.h"
+#include <wtf/HashMap.h>
 
 namespace WebKit {
 
@@ -97,6 +99,58 @@ WebString WebIntent::data() const
 {
 #if ENABLE(WEB_INTENTS)
     return m_private->data()->toWireString();
+#else
+    return WebString();
+#endif
+}
+
+WebURL WebIntent::service() const
+{
+#if ENABLE(WEB_INTENTS)
+    return WebURL(m_private->service());
+#else
+    return WebURL();
+#endif
+}
+
+WebMessagePortChannelArray* WebIntent::messagePortChannelsRelease() const
+{
+    // Note: see PlatformMessagePortChannel::postMessageToRemote.
+    WebMessagePortChannelArray* webChannels = 0;
+    WebCore::MessagePortChannelArray* messagePorts = m_private->messagePorts();
+    if (messagePorts) {
+        webChannels = new WebMessagePortChannelArray(messagePorts->size());
+        for (size_t i = 0; i < messagePorts->size(); ++i) {
+            WebCore::PlatformMessagePortChannel* platformChannel = messagePorts->at(i)->channel();
+            (*webChannels)[i] = platformChannel->webChannelRelease();
+            (*webChannels)[i]->setClient(0);
+        }
+    }
+
+    return webChannels;
+}
+
+WebVector<WebString> WebIntent::extrasNames() const
+{
+#if ENABLE(WEB_INTENTS)
+    size_t numExtras = m_private->extras().size();
+    WebVector<WebString> keyStrings(numExtras);
+    WTF::HashMap<String, String>::const_iterator::Keys keyIter = m_private->extras().begin().keys();
+    for (size_t i = 0; keyIter != m_private->extras().end().keys(); ++keyIter, ++i)
+        keyStrings[i] = *keyIter;
+    return keyStrings;
+#else
+    return WebVector<WebString>();
+#endif
+}
+
+WebString WebIntent::extrasValue(const WebString& name) const
+{
+#if ENABLE(WEB_INTENTS)
+    WTF::HashMap<String, String>::const_iterator val = m_private->extras().find(name);
+    if (val == m_private->extras().end())
+        return WebString();
+    return val->second;
 #else
     return WebString();
 #endif

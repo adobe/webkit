@@ -41,6 +41,7 @@
 #include "LayerRendererChromium.h"
 #include "PlatformSupport.h"
 #include "cc/CCLayerTreeHost.h"
+#include <public/Platform.h>
 #include <wtf/CurrentTime.h>
 
 namespace WebCore {
@@ -61,8 +62,8 @@ public:
         m_delegate->paintContents(context, contentRect);
         double paintEnd = currentTime();
         double pixelsPerSec = (contentRect.width() * contentRect.height()) / (paintEnd - paintStart);
-        PlatformSupport::histogramCustomCounts("Renderer4.AccelContentPaintDurationMS", (paintEnd - paintStart) * 1000, 0, 120, 30);
-        PlatformSupport::histogramCustomCounts("Renderer4.AccelContentPaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
+        WebKit::Platform::current()->histogramCustomCounts("Renderer4.AccelContentPaintDurationMS", (paintEnd - paintStart) * 1000, 0, 120, 30);
+        WebKit::Platform::current()->histogramCustomCounts("Renderer4.AccelContentPaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
     }
 private:
     explicit ContentLayerPainter(ContentLayerDelegate* delegate)
@@ -93,29 +94,29 @@ bool ContentLayerChromium::drawsContent() const
     return TiledLayerChromium::drawsContent() && m_delegate;
 }
 
-void ContentLayerChromium::paintContentsIfDirty(const CCOcclusionTracker* occlusion)
+void ContentLayerChromium::update(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion)
 {
     updateTileSizeAndTilingOption();
     createTextureUpdaterIfNeeded();
 
     IntRect layerRect;
 
-    // Always call prepareToUpdate() but with an empty layer rectangle when
+    // Always call updateLayerRect() but with an empty layer rectangle when
     // layer doesn't draw contents.
     if (drawsContent())
         layerRect = visibleLayerRect();
 
-    prepareToUpdate(layerRect, occlusion);
+    updateLayerRect(updater, layerRect, occlusion);
     m_needsDisplay = false;
 }
 
-void ContentLayerChromium::idlePaintContentsIfDirty(const CCOcclusionTracker* occlusion)
+void ContentLayerChromium::idleUpdate(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion)
 {
     if (!drawsContent())
         return;
 
     const IntRect layerRect = visibleLayerRect();
-    prepareToUpdateIdle(layerRect, occlusion);
+    idleUpdateLayerRect(updater, layerRect, occlusion);
     if (needsIdlePaint(layerRect))
         setNeedsCommit();
 }
@@ -142,6 +143,13 @@ void ContentLayerChromium::setOpaque(bool opaque)
     LayerChromium::setOpaque(opaque);
     if (m_textureUpdater)
         m_textureUpdater->setOpaque(opaque);
+}
+
+void ContentLayerChromium::scrollBy(const IntSize& scrollDelta)
+{
+    setScrollPosition(scrollPosition() + scrollDelta);
+    if (m_delegate)
+        m_delegate->didScroll(scrollDelta);
 }
 
 }

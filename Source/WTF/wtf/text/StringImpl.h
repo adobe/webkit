@@ -459,8 +459,11 @@ public:
     uint64_t toUInt64(bool* ok = 0); // ignores trailing garbage
     intptr_t toIntPtr(bool* ok = 0); // ignores trailing garbage
 
-    double toDouble(bool* ok = 0, bool* didReadNumber = 0);
-    float toFloat(bool* ok = 0, bool* didReadNumber = 0);
+    // FIXME: Like the strict functions above, these give false for "ok" when there is trailing garbage.
+    // Like the non-strict functions above, these return the value when there is trailing garbage.
+    // It would be better if these were more consistent with the above functions instead.
+    double toDouble(bool* ok = 0);
+    float toFloat(bool* ok = 0);
 
     WTF_EXPORT_PRIVATE PassRefPtr<StringImpl> lower();
     WTF_EXPORT_PRIVATE PassRefPtr<StringImpl> upper();
@@ -478,11 +481,14 @@ public:
     template <typename CharType>
     ALWAYS_INLINE PassRefPtr<StringImpl> removeCharacters(const CharType* characters, CharacterMatchFunctionPtr);
 
-    WTF_EXPORT_PRIVATE size_t find(UChar, unsigned index = 0);
+    size_t find(LChar character, unsigned start = 0);
+    size_t find(char character, unsigned start = 0);
+    size_t find(UChar character, unsigned start = 0);
     WTF_EXPORT_PRIVATE size_t find(CharacterMatchFunctionPtr, unsigned index = 0);
     size_t find(const LChar*, unsigned index = 0);
     ALWAYS_INLINE size_t find(const char* s, unsigned index = 0) { return find(reinterpret_cast<const LChar*>(s), index); };
-    WTF_EXPORT_PRIVATE size_t find(StringImpl*, unsigned index = 0);
+    WTF_EXPORT_PRIVATE size_t find(StringImpl*);
+    WTF_EXPORT_PRIVATE size_t find(StringImpl*, unsigned index);
     size_t findIgnoringCase(const LChar*, unsigned index = 0);
     ALWAYS_INLINE size_t findIgnoringCase(const char* s, unsigned index = 0) { return findIgnoringCase(reinterpret_cast<const LChar*>(s), index); };
     WTF_EXPORT_PRIVATE size_t findIgnoringCase(StringImpl*, unsigned index = 0);
@@ -731,6 +737,94 @@ inline bool equalIgnoringCase(const LChar* a, const UChar* b, unsigned length) {
 inline bool equalIgnoringCase(const char* a, const UChar* b, unsigned length) { return equalIgnoringCase(b, reinterpret_cast<const LChar*>(a), length); }
 
 WTF_EXPORT_PRIVATE bool equalIgnoringNullity(StringImpl*, StringImpl*);
+
+template<typename CharacterType>
+inline size_t find(const CharacterType* characters, unsigned length, CharacterType matchCharacter, unsigned index = 0)
+{
+    while (index < length) {
+        if (characters[index] == matchCharacter)
+            return index;
+        ++index;
+    }
+    return notFound;
+}
+
+ALWAYS_INLINE size_t find(const UChar* characters, unsigned length, LChar matchCharacter, unsigned index = 0)
+{
+    return find(characters, length, static_cast<UChar>(matchCharacter), index);
+}
+
+inline size_t find(const LChar* characters, unsigned length, UChar matchCharacter, unsigned index = 0)
+{
+    if (matchCharacter & ~0xFF)
+        return notFound;
+    return find(characters, length, static_cast<LChar>(matchCharacter), index);
+}
+
+inline size_t find(const LChar* characters, unsigned length, CharacterMatchFunctionPtr matchFunction, unsigned index = 0)
+{
+    while (index < length) {
+        if (matchFunction(characters[index]))
+            return index;
+        ++index;
+    }
+    return notFound;
+}
+
+inline size_t find(const UChar* characters, unsigned length, CharacterMatchFunctionPtr matchFunction, unsigned index = 0)
+{
+    while (index < length) {
+        if (matchFunction(characters[index]))
+            return index;
+        ++index;
+    }
+    return notFound;
+}
+
+inline size_t reverseFind(const LChar* characters, unsigned length, LChar matchCharacter, unsigned index = UINT_MAX)
+{
+    if (!length)
+        return notFound;
+    if (index >= length)
+        index = length - 1;
+    while (characters[index] != matchCharacter) {
+        if (!index--)
+            return notFound;
+    }
+    return index;
+}
+
+inline size_t reverseFind(const UChar* characters, unsigned length, UChar matchCharacter, unsigned index = UINT_MAX)
+{
+    if (!length)
+        return notFound;
+    if (index >= length)
+        index = length - 1;
+    while (characters[index] != matchCharacter) {
+        if (!index--)
+            return notFound;
+    }
+    return index;
+}
+
+inline size_t StringImpl::find(LChar character, unsigned start)
+{
+    if (is8Bit())
+        return WTF::find(characters8(), m_length, character, start);
+    return WTF::find(characters16(), m_length, character, start);
+}
+
+ALWAYS_INLINE size_t StringImpl::find(char character, unsigned start)
+{
+    return find(static_cast<LChar>(character), start);
+}
+
+inline size_t StringImpl::find(UChar character, unsigned start)
+{
+    if (is8Bit())
+        return WTF::find(characters8(), m_length, character, start);
+    return WTF::find(characters16(), m_length, character, start);
+}
 
 template<size_t inlineCapacity>
 bool equalIgnoringNullity(const Vector<UChar, inlineCapacity>& a, StringImpl* b)

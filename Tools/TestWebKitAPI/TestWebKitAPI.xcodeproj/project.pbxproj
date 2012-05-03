@@ -38,11 +38,15 @@
 		440A1D3914A0103A008A66F2 /* KURL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 440A1D3814A0103A008A66F2 /* KURL.cpp */; };
 		4BFDFFA71314776C0061F24B /* HitTestResultNodeHandle_Bundle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4BFDFFA61314776C0061F24B /* HitTestResultNodeHandle_Bundle.cpp */; };
 		4BFDFFA9131477770061F24B /* HitTestResultNodeHandle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4BFDFFA8131477770061F24B /* HitTestResultNodeHandle.cpp */; };
+		51393E201523944A005F39C5 /* DOMWindowExtensionBasic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51393E1E1523944A005F39C5 /* DOMWindowExtensionBasic.cpp */; };
+		51393E221523952D005F39C5 /* DOMWindowExtensionBasic_Bundle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51393E1D1523944A005F39C5 /* DOMWindowExtensionBasic_Bundle.cpp */; };
 		5142B2711517C88B00C32B19 /* ContextMenuCanCopyURL.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5142B2701517C88B00C32B19 /* ContextMenuCanCopyURL.mm */; };
 		5142B2731517C8C800C32B19 /* ContextMenuCanCopyURL.html in Copy Resources */ = {isa = PBXBuildFile; fileRef = 5142B2721517C89100C32B19 /* ContextMenuCanCopyURL.html */; };
 		517E7DFC15110EA600D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 517E7DFB15110EA600D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.mm */; };
 		517E7E04151119C100D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.html in Copy Resources */ = {isa = PBXBuildFile; fileRef = 517E7E031511187500D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.html */; };
 		51FBBB4D1513D4E900822738 /* WebViewCanPasteURL.mm in Sources */ = {isa = PBXBuildFile; fileRef = 51FBBB4C1513D4E900822738 /* WebViewCanPasteURL.mm */; };
+		51FCF79A1534AC6D00104491 /* ShouldGoToBackForwardListItem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51FCF7981534AC6D00104491 /* ShouldGoToBackForwardListItem.cpp */; };
+		51FCF7A11534B2A000104491 /* ShouldGoToBackForwardListItem_Bundle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 51FCF7971534AC6D00104491 /* ShouldGoToBackForwardListItem_Bundle.cpp */; };
 		520BCF4C141EB09E00937EA8 /* WebArchive_Bundle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 520BCF4A141EB09E00937EA8 /* WebArchive_Bundle.cpp */; };
 		520BCF4D141EB09E00937EA8 /* WebArchive.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 520BCF4B141EB09E00937EA8 /* WebArchive.cpp */; };
 		52CB47411448FB9300873995 /* LoadAlternateHTMLStringWithNonDirectoryURL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52CB47401448FB9300873995 /* LoadAlternateHTMLStringWithNonDirectoryURL.cpp */; };
@@ -132,6 +136,8 @@
 		C0C5D3BE14598B6F00A802A6 /* GetBackingScaleFactor.mm in Sources */ = {isa = PBXBuildFile; fileRef = C0C5D3BC14598B6F00A802A6 /* GetBackingScaleFactor.mm */; };
 		C0C5D3C61459912900A802A6 /* GetBackingScaleFactor_Bundle.mm in Sources */ = {isa = PBXBuildFile; fileRef = C0C5D3BD14598B6F00A802A6 /* GetBackingScaleFactor_Bundle.mm */; };
 		C507E8A714C6545B005D6B3B /* InspectorBar.mm in Sources */ = {isa = PBXBuildFile; fileRef = C507E8A614C6545B005D6B3B /* InspectorBar.mm */; };
+		C540F776152E4DA000A40C8C /* SimplifyMarkup.mm in Sources */ = {isa = PBXBuildFile; fileRef = C540F775152E4DA000A40C8C /* SimplifyMarkup.mm */; };
+		C540F784152E5A9A00A40C8C /* verboseMarkup.html in Copy Resources */ = {isa = PBXBuildFile; fileRef = C540F783152E5A7800A40C8C /* verboseMarkup.html */; };
 		E490296814E2E3A4002BEDD1 /* TypingStyleCrash.mm in Sources */ = {isa = PBXBuildFile; fileRef = E490296714E2E3A4002BEDD1 /* TypingStyleCrash.mm */; };
 		F3FC3EE313678B7300126A65 /* libgtest.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F3FC3EE213678B7300126A65 /* libgtest.a */; };
 		F6F3F29113342FEB00A6BF19 /* CookieManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F6F3F29013342FEB00A6BF19 /* CookieManager.cpp */; };
@@ -187,6 +193,7 @@
 				BC2D006412AA04CE00E732A3 /* file-with-anchor.html in Copy Resources */,
 				37DC6791140D7D7600ABCCDB /* DOMRangeOfString.html in Copy Resources */,
 				1ADBEFE3130C6AA100D61D19 /* simple-accelerated-compositing.html in Copy Resources */,
+				C540F784152E5A9A00A40C8C /* verboseMarkup.html in Copy Resources */,
 			);
 			name = "Copy Resources";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -225,11 +232,15 @@
 		44A622C114A0E2B60048515B /* WTFStringUtilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WTFStringUtilities.h; sourceTree = "<group>"; };
 		4BFDFFA61314776C0061F24B /* HitTestResultNodeHandle_Bundle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HitTestResultNodeHandle_Bundle.cpp; sourceTree = "<group>"; };
 		4BFDFFA8131477770061F24B /* HitTestResultNodeHandle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HitTestResultNodeHandle.cpp; sourceTree = "<group>"; };
+		51393E1D1523944A005F39C5 /* DOMWindowExtensionBasic_Bundle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DOMWindowExtensionBasic_Bundle.cpp; sourceTree = "<group>"; };
+		51393E1E1523944A005F39C5 /* DOMWindowExtensionBasic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DOMWindowExtensionBasic.cpp; sourceTree = "<group>"; };
 		5142B2701517C88B00C32B19 /* ContextMenuCanCopyURL.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ContextMenuCanCopyURL.mm; sourceTree = "<group>"; };
 		5142B2721517C89100C32B19 /* ContextMenuCanCopyURL.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; path = ContextMenuCanCopyURL.html; sourceTree = "<group>"; };
 		517E7DFB15110EA600D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MemoryCachePruneWithinResourceLoadDelegate.mm; sourceTree = "<group>"; };
 		517E7E031511187500D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; path = MemoryCachePruneWithinResourceLoadDelegate.html; sourceTree = "<group>"; };
 		51FBBB4C1513D4E900822738 /* WebViewCanPasteURL.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WebViewCanPasteURL.mm; sourceTree = "<group>"; };
+		51FCF7971534AC6D00104491 /* ShouldGoToBackForwardListItem_Bundle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShouldGoToBackForwardListItem_Bundle.cpp; sourceTree = "<group>"; };
+		51FCF7981534AC6D00104491 /* ShouldGoToBackForwardListItem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShouldGoToBackForwardListItem.cpp; sourceTree = "<group>"; };
 		520BCF4A141EB09E00937EA8 /* WebArchive_Bundle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WebArchive_Bundle.cpp; sourceTree = "<group>"; };
 		520BCF4B141EB09E00937EA8 /* WebArchive.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WebArchive.cpp; sourceTree = "<group>"; };
 		52CB47401448FB9300873995 /* LoadAlternateHTMLStringWithNonDirectoryURL.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = LoadAlternateHTMLStringWithNonDirectoryURL.cpp; sourceTree = "<group>"; };
@@ -334,6 +345,8 @@
 		C0C5D3BC14598B6F00A802A6 /* GetBackingScaleFactor.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = GetBackingScaleFactor.mm; sourceTree = "<group>"; };
 		C0C5D3BD14598B6F00A802A6 /* GetBackingScaleFactor_Bundle.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = GetBackingScaleFactor_Bundle.mm; sourceTree = "<group>"; };
 		C507E8A614C6545B005D6B3B /* InspectorBar.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorBar.mm; sourceTree = "<group>"; };
+		C540F775152E4DA000A40C8C /* SimplifyMarkup.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = SimplifyMarkup.mm; sourceTree = "<group>"; };
+		C540F783152E5A7800A40C8C /* verboseMarkup.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; path = verboseMarkup.html; sourceTree = "<group>"; };
 		E490296714E2E3A4002BEDD1 /* TypingStyleCrash.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TypingStyleCrash.mm; sourceTree = "<group>"; };
 		F3FC3EE213678B7300126A65 /* libgtest.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libgtest.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6F3F29013342FEB00A6BF19 /* CookieManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CookieManager.cpp; sourceTree = "<group>"; };
@@ -479,6 +492,8 @@
 				BC246D98132F1FE100B56D7C /* CanHandleRequest.cpp */,
 				BC246D97132F1FE100B56D7C /* CanHandleRequest_Bundle.cpp */,
 				F6F3F29013342FEB00A6BF19 /* CookieManager.cpp */,
+				51393E1E1523944A005F39C5 /* DOMWindowExtensionBasic.cpp */,
+				51393E1D1523944A005F39C5 /* DOMWindowExtensionBasic_Bundle.cpp */,
 				BCB6803F126FBFE100642A61 /* DocumentStartUserScriptAlertCrash.cpp */,
 				BCB68041126FBFF100642A61 /* DocumentStartUserScriptAlertCrash_Bundle.cpp */,
 				C045F9441385C2E900C0F3CD /* DownloadDecideDestinationCrash.cpp */,
@@ -514,6 +529,8 @@
 				C0BD669C131D3CF700E18F2A /* ResponsivenessTimerDoesntFireEarly.cpp */,
 				C0BD669E131D3CFF00E18F2A /* ResponsivenessTimerDoesntFireEarly_Bundle.cpp */,
 				C0ADBE8212FCA6AA00D2C129 /* RestoreSessionStateContainingFormData.cpp */,
+				51FCF7981534AC6D00104491 /* ShouldGoToBackForwardListItem.cpp */,
+				51FCF7971534AC6D00104491 /* ShouldGoToBackForwardListItem_Bundle.cpp */,
 				C02B77F1126612140026BF0F /* SpacebarScrolling.cpp */,
 				BC22D31314DC689800FFB1DD /* UserMessage.cpp */,
 				BC22D31714DC68B800FFB1DD /* UserMessage_Bundle.cpp */,
@@ -615,6 +632,7 @@
 				C507E8A614C6545B005D6B3B /* InspectorBar.mm */,
 				517E7DFB15110EA600D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.mm */,
 				3722C8681461E03E00C45D00 /* RenderedImageFromDOMRange.mm */,
+				C540F775152E4DA000A40C8C /* SimplifyMarkup.mm */,
 				3799AD3914120A43005EB0C6 /* StringByEvaluatingJavaScriptFromString.mm */,
 				37A6895D148A9B50005100FA /* SubresourceErrorCrash.mm */,
 				E490296714E2E3A4002BEDD1 /* TypingStyleCrash.mm */,
@@ -633,6 +651,7 @@
 				37DC678F140D7D3A00ABCCDB /* DOMRangeOfString.html */,
 				C07E6CB113FD738A0038B22B /* devicePixelRatio.html */,
 				517E7E031511187500D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.html */,
+				C540F783152E5A7800A40C8C /* verboseMarkup.html */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -831,6 +850,9 @@
 				517E7DFC15110EA600D0B008 /* MemoryCachePruneWithinResourceLoadDelegate.mm in Sources */,
 				51FBBB4D1513D4E900822738 /* WebViewCanPasteURL.mm in Sources */,
 				5142B2711517C88B00C32B19 /* ContextMenuCanCopyURL.mm in Sources */,
+				C540F776152E4DA000A40C8C /* SimplifyMarkup.mm in Sources */,
+				51FCF79A1534AC6D00104491 /* ShouldGoToBackForwardListItem.cpp in Sources */,
+				51393E201523944A005F39C5 /* DOMWindowExtensionBasic.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -859,6 +881,8 @@
 				93F7E86F14DC8E5C00C84A99 /* NewFirstVisuallyNonEmptyLayoutFrames_Bundle.cpp in Sources */,
 				BC22D31914DC68B900FFB1DD /* UserMessage_Bundle.cpp in Sources */,
 				93AF4ECE1506F064007FD57E /* NewFirstVisuallyNonEmptyLayoutForImages_Bundle.cpp in Sources */,
+				51FCF7A11534B2A000104491 /* ShouldGoToBackForwardListItem_Bundle.cpp in Sources */,
+				51393E221523952D005F39C5 /* DOMWindowExtensionBasic_Bundle.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

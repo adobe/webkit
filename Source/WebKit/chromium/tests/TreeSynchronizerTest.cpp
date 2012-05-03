@@ -73,12 +73,12 @@ public:
 
     virtual ~MockLayerChromium() { }
 
-    virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl()
+    virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl() OVERRIDE
     {
         return MockCCLayerImpl::create(m_layerId);
     }
 
-    virtual void pushPropertiesTo(CCLayerImpl* ccLayer)
+    virtual void pushPropertiesTo(CCLayerImpl* ccLayer) OVERRIDE
     {
         LayerChromium::pushPropertiesTo(ccLayer);
 
@@ -197,29 +197,6 @@ TEST(TreeSynchronizerTest, syncSimpleTreeReusingLayers)
     EXPECT_EQ(secondCCLayerId, ccLayerDestructionList[0]);
 }
 
-TEST(TreeSynchronizerTest, syncSimpleTreeWithNonFastScrollableRegionAndFreshLayer)
-{
-    DebugScopedSetImplThread impl;
-    Vector<int> ccLayerDestructionList;
-    Region testRegion(IntRect(0, 0, 1, 1));
-
-    RefPtr<LayerChromium> layerTreeRoot = MockLayerChromium::create(&ccLayerDestructionList);
-    layerTreeRoot->addChild(MockLayerChromium::create(&ccLayerDestructionList));
-    layerTreeRoot->addChild(MockLayerChromium::create(&ccLayerDestructionList));
-
-    // Create non-empty nonFastScrollableRegion in one of the children.
-    layerTreeRoot->children()[0]->setNonFastScrollableRegion(testRegion);
-
-    OwnPtr<CCLayerImpl> ccLayerTreeRoot = TreeSynchronizer::synchronizeTrees(layerTreeRoot.get(), nullptr);
-    expectTreesAreIdentical(layerTreeRoot.get(), ccLayerTreeRoot.get());
-
-    ccLayerTreeRoot->removeAllChildren(); // Force these to be re-created on next sync.
-
-    // Synchronize again. After the sync the trees should be equivalent and we should have re-created one CCLayerImpl that has a non-empty nonFastScrollableRegion.
-    ccLayerTreeRoot = TreeSynchronizer::synchronizeTrees(layerTreeRoot.get(), ccLayerTreeRoot.release());
-    expectTreesAreIdentical(layerTreeRoot.get(), ccLayerTreeRoot.get());
-}
-
 TEST(TreeSynchronizerTest, syncSimpleTreeAndProperties)
 {
     DebugScopedSetImplThread impl;
@@ -228,10 +205,10 @@ TEST(TreeSynchronizerTest, syncSimpleTreeAndProperties)
     layerTreeRoot->addChild(LayerChromium::create());
 
     // Pick some random properties to set. The values are not important, we're just testing that at least some properties are making it through.
-    FloatPoint rootPosition = FloatPoint(2.3, 7.4);
+    FloatPoint rootPosition = FloatPoint(2.3f, 7.4f);
     layerTreeRoot->setPosition(rootPosition);
 
-    float firstChildOpacity = 0.25;
+    float firstChildOpacity = 0.25f;
     layerTreeRoot->children()[0]->setOpacity(firstChildOpacity);
 
     IntSize secondChildBounds = IntSize(25, 53);

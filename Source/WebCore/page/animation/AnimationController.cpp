@@ -32,6 +32,7 @@
 #include "AnimationBase.h"
 #include "AnimationControllerPrivate.h"
 #include "CSSParser.h"
+#include "CSSPropertyAnimation.h"
 #include "CompositeAnimation.h"
 #include "EventNames.h"
 #include "Frame.h"
@@ -547,7 +548,7 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     if (blendedStyle != newStyle) {
         // If the animations/transitions change opacity or transform, we need to update
         // the style to impose the stacking rules. Note that this is also
-        // done in CSSStyleSelector::adjustRenderStyle().
+        // done in StyleResolver::adjustRenderStyle().
         if (blendedStyle->hasAutoZIndex() && (blendedStyle->opacity() < 1.0f || blendedStyle->hasTransform()))
             blendedStyle->setZIndex(0);
     }
@@ -629,7 +630,7 @@ void AnimationController::endAnimationUpdate()
 bool AnimationController::supportsAcceleratedAnimationOfProperty(CSSPropertyID property)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    return AnimationBase::animationOfPropertyIsAccelerated(property);
+    return CSSPropertyAnimation::animationOfPropertyIsAccelerated(property);
 #else
     UNUSED_PARAM(property);
     return false;

@@ -55,7 +55,8 @@
             'msvs_guid': '7CEFE800-8403-418A-AD6A-2D52C6FC3EAD',
             'dependencies': [
                 'WebKit.gyp:webkit',
-                '../../WebCore/WebCore.gyp/WebCore.gyp:webcore',
+                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
+                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
                 '<(chromium_src_dir)/testing/gtest.gyp:gtest',
                 '<(chromium_src_dir)/testing/gmock.gyp:gmock',
                 '<(chromium_src_dir)/base/base.gyp:base',
@@ -71,6 +72,11 @@
             'include_dirs': [
                 'public',
                 'src',
+                # WebKit unit tests are allowed to include WebKit and WebCore header files, which may include headers in the
+                # Platform API as <public/WebFoo.h>. Thus we need to have the Platform API include path, but we can't depend
+                # directly on Platform.gyp:webkit_platform since platform cannot link as a separate library. Instead, we just
+                # add the include path directly.
+                '../../Platform/chromium',
             ],
             'conditions': [
                 ['inside_chromium_build==1 and component=="shared_library"', {
@@ -78,6 +84,9 @@
                         'WEBKIT_DLL_UNITTEST',
                     ],
                 }, {
+                    'dependencies': [
+                        '../../WebCore/WebCore.gyp/WebCore.gyp:webcore',
+                    ],
                     'sources': [
                         '<@(webkit_unittest_files)',
                     ],

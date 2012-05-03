@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2002-2010 The ANGLE Project Authors. All rights reserved.
+// Copyright (c) 2002-2012 The ANGLE Project Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
@@ -22,7 +22,14 @@
 #include "compiler/SymbolTable.h"
 #include "compiler/VariableInfo.h"
 
+class LongNameMap;
 class TCompiler;
+class TDepGraph;
+
+//
+// Helper function to identify specs based on the WebGL spec.
+//
+bool isWebGLSpecSubset(ShShaderSpec spec);
 
 //
 // The base class used to back handles returned to the driver.
@@ -50,6 +57,7 @@ public:
     virtual TCompiler* getAsCompiler() { return this; }
 
     bool Init(const ShBuiltInResources& resources);
+    void setHiddenSymbolSuffix(const char* const suffix) { hiddenSymbolSuffix = suffix; }
     bool compile(const char* const shaderStrings[],
                  const int numStrings,
                  int compileOptions);
@@ -67,21 +75,23 @@ protected:
     bool InitBuiltInSymbolTable(const ShBuiltInResources& resources);
     // Clears the results from the previous compilation.
     void clearResults();
-    // Return true if any uniform is a texture.
-    bool detectTextureAccess(TIntermNode* root);
     // Return true if function recursion is detected.
     bool detectRecursion(TIntermNode* root);
+    // Rewrites a CSS shader's intermediate tree into a valid GLSL shader,
+    // and returns the potentially new intermediate tree root.
+    TIntermNode* rewriteCSSShader(TIntermNode* root);
     // Returns true if the given shader does not exceed the minimum
     // functionality mandated in GLSL 1.0 spec Appendix A.
     bool validateLimitations(TIntermNode* root);
-    // returns true if color is used in a potential malicious way
-    bool validateColorLimitations(TIntermNode* root);
     // Collect info for all attribs and uniforms.
     void collectAttribsUniforms(TIntermNode* root);
     // Map long variable names into shorter ones.
     void mapLongVariableNames(TIntermNode* root);
     // Translate to object code.
     virtual void translate(TIntermNode* root) = 0;
+    bool validateWebSafeShader(TIntermNode* root, bool outputDepGraph);
+    bool validateWebSafeVertexShader(TIntermNode* root);
+    bool validateWebSafeFragmentShader(TDepGraph* depGraph);    
     // Get built-in extensions with default behavior.
     const TExtensionBehavior& getExtensionBehavior() const;
 
@@ -90,6 +100,8 @@ protected:
 private:
     ShShaderType shaderType;
     ShShaderSpec shaderSpec;
+
+    TString hiddenSymbolSuffix;    
 
     // Built-in symbol table for the given language, spec, and resources.
     // It is preserved from compile-to-compile.
@@ -104,8 +116,8 @@ private:
     TVariableInfoList attribs;  // Active attributes in the compiled shader.
     TVariableInfoList uniforms;  // Active uniforms in the compiled shader.
 
-    // Pair of long varying varibale name <originalName, mappedName>.
-    std::map<std::string, std::string> varyingLongNameMap;
+    // Cached copy of the ref-counted singleton.
+    LongNameMap* longNameMap;
 };
 
 //

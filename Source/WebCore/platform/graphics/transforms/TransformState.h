@@ -38,8 +38,16 @@ namespace WebCore {
 
 class TransformState {
 public:
-    enum TransformDirection { ApplyTransformDirection, UnapplyInverseTransformDirection };
+    enum TransformDirection { ApplyTransformDirection, UnapplyInverseTransformDirection, GlobalTransformationMatrix };
     enum TransformAccumulation { FlattenTransform, AccumulateTransform };
+
+    TransformState()
+        : m_accumulatingTransform(false)
+        , m_mapPoint(false)
+        , m_mapQuad(false)
+        , m_direction(GlobalTransformationMatrix)
+    {
+    }
 
     TransformState(TransformDirection mappingDirection, const FloatPoint& p, const FloatQuad& quad)
         : m_lastPlanarPoint(p)
@@ -92,6 +100,8 @@ public:
     // Return the point or quad mapped through the current transform
     FloatPoint mappedPoint() const;
     FloatQuad mappedQuad() const;
+    
+    TransformationMatrix globalTransformationMatrix() const;
 
 private:
     void flattenWithTransform(const TransformationMatrix&);

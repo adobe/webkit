@@ -30,13 +30,13 @@
 #include "config.h"
 #include "WebKitNamedFlow.h"
 
-#include "RenderFlowThread.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderRegion.h"
 #include "StaticNodeList.h"
 
 namespace WebCore {
 
-WebKitNamedFlow::WebKitNamedFlow(RenderFlowThread* parentFlowThread)
+WebKitNamedFlow::WebKitNamedFlow(RenderNamedFlowThread* parentFlowThread)
 : m_parentFlowThread(parentFlowThread)
 {
 }
@@ -72,6 +72,20 @@ PassRefPtr<NodeList> WebKitNamedFlow::getRegionsByContentNode(Node* contentNode)
         }
     }
     return StaticNodeList::adopt(regionNodes);
+}
+
+PassRefPtr<NodeList> WebKitNamedFlow::contentNodes() const
+{
+    m_parentFlowThread->document()->updateLayoutIgnorePendingStylesheets();
+
+    Vector<RefPtr<Node> > contentNodes;
+    for (NamedFlowContentNodes::const_iterator it = m_parentFlowThread->contentNodes().begin(); it != m_parentFlowThread->contentNodes().end(); ++it) {
+        Node* node = const_cast<Node*>(*it);
+        ASSERT(node->computedStyle()->flowThread() == m_parentFlowThread->flowThreadName());
+        contentNodes.append(node);
+    }
+
+    return StaticNodeList::adopt(contentNodes);
 }
 
 } // namespace WebCore

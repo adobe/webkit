@@ -7,7 +7,12 @@
 SOURCES += \
     $$PWD/YarrInterpreter.cpp \
     $$PWD/YarrPattern.cpp \
-    $$PWD/YarrSyntaxChecker.cpp
+    $$PWD/YarrSyntaxChecker.cpp \
+    $$PWD/YarrCanonicalizeUCS2.cpp
 
 # For UString.h
-v8: INCLUDEPATH += $$PWD/../runtime
+v8 {
+    INCLUDEPATH += \
+        $$PWD/.. \
+        $$PWD/../runtime
+}

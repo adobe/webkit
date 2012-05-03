@@ -41,10 +41,15 @@ PassOwnPtr<ActivePlatformGestureAnimation> ActivePlatformGestureAnimation::creat
     return adoptPtr(new ActivePlatformGestureAnimation(curve, target));
 }
 
+PassOwnPtr<ActivePlatformGestureAnimation> ActivePlatformGestureAnimation::create(PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target, double startTime)
+{
+    return adoptPtr(new ActivePlatformGestureAnimation(curve, target, startTime));
+}
+
 ActivePlatformGestureAnimation::~ActivePlatformGestureAnimation()
 {
 #if PLATFORM(CHROMIUM)
-    TRACE_EVENT_FINISH0("input", "GestureAnimation", this);
+    TRACE_EVENT_ASYNC_END0("input", "GestureAnimation", this);
 #endif
 }
 
@@ -55,7 +60,18 @@ ActivePlatformGestureAnimation::ActivePlatformGestureAnimation(PassOwnPtr<Platfo
     , m_target(target)
 {
 #if PLATFORM(CHROMIUM)
-    TRACE_EVENT_START1("input", "GestureAnimation", this, "curve", curve->debugName());
+    TRACE_EVENT_ASYNC_BEGIN1("input", "GestureAnimation", this, "curve", m_curve->debugName());
+#endif
+}
+
+ActivePlatformGestureAnimation::ActivePlatformGestureAnimation(PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target, double startTime)
+    : m_startTime(startTime)
+    , m_waitingForFirstTick(false)
+    , m_curve(curve)
+    , m_target(target)
+{
+#if PLATFORM(CHROMIUM)
+    TRACE_EVENT_ASYNC_BEGIN1("input", "GestureAnimation", this, "curve", m_curve->debugName());
 #endif
 }
 

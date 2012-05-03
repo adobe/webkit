@@ -27,12 +27,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import codecs
 import mimetypes
-import socket
+import time
 import urllib2
 
-from webkitpy.common.net.networktransaction import NetworkTransaction
+from webkitpy.common.net.networktransaction import NetworkTransaction, NetworkTimeout
 
 
 def get_mime_type(filename):
@@ -92,9 +91,7 @@ class FileUploader(object):
     def upload_as_multipart_form_data(self, filesystem, files, attrs):
         file_objs = []
         for filename, path in files:
-            # FIXME: We should talk to the filesytem via a Host object.
-            with codecs.open(path, "rb") as file:
-                file_objs.append(('file', filename, file.read()))
+            file_objs.append(('file', filename, filesystem.read_binary_file(path)))
 
         # FIXME: We should use the same variable names for the formal and actual parameters.
         content_type, data = _encode_multipart_form_data(attrs, file_objs)
@@ -102,15 +99,10 @@ class FileUploader(object):
 
     def _upload_data(self, content_type, data):
         def callback():
+            # FIXME: Setting a timeout, either globally using socket.setdefaulttimeout()
+            # or in urlopen(), doesn't appear to work on Mac 10.5 with Python 2.7.
+            # For now we will ignore the timeout value and hope for the best.
             request = urllib2.Request(self._url, data, {"Content-Type": content_type})
             return urllib2.urlopen(request)
 
-        orig_timeout = socket.getdefaulttimeout()
-        response = None
-        try:
-            # FIXME: We shouldn't mutate global static state.
-            socket.setdefaulttimeout(self._timeout_seconds)
-            response = NetworkTransaction(timeout_seconds=self._timeout_seconds).run(callback)
-        finally:
-            socket.setdefaulttimeout(orig_timeout)
-            return response
+        return NetworkTransaction(timeout_seconds=self._timeout_seconds).run(callback)

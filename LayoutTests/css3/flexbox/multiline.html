@@ -6,6 +6,7 @@
     display: -webkit-flexbox;
     background-color: grey;
     max-width: 600px;
+    -webkit-flex-line-pack: start;
 }
 .title {
     margin-top: 1em;
@@ -41,10 +42,10 @@
     -webkit-flex-flow: column-reverse;
 }
 .wrap {
-  -webkit-flex-wrap: wrap;
+    -webkit-flex-wrap: wrap;
 }
 .wrap-reverse {
-  -webkit-flex-wrap: wrap-reverse;
+    -webkit-flex-wrap: wrap-reverse;
 }
 .flexbox > :nth-child(1) {
     background-color: #0f0;
@@ -700,7 +701,7 @@ function mainAxisDirection(writingMode, flexDirection)
 function addChild(flexbox, mainAxis, crossAxis, preferredSize, crossAxisLength, expectations)
 {
     var child = document.createElement('div');
-    child.setAttribute('style', mainAxis + ': -webkit-flex(1 ' + preferredSize + 'px);'
+    child.setAttribute('style', '-webkit-flex: 1 ' + preferredSize + 'px;'
         + crossAxis + ': ' + crossAxisLength + 'px;');
 
     child.setAttribute("data-expected-width", expectations[0]);

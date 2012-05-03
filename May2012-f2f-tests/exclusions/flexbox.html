@@ -1,0 +1,73 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <script src="http://code.jquery.com/ui/1.8.18/jquery-ui.min.js" type="text/javascript"></script>
+    
+    <title>Exclusions</title>
+    <style>
+    /*<![CDATA[*/
+.exclusion {
+    -webkit-wrap-flow: clear; 
+    x-webkit-wrap-through: none; 
+    position: absolute;
+    top: 30px;
+    left: 50px;
+    width: 100px; 
+    min-height: 100px; 
+    border: 5px solid red;
+    background: white;
+}
+#rA div, #rB div, #rC div {
+    background: #a0a0a0;
+    border: 1px solid #808080;
+}
+
+.flex {
+    display: -webkit-box;
+}
+
+#rA, #rB, #rC {
+    border: 1px solid #a0a0a0;
+    background-color: #f0f0f0;
+    -webkit-box-flex: 1;
+    margin: 10px;
+    padding: 10px;
+    min-height: 300px;
+}
+/*]]>*/
+</style>
+</head>
+<body style="z-index: 0">
+
+    <div class="exclusion" style="z-index: 0">
+        Drag me around 1 
+    </div>
+    <div class="exclusion" style="z-index: 1">
+        Drag me around 2
+    </div>
+    <div class="exclusion" style="z-index: 2">
+        Drag me around 3
+    </div>
+    <div class="exclusion" style="z-index: -3">
+        Drag me around 4
+    </div>
+
+    <div style="z-index: 0; position: absolute; border: 1px solid green;">
+    <div class="flex" >
+       <div id="rA"><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p></div>
+       <div id="rB"> <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p></div>
+       <div id="rC"> <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam vulputate porta lorem vel scelerisque. Quisque id nulla lorem, at tincidunt arcu. Maecenas commodo eros a nisi aliquam a pharetra orci tristique. Ut varius aliquam eleifend. Mauris auctor dignissim convallis. Vestibulum pulvinar orci id lacus varius a feugiat ante adipiscing.</p></div>
+    </div>
+    </div>
+    
+    <script>
+        $(function() {
+            $(".exclusion").draggable();
+        });
+    </script>
+</body>
+</html>

@@ -58,7 +58,14 @@ WebString WebIDBIndexImpl::storeName() const
     return m_backend->storeName();
 }
 
-WebString WebIDBIndexImpl::keyPath() const
+WebIDBKeyPath WebIDBIndexImpl::keyPath() const
+{
+    return WebIDBKeyPath(m_backend->keyPath());
+}
+
+// FIXME: Remove this method once callers are updated.
+// http://webkit.org/b/84207
+WebString WebIDBIndexImpl::keyPathString() const
 {
     return m_backend->keyPath();
 }
@@ -88,12 +95,12 @@ void WebIDBIndexImpl::count(const WebIDBKeyRange& keyRange,  WebIDBCallbacks* ca
     m_backend->count(keyRange, IDBCallbacksProxy::create(adoptPtr(callbacks)), transaction.getIDBTransactionBackendInterface(), ec);
 }
 
-void WebIDBIndexImpl::getObject(const WebIDBKey& keyRange, WebIDBCallbacks* callbacks, const WebIDBTransaction& transaction, WebExceptionCode& ec)
+void WebIDBIndexImpl::getObject(const WebIDBKeyRange& keyRange, WebIDBCallbacks* callbacks, const WebIDBTransaction& transaction, WebExceptionCode& ec)
 {
     m_backend->get(keyRange, IDBCallbacksProxy::create(adoptPtr(callbacks)), transaction.getIDBTransactionBackendInterface(), ec);
 }
 
-void WebIDBIndexImpl::getKey(const WebIDBKey& keyRange, WebIDBCallbacks* callbacks, const WebIDBTransaction& transaction, WebExceptionCode& ec)
+void WebIDBIndexImpl::getKey(const WebIDBKeyRange& keyRange, WebIDBCallbacks* callbacks, const WebIDBTransaction& transaction, WebExceptionCode& ec)
 {
     m_backend->getKey(keyRange, IDBCallbacksProxy::create(adoptPtr(callbacks)), transaction.getIDBTransactionBackendInterface(), ec);
 }

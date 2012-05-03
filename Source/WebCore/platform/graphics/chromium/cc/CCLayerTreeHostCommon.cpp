@@ -37,6 +37,7 @@
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerIterator.h"
 #include "cc/CCLayerSorter.h"
+#include "cc/CCMathUtil.h"
 #include "cc/CCRenderSurface.h"
 
 namespace WebCore {
@@ -44,7 +45,7 @@ namespace WebCore {
 IntRect CCLayerTreeHostCommon::calculateVisibleRect(const IntRect& targetSurfaceRect, const IntRect& layerBoundRect, const TransformationMatrix& transform)
 {
     // Is this layer fully contained within the target surface?
-    IntRect layerInSurfaceSpace = transform.mapRect(layerBoundRect);
+    IntRect layerInSurfaceSpace = CCMathUtil::mapClippedRect(transform, layerBoundRect);
     if (targetSurfaceRect.contains(layerInSurfaceSpace))
         return layerBoundRect;
 
@@ -59,9 +60,42 @@ IntRect CCLayerTreeHostCommon::calculateVisibleRect(const IntRect& targetSurface
     // axis-aligned), but is a reasonable filter on the space to consider.
     // Non-invertible transforms will create an empty rect here.
     const TransformationMatrix surfaceToLayer = transform.inverse();
-    IntRect layerRect = surfaceToLayer.projectQuad(FloatQuad(FloatRect(minimalSurfaceRect))).enclosingBoundingBox();
+    IntRect layerRect = enclosingIntRect(CCMathUtil::projectClippedRect(surfaceToLayer, FloatRect(minimalSurfaceRect)));
     layerRect.intersect(layerBoundRect);
     return layerRect;
+}
+
+template<typename LayerType>
+static IntRect calculateVisibleLayerRect(LayerType* layer)
+{
+    ASSERT(layer->targetRenderSurface());
+
+    // Animated layers can exist in the render surface tree that are not visible currently
+    // and have their back face showing. In this case, their visible rect should be empty.
+    if (!layer->doubleSided() && layer->screenSpaceTransform().isBackFaceVisible())
+        return IntRect();
+
+    IntRect targetSurfaceRect = layer->targetRenderSurface()->contentRect();
+
+    if (layer->usesLayerClipping())
+        targetSurfaceRect.intersect(layer->clipRect());
+
+    if (targetSurfaceRect.isEmpty() || layer->contentBounds().isEmpty())
+        return targetSurfaceRect;
+
+    // Note carefully these are aliases
+    const IntSize& bounds = layer->bounds();
+    const IntSize& contentBounds = layer->contentBounds();
+
+    const IntRect layerBoundRect = IntRect(IntPoint(), contentBounds);
+    TransformationMatrix transform = layer->drawTransform();
+
+    transform.scaleNonUniform(bounds.width() / static_cast<double>(contentBounds.width()),
+                              bounds.height() / static_cast<double>(contentBounds.height()));
+    transform.translate(-contentBounds.width() / 2.0, -contentBounds.height() / 2.0);
+
+    IntRect visibleLayerRect = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerBoundRect, transform);
+    return visibleLayerRect;
 }
 
 static bool isScaleOrTranslation(const TransformationMatrix& m)
@@ -70,7 +104,39 @@ static bool isScaleOrTranslation(const TransformationMatrix& m)
            && !m.m21() && !m.m23() && !m.m24()
            && !m.m31() && !m.m32() && !m.m43()
            && m.m44();
+}
 
+static inline bool layerOpacityIsOpaque(CCLayerImpl* layer)
+{
+    return layer->opacity() == 1;
+}
+
+static inline bool layerOpacityIsOpaque(LayerChromium* layer)
+{
+    // If the opacity is being animated then the opacity on the main thread is unreliable
+    // (since the impl thread may be using a different opacity), so it should not be trusted.
+    // In particular, it should not be treated as opaque.
+    return layer->opacity() == 1 && !layer->opacityIsAnimating();
+}
+
+static inline bool transformToParentIsKnown(CCLayerImpl*)
+{
+    return true;
+}
+
+static inline bool transformToParentIsKnown(LayerChromium* layer)
+{
+    return !layer->transformIsAnimating();
+}
+
+static inline bool transformToScreenIsKnown(CCLayerImpl*)
+{
+    return true;
+}
+
+static inline bool transformToScreenIsKnown(LayerChromium* layer)
+{
+    return !layer->screenSpaceTransformIsAnimating();
 }
 
 template<typename LayerType>
@@ -93,19 +159,9 @@ static bool layerShouldBeSkipped(LayerType* layer)
     if (!layer->drawsContent() || layer->bounds().isEmpty())
         return true;
 
-    // The layer should not be drawn if (1) it is not double-sided and (2) the back of the layer is facing the screen.
-    // This second condition is checked by computing the transformed normal of the layer.
-    if (!layer->doubleSided()) {
-        FloatRect layerRect(FloatPoint(0, 0), FloatSize(layer->bounds()));
-        FloatQuad mappedLayer = layer->screenSpaceTransform().mapQuad(FloatQuad(layerRect));
-        FloatSize horizontalDir = mappedLayer.p2() - mappedLayer.p1();
-        FloatSize verticalDir = mappedLayer.p4() - mappedLayer.p1();
-        FloatPoint3D xAxis(horizontalDir.width(), horizontalDir.height(), 0);
-        FloatPoint3D yAxis(verticalDir.width(), verticalDir.height(), 0);
-        FloatPoint3D zAxis = xAxis.cross(yAxis);
-        if (zAxis.z() < 0)
-            return true;
-    }
+    // The layer should not be drawn if (1) it is not double-sided and (2) the back of the layer is known to be facing the screen.
+    if (!layer->doubleSided() && transformToScreenIsKnown(layer) && layer->screenSpaceTransform().isBackFaceVisible())
+        return true;
 
     return false;
 }
@@ -124,19 +180,6 @@ static inline bool subtreeShouldBeSkipped(LayerChromium* layer)
     // (since the impl thread may be using a different opacity), so it should not be trusted.
     // In particular, it should not cause the subtree to be skipped.
     return !layer->opacity() && !layer->opacityIsAnimating();
-}
-
-static inline bool layerOpacityIsOpaque(CCLayerImpl* layer)
-{
-    return layer->opacity() == 1;
-}
-
-static inline bool layerOpacityIsOpaque(LayerChromium* layer)
-{
-    // If the opacity is being animated then the opacity on the main thread is unreliable
-    // (since the impl thread may be using a different opacity), so it should not be trusted.
-    // In particular, it should not be treated as opaque.
-    return layer->opacity() == 1 && !layer->opacityIsAnimating();
 }
 
 template<typename LayerType>
@@ -163,12 +206,18 @@ static bool subtreeShouldRenderToSeparateSurface(LayerType* layer, bool axisAlig
         return true;
 
     // If the layer uses a CSS filter.
-    if (!layer->filters().isEmpty())
+    if (!layer->filters().isEmpty() || !layer->backgroundFilters().isEmpty())
         return true;
 
     // If the layer flattens its subtree (i.e. the layer doesn't preserve-3d), but it is
     // treated as a 3D object by its parent (i.e. parent does preserve-3d).
     if (layer->parent() && layer->parent()->preserves3D() && !layer->preserves3D() && descendantDrawsContent)
+        return true;
+
+    // On the main thread side, animating transforms are unknown, and may cause a RenderSurface on the impl side.
+    // Since they are cheap, we create a rendersurface for all animating transforms to cover these cases, and so
+    // that we can consider descendants as not animating relative to their target to aid culling.
+    if (!transformToParentIsKnown(layer) && descendantDrawsContent)
         return true;
 
     // If the layer clips its descendants but it is not axis-aligned with respect to its parent.
@@ -315,11 +364,11 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
     TransformationMatrix combinedTransform = parentMatrix;
     combinedTransform = combinedTransform.multiply(layerLocalTransform);
 
-    bool layerIsInAnimatingSubtreeForSurface = layer->transformIsAnimating();
-    bool layerIsInAnimatingSubtreeForScreen = layer->transformIsAnimating();
+    bool animatingTransformToTarget = layer->transformIsAnimating();
+    bool animatingTransformToScreen = animatingTransformToTarget;
     if (layer->parent()) {
-        layerIsInAnimatingSubtreeForSurface |= layer->parent()->drawTransformIsAnimating();
-        layerIsInAnimatingSubtreeForScreen |= layer->parent()->screenSpaceTransformIsAnimating();
+        animatingTransformToTarget |= layer->parent()->drawTransformIsAnimating();
+        animatingTransformToScreen |= layer->parent()->screenSpaceTransformIsAnimating();
     }
 
     FloatRect layerRect(-0.5 * layer->bounds().width(), -0.5 * layer->bounds().height(), layer->bounds().width(), layer->bounds().height());
@@ -356,11 +405,11 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
         surfaceOriginTransform.translate3d(-0.5 * bounds.width(), -0.5 * bounds.height(), 0);
         renderSurface->setOriginTransform(surfaceOriginTransform);
 
-        renderSurface->setTargetSurfaceTransformsAreAnimating(layerIsInAnimatingSubtreeForSurface);
-        renderSurface->setScreenSpaceTransformsAreAnimating(layerIsInAnimatingSubtreeForScreen);
-        layerIsInAnimatingSubtreeForSurface = false;
-        layer->setDrawTransformIsAnimating(layerIsInAnimatingSubtreeForSurface);
-        layer->setScreenSpaceTransformIsAnimating(layerIsInAnimatingSubtreeForScreen);
+        renderSurface->setTargetSurfaceTransformsAreAnimating(animatingTransformToTarget);
+        renderSurface->setScreenSpaceTransformsAreAnimating(animatingTransformToScreen);
+        animatingTransformToTarget = false;
+        layer->setDrawTransformIsAnimating(animatingTransformToTarget);
+        layer->setScreenSpaceTransformIsAnimating(animatingTransformToScreen);
 
         // Update the aggregate hierarchy matrix to include the transform of the newly created RenderSurface.
         nextHierarchyMatrix.multiply(surfaceOriginTransform);
@@ -369,6 +418,10 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
         // be applied before drawing the render surface onto its containing
         // surface and is therefore expressed in the parent's coordinate system.
         renderSurface->setClipRect(layer->parent() ? layer->parent()->clipRect() : layer->clipRect());
+
+        // The layer's clipRect can be reset here. The renderSurface will correctly clip the subtree.
+        layer->setUsesLayerClipping(false);
+        layer->setClipRect(IntRect());
 
         if (layer->maskLayer()) {
             renderSurface->setMaskLayer(layer->maskLayer());
@@ -384,12 +437,14 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
             nearestAncestorThatMovesPixels = renderSurface;
         renderSurface->setNearestAncestorThatMovesPixels(nearestAncestorThatMovesPixels);
 
+        renderSurface->setBackgroundFilters(layer->backgroundFilters());
+
         renderSurfaceLayerList.append(layer);
     } else {
         layer->setDrawTransform(combinedTransform);
-        layer->setDrawTransformIsAnimating(layerIsInAnimatingSubtreeForSurface);
-        layer->setScreenSpaceTransformIsAnimating(layerIsInAnimatingSubtreeForScreen);
-        transformedLayerRect = enclosingIntRect(layer->drawTransform().mapRect(layerRect));
+        layer->setDrawTransformIsAnimating(animatingTransformToTarget);
+        layer->setScreenSpaceTransformIsAnimating(animatingTransformToScreen);
+        transformedLayerRect = enclosingIntRect(CCMathUtil::mapClippedRect(layer->drawTransform(), layerRect));
 
         layer->setDrawOpacity(drawOpacity);
         layer->setDrawOpacityIsAnimating(drawOpacityIsAnimating);
@@ -406,13 +461,18 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
             // Layers without their own renderSurface will render into the nearest ancestor surface.
             layer->setTargetRenderSurface(layer->parent()->targetRenderSurface());
         }
+    }
 
-        if (layer->masksToBounds()) {
-            IntRect clipRect = transformedLayerRect;
+    if (layer->masksToBounds()) {
+        IntRect clipRect = transformedLayerRect;
+
+        // If the layer already inherited a clipRect, we need to intersect with it before
+        // overriding the layer's clipRect and usesLayerClipping.
+        if (layer->usesLayerClipping())
             clipRect.intersect(layer->clipRect());
-            layer->setClipRect(clipRect);
-            layer->setUsesLayerClipping(true);
-        }
+
+        layer->setClipRect(clipRect);
+        layer->setUsesLayerClipping(true);
     }
 
     // Note that at this point, layer->drawTransform() is not necessarily the same as local variable drawTransform.
@@ -590,7 +650,7 @@ static void walkLayersAndCalculateVisibleLayerRects(const LayerList& renderSurfa
     CCLayerIteratorType end = CCLayerIteratorType::end(&renderSurfaceLayerList);
     for (CCLayerIteratorType it = CCLayerIteratorType::begin(&renderSurfaceLayerList); it != end; ++it) {
         if (!it.representsTargetRenderSurface()) {
-            IntRect visibleLayerRect = CCLayerTreeHostCommon::calculateVisibleLayerRect<LayerType>(*it);
+            IntRect visibleLayerRect = calculateVisibleLayerRect(*it);
             it->setVisibleLayerRect(visibleLayerRect);
         }
     }

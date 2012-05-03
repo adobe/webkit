@@ -48,6 +48,15 @@ namespace BlackBerry {
 namespace WebKit {
 namespace DOMSupport {
 
+void visibleTextQuads(const VisibleSelection& selection, Vector<FloatQuad>& quads)
+{
+    if (!selection.isRange())
+        return;
+    ASSERT(selection.firstRange());
+
+    visibleTextQuads(*(selection.firstRange()), quads, true /* useSelectionHeight */);
+}
+
 void visibleTextQuads(const Range& range, Vector<FloatQuad>& quads, bool useSelectionHeight)
 {
     // Range::textQuads includes hidden text, which we don't want.
@@ -165,7 +174,7 @@ bool isColorInputField(const Element* element)
 
     const HTMLInputElement* inputElement = static_cast<const HTMLInputElement*>(element);
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     if (inputElement->isColorControl())
         return true;
 #endif
@@ -385,31 +394,45 @@ bool elementIdOrNameIndicatesNoAutocomplete(const Element* element)
     return false;
 }
 
+bool elementPatternIndicatesNumber(const HTMLInputElement* inputElement)
+{
+    return elementPatternMatches("[0-9]", inputElement);
+}
+
 bool elementPatternIndicatesHexadecimal(const HTMLInputElement* inputElement)
 {
-    if (!inputElement)
+    return elementPatternMatches("[0-9a-fA-F]", inputElement);
+}
+
+bool elementPatternMatches(const char* pattern, const HTMLInputElement* inputElement)
+{
+    WTF::String patternString(pattern);
+    if (!inputElement || patternString.isEmpty())
         return false;
 
     if (inputElement->fastHasAttribute(HTMLNames::patternAttr)) {
-        AtomicString patternAttribute = inputElement->fastGetAttribute(HTMLNames::patternAttr);
-        if (patternAttribute.startsWith("[0-9a-fA-F]")) {
+        WTF::String patternAttribute = inputElement->fastGetAttribute(HTMLNames::patternAttr);
+        if (patternAttribute.startsWith(patternString)) {
             // The pattern is for hexadecimal, make sure nothing else is permitted.
 
             // Check if it was an exact match.
-            if (patternAttribute.length() == 11)
+            if (patternAttribute.length() == patternString.length())
+                return true;
+
+            // Check for *
+            if (patternAttribute.length() == patternString.length() + 1 && patternAttribute[patternString.length()] == '*')
                 return true;
 
             // Is the regex specifying a character count?
-            if (patternAttribute[11] != '{' || !patternAttribute.endsWith("}"))
+            if (patternAttribute[patternString.length()] != '{' || !patternAttribute.endsWith("}"))
                 return false;
 
-            int count = 0;
             // Make sure the number in the regex is actually a number.
-            if ((sscanf(patternAttribute.string().latin1().data(), "[0-9a-fA-F]{%d}\0", &count) == 1) && count > 0)
-                return true;
+            unsigned count = 0;
+            patternString = patternString + "{%d}";
+            return (sscanf(patternAttribute.latin1().data(), patternString.latin1().data() + '\0', &count) == 1) && count > 0;
         }
     }
-
     return false;
 }
 

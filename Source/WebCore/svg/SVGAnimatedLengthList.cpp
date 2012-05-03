@@ -40,118 +40,87 @@ PassOwnPtr<SVGAnimatedType> SVGAnimatedLengthListAnimator::constructFromString(c
     return animateType.release();
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedLengthListAnimator::startAnimValAnimation(const Vector<SVGAnimatedProperty*>& properties)
+PassOwnPtr<SVGAnimatedType> SVGAnimatedLengthListAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    return SVGAnimatedType::createLengthList(constructFromOneBaseValue<SVGLengthList, SVGAnimatedLengthList>(properties));
+    return SVGAnimatedType::createLengthList(constructFromBaseValue<SVGAnimatedLengthList>(animatedTypes));
 }
 
-void SVGAnimatedLengthListAnimator::stopAnimValAnimation(const Vector<SVGAnimatedProperty*>& properties)
+void SVGAnimatedLengthListAnimator::stopAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    SVGAnimatedTypeAnimator::stopAnimValAnimationForType<SVGAnimatedLengthList>(properties);
+    stopAnimValAnimationForType<SVGAnimatedLengthList>(animatedTypes);
 }
 
-void SVGAnimatedLengthListAnimator::resetAnimValToBaseVal(const Vector<SVGAnimatedProperty*>& properties, SVGAnimatedType* type)
+void SVGAnimatedLengthListAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
 {
-    resetFromOneBaseValue<SVGLengthList, SVGAnimatedLengthList>(properties, type, &SVGAnimatedType::lengthList);
+    resetFromBaseValue<SVGAnimatedLengthList>(animatedTypes, type, &SVGAnimatedType::lengthList);
 }
 
-void SVGAnimatedLengthListAnimator::animValWillChange(const Vector<SVGAnimatedProperty*>& properties)
+void SVGAnimatedLengthListAnimator::animValWillChange(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    animValWillChangeForType<SVGAnimatedLengthList>(properties);
+    animValWillChangeForType<SVGAnimatedLengthList>(animatedTypes);
 }
 
-void SVGAnimatedLengthListAnimator::animValDidChange(const Vector<SVGAnimatedProperty*>& properties)
+void SVGAnimatedLengthListAnimator::animValDidChange(const SVGElementAnimatedPropertyList& animatedTypes)
 {
-    animValDidChangeForType<SVGAnimatedLengthList>(properties);
+    animValDidChangeForType<SVGAnimatedLengthList>(animatedTypes);
 }
 
-void SVGAnimatedLengthListAnimator::calculateFromAndToValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& toString)
+void SVGAnimatedLengthListAnimator::addAnimatedTypes(SVGAnimatedType* from, SVGAnimatedType* to)
 {
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    animationElement->determinePropertyValueTypes(fromString, toString);
-    
-    from = constructFromString(fromString);
-    to = constructFromString(toString);
-}
+    ASSERT(from->type() == AnimatedLengthList);
+    ASSERT(from->type() == to->type());
 
-void SVGAnimatedLengthListAnimator::calculateFromAndByValues(OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, const String& fromString, const String& byString)
-{
-    ASSERT(m_contextElement);
-    ASSERT(m_animationElement);
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    animationElement->determinePropertyValueTypes(fromString, byString);
-    
-    from = constructFromString(fromString);
-    to = constructFromString(byString);
-    
     SVGLengthList& fromLengthList = from->lengthList();
     SVGLengthList& toLengthList = to->lengthList();
-    unsigned itemsCount = fromLengthList.size();
-    if (itemsCount != toLengthList.size())
+
+    unsigned fromLengthListSize = fromLengthList.size();
+    if (!fromLengthListSize || fromLengthListSize != toLengthList.size())
         return;
+
     SVGLengthContext lengthContext(m_contextElement);
     ExceptionCode ec = 0;
-    for (unsigned i = 0; i < itemsCount; ++i) {
+    for (unsigned i = 0; i < fromLengthListSize; ++i) {
         toLengthList[i].setValue(toLengthList[i].value(lengthContext) + fromLengthList[i].value(lengthContext), lengthContext, ec);
         ASSERT(!ec);
     }
 }
 
-void SVGAnimatedLengthListAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount,
-                                                       OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
+static SVGLengthList parseLengthListFromString(SVGAnimationElement* animationElement, const String& string)
+{
+    SVGLengthList lengthList;
+    lengthList.parse(string, SVGLength::lengthModeForAnimatedLengthAttribute(animationElement->attributeName()));
+    return lengthList;
+}
+
+void SVGAnimatedLengthListAnimator::calculateAnimatedValue(float percentage, unsigned repeatCount, OwnPtr<SVGAnimatedType>& from, OwnPtr<SVGAnimatedType>& to, OwnPtr<SVGAnimatedType>& animated)
 {
     ASSERT(m_animationElement);
     ASSERT(m_contextElement);
 
-    SVGAnimateElement* animationElement = static_cast<SVGAnimateElement*>(m_animationElement);
-    AnimationMode animationMode = animationElement->animationMode();
-
-    // To animation uses contributions from the lower priority animations as the base value.
     SVGLengthList& fromLengthList = from->lengthList();
-    SVGLengthList& animatedLengthList = animated->lengthList();
-    if (animationMode == ToAnimation)
-        fromLengthList = animatedLengthList;
-    
-    // Replace 'inherit' by their computed property values.    
     SVGLengthList& toLengthList = to->lengthList();
-    if (animationElement->fromPropertyValueType() == InheritValue) {
-        String fromLengthString;
-        animationElement->adjustForInheritance(m_contextElement, animationElement->attributeName(), fromLengthString);
-        fromLengthList.parse(fromLengthString, m_lengthMode);
-    }
-    if (animationElement->toPropertyValueType() == InheritValue) {
-        String toLengthString;
-        animationElement->adjustForInheritance(m_contextElement, animationElement->attributeName(), toLengthString);
-        toLengthList.parse(toLengthString, m_lengthMode);
-    }
-
-    unsigned itemsCount = fromLengthList.size();
-    if (itemsCount != toLengthList.size()) {
-        if (percentage < 0.5) {
-            if (animationMode != ToAnimation)
-                animatedLengthList = fromLengthList;
-        } else
-            animatedLengthList = toLengthList;
+    SVGLengthList& animatedLengthList = animated->lengthList();
+    if (!m_animationElement->adjustFromToListValues<SVGLengthList>(parseLengthListFromString, fromLengthList, toLengthList, animatedLengthList, percentage, m_contextElement))
         return;
-    }
-    
-    bool animatedListSizeEqual = itemsCount == animatedLengthList.size();
-    if (!animatedListSizeEqual)
-        animatedLengthList.clear();
+
+    unsigned fromLengthListSize = fromLengthList.size();
+    unsigned toLengthListSize = toLengthList.size();
+
     SVGLengthContext lengthContext(m_contextElement);
     ExceptionCode ec = 0;
-    for (unsigned i = 0; i < itemsCount; ++i) {
-        float result = animatedListSizeEqual ? animatedLengthList[i].value(lengthContext) : 0;
-        SVGLengthType unitType = percentage < 0.5 ? fromLengthList[i].unitType() : toLengthList[i].unitType();
-        SVGAnimatedNumberAnimator::calculateAnimatedNumber(animationElement, percentage, repeatCount, result, fromLengthList[i].value(lengthContext), toLengthList[i].value(lengthContext));
-        if (!animatedListSizeEqual)
-            animatedLengthList.append(SVGLength(lengthContext, result, m_lengthMode, unitType));
-        else {
-            animatedLengthList[i].setValue(lengthContext, result, m_lengthMode, unitType, ec);
-            ASSERT(!ec);
+    for (unsigned i = 0; i < toLengthListSize; ++i) {
+        float animatedNumber = animatedLengthList[i].value(lengthContext);
+        SVGLengthType unitType = toLengthList[i].unitType();
+        float effectiveFrom = 0;
+        if (fromLengthListSize) {
+            if (percentage < 0.5)
+                unitType = fromLengthList[i].unitType();
+            effectiveFrom = fromLengthList[i].value(lengthContext);
         }
+
+        m_animationElement->animateAdditiveNumber(percentage, repeatCount, effectiveFrom, toLengthList[i].value(lengthContext), animatedNumber);
+        animatedLengthList[i].setValue(lengthContext, animatedNumber, m_lengthMode, unitType, ec);
+        ASSERT(!ec);
     }
 }
 

@@ -39,7 +39,7 @@
 
 namespace WebCore {
 class AccessibilityObject;
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 class ColorChooser;
 class ColorChooserClient;
 #endif
@@ -137,7 +137,7 @@ public:
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded);
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded);
     virtual bool paintCustomOverhangArea(WebCore::GraphicsContext*, const WebCore::IntRect&, const WebCore::IntRect&, const WebCore::IntRect&);
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     virtual PassOwnPtr<WebCore::ColorChooser> createColorChooser(WebCore::ColorChooserClient*, const WebCore::Color&) OVERRIDE;
 #endif
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>);
@@ -195,6 +195,12 @@ public:
     virtual bool hasOpenedPopup() const OVERRIDE;
     virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const;
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const;
+#if ENABLE(PAGE_POPUP)
+    virtual WebCore::PagePopup* openPagePopup(WebCore::PagePopupClient*, const WebCore::IntRect&) OVERRIDE;
+    virtual void closePagePopup(WebCore::PagePopup*) OVERRIDE;
+#endif
+    virtual bool willAddTextFieldDecorationsTo(WebCore::HTMLInputElement*) OVERRIDE;
+    virtual void addTextFieldDecorationsTo(WebCore::HTMLInputElement*) OVERRIDE;
 
     virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String& dialogMessage, WebCore::FrameLoader::PageDismissalType) const;
 

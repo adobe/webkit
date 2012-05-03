@@ -358,6 +358,24 @@ bool WebRuntimeFeatures::isMediaStreamEnabled()
 #endif
 }
 
+void WebRuntimeFeatures::enablePeerConnection(bool enable)
+{
+#if ENABLE(MEDIA_STREAM)
+    RuntimeEnabledFeatures::setPeerConnectionEnabled(enable);
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::isPeerConnectionEnabled()
+{
+#if ENABLE(MEDIA_STREAM)
+    return RuntimeEnabledFeatures::peerConnectionEnabled();
+#else
+    return false;
+#endif
+}
+
 void WebRuntimeFeatures::enableFullScreenAPI(bool enable)
 {
 #if ENABLE(FULLSCREEN_API)
@@ -397,7 +415,7 @@ bool WebRuntimeFeatures::isPointerLockEnabled()
 void WebRuntimeFeatures::enableMediaSource(bool enable)
 {
 #if ENABLE(MEDIA_SOURCE)
-    RuntimeEnabledFeatures::setWebkitMediaSourceEnabled(enable);
+    RuntimeEnabledFeatures::setMediaSourceEnabled(enable);
 #else
     UNUSED_PARAM(enable);
 #endif
@@ -406,7 +424,25 @@ void WebRuntimeFeatures::enableMediaSource(bool enable)
 bool WebRuntimeFeatures::isMediaSourceEnabled()
 {
 #if ENABLE(MEDIA_SOURCE)
-    return RuntimeEnabledFeatures::webkitMediaSourceEnabled();
+    return RuntimeEnabledFeatures::mediaSourceEnabled();
+#else
+    return false;
+#endif
+}
+
+void WebRuntimeFeatures::enableEncryptedMedia(bool enable)
+{
+#if ENABLE(ENCRYPTED_MEDIA)
+    RuntimeEnabledFeatures::setEncryptedMediaEnabled(enable);
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::isEncryptedMediaEnabled()
+{
+#if ENABLE(ENCRYPTED_MEDIA)
+    return RuntimeEnabledFeatures::encryptedMediaEnabled();
 #else
     return false;
 #endif
@@ -484,5 +520,22 @@ bool WebRuntimeFeatures::isStyleScopedEnabled()
 #endif
 }
 
+void WebRuntimeFeatures::enableInputTypeDate(bool enable)
+{
+#if ENABLE(INPUT_TYPE_DATE)
+    RuntimeEnabledFeatures::setInputTypeDateEnabled(enable);
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::isInputTypeDateEnabled()
+{
+#if ENABLE(INPUT_TYPE_DATE)
+    return RuntimeEnabledFeatures::inputTypeDateEnabled();
+#else
+    return false;
+#endif
+}
 
 } // namespace WebKit

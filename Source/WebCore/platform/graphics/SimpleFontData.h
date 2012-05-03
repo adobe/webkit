@@ -54,7 +54,11 @@ typedef struct OpaqueATSUStyle* ATSUStyle;
 #endif
 
 #if PLATFORM(QT)
+#if !HAVE(QRAWFONT)
 #include <QFont>
+#else
+#include <QRawFont>
+#endif
 #endif
 
 namespace WebCore {
@@ -118,6 +122,7 @@ public:
 
     FontMetrics& fontMetrics() { return m_fontMetrics; }
     const FontMetrics& fontMetrics() const { return m_fontMetrics; }
+    float sizePerUnit() const { return platformData().size() / (fontMetrics().unitsPerEm() ? fontMetrics().unitsPerEm() : 1); }
     
     float maxCharWidth() const { return m_maxCharWidth; }
     void setMaxCharWidth(float maxCharWidth) { m_maxCharWidth = maxCharWidth; }
@@ -164,6 +169,7 @@ public:
 #endif
 
 #if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+    const SimpleFontData* getCompositeFontReferenceFontData(NSFont *key) const;
     NSFont* getNSFont() const { return m_platformData.font(); }
 #elif (PLATFORM(WX) && OS(DARWIN)) 
     NSFont* getNSFont() const { return m_platformData.nsFont(); }
@@ -188,7 +194,11 @@ public:
 #endif
 
 #if PLATFORM(QT)
+#if !HAVE(QRAWFONT)
     QFont getQtFont() const { return m_platformData.font(); }
+#else
+    QRawFont getQtRawFont() const { return m_platformData.rawFont(); }
+#endif // !HAVE(QRAWFONT)
 #endif
 
 #if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
@@ -262,7 +272,10 @@ private:
         OwnPtr<SimpleFontData> brokenIdeograph;
         OwnPtr<SimpleFontData> verticalRightOrientation;
         OwnPtr<SimpleFontData> uprightOrientation;
-
+#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+        mutable RetainPtr<CFMutableDictionaryRef> compositeFontReferences;
+#endif
+        
     private:
         DerivedFontData(bool custom)
             : forCustomFont(custom)
@@ -341,7 +354,7 @@ ALWAYS_INLINE float SimpleFontData::widthForGlyph(Glyph glyph) const
     m_glyphToWidthMap.setMetricsForGlyph(glyph, width);
     return width;
 }
-#endif
+#endif // HAVE(QRAWFONT)
 
 } // namespace WebCore
 

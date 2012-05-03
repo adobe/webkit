@@ -74,6 +74,8 @@ public:
 
     bool m_styleAffectedByEmpty;
 
+    IntSize m_savedLayerScrollOffset;
+
 #if ENABLE(FULLSCREEN_API)
     bool m_containsFullScreenElement;
 #endif
@@ -81,7 +83,7 @@ public:
 
 inline IntSize defaultMinimumSizeForResizing()
 {
-    return IntSize(INT_MAX, INT_MAX);
+    return IntSize(MAX_LAYOUT_UNIT, MAX_LAYOUT_UNIT);
 }
 
 inline ElementRareData::ElementRareData()

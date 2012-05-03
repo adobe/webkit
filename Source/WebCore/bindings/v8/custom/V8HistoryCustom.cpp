@@ -53,7 +53,7 @@ v8::Handle<v8::Value> V8History::stateAccessorGetter(v8::Local<v8::String> name,
         return value;
 
     SerializedScriptValue* serialized = history->state();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null());
+    value = serialized ? serialized->deserialize(0, info.GetIsolate()) : v8::Handle<v8::Value>(v8::Null());
     info.Holder()->SetHiddenValue(V8HiddenPropertyName::state(), value);
 
     return value;
@@ -62,7 +62,7 @@ v8::Handle<v8::Value> V8History::stateAccessorGetter(v8::Local<v8::String> name,
 v8::Handle<v8::Value> V8History::pushStateCallback(const v8::Arguments& args)
 {
     bool didThrow = false;
-    RefPtr<SerializedScriptValue> historyState = SerializedScriptValue::create(args[0], 0, 0, didThrow);
+    RefPtr<SerializedScriptValue> historyState = SerializedScriptValue::create(args[0], 0, 0, didThrow, args.GetIsolate());
     if (didThrow)
         return v8::Undefined();
 
@@ -87,7 +87,7 @@ v8::Handle<v8::Value> V8History::pushStateCallback(const v8::Arguments& args)
 v8::Handle<v8::Value> V8History::replaceStateCallback(const v8::Arguments& args)
 {
     bool didThrow = false;
-    RefPtr<SerializedScriptValue> historyState = SerializedScriptValue::create(args[0], 0, 0, didThrow);
+    RefPtr<SerializedScriptValue> historyState = SerializedScriptValue::create(args[0], 0, 0, didThrow, args.GetIsolate());
     if (didThrow)
         return v8::Undefined();
 

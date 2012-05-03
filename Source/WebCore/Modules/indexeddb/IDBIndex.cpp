@@ -75,6 +75,15 @@ PassRefPtr<IDBRequest> IDBIndex::openCursor(ScriptExecutionContext* context, Pas
     return request;
 }
 
+PassRefPtr<IDBRequest> IDBIndex::openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, unsigned short direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBObjectStore::openCursor");
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+    return openCursor(context, keyRange.release(), ec);
+}
+
 PassRefPtr<IDBRequest> IDBIndex::count(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec)
 {
     IDB_TRACE("IDBIndex::count");
@@ -115,6 +124,15 @@ PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, 
     return request;
 }
 
+PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, unsigned short direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBObjectStore::openKeyCursor");
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+    return openKeyCursor(context, keyRange.release(), ec);
+}
+
 PassRefPtr<IDBRequest> IDBIndex::get(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec)
 {
     IDB_TRACE("IDBIndex::get");
@@ -123,8 +141,23 @@ PassRefPtr<IDBRequest> IDBIndex::get(ScriptExecutionContext* context, PassRefPtr
         return 0;
     }
 
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+
+    return get(context, keyRange.release(), ec);
+}
+
+PassRefPtr<IDBRequest> IDBIndex::get(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBIndex::get");
+    if (!keyRange) {
+        ec = IDBDatabaseException::DATA_ERR;
+        return 0;
+    }
+
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
-    m_backend->get(key, request, m_transaction->backend(), ec);
+    m_backend->get(keyRange, request, m_transaction->backend(), ec);
     if (ec) {
         request->markEarlyDeath();
         return 0;
@@ -140,8 +173,23 @@ PassRefPtr<IDBRequest> IDBIndex::getKey(ScriptExecutionContext* context, PassRef
         return 0;
     }
 
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+
+    return getKey(context, keyRange.release(), ec);
+}
+
+PassRefPtr<IDBRequest> IDBIndex::getKey(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBIndex::getKey");
+    if (!keyRange) {
+        ec = IDBDatabaseException::DATA_ERR;
+        return 0;
+    }
+
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
-    m_backend->getKey(key, request, m_transaction->backend(), ec);
+    m_backend->getKey(keyRange, request, m_transaction->backend(), ec);
     if (ec) {
         request->markEarlyDeath();
         return 0;

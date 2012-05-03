@@ -29,8 +29,8 @@
 #include "ShareableBitmap.h"
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxy.h"
+#include <WebCore/AlternativeTextClient.h>
 #include <WebCore/EditorClient.h>
-#include <WebCore/SpellingCorrectionController.h>
 #include <wtf/Forward.h>
 
 #if PLATFORM(MAC)
@@ -41,7 +41,7 @@ OBJC_CLASS WKView;
 
 namespace WebCore {
     class Cursor;
-    struct ViewportArguments;
+    struct ViewportAttributes;
 }
 
 namespace WebKit {
@@ -123,7 +123,7 @@ public:
 
     virtual void setCursor(const WebCore::Cursor&) = 0;
     virtual void setCursorHiddenUntilMouseMoves(bool) = 0;
-    virtual void didChangeViewportProperties(const WebCore::ViewportArguments&) = 0;
+    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&) = 0;
 
     virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo) = 0;
     virtual void clearAllEditCommands() = 0;
@@ -185,10 +185,10 @@ public:
     virtual CGContextRef containingWindowGraphicsContext() = 0;
     virtual void didPerformDictionaryLookup(const String&, double scaleFactor, const DictionaryPopupInfo&) = 0;
     virtual void dismissDictionaryLookupPanel() = 0;
-    virtual void showCorrectionPanel(WebCore::CorrectionPanelInfo::PanelType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
-    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingCorrectionPanel) = 0;
-    virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingCorrectionPanel) = 0;
-    virtual void recordAutocorrectionResponse(WebCore::EditorClient::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
+    virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
+    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingAlternativeText) = 0;
+    virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText) = 0;
+    virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) = 0;
     
     virtual WKView* wkView() const = 0;

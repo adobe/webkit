@@ -93,7 +93,6 @@ public:
     virtual void cancelPolicyCheck();
     virtual void dispatchUnableToImplementPolicy(const ResourceError&) { notImplemented(); }
     virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>);
-    virtual void dispatchDidLoadMainResource(DocumentLoader*) { notImplemented(); }
     virtual void revertToProvisionalState(DocumentLoader*) { notImplemented(); }
     virtual void setMainDocumentError(DocumentLoader*, const ResourceError&);
     virtual void postProgressStartedNotification();
@@ -171,10 +170,6 @@ public:
 
     virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext();
 
-     // Schedule a script that was loaded manually by the user (eg. a
-     // bookmarklet) while page loading was deferred.
-    void setDeferredManualScript(const KURL&);
-
     void readyToRender(bool pageIsVisuallyNonEmpty);
 
     void doPendingFragmentScroll();
@@ -196,14 +191,10 @@ private:
     PolicyAction decidePolicyForExternalLoad(const ResourceRequest &, bool isFragmentScroll);
     void delayPolicyCheckUntilFragmentExists(const String& fragment, FramePolicyFunction);
 
-    void deferredJobsTimerFired(Timer<FrameLoaderClientBlackBerry>*);
-
     Frame* m_frame;
     ResourceError m_loadError;
     BlackBerry::WebKit::WebPagePrivate* m_webPagePrivate;
 
-    Timer<FrameLoaderClientBlackBerry>* m_deferredJobsTimer;
-    KURL m_deferredManualScript;
     Geolocation* m_geolocation;
     bool m_sentReadyToRender;
 

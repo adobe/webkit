@@ -426,7 +426,7 @@ void RenderInline::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox
         madeNewBeforeBlock = true;
     }
 
-    RenderBlock* post = block->createAnonymousBlockWithSameTypeAs(pre);
+    RenderBlock* post = toRenderBlock(pre->createAnonymousBoxWithSameTypeAs(block));
 
     RenderObject* boxFirst = madeNewBeforeBlock ? block->firstChild() : pre->nextSibling();
     if (madeNewBeforeBlock)
@@ -701,7 +701,9 @@ static LayoutUnit computeMargin(const RenderInline* renderer, const Length& marg
     if (margin.isFixed())
         return margin.value();
     if (margin.isPercent())
-        return miminumValueForLength(margin, max<LayoutUnit>(0, renderer->containingBlock()->availableLogicalWidth()));
+        return minimumValueForLength(margin, max<LayoutUnit>(0, renderer->containingBlock()->availableLogicalWidth()));
+    if (margin.isViewportPercentage())
+        return valueForLength(margin, 0, renderer->view());
     return 0;
 }
 
@@ -785,14 +787,14 @@ VisiblePosition RenderInline::positionForPoint(const LayoutPoint& point)
     return RenderBoxModelObject::positionForPoint(point);
 }
 
-LayoutRect RenderInline::linesBoundingBox() const
+IntRect RenderInline::linesBoundingBox() const
 {
     if (!alwaysCreateLineBoxes()) {
         ASSERT(!firstLineBox());
-        return enclosingLayoutRect(culledInlineBoundingBox(this));
+        return enclosingIntRect(culledInlineBoundingBox(this));
     }
 
-    LayoutRect result;
+    IntRect result;
     
     // See <rdar://problem/5289721>, for an unknown reason the linked list here is sometimes inconsistent, first is non-zero and last is zero.  We have been
     // unable to reproduce this at all (and consequently unable to figure ot why this is happening).  The assert will hopefully catch the problem in debug
@@ -815,7 +817,7 @@ LayoutRect RenderInline::linesBoundingBox() const
         float y = isHorizontal ? firstLineBox()->y() : logicalLeftSide;
         float width = isHorizontal ? logicalRightSide - logicalLeftSide : lastLineBox()->logicalBottom() - x;
         float height = isHorizontal ? lastLineBox()->logicalBottom() - y : logicalRightSide - logicalLeftSide;
-        result = enclosingLayoutRect(FloatRect(x, y, width, height));
+        result = enclosingIntRect(FloatRect(x, y, width, height));
     }
 
     return result;
@@ -976,8 +978,8 @@ LayoutRect RenderInline::linesVisualOverflowBoundingBox() const
         return LayoutRect();
 
     // Return the width of the minimal left side and the maximal right side.
-    LayoutUnit logicalLeftSide = numeric_limits<LayoutUnit>::max();
-    LayoutUnit logicalRightSide = numeric_limits<LayoutUnit>::min();
+    LayoutUnit logicalLeftSide = MAX_LAYOUT_UNIT;
+    LayoutUnit logicalRightSide = MIN_LAYOUT_UNIT;
     for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
         logicalLeftSide = min(logicalLeftSide, curr->logicalLeftVisualOverflow());
         logicalRightSide = max(logicalRightSide, curr->logicalRightVisualOverflow());
@@ -1029,7 +1031,7 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(RenderBoxModelObject* rep
 
     LayoutRect r(-ow + left, -ow + top, boundingBox.width() + ow * 2, boundingBox.height() + ow * 2);
 
-    if (hitRepaintContainer)
+    if (hitRepaintContainer || !cb)
         return r;
 
     if (cb->hasColumns())
@@ -1056,7 +1058,7 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(RenderBoxModelObject* rep
             }
         }
 
-        if (continuation() && !continuation()->isInline()) {
+        if (continuation() && !continuation()->isInline() && continuation()->parent()) {
             LayoutRect contRect = continuation()->rectWithOutlineForRepaint(repaintContainer, ow);
             r.unite(contRect);
         }
@@ -1109,18 +1111,6 @@ void RenderInline::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
             rect = repaintRect;
         }
     }
-
-#if ENABLE(CSS_FILTERS)
-    if (style()->hasFilterOutsets()) {
-        LayoutUnit topOutset;
-        LayoutUnit rightOutset;
-        LayoutUnit bottomOutset;
-        LayoutUnit leftOutset;
-        style()->filter().getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
-        rect.move(-leftOutset, -topOutset);
-        rect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
-    }
-#endif
 
     if (style()->position() == RelativePosition && layer()) {
         // Apply the relative position offset when invalidating a rectangle.  The layer
@@ -1313,10 +1303,10 @@ LayoutUnit RenderInline::lineHeight(bool firstLine, LineDirectionMode /*directio
     if (firstLine && document()->usesFirstLineRules()) {
         RenderStyle* s = style(firstLine);
         if (s != style())
-            return s->computedLineHeight();
+            return s->computedLineHeight(view());
     }
 
-    return style()->computedLineHeight();
+    return style()->computedLineHeight(view());
 }
 
 LayoutUnit RenderInline::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
@@ -1463,6 +1453,8 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
         LayoutSize(thisline.width() + offset, thisline.height() + offset));
 
     IntRect pixelSnappedBox = pixelSnappedIntRect(box);
+    IntRect pixelSnappedLastLine = pixelSnappedIntRect(paintOffset.x() + lastline.x(), 0, lastline.width(), 0);
+    IntRect pixelSnappedNextLine = pixelSnappedIntRect(paintOffset.x() + nextline.x(), 0, nextline.width(), 0);
     
     // left edge
     drawLineForBoxSide(graphicsContext,
@@ -1492,7 +1484,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
         drawLineForBoxSide(graphicsContext,
             pixelSnappedBox.x() - outlineWidth,
             pixelSnappedBox.y() - outlineWidth,
-            min(pixelSnappedBox.maxX() + outlineWidth, (lastline.isEmpty() ? 1000000 : paintOffset.x() + lastline.x())),
+            min(pixelSnappedBox.maxX() + outlineWidth, (lastline.isEmpty() ? 1000000 : pixelSnappedLastLine.x())),
             pixelSnappedBox.y(),
             BSTop, outlineColor, outlineStyle,
             outlineWidth,
@@ -1501,7 +1493,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
     
     if (lastline.maxX() < thisline.maxX())
         drawLineForBoxSide(graphicsContext,
-            max(lastline.isEmpty() ? -1000000 : paintOffset.x() + lastline.maxX(), pixelSnappedBox.x() - outlineWidth),
+            max(lastline.isEmpty() ? -1000000 : pixelSnappedLastLine.maxX(), pixelSnappedBox.x() - outlineWidth),
             pixelSnappedBox.y() - outlineWidth,
             pixelSnappedBox.maxX() + outlineWidth,
             pixelSnappedBox.y(),
@@ -1525,7 +1517,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
         drawLineForBoxSide(graphicsContext,
             pixelSnappedBox.x() - outlineWidth,
             pixelSnappedBox.maxY(),
-            min(pixelSnappedBox.maxX() + outlineWidth, !nextline.isEmpty() ? paintOffset.x() + nextline.x() + 1 : 1000000),
+            min(pixelSnappedBox.maxX() + outlineWidth, !nextline.isEmpty() ? pixelSnappedNextLine.x() + 1 : 1000000),
             pixelSnappedBox.maxY() + outlineWidth,
             BSBottom, outlineColor, outlineStyle,
             outlineWidth,
@@ -1534,7 +1526,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
     
     if (nextline.maxX() < thisline.maxX())
         drawLineForBoxSide(graphicsContext,
-            max(!nextline.isEmpty() ? paintOffset.x() + nextline.maxX() : -1000000, pixelSnappedBox.x() - outlineWidth),
+            max(!nextline.isEmpty() ? pixelSnappedNextLine.maxX() : -1000000, pixelSnappedBox.x() - outlineWidth),
             pixelSnappedBox.maxY(),
             pixelSnappedBox.maxX() + outlineWidth,
             pixelSnappedBox.maxY() + outlineWidth,

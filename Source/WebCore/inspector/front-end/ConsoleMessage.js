@@ -35,14 +35,14 @@
  * @param {string} source
  * @param {string} level
  * @param {string} message
- * @param {WebInspector.DebuggerPresentationModel.Linkifier} linkifier
+ * @param {WebInspector.Linkifier} linkifier
  * @param {string=} type
  * @param {string=} url
  * @param {number=} line
  * @param {number=} repeatCount
  * @param {Array.<RuntimeAgent.RemoteObject>=} parameters
  * @param {ConsoleAgent.StackTrace=} stackTrace
- * @param {WebInspector.Resource=} request
+ * @param {WebInspector.NetworkRequest=} request
  */
 WebInspector.ConsoleMessageImpl = function(source, level, message, linkifier, type, url, line, repeatCount, parameters, stackTrace, request)
 {
@@ -91,7 +91,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             }
         } else if (this.source === WebInspector.ConsoleMessage.MessageSource.Network) {
             if (this._request) {
-                this._stackTrace = this._request.stackTrace;
+                this._stackTrace = this._request.initiator.stackTrace;
                 if (this._request.initiator && this._request.initiator.url) {
                     this.url = this._request.initiator.url;
                     this.line = this._request.initiator.lineNumber;
@@ -436,7 +436,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             matchRanges.push({ offset: match.index, length: match[0].length });
             match = regexObject.exec(text);
         }
-        highlightSearchResults(element, matchRanges);
+        WebInspector.highlightSearchResults(element, matchRanges);
     },
 
     matchesRegex: function(regexObject)

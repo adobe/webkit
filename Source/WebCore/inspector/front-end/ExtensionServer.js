@@ -319,12 +319,17 @@ WebInspector.ExtensionServer.prototype = {
 
     _onEvaluateOnInspectedPage: function(message, port)
     {
+        /**
+         * @param {?Protocol.Error} error
+         * @param {RuntimeAgent.RemoteObject} resultPayload
+         * @param {boolean=} wasThrown
+         */
         function callback(error, resultPayload, wasThrown)
         {
             var result = {};
             if (error) {
                 result.isException = true;
-                result.value = error.message;
+                result.value = error.toString();
             }  else
                 result.value = resultPayload.value;
 
@@ -406,7 +411,7 @@ WebInspector.ExtensionServer.prototype = {
 
     _onGetHAR: function()
     {
-        var requests = WebInspector.networkLog.resources;
+        var requests = WebInspector.networkLog.requests;
         var harLog = (new WebInspector.HARLog(requests)).build();
         for (var i = 0; i < harLog.entries.length; ++i)
             harLog.entries[i]._requestId = this._requestId(requests[i]);
@@ -417,7 +422,7 @@ WebInspector.ExtensionServer.prototype = {
     {
         return {
             url: resource.url,
-            type: WebInspector.Resource.Type.toString(resource.type)
+            type: resource.type.name()
         };
     },
 
@@ -434,10 +439,15 @@ WebInspector.ExtensionServer.prototype = {
 
     _getResourceContent: function(resource, message, port)
     {
-        function onContentAvailable(content, encoded)
+        /**
+         * @param {?string} content
+         * @param {boolean} contentEncoded
+         * @param {string} mimeType
+         */
+        function onContentAvailable(content, contentEncoded, mimeType)
         {
             var response = {
-                encoding: encoded ? "base64" : "",
+                encoding: contentEncoded ? "base64" : "",
                 content: content
             };
             this._dispatchCallback(message.requestId, port, response);
@@ -463,6 +473,9 @@ WebInspector.ExtensionServer.prototype = {
 
     _onSetResourceContent: function(message, port)
     {
+        /**
+         * @param {?Protocol.Error} error
+         */
         function callbackWrapper(error)
         {
             var response = error ? this._status.E_FAILED(error) : this._status.OK();
@@ -529,7 +542,7 @@ WebInspector.ExtensionServer.prototype = {
         this._registerAutosubscriptionHandler(WebInspector.extensionAPI.Events.ConsoleMessageAdded,
             WebInspector.console, WebInspector.ConsoleModel.Events.MessageAdded, this._notifyConsoleMessageAdded);
         this._registerAutosubscriptionHandler(WebInspector.extensionAPI.Events.NetworkRequestFinished,
-            WebInspector.networkManager, WebInspector.NetworkManager.EventTypes.ResourceFinished, this._notifyRequestFinished);
+            WebInspector.networkManager, WebInspector.NetworkManager.EventTypes.RequestFinished, this._notifyRequestFinished);
         this._registerAutosubscriptionHandler(WebInspector.extensionAPI.Events.ResourceAdded,
             WebInspector.resourceTreeModel,
             WebInspector.ResourceTreeModel.EventTypes.ResourceAdded,
@@ -584,7 +597,7 @@ WebInspector.ExtensionServer.prototype = {
 
     _notifyRequestFinished: function(event)
     {
-        var request = event.data;
+        var request = /** @type {WebInspector.NetworkRequest} */ event.data;
         this._postNotification(WebInspector.extensionAPI.Events.NetworkRequestFinished, this._requestId(request), (new WebInspector.HAREntry(request)).build());
     },
 

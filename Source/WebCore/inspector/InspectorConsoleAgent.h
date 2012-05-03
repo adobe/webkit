@@ -25,6 +25,8 @@
 #ifndef InspectorConsoleAgent_h
 #define InspectorConsoleAgent_h
 
+#if ENABLE(INSPECTOR)
+
 #include "ConsoleTypes.h"
 #include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
@@ -35,8 +37,6 @@
 #include <wtf/Vector.h>
 
 namespace WebCore {
-
-#if ENABLE(INSPECTOR)
 
 class ConsoleMessage;
 class DOMWindow;
@@ -69,6 +69,7 @@ public:
 
     void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
     void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, const String& scriptId, unsigned lineNumber);
+    Vector<unsigned> consoleMessageArgumentCounts();
 
     void startTiming(const String& title);
     void stopTiming(const String& title, PassRefPtr<ScriptCallStack>);
@@ -101,8 +102,8 @@ protected:
     HashMap<String, double> m_times;
 };
 
-#endif
-
 } // namespace WebCore
+
+#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorConsoleAgent_h)

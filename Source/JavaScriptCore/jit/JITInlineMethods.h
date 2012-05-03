@@ -132,7 +132,6 @@ ALWAYS_INLINE bool JIT::atJumpTarget()
 
 ALWAYS_INLINE void JIT::beginUninterruptedSequence(int insnSpace, int constSpace)
 {
-    JSInterfaceJIT::beginUninterruptedSequence();
 #if CPU(ARM_TRADITIONAL)
 #ifndef NDEBUG
     // Ensure the label after the sequence can also fit
@@ -182,7 +181,6 @@ ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, 
     ASSERT(differenceBetween(m_uninterruptedInstructionSequenceBegin, label()) <= insnSpace);
     ASSERT(sizeOfConstantPool() - m_uninterruptedConstantSequenceBegin <= constSpace);
 #endif
-    JSInterfaceJIT::endUninterruptedSequence();
 }
 
 #endif
@@ -414,12 +412,12 @@ template <typename ClassType, bool destructor, typename StructureType> inline vo
         allocator = &m_globalData->heap.allocatorForObjectWithDestructor(sizeof(ClassType));
     else
         allocator = &m_globalData->heap.allocatorForObjectWithoutDestructor(sizeof(ClassType));
-    loadPtr(&allocator->m_firstFreeCell, result);
+    loadPtr(&allocator->m_freeList.head, result);
     addSlowCase(branchTestPtr(Zero, result));
 
     // remove the object from the free list
     loadPtr(Address(result), storagePtr);
-    storePtr(storagePtr, &allocator->m_firstFreeCell);
+    storePtr(storagePtr, &allocator->m_freeList.head);
 
     // initialize the object's structure
     storePtr(structure, Address(result, JSCell::structureOffset()));
@@ -485,11 +483,12 @@ inline void JIT::emitAllocateJSArray(unsigned valuesRegister, unsigned length, R
     unsigned initialLength = std::max(length, 4U);
     size_t initialStorage = JSArray::storageSize(initialLength);
 
+    // We allocate the backing store first to ensure that garbage collection 
+    // doesn't happen during JSArray initialization.
+    emitAllocateBasicStorage(initialStorage, storageResult, storagePtr);
+
     // Allocate the cell for the array.
     emitAllocateBasicJSObject<JSArray, false>(TrustedImmPtr(m_codeBlock->globalObject()->arrayStructure()), cellResult, storagePtr);
-
-    // Allocate the backing store for the array.
-    emitAllocateBasicStorage(initialStorage, storageResult, storagePtr);
 
     // Store all the necessary info in the ArrayStorage.
     storePtr(storageResult, Address(storageResult, ArrayStorage::allocBaseOffset()));
@@ -503,8 +502,7 @@ inline void JIT::emitAllocateJSArray(unsigned valuesRegister, unsigned length, R
     store32(Imm32(initialLength), Address(cellResult, JSArray::vectorLengthOffset()));
     store32(TrustedImm32(0), Address(cellResult, JSArray::indexBiasOffset()));
 
-    // Initialize the subclass data and the sparse value map.
-    storePtr(TrustedImmPtr(0), Address(cellResult, JSArray::subclassDataOffset()));
+    // Initialize the sparse value map.
     storePtr(TrustedImmPtr(0), Address(cellResult, JSArray::sparseValueMapOffset()));
 
         // Store the values we have.

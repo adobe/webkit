@@ -13,14 +13,20 @@ TestWebView {
     height: 400
 
     property bool selectFile
+    property bool acceptMultiple: false
 
     experimental.filePicker: Item {
         Timer {
             running: true
             interval: 1
             onTriggered: {
-                if (selectFile)
-                    model.accept("acceptedfilename");
+                var selectedFiles = ["filename1", "filename2"]
+                if (selectFile) {
+                    if (acceptMultiple)
+                        model.accept(selectedFiles)
+                    else
+                        model.accept("acceptedfilename");
+                }
                 else
                     model.reject();
             }
@@ -53,6 +59,14 @@ TestWebView {
             openItemSelector()
             titleSpy.wait()
             compare(webView.title, "acceptedfilename")
+        }
+
+        function test_multiple() {
+            webView.selectFile = true;
+            webView.acceptMultiple = true;
+            openItemSelector()
+            titleSpy.wait()
+            compare(webView.title, "filename1")
         }
 
         function test_reject() {

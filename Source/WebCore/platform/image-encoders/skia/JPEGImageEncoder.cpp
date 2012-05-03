@@ -81,7 +81,7 @@ static void handleError(j_common_ptr common)
 
 static void preMultipliedBGRAtoRGB(const unsigned char* pixels, unsigned int pixelCount, unsigned char* output)
 {
-    const SkPMColor* input = reinterpret_cast<const SkPMColor*>(pixels);
+    const SkPMColor* input = reinterpret_cast_ptr<const SkPMColor*>(pixels);
     for (; pixelCount-- > 0; ++input) {
         *output++ = SkGetPackedR32(*input);
         *output++ = SkGetPackedG32(*input);
@@ -195,7 +195,7 @@ bool JPEGImageEncoder::encode(const SkBitmap& bitmap, int quality, Vector<unsign
 
 bool JPEGImageEncoder::encode(const ImageData& imageData, int quality, Vector<unsigned char>* output)
 {
-    return encodePixels(imageData.size(), imageData.data()->data()->data(), false, quality, output);
+    return encodePixels(imageData.size(), imageData.data()->data(), false, quality, output);
 }
 
 } // namespace WebCore

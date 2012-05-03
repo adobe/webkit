@@ -25,6 +25,7 @@
 
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
+#include <AlternativeTextController.cpp>
 #include <AppendNodeCommand.cpp>
 #include <ApplyBlockElementCommand.cpp>
 #include <ApplyStyleCommand.cpp>
@@ -35,6 +36,8 @@
 #include <DeleteButtonController.cpp>
 #include <DeleteFromTextNodeCommand.cpp>
 #include <DeleteSelectionCommand.cpp>
+#include <DictationAlternative.cpp>
+#include <DictationCommand.cpp>
 #include <EditCommand.cpp>
 #include <EditingStyle.cpp>
 #include <Editor.cpp>
@@ -62,15 +65,16 @@
 #include <ReplaceSelectionCommand.cpp>
 #include <SetNodeAttributeCommand.cpp>
 #include <SetSelectionCommand.cpp>
+#include <SimplifyMarkupCommand.cpp>
 #include <SmartReplace.cpp>
 #include <SmartReplaceCF.cpp>
 #include <SpellingCorrectionCommand.cpp>
-#include <SpellingCorrectionController.cpp>
 #include <SpellChecker.cpp>
 #include <SplitElementCommand.cpp>
 #include <SplitTextNodeCommand.cpp>
 #include <SplitTextNodeContainingElementCommand.cpp>
 #include <TextCheckingHelper.cpp>
+#include <TextInsertionBaseCommand.cpp>
 #include <TextIterator.cpp>
 #include <TypingCommand.cpp>
 #include <UnlinkCommand.cpp>

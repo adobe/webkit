@@ -81,7 +81,7 @@ TEST(CCLayerImplTest, verifyLayerChangesAreTrackedProperly)
     IntSize arbitraryIntSize = IntSize(111, 222);
     IntPoint arbitraryIntPoint = IntPoint(333, 444);
     IntRect arbitraryIntRect = IntRect(arbitraryIntPoint, arbitraryIntSize);
-    FloatRect arbitraryFloatRect = FloatRect(arbitraryFloatPoint, FloatSize(1.234, 5.678));
+    FloatRect arbitraryFloatRect = FloatRect(arbitraryFloatPoint, FloatSize(1.234f, 5.678f));
     Color arbitraryColor = Color(10, 20, 30);
     TransformationMatrix arbitraryTransform;
     arbitraryTransform.scale3d(0.1, 0.2, 0.3);
@@ -112,7 +112,7 @@ TEST(CCLayerImplTest, verifyLayerChangesAreTrackedProperly)
     EXECUTE_AND_VERIFY_ONLY_LAYER_CHANGED(root->setDebugBorderWidth(arbitraryNumber));
     EXECUTE_AND_VERIFY_ONLY_LAYER_CHANGED(root->setDrawsContent(true));
     EXECUTE_AND_VERIFY_ONLY_LAYER_CHANGED(root->setBackgroundColor(Color::gray));
-    EXECUTE_AND_VERIFY_ONLY_LAYER_CHANGED(root->setBackgroundCoversViewport(true));
+    EXECUTE_AND_VERIFY_ONLY_LAYER_CHANGED(root->setBackgroundFilters(arbitraryFilters));
 
     // Special case: check that sublayer transform changes all layer's descendants, but not the layer itself.
     root->resetAllChangeTrackingForSubtree();

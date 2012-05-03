@@ -52,18 +52,18 @@ public:
     
     void addClient(CustomFilterProgramClient*);
     void removeClient(CustomFilterProgramClient*);
-    
-#if ENABLE(WEBGL)
-    PassRefPtr<CustomFilterShader> createShaderWithContext(GraphicsContext3D*);
-#endif
 
+    // StyleCustomFilterProgram has the only implementation for the following method. That means, it casts to StyleCustomFilterProgram
+    // withouth checking the type. If you add another implementation, also add a mechanism to check for the correct type.
+    virtual bool operator==(const CustomFilterProgram&) const = 0;
+    bool operator!=(const CustomFilterProgram& o) const { return !(*this == o); }
+
+    virtual String vertexShaderString() const = 0;
+    virtual String fragmentShaderString() const = 0;
 protected:
     // StyleCustomFilterProgram can notify the clients that the cached resources are
     // loaded and it is ready to create CustomFilterShader objects.
     void notifyClients();
-    
-    virtual String vertexShaderString() const = 0;
-    virtual String fragmentShaderString() const = 0;
     
     virtual void willHaveClients() = 0;
     virtual void didRemoveLastClient() = 0;

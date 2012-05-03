@@ -35,11 +35,13 @@
 
 #include "DOMWindowProperty.h"
 #include "MemoryInfo.h"
+#include "PerformanceEntryList.h"
 #include "PerformanceNavigation.h"
 #include "PerformanceTiming.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -50,6 +52,13 @@ public:
     PassRefPtr<MemoryInfo> memory() const;
     PerformanceNavigation* navigation() const;
     PerformanceTiming* timing() const;
+    double webkitNow() const;
+
+#if ENABLE(PERFORMANCE_TIMELINE)
+    PassRefPtr<PerformanceEntryList> webkitGetEntries() const;
+    PassRefPtr<PerformanceEntryList> webkitGetEntriesByType(const String& entryType);
+    PassRefPtr<PerformanceEntryList> webkitGetEntriesByName(const String& name, const String& entryType);
+#endif
 
 private:
     explicit Performance(Frame*);

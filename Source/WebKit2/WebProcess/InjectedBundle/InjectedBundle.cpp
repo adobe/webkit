@@ -54,6 +54,7 @@
 #include <WebCore/JSDOMWindow.h>
 #include <WebCore/Page.h>
 #include <WebCore/PageGroup.h>
+#include <WebCore/PageVisibilityState.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/ScriptController.h>
@@ -138,7 +139,8 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     macro(WebKitUsesPageCachePreferenceKey, UsesPageCache, usesPageCache) \
     macro(WebKitWebAudioEnabled, WebAudioEnabled, webAudioEnabled) \
     macro(WebKitWebGLEnabled, WebGLEnabled, webGLEnabled) \
-    macro(WebKitXSSAuditorEnabled, XSSAuditorEnabled, xssAuditorEnabled)
+    macro(WebKitXSSAuditorEnabled, XSSAuditorEnabled, xssAuditorEnabled) \
+    macro(WebKitShouldRespectImageOrientation, ShouldRespectImageOrientation, shouldRespectImageOrientation)
 
     if (preference == "WebKitAcceleratedCompositingEnabled")
         enabled = enabled && LayerTreeHost::supportsAcceleratedCompositing();
@@ -198,7 +200,7 @@ void InjectedBundle::setGeoLocationPermission(WebPageGroupProxy* pageGroup, bool
 #if ENABLE(GEOLOCATION)
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
     for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
-        static_cast<GeolocationClientMock*>((*iter)->geolocationController()->client())->setPermission(enabled);
+        static_cast<GeolocationClientMock*>(GeolocationController::from(*iter)->client())->setPermission(enabled);
 #endif // ENABLE(GEOLOCATION)
 }
 
@@ -454,6 +456,15 @@ void InjectedBundle::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC:
     }
 
     ASSERT_NOT_REACHED();
+}
+
+void InjectedBundle::setPageVisibilityState(WebPageGroupProxy* pageGroup, int state, bool isInitialState)
+{
+#if ENABLE(PAGE_VISIBILITY_API)
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->setVisibilityState(static_cast<PageVisibilityState>(state), isInitialState);
+#endif
 }
 
 } // namespace WebKit

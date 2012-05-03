@@ -42,6 +42,11 @@
 
 namespace WebCore {
 
+void GraphicsContext3D::readPixelsAndConvertToBGRAIfNecessary(int x, int y, int width, int height, unsigned char* pixels)
+{
+    ::glReadPixels(x, y, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+}
+
 bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
 {
     const int width = size.width();
@@ -186,6 +191,37 @@ void GraphicsContext3D::getIntegerv(GC3Denum pname, GC3Dint* value)
         break;
     default:
         ::glGetIntegerv(pname, value);
+    }
+}
+
+void GraphicsContext3D::getShaderPrecisionFormat(GC3Denum shaderType, GC3Denum precisionType, GC3Dint* range, GC3Dint* precision)
+{
+    UNUSED_PARAM(shaderType);
+    ASSERT(range);
+    ASSERT(precision);
+
+    makeContextCurrent();
+
+    switch (precisionType) {
+    case GraphicsContext3D::LOW_INT:
+    case GraphicsContext3D::MEDIUM_INT:
+    case GraphicsContext3D::HIGH_INT:
+        // These values are for a 32-bit twos-complement integer format.
+        range[0] = 31;
+        range[1] = 30;
+        precision[0] = 0;
+        break;
+    case GraphicsContext3D::LOW_FLOAT:
+    case GraphicsContext3D::MEDIUM_FLOAT:
+    case GraphicsContext3D::HIGH_FLOAT:
+        // These values are for an IEEE single-precision floating-point format.
+        range[0] = 127;
+        range[1] = 127;
+        precision[0] = 23;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
     }
 }
 

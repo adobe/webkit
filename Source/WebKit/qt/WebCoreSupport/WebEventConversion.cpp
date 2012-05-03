@@ -23,9 +23,12 @@
 #include "WebEventConversion.h"
 
 #include "PlatformMouseEvent.h"
+#include "PlatformTouchEvent.h"
+#include "PlatformTouchPoint.h"
 #include "PlatformWheelEvent.h"
 #include <QApplication>
 #include <QGraphicsSceneMouseEvent>
+#include <QTouchEvent>
 #include <QWheelEvent>
 #include <wtf/CurrentTime.h>
 
@@ -178,27 +181,21 @@ private:
 
 void WebKitPlatformWheelEvent::applyDelta(int delta, Qt::Orientation orientation)
 {
-    // A delta that is not mod 120 indicates a device that is sending
-    // fine-resolution scroll events, so use the delta as number of wheel ticks
-    // and number of pixels to scroll.See also webkit.org/b/29601
-    bool fullTick = !(delta % 120);
-
     if (orientation == Qt::Horizontal) {
-        m_deltaX = (fullTick) ? delta / 120.0f : delta;
+        m_deltaX = delta;
         m_deltaY = 0;
     } else {
         m_deltaX = 0;
-        m_deltaY = (fullTick) ? delta / 120.0f : delta;
+        m_deltaY = delta;
     }
+    m_wheelTicksX = m_deltaX / 120.0f;
+    m_wheelTicksY = m_deltaY / 120.0f;
 
-    m_wheelTicksX = m_deltaX;
-    m_wheelTicksY = m_deltaY;
-
-    // Use the same single scroll step as QTextEdit
-    // (in QTextEditPrivate::init [h,v]bar->setSingleStep)
+    // Since we request the scroll delta by the pixel, convert the wheel delta to pixel delta using the standard scroll step.
+    // Use the same single scroll step as QTextEdit (in QTextEditPrivate::init [h,v]bar->setSingleStep)
     static const float cDefaultQtScrollStep = 20.f;
-    m_deltaX *= (fullTick) ? QApplication::wheelScrollLines() * cDefaultQtScrollStep : 1;
-    m_deltaY *= (fullTick) ? QApplication::wheelScrollLines() * cDefaultQtScrollStep : 1;
+    m_deltaX = m_wheelTicksX * QApplication::wheelScrollLines() * cDefaultQtScrollStep;
+    m_deltaY = m_wheelTicksY * QApplication::wheelScrollLines() * cDefaultQtScrollStep;
 }
 
 WebKitPlatformWheelEvent::WebKitPlatformWheelEvent(QGraphicsSceneWheelEvent* e)
@@ -223,6 +220,89 @@ WebKitPlatformWheelEvent::WebKitPlatformWheelEvent(QWheelEvent* e)
     applyDelta(e->delta(), e->orientation());
 }
 
+#if ENABLE(TOUCH_EVENTS)
+class WebKitPlatformTouchEvent : public PlatformTouchEvent {
+public:
+    WebKitPlatformTouchEvent(QTouchEvent*);
+};
+
+class WebKitPlatformTouchPoint : public PlatformTouchPoint {
+public:
+    WebKitPlatformTouchPoint(const QTouchEvent::TouchPoint&, State);
+};
+
+WebKitPlatformTouchEvent::WebKitPlatformTouchEvent(QTouchEvent* event)
+{
+    switch (event->type()) {
+    case QEvent::TouchBegin:
+        m_type = PlatformEvent::TouchStart;
+        break;
+    case QEvent::TouchUpdate:
+        m_type = PlatformEvent::TouchMove;
+        break;
+    case QEvent::TouchEnd:
+        m_type = PlatformEvent::TouchEnd;
+        break;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+    case QEvent::TouchCancel:
+        m_type = PlatformEvent::TouchCancel;
+        break;
+#endif
+    }
+
+    const QList<QTouchEvent::TouchPoint>& points = event->touchPoints();
+    for (int i = 0; i < points.count(); ++i) {
+        PlatformTouchPoint::State state = PlatformTouchPoint::TouchStateEnd;
+
+        switch (points.at(i).state()) {
+        case Qt::TouchPointReleased:
+            state = PlatformTouchPoint::TouchReleased;
+            break;
+        case Qt::TouchPointMoved:
+            state = PlatformTouchPoint::TouchMoved;
+            break;
+        case Qt::TouchPointPressed:
+            state = PlatformTouchPoint::TouchPressed;
+            break;
+        case Qt::TouchPointStationary:
+            state = PlatformTouchPoint::TouchStationary;
+            break;
+        }
+
+        // Qt does not have a Qt::TouchPointCancelled point state, so if we receive a touch cancel event,
+        // simply cancel all touch points here.
+        if (m_type == PlatformEvent::TouchCancel)
+            state = PlatformTouchPoint::TouchCancelled;
+
+        m_touchPoints.append(WebKitPlatformTouchPoint(points.at(i), state));
+    }
+
+    mouseEventModifiersFromQtKeyboardModifiers(event->modifiers(), m_modifiers);
+
+    m_timestamp = WTF::currentTime();
+}
+
+WebKitPlatformTouchPoint::WebKitPlatformTouchPoint(const QTouchEvent::TouchPoint& point, State state)
+{
+    // The QTouchEvent::TouchPoint API states that ids will be >= 0.
+    m_id = point.id();
+    m_state = state;
+    m_screenPos = point.screenPos().toPoint();
+    m_pos = point.pos().toPoint();
+    // Qt reports touch point size as rectangles, but we will pretend it is an oval.
+    QRect touchRect = point.rect().toAlignedRect();
+    if (touchRect.isValid()) {
+        m_radiusX = point.rect().width() / 2;
+        m_radiusY = point.rect().height() / 2;
+    } else {
+        // http://www.w3.org/TR/2011/WD-touch-events-20110505: 1 if no value is known.
+        m_radiusX = 1;
+        m_radiusY = 1;
+    }
+    m_force = point.pressure();
+    // FIXME: Support m_rotationAngle if QTouchEvent at some point supports it.
+}
+#endif
 
 PlatformWheelEvent convertWheelEvent(QWheelEvent* event)
 {
@@ -233,5 +313,12 @@ PlatformWheelEvent convertWheelEvent(QGraphicsSceneWheelEvent* event)
 {
     return WebKitPlatformWheelEvent(event);
 }
+
+#if ENABLE(TOUCH_EVENTS)
+PlatformTouchEvent convertTouchEvent(QTouchEvent* event)
+{
+    return WebKitPlatformTouchEvent(event);
+}
+#endif
 
 }

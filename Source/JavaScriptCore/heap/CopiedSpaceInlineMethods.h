@@ -56,8 +56,6 @@ inline void CopiedSpace::startedCopying()
     m_toSpaceFilter.reset();
     m_allocator.startedCopying();
 
-    m_waterMark = 0;
-
     ASSERT(!m_inCopyingPhase);
     ASSERT(!m_numberOfLoanedBlocks);
     m_inCopyingPhase = true;
@@ -65,11 +63,7 @@ inline void CopiedSpace::startedCopying()
 
 inline void CopiedSpace::recycleBlock(CopiedBlock* block)
 {
-    {
-        MutexLocker locker(m_heap->m_freeBlockLock);
-        m_heap->m_freeBlocks.push(block);
-        m_heap->m_numberOfFreeBlocks++;
-    }
+    m_heap->blockAllocator().deallocate(block);
 
     {
         MutexLocker locker(m_loanedBlocksLock);

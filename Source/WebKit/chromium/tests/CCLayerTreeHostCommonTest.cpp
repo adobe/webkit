@@ -26,16 +26,19 @@
 
 #include "cc/CCLayerTreeHostCommon.h"
 
+#include "CCAnimationTestCommon.h"
 #include "CCLayerTreeTestCommon.h"
 #include "LayerChromium.h"
 #include "TransformationMatrix.h"
 #include "TranslateTransformOperation.h"
 #include "cc/CCLayerAnimationController.h"
+#include "cc/CCMathUtil.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 using namespace WebCore;
+using namespace WebKitTests;
 
 namespace {
 
@@ -78,7 +81,7 @@ public:
     {
     }
 
-    virtual bool drawsContent() const { return true; }
+    virtual bool drawsContent() const OVERRIDE { return true; }
 };
 
 TEST(CCLayerTreeHostCommonTest, verifyTransformsForNoOpLayer)
@@ -526,7 +529,7 @@ TEST(CCLayerTreeHostCommonTest, verifyRenderSurfaceListForClipLayer)
     RefPtr<LayerChromium> parent = LayerChromium::create();
     RefPtr<LayerChromium> renderSurface1 = LayerChromium::create();
     RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent());
-    renderSurface1->setOpacity(0.9);
+    renderSurface1->setOpacity(0.9f);
 
     const TransformationMatrix identityMatrix;
     setLayerPropertiesForTesting(renderSurface1.get(), identityMatrix, identityMatrix, FloatPoint::zero(), FloatPoint::zero(), IntSize(10, 10), false);
@@ -619,9 +622,58 @@ TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfaces)
     setLayerPropertiesForTesting(leafNode2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(20, 20), false);
 
     child->setMasksToBounds(true);
-    child->setOpacity(0.4);
-    grandChild->setOpacity(0.5);
-    greatGrandChild->setOpacity(0.4);
+    child->setOpacity(0.4f);
+    grandChild->setOpacity(0.5f);
+    greatGrandChild->setOpacity(0.4f);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    ASSERT_EQ(2U, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+    EXPECT_EQ(child->id(), renderSurfaceLayerList[1]->id());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfacesCrashRepro)
+{
+    // This is a similar situation as verifyClipRectCullsRenderSurfaces, except that
+    // it reproduces a crash bug http://code.google.com/p/chromium/issues/detail?id=106734.
+
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild = LayerChromium::create();
+    RefPtr<LayerChromium> greatGrandChild = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode1 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    parent->createRenderSurface();
+    parent->addChild(child);
+    child->addChild(grandChild);
+    grandChild->addChild(greatGrandChild);
+
+    // leafNode1 ensures that parent and child are kept on the renderSurfaceLayerList,
+    // even though grandChild and greatGrandChild should be clipped.
+    child->addChild(leafNode1);
+    greatGrandChild->addChild(leafNode2);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(500, 500), false);
+    setLayerPropertiesForTesting(child.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(20, 20), false);
+    setLayerPropertiesForTesting(grandChild.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(45, 45), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(greatGrandChild.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(leafNode1.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(500, 500), false);
+    setLayerPropertiesForTesting(leafNode2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(20, 20), false);
+
+    child->setMasksToBounds(true);
+    child->setOpacity(0.4f);
+    grandChild->setOpacity(0.5f);
+    greatGrandChild->setOpacity(0.4f);
 
     // Contaminate the grandChild and greatGrandChild's clipRect to reproduce the crash
     // bug found in http://code.google.com/p/chromium/issues/detail?id=106734. In this
@@ -630,9 +682,6 @@ TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfaces)
     // renderSurface remains on the renderSurfaceLayerList, which violates the assumption
     // that an empty renderSurface will always be the last item on the list, which
     // ultimately caused the crash.
-    //
-    // FIXME: it is also useful to test with this commented out. Eventually we should
-    // create several test cases that test clipRect/drawableContentRect computation.
     child->setClipRect(IntRect(IntPoint::zero(), IntSize(20, 20)));
     greatGrandChild->setClipRect(IntRect(IntPoint::zero(), IntSize(1234, 1234)));
 
@@ -651,36 +700,146 @@ TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfaces)
     EXPECT_EQ(child->id(), renderSurfaceLayerList[1]->id());
 }
 
-static int addOpacityAnimationToLayer(LayerChromium* layer, float startValue, float endValue, double duration)
+TEST(CCLayerTreeHostCommonTest, verifyClipRectIsPropagatedCorrectlyToLayers)
 {
-    static int id = 0;
-    WebCore::KeyframeValueList values(AnimatedPropertyOpacity);
-    values.insert(new FloatAnimationValue(0, startValue));
-    values.insert(new FloatAnimationValue(duration, endValue));
+    // Verify that layers get the appropriate clipRects when their parent masksToBounds is true.
+    //
+    //   grandChild1 - completely inside the region; clipRect should be the mask region (larger than this layer's bounds).
+    //   grandChild2 - partially clipped but NOT masksToBounds; the clipRect should be the parent's clipRect regardless of the layer's bounds.
+    //   grandChild3 - partially clipped and masksToBounds; the clipRect will be the intersection of layerBounds and the mask region.
+    //   grandChild4 - outside parent's clipRect, and masksToBounds; the clipRect should be empty.
+    //
 
-    RefPtr<Animation> animation = Animation::create();
-    animation->setDuration(duration);
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild1 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild2 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild3 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild4 = LayerChromium::create();
 
-    IntSize boxSize;
-    layer->layerAnimationController()->addAnimation(values, boxSize, animation.get(), id, 0, 0);
-    return id++;
+    parent->createRenderSurface();
+    parent->addChild(child);
+    child->addChild(grandChild1);
+    child->addChild(grandChild2);
+    child->addChild(grandChild3);
+    child->addChild(grandChild4);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(500, 500), false);
+    setLayerPropertiesForTesting(child.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(20, 20), false);
+    setLayerPropertiesForTesting(grandChild1.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(5, 5), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(grandChild2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(15, 15), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(grandChild3.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(15, 15), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(grandChild4.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(45, 45), IntSize(10, 10), false);
+
+    child->setMasksToBounds(true);
+    grandChild3->setMasksToBounds(true);
+    grandChild4->setMasksToBounds(true);
+
+    // Force everyone to be a render surface.
+    child->setOpacity(0.4f);
+    grandChild1->setOpacity(0.5f);
+    grandChild2->setOpacity(0.5f);
+    grandChild3->setOpacity(0.5f);
+    grandChild4->setOpacity(0.5f);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    EXPECT_INT_RECT_EQ(IntRect(IntPoint::zero(), IntSize(20, 20)), grandChild1->clipRect());
+    EXPECT_INT_RECT_EQ(IntRect(IntPoint::zero(), IntSize(20, 20)), grandChild2->clipRect());
+    EXPECT_INT_RECT_EQ(IntRect(IntPoint(15, 15), IntSize(5, 5)), grandChild3->clipRect());
+    EXPECT_TRUE(grandChild4->clipRect().isEmpty());
 }
 
-static int addTransformAnimationToLayer(LayerChromium* layer, double duration)
+TEST(CCLayerTreeHostCommonTest, verifyClipRectIsPropagatedCorrectlyToSurfaces)
 {
-    static int id = 0;
-    WebCore::KeyframeValueList values(AnimatedPropertyWebkitTransform);
+    // Verify that renderSurfaces (and their layers) get the appropriate clipRects when their parent masksToBounds is true.
+    //
+    // Layers that own renderSurfaces (at least for now) do not inherit any clipRect;
+    // instead the surface will enforce the clip for the entire subtree. They may still
+    // have a clipRect of their own layer bounds, however, if masksToBounds was true.
+    //
 
-    TransformOperations operations1;
-    operations1.operations().append(TranslateTransformOperation::create(Length(2, WebCore::Fixed), Length(0, WebCore::Fixed), TransformOperation::TRANSLATE_X));
-    values.insert(new TransformAnimationValue(0, &operations1));
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild1 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild2 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild3 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild4 = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode1 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode3 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode4 = adoptRef(new LayerChromiumWithForcedDrawsContent());
 
-    RefPtr<Animation> animation = Animation::create();
-    animation->setDuration(duration);
+    parent->createRenderSurface();
+    parent->addChild(child);
+    child->addChild(grandChild1);
+    child->addChild(grandChild2);
+    child->addChild(grandChild3);
+    child->addChild(grandChild4);
 
-    IntSize boxSize;
-    layer->layerAnimationController()->addAnimation(values, boxSize, animation.get(), id, 0, 0);
-    return id++;
+    // the leaf nodes ensure that these grandChildren become renderSurfaces for this test.
+    grandChild1->addChild(leafNode1);
+    grandChild2->addChild(leafNode2);
+    grandChild3->addChild(leafNode3);
+    grandChild4->addChild(leafNode4);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(500, 500), false);
+    setLayerPropertiesForTesting(child.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(20, 20), false);
+    setLayerPropertiesForTesting(grandChild1.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(5, 5), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(grandChild2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(15, 15), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(grandChild3.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(15, 15), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(grandChild4.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(45, 45), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(leafNode1.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(leafNode2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(leafNode3.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(leafNode4.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 10), false);
+
+    child->setMasksToBounds(true);
+    grandChild3->setMasksToBounds(true);
+    grandChild4->setMasksToBounds(true);
+
+    // Force everyone to be a render surface.
+    child->setOpacity(0.4f);
+    grandChild1->setOpacity(0.5f);
+    grandChild2->setOpacity(0.5f);
+    grandChild3->setOpacity(0.5f);
+    grandChild4->setOpacity(0.5f);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    ASSERT_TRUE(grandChild1->renderSurface());
+    ASSERT_TRUE(grandChild2->renderSurface());
+    ASSERT_TRUE(grandChild3->renderSurface());
+    EXPECT_FALSE(grandChild4->renderSurface()); // Because grandChild4 is entirely clipped, it is expected to not have a renderSurface.
+
+    // Surfaces are clipped by their parent, but un-affected by the owning layer's masksToBounds.
+    EXPECT_INT_RECT_EQ(IntRect(IntPoint(0, 0), IntSize(20, 20)), grandChild1->renderSurface()->clipRect());
+    EXPECT_INT_RECT_EQ(IntRect(IntPoint(0, 0), IntSize(20, 20)), grandChild2->renderSurface()->clipRect());
+    EXPECT_INT_RECT_EQ(IntRect(IntPoint(0, 0), IntSize(20, 20)), grandChild3->renderSurface()->clipRect());
+
+    // Layers do not inherit the clipRect from their owned surfaces, but if masksToBounds is true, they do create their own clipRect.
+    EXPECT_FALSE(grandChild1->usesLayerClipping());
+    EXPECT_FALSE(grandChild2->usesLayerClipping());
+    EXPECT_TRUE(grandChild3->usesLayerClipping());
+    EXPECT_TRUE(grandChild4->usesLayerClipping());
 }
 
 TEST(CCLayerTreeHostCommonTest, verifyAnimationsForRenderSurfaceHierarchy)
@@ -705,22 +864,22 @@ TEST(CCLayerTreeHostCommonTest, verifyAnimationsForRenderSurfaceHierarchy)
     childOfRS2->addChild(grandChildOfRS2);
 
     // In combination with descendantDrawsContent, opacity != 1 forces the layer to have a new renderSurface.
-    addOpacityAnimationToLayer(renderSurface1.get(), 1, 0, 10);
-    addOpacityAnimationToLayer(renderSurface2.get(), 1, 0, 10);
+    addOpacityTransitionToController(*renderSurface1->layerAnimationController(), 10, 1, 0, false);
 
-    // Also put an animation on a layer without descendants.
-    addOpacityAnimationToLayer(grandChildOfRoot.get(), 1, 0, 10);
+    // Also put an animated opacity on a layer without descendants.
+    addOpacityTransitionToController(*grandChildOfRoot->layerAnimationController(), 10, 1, 0, false);
 
     TransformationMatrix layerTransform;
     layerTransform.translate(1.0, 1.0);
     TransformationMatrix sublayerTransform;
     sublayerTransform.scale3d(10.0, 1.0, 1.0);
 
-    // Put transform animations on child, renderSurface2, grandChildOfRoot, and grandChildOfRS2
-    addTransformAnimationToLayer(childOfRoot.get(), 10);
-    addTransformAnimationToLayer(grandChildOfRoot.get(), 10);
-    addTransformAnimationToLayer(renderSurface2.get(), 10);
-    addTransformAnimationToLayer(grandChildOfRS2.get(), 10);
+    // In combination with descendantDrawsContent, an animated transform forces the layer to have a new renderSurface.
+    addAnimatedTransformToController(*renderSurface2->layerAnimationController(), 10, 30, 0);
+
+    // Also put transform animations on grandChildOfRoot, and grandChildOfRS2
+    addAnimatedTransformToController(*grandChildOfRoot->layerAnimationController(), 10, 30, 0);
+    addAnimatedTransformToController(*grandChildOfRS2->layerAnimationController(), 10, 30, 0);
 
     setLayerPropertiesForTesting(parent.get(), layerTransform, sublayerTransform, FloatPoint(0.25f, 0.0f), FloatPoint(2.5f, 0.0f), IntSize(10, 10), false);
     setLayerPropertiesForTesting(renderSurface1.get(), layerTransform, sublayerTransform, FloatPoint(0.25f, 0.0f), FloatPoint(2.5f, 0.0f), IntSize(10, 10), false);
@@ -772,14 +931,14 @@ TEST(CCLayerTreeHostCommonTest, verifyAnimationsForRenderSurfaceHierarchy)
     EXPECT_FALSE(childOfRS1->drawOpacityIsAnimating());
     EXPECT_FALSE(grandChildOfRS1->drawOpacityIsAnimating());
     EXPECT_FALSE(renderSurface2->drawOpacityIsAnimating());
-    EXPECT_TRUE(renderSurface2->renderSurface()->drawOpacityIsAnimating());
+    EXPECT_FALSE(renderSurface2->renderSurface()->drawOpacityIsAnimating());
     EXPECT_FALSE(childOfRS2->drawOpacityIsAnimating());
     EXPECT_FALSE(grandChildOfRS2->drawOpacityIsAnimating());
 
     // Verify drawTransformsAnimatingInTarget values
     //
     EXPECT_FALSE(parent->drawTransformIsAnimating());
-    EXPECT_TRUE(childOfRoot->drawTransformIsAnimating());
+    EXPECT_FALSE(childOfRoot->drawTransformIsAnimating());
     EXPECT_TRUE(grandChildOfRoot->drawTransformIsAnimating());
     EXPECT_FALSE(renderSurface1->drawTransformIsAnimating());
     EXPECT_FALSE(renderSurface1->renderSurface()->targetSurfaceTransformsAreAnimating());
@@ -793,7 +952,7 @@ TEST(CCLayerTreeHostCommonTest, verifyAnimationsForRenderSurfaceHierarchy)
     // Verify drawTransformsAnimatingInScreen values
     //
     EXPECT_FALSE(parent->screenSpaceTransformIsAnimating());
-    EXPECT_TRUE(childOfRoot->screenSpaceTransformIsAnimating());
+    EXPECT_FALSE(childOfRoot->screenSpaceTransformIsAnimating());
     EXPECT_TRUE(grandChildOfRoot->screenSpaceTransformIsAnimating());
     EXPECT_FALSE(renderSurface1->screenSpaceTransformIsAnimating());
     EXPECT_FALSE(renderSurface1->renderSurface()->screenSpaceTransformsAreAnimating());
@@ -819,6 +978,373 @@ TEST(CCLayerTreeHostCommonTest, verifyAnimationsForRenderSurfaceHierarchy)
     EXPECT_FLOAT_EQ(3.0, renderSurface2->screenSpaceTransform().m42());
     EXPECT_FLOAT_EQ(4.0, childOfRS2->screenSpaceTransform().m42());
     EXPECT_FLOAT_EQ(5.0, grandChildOfRS2->screenSpaceTransform().m42());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectForIdentityTransform)
+{
+    // Test the calculateVisibleRect() function works correctly for identity transforms.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // Case 1: Layer is contained within the surface.
+    IntRect layerContentRect = IntRect(IntPoint(10, 10), IntSize(30, 30));
+    IntRect expected = IntRect(IntPoint(10, 10), IntSize(30, 30));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+
+    // Case 2: Layer is outside the surface rect.
+    layerContentRect = IntRect(IntPoint(120, 120), IntSize(30, 30));
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_TRUE(actual.isEmpty());
+
+    // Case 3: Layer is partially overlapping the surface rect.
+    layerContentRect = IntRect(IntPoint(80, 80), IntSize(30, 30));
+    expected = IntRect(IntPoint(80, 80), IntSize(20, 20));
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectForTranslations)
+{
+    // Test the calculateVisibleRect() function works correctly for scaling transforms.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(0, 0), IntSize(30, 30));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // Case 1: Layer is contained within the surface.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(10, 10);
+    IntRect expected = IntRect(IntPoint(0, 0), IntSize(30, 30));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+
+    // Case 2: Layer is outside the surface rect.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(120, 120);
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_TRUE(actual.isEmpty());
+
+    // Case 3: Layer is partially overlapping the surface rect.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(80, 80);
+    expected = IntRect(IntPoint(0, 0), IntSize(20, 20));
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectFor2DRotations)
+{
+    // Test the calculateVisibleRect() function works correctly for rotations about z-axis (i.e. 2D rotations).
+    // Remember that calculateVisibleRect() should return the visible rect in the layer's space.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(0, 0), IntSize(30, 30));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // Case 1: Layer is contained within the surface.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(50, 50);
+    layerToSurfaceTransform.rotate(45);
+    IntRect expected = IntRect(IntPoint(0, 0), IntSize(30, 30));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+
+    // Case 2: Layer is outside the surface rect.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(-50, 0);
+    layerToSurfaceTransform.rotate(45);
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_TRUE(actual.isEmpty());
+
+    // Case 3: The layer is rotated about its top-left corner. In surface space, the layer
+    //         is oriented diagonally, with the left half outside of the renderSurface. In
+    //         this case, the visible rect should still be the entire layer (remember the
+    //         visible rect is computed in layer space); both the top-left and
+    //         bottom-right corners of the layer are still visible.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.rotate(45);
+    expected = IntRect(IntPoint(0, 0), IntSize(30, 30));
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+
+    // Case 4: The layer is rotated about its top-left corner, and translated upwards. In
+    //         surface space, the layer is oriented diagonally, with only the top corner
+    //         of the surface overlapping the layer. In layer space, the render surface
+    //         overlaps the right side of the layer. The visible rect should be the
+    //         layer's right half.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(0, -sqrt(2.0) * 15);
+    layerToSurfaceTransform.rotate(45);
+    expected = IntRect(IntPoint(15, 0), IntSize(15, 30)); // right half of layer bounds.
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectFor3dOrthographicTransform)
+{
+    // Test that the calculateVisibleRect() function works correctly for 3d transforms.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // Case 1: Orthographic projection of a layer rotated about y-axis by 45 degrees, should be fully contained in the renderSurface.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.rotate3d(0, 45, 0);
+    IntRect expected = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+
+    // Case 2: Orthographic projection of a layer rotated about y-axis by 45 degrees, but
+    //         shifted to the side so only the right-half the layer would be visible on
+    //         the surface.
+    double halfWidthOfRotatedLayer = (100.0 / sqrt(2.0)) * 0.5; // 100.0 is the un-rotated layer width; divided by sqrt(2.0) is the rotated width.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(-halfWidthOfRotatedLayer, 0);
+    layerToSurfaceTransform.rotate3d(0, 45, 0); // rotates about the left edge of the layer
+    expected = IntRect(IntPoint(50, 0), IntSize(50, 100)); // right half of the layer.
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectFor3dPerspectiveTransform)
+{
+    // Test the calculateVisibleRect() function works correctly when the layer has a
+    // perspective projection onto the target surface.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(-50, -50), IntSize(200, 200));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // Case 1: Even though the layer is twice as large as the surface, due to perspective
+    //         foreshortening, the layer will fit fully in the surface when its translated
+    //         more than the perspective amount.
+    layerToSurfaceTransform.makeIdentity();
+
+    // The following sequence of transforms applies the perspective about the center of the surface.
+    layerToSurfaceTransform.translate(50, 50);
+    layerToSurfaceTransform.applyPerspective(9);
+    layerToSurfaceTransform.translate(-50, -50);
+
+    // This translate places the layer in front of the surface's projection plane.
+    layerToSurfaceTransform.translate3d(0, 0, -27);
+
+    IntRect expected = IntRect(IntPoint(-50, -50), IntSize(200, 200));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+
+    // Case 2: same projection as before, except that the layer is also translated to the
+    //         side, so that only the right half of the layer should be visible.
+    //
+    // Explanation of expected result:
+    // The perspective ratio is (z distance between layer and camera origin) / (z distance between projection plane and camera origin) == ((-27 - 9) / 9)
+    // Then, by similar triangles, if we want to move a layer by translating -50 units in projected surface units (so that only half of it is
+    // visible), then we would need to translate by (-36 / 9) * -50 == -200 in the layer's units.
+    //
+    layerToSurfaceTransform.translate3d(-200, 0, 0);
+    expected = IntRect(IntPoint(50, -50), IntSize(100, 200)); // The right half of the layer's bounding rect.
+    actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectFor3dOrthographicIsNotClippedBehindSurface)
+{
+    // There is currently no explicit concept of an orthographic projection plane in our
+    // code (nor in the CSS spec to my knowledge). Therefore, layers that are technically
+    // behind the surface in an orthographic world should not be clipped when they are
+    // flattened to the surface.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // This sequence of transforms effectively rotates the layer about the y-axis at the
+    // center of the layer.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.translate(50, 0);
+    layerToSurfaceTransform.rotate3d(0, 45, 0);
+    layerToSurfaceTransform.translate(-50, 0);
+
+    IntRect expected = IntRect(IntPoint(0, 0), IntSize(100, 100));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectFor3dPerspectiveIsClipped)
+{
+    // Test the calculateVisibleRect() function works correctly when projecting a surface
+    // onto a layer, but the layer is partially behind the camera (not just behind the
+    // projection plane). In this case, the cartesian coordinates may seem to be valid,
+    // but actually they are not. The visibleRect needs to be properly clipped by the
+    // w = 0 plane in homogeneous coordinates before converting to cartesian coordinates.
+
+    IntRect targetSurfaceRect = IntRect(IntPoint(-50, -50), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(-10, -1), IntSize(20, 2));
+    TransformationMatrix layerToSurfaceTransform;
+
+    // The layer is positioned so that the right half of the layer should be in front of
+    // the camera, while the other half is behind the surface's projection plane. The
+    // following sequence of transforms applies the perspective and rotation about the
+    // center of the layer.
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.applyPerspective(1);
+    layerToSurfaceTransform.translate3d(0, 0, 1);
+    layerToSurfaceTransform.rotate3d(0, 45, 0);
+
+    // Sanity check that this transform does indeed cause w < 0 when applying the
+    // transform, otherwise this code is not testing the intended scenario.
+    bool clipped = false;
+    CCMathUtil::mapQuad(layerToSurfaceTransform, FloatQuad(FloatRect(layerContentRect)), clipped);
+    ASSERT_TRUE(clipped);
+
+    int expectedXPosition = -10;
+    int expectedWidth = 10;
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_EQ(expectedXPosition, actual.x());
+    EXPECT_EQ(expectedWidth, actual.width());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyVisibleRectForPerspectiveUnprojection)
+{
+    // To determine visibleRect in layer space, there needs to be an un-projection from
+    // surface space to layer space. When the original transform was a perspective
+    // projection that was clipped, it returns a rect that encloses the clipped bounds.
+    // Un-projecting this new rect may require clipping again.
+
+    // This sequence of transforms causes one corner of the layer to protrude across the w = 0 plane, and should be clipped.
+    IntRect targetSurfaceRect = IntRect(IntPoint(-50, -50), IntSize(100, 100));
+    IntRect layerContentRect = IntRect(IntPoint(-10, -10), IntSize(20, 20));
+    TransformationMatrix layerToSurfaceTransform;
+    layerToSurfaceTransform.makeIdentity();
+    layerToSurfaceTransform.applyPerspective(1);
+    layerToSurfaceTransform.translate3d(0, 0, -5);
+    layerToSurfaceTransform.rotate3d(0, 45, 0);
+    layerToSurfaceTransform.rotate3d(80, 0, 0);
+
+    // Sanity check that un-projection does indeed cause w < 0, otherwise this code is not
+    // testing the intended scenario.
+    bool clipped = false;
+    FloatRect clippedRect = CCMathUtil::mapClippedRect(layerToSurfaceTransform, layerContentRect);
+    CCMathUtil::projectQuad(layerToSurfaceTransform.inverse(), FloatQuad(clippedRect), clipped);
+    ASSERT_TRUE(clipped);
+
+    // Only the corner of the layer is not visible on the surface because of being
+    // clipped. But, the net result of rounding visible region to an axis-aligned rect is
+    // that the entire layer should still be considered visible.
+    IntRect expected = IntRect(IntPoint(-10, -10), IntSize(20, 20));
+    IntRect actual = CCLayerTreeHostCommon::calculateVisibleRect(targetSurfaceRect, layerContentRect, layerToSurfaceTransform);
+    EXPECT_INT_RECT_EQ(expected, actual);
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyBackFaceCulling)
+{
+    // Verify that layers are appropriately culled when their back face is showing and they are not double sided.
+    //
+    // Layers that are animating do not get culled on the main thread, as their transforms should be
+    // treated as "unknown" so we can not be sure that their back face is really showing.
+    //
+
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> animatingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> childOfAnimatingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> animatingChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> child2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+
+    parent->createRenderSurface();
+    parent->addChild(child);
+    parent->addChild(animatingSurface);
+    animatingSurface->addChild(childOfAnimatingSurface);
+    parent->addChild(animatingChild);
+    parent->addChild(child2);
+
+    // Nothing is double-sided
+    child->setDoubleSided(false);
+    child2->setDoubleSided(false);
+    animatingSurface->setDoubleSided(false);
+    childOfAnimatingSurface->setDoubleSided(false);
+    animatingChild->setDoubleSided(false);
+
+    TransformationMatrix backfaceMatrix;
+    backfaceMatrix.translate(50, 50);
+    backfaceMatrix.rotate3d(0, 1, 0, 180);
+    backfaceMatrix.translate(-50, -50);
+
+    // Having a descendent, and animating transforms, will make the animatingSurface own a render surface.
+    addAnimatedTransformToController(*animatingSurface->layerAnimationController(), 10, 30, 0);
+    // This is just an animating layer, not a surface.
+    addAnimatedTransformToController(*animatingChild->layerAnimationController(), 10, 30, 0);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
+    setLayerPropertiesForTesting(child.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(animatingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(childOfAnimatingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(animatingChild.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(child2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    parent->renderSurface()->setContentRect(IntRect(IntPoint(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    EXPECT_FALSE(child->renderSurface());
+    EXPECT_TRUE(animatingSurface->renderSurface());
+    EXPECT_FALSE(childOfAnimatingSurface->renderSurface());
+    EXPECT_FALSE(animatingChild->renderSurface());
+    EXPECT_FALSE(child2->renderSurface());
+
+    // Verify that the animatingChild and childOfAnimatingSurface were not culled, but that child was.
+    ASSERT_EQ(2u, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+    EXPECT_EQ(animatingSurface->id(), renderSurfaceLayerList[1]->id());
+
+    // The non-animating child be culled from the layer list for the parent render surface.
+    ASSERT_EQ(3u, renderSurfaceLayerList[0]->renderSurface()->layerList().size());
+    EXPECT_EQ(animatingSurface->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(animatingChild->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[1]->id());
+    EXPECT_EQ(child2->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[2]->id());
+
+    ASSERT_EQ(2u, renderSurfaceLayerList[1]->renderSurface()->layerList().size());
+    EXPECT_EQ(animatingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(childOfAnimatingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[1]->id());
+
+    EXPECT_FALSE(child2->visibleLayerRect().isEmpty());
+
+    // But if the back face is visible, then the visibleLayerRect should be empty.
+    EXPECT_TRUE(animatingChild->visibleLayerRect().isEmpty());
+    EXPECT_TRUE(animatingSurface->visibleLayerRect().isEmpty());
+    // And any layers in the subtree should not be considered visible either.
+    EXPECT_TRUE(childOfAnimatingSurface->visibleLayerRect().isEmpty());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifySubtreeSearch)
+{
+    RefPtr<LayerChromium> root = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild = LayerChromium::create();
+    RefPtr<LayerChromium> maskLayer = LayerChromium::create();
+    RefPtr<LayerChromium> replicaLayer = LayerChromium::create();
+
+    grandChild->setReplicaLayer(replicaLayer.get());
+    child->addChild(grandChild.get());
+    child->setMaskLayer(maskLayer.get());
+    root->addChild(child.get());
+
+    int nonexistentId = -1;
+    EXPECT_EQ(root, CCLayerTreeHostCommon::findLayerInSubtree(root.get(), root->id()));
+    EXPECT_EQ(child, CCLayerTreeHostCommon::findLayerInSubtree(root.get(), child->id()));
+    EXPECT_EQ(grandChild, CCLayerTreeHostCommon::findLayerInSubtree(root.get(), grandChild->id()));
+    EXPECT_EQ(maskLayer, CCLayerTreeHostCommon::findLayerInSubtree(root.get(), maskLayer->id()));
+    EXPECT_EQ(replicaLayer, CCLayerTreeHostCommon::findLayerInSubtree(root.get(), replicaLayer->id()));
+    EXPECT_EQ(0, CCLayerTreeHostCommon::findLayerInSubtree(root.get(), nonexistentId));
 }
 
 // FIXME:

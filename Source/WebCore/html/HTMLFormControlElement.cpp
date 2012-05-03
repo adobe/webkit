@@ -30,8 +30,10 @@
 #include "EventHandler.h"
 #include "EventNames.h"
 #include "Frame.h"
+#include "HTMLFieldSetElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
+#include "HTMLLegendElement.h"
 #include "RenderBox.h"
 #include "RenderTheme.h"
 #include "ScriptEventListener.h"
@@ -46,6 +48,9 @@ using namespace std;
 
 HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
     : LabelableElement(tagName, document)
+    , m_fieldSetAncestor(0)
+    , m_legendAncestor(0)
+    , m_fieldSetAncestorValid(false)
     , m_disabled(false)
     , m_readOnly(false)
     , m_required(false)
@@ -95,6 +100,21 @@ bool HTMLFormControlElement::formNoValidate() const
     return fastHasAttribute(formnovalidateAttr);
 }
 
+void HTMLFormControlElement::updateFieldSetAndLegendAncestor() const
+{
+    m_fieldSetAncestor = 0;
+    m_legendAncestor = 0;
+    for (ContainerNode* ancestor = parentNode(); ancestor; ancestor = ancestor->parentNode()) {
+        if (!m_legendAncestor && ancestor->hasTagName(legendTag))
+            m_legendAncestor = static_cast<HTMLLegendElement*>(ancestor);
+        if (ancestor->hasTagName(fieldsetTag)) {
+            m_fieldSetAncestor = static_cast<HTMLFieldSetElement*>(ancestor);
+            break;
+        }
+    }
+    m_fieldSetAncestorValid = true;
+}
+
 void HTMLFormControlElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == formAttr)
@@ -102,11 +122,8 @@ void HTMLFormControlElement::parseAttribute(Attribute* attr)
     else if (attr->name() == disabledAttr) {
         bool oldDisabled = m_disabled;
         m_disabled = !attr->isNull();
-        if (oldDisabled != m_disabled) {
-            setNeedsStyleRecalc();
-            if (renderer() && renderer()->style()->hasAppearance())
-                renderer()->theme()->stateChanged(renderer(), EnabledState);
-        }
+        if (oldDisabled != m_disabled)
+            disabledAttributeChanged();
     } else if (attr->name() == readonlyAttr) {
         bool oldReadOnly = m_readOnly;
         m_readOnly = !attr->isNull();
@@ -123,6 +140,13 @@ void HTMLFormControlElement::parseAttribute(Attribute* attr)
     } else
         HTMLElement::parseAttribute(attr);
     setNeedsWillValidateCheck();
+}
+
+void HTMLFormControlElement::disabledAttributeChanged()
+{
+    setNeedsStyleRecalc();
+    if (renderer() && renderer()->style()->hasAppearance())
+        renderer()->theme()->stateChanged(renderer(), EnabledState);
 }
 
 void HTMLFormControlElement::requiredAttributeChanged()
@@ -197,28 +221,18 @@ void HTMLFormControlElement::didMoveToNewDocument(Document* oldDocument)
     HTMLElement::didMoveToNewDocument(oldDocument);
 }
 
-void HTMLFormControlElement::insertedIntoTree(bool deep)
+Node::InsertionNotificationRequest HTMLFormControlElement::insertedInto(Node* insertionPoint)
 {
-    FormAssociatedElement::insertedIntoTree();
-    HTMLElement::insertedIntoTree(deep);
+    HTMLElement::insertedInto(insertionPoint);
+    FormAssociatedElement::insertedInto(insertionPoint);
+    return InsertionDone;
 }
 
-void HTMLFormControlElement::removedFromTree(bool deep)
+void HTMLFormControlElement::removedFrom(Node* insertionPoint)
 {
-    FormAssociatedElement::removedFromTree();
-    HTMLElement::removedFromTree(deep);
-}
-
-void HTMLFormControlElement::insertedIntoDocument()
-{
-    HTMLElement::insertedIntoDocument();
-    FormAssociatedElement::insertedIntoDocument();
-}
-
-void HTMLFormControlElement::removedFromDocument()
-{
-    HTMLElement::removedFromDocument();
-    FormAssociatedElement::removedFromDocument();
+    m_fieldSetAncestorValid = false;
+    HTMLElement::removedFrom(insertionPoint);
+    FormAssociatedElement::removedFrom(insertionPoint);
 }
 
 const AtomicString& HTMLFormControlElement::formControlName() const
@@ -252,6 +266,20 @@ void HTMLFormControlElement::dispatchFormControlInputEvent()
 {
     setChangedSinceLastFormControlChangeEvent(true);
     HTMLElement::dispatchInputEvent();
+}
+
+bool HTMLFormControlElement::disabled() const
+{
+    if (m_disabled)
+        return true;
+
+    if (!m_fieldSetAncestorValid)
+        updateFieldSetAndLegendAncestor();
+
+    // Form controls in the first legend element inside a fieldset are not affected by fieldset.disabled.
+    if (m_fieldSetAncestor && m_fieldSetAncestor->disabled())
+        return !(m_legendAncestor && m_legendAncestor == m_fieldSetAncestor->legend());
+    return false;
 }
 
 void HTMLFormControlElement::setDisabled(bool b)
@@ -461,6 +489,15 @@ HTMLFormElement* HTMLFormControlElement::virtualForm() const
 bool HTMLFormControlElement::isDefaultButtonForForm() const
 {
     return isSuccessfulSubmitButton() && form() && form()->defaultButton() == this;
+}
+
+HTMLFormControlElement* HTMLFormControlElement::enclosingFormControlElement(Node* node)
+{
+    for (; node; node = node->parentNode()) {
+        if (node->isElementNode() && toElement(node)->isFormControlElement())
+            return static_cast<HTMLFormControlElement*>(node);
+    }
+    return 0;
 }
 
 } // namespace Webcore

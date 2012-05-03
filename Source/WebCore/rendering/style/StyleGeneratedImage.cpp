@@ -25,8 +25,8 @@
 #include "StyleGeneratedImage.h"
 
 #include "CSSImageGeneratorValue.h"
-#include "CSSStyleSelector.h"
 #include "RenderObject.h"
+#include "StyleResolver.h"
 
 namespace WebCore {
     
@@ -85,7 +85,7 @@ void StyleGeneratedImage::removeClient(RenderObject* renderer)
 
 PassRefPtr<Image> StyleGeneratedImage::image(RenderObject* renderer, const IntSize& size) const
 {
-    renderer->document()->styleSelector()->setStyle(renderer->style());
+    renderer->document()->styleResolver()->setStyle(renderer->style());
     return m_imageGeneratorValue->image(renderer, size);
 }
 

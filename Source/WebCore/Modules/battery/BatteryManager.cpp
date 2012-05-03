@@ -24,6 +24,7 @@
 
 #include "BatteryController.h"
 #include "BatteryStatus.h"
+#include "Document.h"
 #include "Event.h"
 #include "Frame.h"
 #include "Navigator.h"
@@ -31,9 +32,9 @@
 
 namespace WebCore {
 
-PassRefPtr<BatteryManager> BatteryManager::create(ScriptExecutionContext* context, Navigator* navigator)
+PassRefPtr<BatteryManager> BatteryManager::create(Navigator* navigator)
 {
-    RefPtr<BatteryManager> batteryManager(adoptRef(new BatteryManager(context, navigator)));
+    RefPtr<BatteryManager> batteryManager(adoptRef(new BatteryManager(navigator)));
     batteryManager->suspendIfNeeded();
     return batteryManager.release();
 }
@@ -42,8 +43,8 @@ BatteryManager::~BatteryManager()
 {
 }
 
-BatteryManager::BatteryManager(ScriptExecutionContext* context, Navigator* navigator)
-    : ActiveDOMObject(context, this)
+BatteryManager::BatteryManager(Navigator* navigator)
+    : ActiveDOMObject(navigator->frame()->document(), this)
     , m_batteryController(BatteryController::from(navigator->frame()->page()))
     , m_batteryStatus(0)
 {
@@ -52,12 +53,12 @@ BatteryManager::BatteryManager(ScriptExecutionContext* context, Navigator* navig
 
 bool BatteryManager::charging()
 {
-    return m_batteryStatus->charging();
+    return m_batteryStatus ? m_batteryStatus->charging() : true;
 }
 
 double BatteryManager::chargingTime()
 {
-    if (!m_batteryStatus->charging())
+    if (!m_batteryStatus || !m_batteryStatus->charging())
         return std::numeric_limits<double>::infinity();
 
     return m_batteryStatus->chargingTime();
@@ -65,7 +66,7 @@ double BatteryManager::chargingTime()
 
 double BatteryManager::dischargingTime()
 {
-    if (m_batteryStatus->charging())
+    if (!m_batteryStatus || m_batteryStatus->charging())
         return std::numeric_limits<double>::infinity();
 
     return m_batteryStatus->dischargingTime();
@@ -73,7 +74,7 @@ double BatteryManager::dischargingTime()
 
 double BatteryManager::level()
 {
-    return m_batteryStatus->level();
+    return m_batteryStatus ? m_batteryStatus->level() : 1;
 }
 
 void BatteryManager::didChangeBatteryStatus(PassRefPtr<Event> event, PassRefPtr<BatteryStatus> batteryStatus)

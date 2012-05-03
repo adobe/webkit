@@ -30,37 +30,34 @@
 namespace WebCore {
 
 class CSSRuleList;
+class StyleRuleMedia;
 
 class CSSMediaRule : public CSSRule {
 public:
-    static PassRefPtr<CSSMediaRule> create(CSSStyleSheet* parent, PassRefPtr<MediaQuerySet> media, Vector<RefPtr<CSSRule> >& adoptRules)
-    {
-        return adoptRef(new CSSMediaRule(parent, media, adoptRules));
-    }
+    static PassRefPtr<CSSMediaRule> create(StyleRuleMedia* rule, CSSStyleSheet* sheet) { return adoptRef(new CSSMediaRule(rule, sheet)); }
+
     ~CSSMediaRule();
 
-    MediaList* media() const { return m_mediaQueries ? m_mediaQueries->ensureMediaList(parentStyleSheet()) : 0; }
-    CSSRuleList* cssRules();
+    MediaList* media() const;
+    CSSRuleList* cssRules() const;
 
     unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
     void deleteRule(unsigned index, ExceptionCode&);
 
     String cssText() const;
-
-    // Not part of the CSSOM
-    unsigned append(CSSRule*);
-    MediaQuerySet* mediaQueries() const { return m_mediaQueries.get(); }
-
-    unsigned ruleCount() const { return m_childRules.size(); }
-    CSSRule* ruleAt(unsigned index) const { return m_childRules[index].get(); }
+        
+    // For CSSRuleList
+    unsigned length() const;
+    CSSRule* item(unsigned index) const;
 
 private:
-    CSSMediaRule(CSSStyleSheet* parent, PassRefPtr<MediaQuerySet>, Vector<RefPtr<CSSRule> >& adoptRules);
-
-    RefPtr<MediaQuerySet> m_mediaQueries;
-    Vector<RefPtr<CSSRule> > m_childRules;
+    CSSMediaRule(StyleRuleMedia*, CSSStyleSheet*);
     
-    OwnPtr<CSSRuleList> m_ruleListCSSOMWrapper;
+    RefPtr<StyleRuleMedia> m_mediaRule;
+
+    mutable RefPtr<MediaList> m_mediaCSSOMWrapper;
+    mutable Vector<RefPtr<CSSRule> > m_childRuleCSSOMWrappers;
+    mutable OwnPtr<CSSRuleList> m_ruleListCSSOMWrapper;
 };
 
 } // namespace WebCore

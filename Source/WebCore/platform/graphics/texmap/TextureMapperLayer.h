@@ -126,6 +126,9 @@ public:
     PassRefPtr<TextureMapperBackingStore> backingStore() { return m_backingStore; }
     void clearBackingStoresRecursive();
 
+    void setScrollPositionDeltaIfNeeded(const IntPoint&);
+    void setFixedToViewport(bool fixed) { m_fixedToViewport = fixed; }
+
 private:
     TextureMapperLayer* rootLayer();
     void computeTransformsRecursive();
@@ -143,6 +146,7 @@ private:
     static void sortByZOrder(Vector<TextureMapperLayer* >& array, int first, int last);
 
     PassRefPtr<BitmapTexture> texture() { return m_backingStore ? m_backingStore->texture() : 0; }
+    bool isAncestorFixedToViewport() const;
 
     void paintRecursive(const TextureMapperPaintOptions&);
     void paintSelf(const TextureMapperPaintOptions&);
@@ -217,6 +221,8 @@ private:
     State m_state;
     TextureMapper* m_textureMapper;
     TextureMapperAnimations m_animations;
+    IntPoint m_scrollPositionDelta;
+    bool m_fixedToViewport;
 };
 
 

@@ -1,3 +1,303 @@
+2012-04-29  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] DRT needs an implementation of layoutTestController.setDomainRelaxationForbiddenForURLScheme
+        https://bugs.webkit.org/show_bug.cgi?id=85131
+
+        Reviewed by Martin Robinson.
+
+        Add support for setDomainRelaxationForbiddenForURLScheme which allow
+        disabling domain relaxation.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setDomainRelaxationForbiddenForURLScheme):
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2012-04-22  Adrian Bunk  <bunk@stusta.de>
+
+        [GTK] Remove the obsolete Hildon UI extensions
+        https://bugs.webkit.org/show_bug.cgi?id=83420
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am:
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::setInputMethodState):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_button_release_event):
+
+2012-04-20  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk][WK1] Use mock scrollbars when testing
+        https://bugs.webkit.org/show_bug.cgi?id=79577
+
+        Reviewed by Daniel Bates.
+
+        Enable mock scrollbars if running DumpRenderTree.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+
+2012-04-18  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r114506.
+        http://trac.webkit.org/changeset/114506
+        https://bugs.webkit.org/show_bug.cgi?id=84254
+
+        Seems to be making gtk's DumpRenderTree crash occasionally
+        (Requested by tomz on #webkit).
+
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+        (webkit_web_settings_set_property):
+        (webkit_web_settings_get_property):
+        * webkit/webkitwebsettingsprivate.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
+2012-04-18  Simon Pena  <spena@igalia.com>
+
+        [GTK] r114021 triggered media flakyness
+        https://bugs.webkit.org/show_bug.cgi?id=83874
+
+        Reviewed by Philippe Normand.
+
+        When the MediaPlaybackRequiresUserGesture setting was added, no gtk
+        API was implemented to access it.
+
+        This adds a property to gtk WebKit WebSettings, and connects it to
+        WebKit WebView, thus allowing clients to programmatically modify it.
+
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+        (webkit_web_settings_set_property):
+        (webkit_web_settings_get_property):
+        * webkit/webkitwebsettingsprivate.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
+2012-04-17  Carlos Garnacho  <carlos@lanedo.com>
+
+        [GTK] Enable back double buffering on WebKitWebView to fix flickering
+        https://bugs.webkit.org/show_bug.cgi?id=84149
+
+        Reviewed by Martin Robinson.
+
+        Despite having WebKitWebView its own backing buffer, calling
+        gtk_widget_set_double_buffered(...,FALSE) may still pose side
+        effects, such as ensuring that all drawing operations are 
+        flushed to the X server before rendering a non-double buffered
+        widget, which may translate into flickering of the parent 
+        GdkWindow before the WebKitWebView itself is rendered. 
+
+        Enabling back double buffering solves this as all contents are 
+        first composited together before getting to the front buffer,
+        but effectively acts as 3rd buffer. This is sort of unavoidable
+        unless GTK+ gains a "let me take ownership of the backing buffer
+        for this widget", which currently lacks.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init): Remove call to gtk_widget_set_double_buffered(..., FALSE)
+
+2012-04-06  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Accelerated compositing is broken after recent TextureMapper reorganizations
+        https://bugs.webkit.org/show_bug.cgi?id=83393
+
+        Reviewed by Noam Rosenthal.
+
+        Ensure that the layer tree is synced when the root layer is resized.
+
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer): Ensure that the layer
+        tree is synced when the root layer resizes and remove a call to recomposite
+        the tree, as it happens anyway.
+
+2012-04-05  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Scrolling some iframes that are partially out of the viewport leads to repaint errors
+        https://bugs.webkit.org/show_bug.cgi?id=83309
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Instead of only updating scrollRect - preservedRegion, update
+        scrollRect - (preservedRegion - offscreenPreservedRegion). This ensures that
+        when part of the scroll rect is moved onscreen from offscreen that part is
+        queued for a redraw.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::scroll): Properly calculate the area to repaint.
+
+2012-04-04  Mariusz Grzegorczyk  <mariusz.g@samsung.com>
+
+        Fix build break when CONTEXT_MENUS is disabled.
+        https://bugs.webkit.org/show_bug.cgi?id=82342
+
+        Reviewed by Andreas Kling.
+
+        Fixes build break in WebKit-Gtk, and WebKit-EFL ports when CONTEXT_MENUS macro is disabled.
+
+        * WebCoreSupport/ContextMenuClientGtk.cpp:
+        * WebCoreSupport/ContextMenuClientGtk.h:
+        * webkit/webkitglobals.cpp:
+        (webkit_context_menu_item_get_action):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_button_press_event):
+        (webkit_web_view_class_init):
+        (webkit_web_view_init):
+
+2012-04-03  Simon Pena  <spena@igalia.com>
+
+        [GTK] DRT missing didRunInsecureContent notification
+        https://bugs.webkit.org/show_bug.cgi?id=59367
+
+        Reviewed by Philippe Normand.
+
+        Add a new signal "insecure-content-run" to the WebFrame to notify
+        when insecure HTTP content (such as CSS, an iframe or a script) is
+        run from a secure HTTPS WebFrame. Implement didRunInsecureContent
+        in gtk's FrameLoaderClient by means of emitting that signal.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp: Implement
+        didRunInsecureContent by emitting WebFrame's
+        "insecure-content-run" signal
+        (WebKit::FrameLoaderClient::didRunInsecureContent):
+        * webkit/webkitwebframe.cpp: Add "insecure-content-run" signal
+        (webkit_web_frame_class_init):
+
+2012-03-30  Mark Pilgrim  <pilgrim@chromium.org>
+
+        GEOLOCATION should be implemented as Page Supplement
+        https://bugs.webkit.org/show_bug.cgi?id=82228
+
+        Reviewed by Adam Barth.
+
+        Geolocation is now a Supplement in Page so the interface
+        has changed for setting up the page's geolocation client
+        initially and accessing the controller later.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::resetGeolocationClientMock):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPermission):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPosition):
+        (DumpRenderTreeSupportGtk::setMockGeolocationError):
+        (DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests):
+        * WebCoreSupport/GeolocationClientGtk.cpp:
+        (WebKit::GeolocationClient::updatePosition):
+        (WebKit::GeolocationClient::errorOccured):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+
+2012-03-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r112553.
+        http://trac.webkit.org/changeset/112553
+        https://bugs.webkit.org/show_bug.cgi?id=82638
+
+        It made all tests crash on Qt WK2 (Requested by Ossy_away on
+        #webkit).
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::resetGeolocationClientMock):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPermission):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPosition):
+        (DumpRenderTreeSupportGtk::setMockGeolocationError):
+        (DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests):
+        * WebCoreSupport/GeolocationClientGtk.cpp:
+        (WebKit::GeolocationClient::updatePosition):
+        (WebKit::GeolocationClient::errorOccured):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+
+2012-03-29  Mark Pilgrim  <pilgrim@chromium.org>
+
+        GEOLOCATION should be implemented as Page Supplement
+        https://bugs.webkit.org/show_bug.cgi?id=82228
+
+        Reviewed by Adam Barth.
+
+        Geolocation is now a Supplement in Page so the interface
+        has changed for setting up the page's geolocation client
+        initially and accessing the controller later.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::resetGeolocationClientMock):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPermission):
+        (DumpRenderTreeSupportGtk::setMockGeolocationPosition):
+        (DumpRenderTreeSupportGtk::setMockGeolocationError):
+        (DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests):
+        * WebCoreSupport/GeolocationClientGtk.cpp:
+        (WebKit::GeolocationClient::updatePosition):
+        (WebKit::GeolocationClient::errorOccured):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+
+2012-03-28  Nate Chapin  <japhet@chromium.org>
+
+        Remove dispatchDidLoadMainResource callback, since no
+        port implements it.
+        https://bugs.webkit.org/show_bug.cgi?id=82539
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit):
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        (FrameLoaderClient):
+
+2012-03-28  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Implement PlatformStrategies
+        https://bugs.webkit.org/show_bug.cgi?id=82454
+
+        Reviewed by Xan Lopez.
+
+        * GNUmakefile.am: Add new files to compilation.
+        * WebCoreSupport/PlatformStrategiesGtk.cpp: Added.
+        (PlatformStrategiesGtk::initialize): Initialize platform
+        strategies.
+        (PlatformStrategiesGtk::PlatformStrategiesGtk):
+        (PlatformStrategiesGtk::createCookiesStrategy): Return this.
+        (PlatformStrategiesGtk::createPluginStrategy): Ditto.
+        (PlatformStrategiesGtk::createVisitedLinkStrategy): Ditto.
+        (PlatformStrategiesGtk::createPasteboardStrategy): Return 0, since
+        PasteboardStrategy is only used by mac code for now.
+        (PlatformStrategiesGtk::notifyCookiesChanged):
+        (PlatformStrategiesGtk::refreshPlugins): Refresh the plugin
+        database.
+        (PlatformStrategiesGtk::getPluginInfo): Initialize plugins and
+        populate the given vector with plugins information.
+        (PlatformStrategiesGtk::isLinkVisited): Return whether the given
+        hash is a visited link of the page group.
+        (PlatformStrategiesGtk::addVisitedLink): Add the given hash to the
+        page group visited links.
+        * WebCoreSupport/PlatformStrategiesGtk.h: Added.
+        * webkit/webkitglobals.cpp:
+        (webkitInit): Initialize PlatformStrategiesGtk.
+
+2012-03-26  Joone Hur  <joone.hur@collabora.co.uk>
+
+        [GTK] Build fix for Accelerated Compositing with Clutter
+        https://bugs.webkit.org/show_bug.cgi?id=81785
+
+        Reviewed by Martin Robinson.
+
+        AcceleratedCompositingContext was introduced to isolate different accelerated 
+        compositing implementations(r104194), but the Clutter implementation doesn't
+        build with it. This fixes the build error.
+
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        (AcceleratedCompositingContext):
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        (WebKit::AcceleratedCompositingContext::AcceleratedCompositingContext):
+        (WebKit::AcceleratedCompositingContext::renderLayersToWindow):
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer):
+        (WebKit::AcceleratedCompositingContext::syncLayersNow):
+        (WebKit::AcceleratedCompositingContext::syncLayersTimeout):
+        (WebKit):
+
 2012-03-26  Gary Kramlich  <grim@reaperworld.com>
 
         WebKitWebView signals with GError parameters cause crashes when using GObject Introspection

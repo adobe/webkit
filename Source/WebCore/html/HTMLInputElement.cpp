@@ -57,7 +57,7 @@
 #include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorInputType.h"
 #endif
 
@@ -532,9 +532,10 @@ void HTMLInputElement::updateType()
         setAttribute(valueAttr, m_valueIfDirty);
         m_valueIfDirty = String();
     }
-    if (!didStoreValue && willStoreValue)
-        m_valueIfDirty = sanitizeValue(fastGetAttribute(valueAttr));
-    else
+    if (!didStoreValue && willStoreValue) {
+        AtomicString valueString = fastGetAttribute(valueAttr);
+        m_valueIfDirty = sanitizeValue(valueString);
+    } else
         updateValueIfNeeded();
 
     setFormControlValueMatchesRenderer(false);
@@ -771,11 +772,11 @@ void HTMLInputElement::parseAttribute(Attribute* attr)
     } else if (attr->name() == patternAttr || attr->name() == precisionAttr)
         setNeedsValidityCheck();
     else if (attr->name() == disabledAttr) {
+        HTMLTextFormControlElement::parseAttribute(attr);
         m_inputType->disabledAttributeChanged();
-        HTMLTextFormControlElement::parseAttribute(attr);
     } else if (attr->name() == readonlyAttr) {
-        m_inputType->readonlyAttributeChanged();
         HTMLTextFormControlElement::parseAttribute(attr);
+        m_inputType->readonlyAttributeChanged();
     }
 #if ENABLE(DATALIST)
     else if (attr->name() == listAttr)
@@ -991,7 +992,8 @@ String HTMLInputElement::value() const
     if (!value.isNull())
         return value;
 
-    value = sanitizeValue(fastGetAttribute(valueAttr));
+    AtomicString valueString = fastGetAttribute(valueAttr);
+    value = sanitizeValue(valueString);
     if (!value.isNull())
         return value;
 
@@ -1454,18 +1456,21 @@ void HTMLInputElement::didChangeForm()
     addToRadioButtonGroup();
 }
 
-void HTMLInputElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLInputElement::insertedInto(Node* insertionPoint)
 {
-    HTMLTextFormControlElement::insertedIntoDocument();
+    HTMLTextFormControlElement::insertedInto(insertionPoint);
+    if (!insertionPoint->inDocument())
+        return InsertionDone;
     ASSERT(inDocument());
     addToRadioButtonGroup();
+    return InsertionDone;
 }
 
-void HTMLInputElement::removedFromDocument()
+void HTMLInputElement::removedFrom(Node* insertionPoint)
 {
-    ASSERT(inDocument());
-    removeFromRadioButtonGroup();
-    HTMLTextFormControlElement::removedFromDocument();
+    if (insertionPoint->inDocument())
+        removeFromRadioButtonGroup();
+    HTMLTextFormControlElement::removedFrom(insertionPoint);
 }
 
 void HTMLInputElement::didMoveToNewDocument(Document* oldDocument)
@@ -1505,7 +1510,7 @@ void HTMLInputElement::requiredAttributeChanged()
         buttons->requiredAttributeChanged(this);
 }
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 void HTMLInputElement::selectColorInColorChooser(const Color& color)
 {
     if (!m_inputType->isColorControl())
@@ -1536,30 +1541,6 @@ HTMLDataListElement* HTMLInputElement::dataList() const
         return 0;
 
     return static_cast<HTMLDataListElement*>(element);
-}
-
-HTMLOptionElement* HTMLInputElement::selectedOption() const
-{
-    String value = this->value();
-
-    // The empty string never matches to a datalist option because it
-    // doesn't represent a suggestion according to the standard.
-    if (value.isEmpty())
-        return 0;
-
-    HTMLDataListElement* sourceElement = dataList();
-    if (!sourceElement)
-        return 0;
-    HTMLCollection* options = sourceElement->options();
-    if (!options)
-        return 0;
-    unsigned length = options->length();
-    for (unsigned i = 0; i < length; ++i) {
-        HTMLOptionElement* option = static_cast<HTMLOptionElement*>(options->item(i));
-        if (!option->disabled() && value == option->value())
-            return option;
-    }
-    return 0;
 }
 
 #endif // ENABLE(DATALIST)
@@ -1780,6 +1761,13 @@ bool HTMLInputElement::supportsPlaceholder() const
     return m_inputType->supportsPlaceholder();
 }
 
+bool HTMLInputElement::isPlaceholderEmpty() const
+{
+    if (m_inputType->usesFixedPlaceholder())
+        return m_inputType->fixedPlaceholder().isEmpty();
+    return HTMLTextFormControlElement::isPlaceholderEmpty();
+}
+
 void HTMLInputElement::updatePlaceholderText()
 {
     return m_inputType->updatePlaceholderText();
@@ -1855,5 +1843,4 @@ inline void HTMLInputElement::removeFromRadioButtonGroup()
     if (CheckedRadioButtons* buttons = checkedRadioButtons())
         buttons->removeButton(this);
 }
-
 } // namespace

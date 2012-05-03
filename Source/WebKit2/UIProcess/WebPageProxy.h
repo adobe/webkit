@@ -92,7 +92,7 @@ namespace WebCore {
     class ProtectionSpace;
     struct FileChooserSettings;
     struct TextCheckingResult;
-    struct ViewportArguments;
+    struct ViewportAttributes;
     struct WindowFeatures;
 }
 
@@ -239,7 +239,9 @@ public:
     WebFullScreenManagerProxy* fullScreenManager();
 #endif
 
+#if ENABLE(CONTEXT_MENUS)
     void initializeContextMenuClient(const WKPageContextMenuClient*);
+#endif
     void initializeFindClient(const WKPageFindClient*);
     void initializeFormClient(const WKPageFormClient*);
     void initializeLoaderClient(const WKPageLoaderClient*);
@@ -272,7 +274,7 @@ public:
     void tryRestoreScrollPosition();
     void didChangeBackForwardList(WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject> >* removedItems);
     void shouldGoToBackForwardListItem(uint64_t itemID, bool& shouldGoToBackForwardListItem);
-    void willGoToBackForwardListItem(uint64_t itemID);
+    void willGoToBackForwardListItem(uint64_t itemID, CoreIPC::ArgumentDecoder* arguments);
 
     String activeURL() const;
     String provisionalURL() const;
@@ -378,7 +380,6 @@ public:
     PlatformWidget viewWidget();
 #endif
 #if USE(TILED_BACKING_STORE)
-    void setFixedVisibleContentRect(const WebCore::IntRect&);
     void setViewportSize(const WebCore::IntSize&);
 #endif
 
@@ -467,8 +468,9 @@ public:
     void registerWebProcessAccessibilityToken(const CoreIPC::DataReference&);
     // Called by the UI process when it is ready to send its tokens to the web process.
     void registerUIProcessAccessibilityTokens(const CoreIPC::DataReference& elemenToken, const CoreIPC::DataReference& windowToken);
-    bool writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes);
     bool readSelectionFromPasteboard(const String& pasteboardName);
+    String stringSelectionForPasteboard();
+    PassRefPtr<WebCore::SharedBuffer> dataSelectionForPasteboard(const String& pasteboardType);
     void makeFirstResponder();
 #endif
 
@@ -535,6 +537,7 @@ public:
     void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
     void processDidBecomeUnresponsive();
+    void interactionOccurredWhileProcessUnresponsive();
     void processDidBecomeResponsive();
     void processDidCrash();
 
@@ -567,8 +570,10 @@ public:
 
     void preferencesDidChange();
 
+#if ENABLE(CONTEXT_MENUS)
     // Called by the WebContextMenuProxy.
     void contextMenuItemSelected(const WebContextMenuItemData&);
+#endif
 
     // Called by the WebOpenPanelResultListenerProxy.
     void didChooseFilesForOpenPanel(const Vector<String>&);
@@ -577,7 +582,7 @@ public:
     WebPageCreationParameters creationParameters() const;
 
 #if PLATFORM(QT)
-    void findZoomableAreaForPoint(const WebCore::IntPoint&);
+    void findZoomableAreaForPoint(const WebCore::IntPoint&, const WebCore::IntSize&);
     void didReceiveMessageFromNavigatorQtObject(const String&);
     void handleDownloadRequest(DownloadProxy*);
 #endif
@@ -612,7 +617,7 @@ public:
     void flashBackingStoreUpdates(const Vector<WebCore::IntRect>& updateRects);
 
 #if PLATFORM(MAC)
-    void handleCorrectionPanelResult(const String& result);
+    void handleAlternativeTextUIResult(const String& result);
 #endif
 
     static void setDebugPaintFlags(WKPageDebugPaintFlags flags) { s_debugPaintFlags = flags; }
@@ -722,7 +727,7 @@ private:
     void screenToWindow(const WebCore::IntPoint& screenPoint, WebCore::IntPoint& windowPoint);
     void windowToScreen(const WebCore::IntRect& viewRect, WebCore::IntRect& result);
     void runBeforeUnloadConfirmPanel(const String& message, uint64_t frameID, bool& shouldClose);
-    void didChangeViewportProperties(const WebCore::ViewportArguments&);
+    void didChangeViewportProperties(const WebCore::ViewportAttributes&);
     void pageDidScroll();
     void runOpenPanel(uint64_t frameID, const WebCore::FileChooserSettings&);
     void printFrame(uint64_t frameID);
@@ -741,7 +746,7 @@ private:
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
     void requestNotificationPermission(uint64_t notificationID, const String& originString);
-    void showNotification(const String& title, const String& body, const String& iconURL, const String& replaceID, const String& originString, uint64_t notificationID);
+    void showNotification(const String& title, const String& body, const String& iconURL, const String& tag, const String& originString, uint64_t notificationID);
     
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
@@ -792,9 +797,11 @@ private:
     void setPopupMenuSelectedIndex(int32_t);
 #endif
 
+#if ENABLE(CONTEXT_MENUS)
     // Context Menu.
     void showContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
     void internalShowContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
+#endif
 
     // Search popup results
     void saveRecentSearches(const String&, const Vector<String>&);
@@ -886,6 +893,11 @@ private:
 
     void setRenderTreeSize(uint64_t treeSize) { m_renderTreeSize = treeSize; }
 
+#if PLUGIN_ARCHITECTURE(X11)
+    void createPluginContainer(uint64_t& windowID);
+    void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID);
+#endif
+
     PageClient* m_pageClient;
     WebLoaderClient m_loaderClient;
     WebPolicyClient m_policyClient;
@@ -893,7 +905,9 @@ private:
     WebResourceLoadClient m_resourceLoadClient;
     WebUIClient m_uiClient;
     WebFindClient m_findClient;
+#if ENABLE(CONTEXT_MENUS)
     WebPageContextMenuClient m_contextMenuClient;
+#endif
 
     OwnPtr<DrawingAreaProxy> m_drawingArea;
     RefPtr<WebProcessProxy> m_process;
@@ -1056,6 +1070,10 @@ private:
 
 #if PLATFORM(QT)
     WTF::HashSet<RefPtr<QtRefCountedNetworkRequestData> > m_applicationSchemeRequests;
+#endif
+
+#if ENABLE(PAGE_VISIBILITY_API)
+    WebCore::PageVisibilityState m_visibilityState;
 #endif
 };
 

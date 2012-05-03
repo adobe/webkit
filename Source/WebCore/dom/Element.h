@@ -119,6 +119,7 @@ public:
     const AtomicString& getAttribute(const QualifiedName&) const;
     void setAttribute(const QualifiedName&, const AtomicString& value, EInUpdateStyleAttribute = NotInUpdateStyleAttribute);
     void removeAttribute(const QualifiedName&);
+    void removeAttribute(size_t index);
 
     // Typed getters and setters for language bindings.
     int getIntegralAttribute(const QualifiedName& attributeName) const;
@@ -167,6 +168,8 @@ public:
     size_t attributeCount() const;
     Attribute* attributeItem(unsigned index) const;
     Attribute* getAttributeItem(const QualifiedName&) const;
+    size_t getAttributeItemIndex(const QualifiedName& name) const { return attributeData()->getAttributeItemIndex(name); }
+    size_t getAttributeItemIndex(const String& name, bool shouldIgnoreAttributeCase) const { return attributeData()->getAttributeItemIndex(name, shouldIgnoreAttributeCase); }
 
     void scrollIntoView(bool alignToTop = true);
     void scrollIntoViewIfNeeded(bool centerIfNeeded = true);
@@ -190,7 +193,7 @@ public:
     virtual int scrollWidth();
     virtual int scrollHeight();
 
-    LayoutRect boundsInRootViewSpace();
+    IntRect boundsInRootViewSpace();
 
     PassRefPtr<ClientRectList> getClientRects();
     PassRefPtr<ClientRect> getBoundingClientRect();
@@ -201,11 +204,16 @@ public:
     void removeAttribute(const String& name);
     void removeAttributeNS(const String& namespaceURI, const String& localName);
 
+    PassRefPtr<Attr> detachAttribute(size_t index);
+
     PassRefPtr<Attr> getAttributeNode(const String& name);
     PassRefPtr<Attr> getAttributeNodeNS(const String& namespaceURI, const String& localName);
     PassRefPtr<Attr> setAttributeNode(Attr*, ExceptionCode&);
     PassRefPtr<Attr> setAttributeNodeNS(Attr*, ExceptionCode&);
     PassRefPtr<Attr> removeAttributeNode(Attr*, ExceptionCode&);
+
+    PassRefPtr<Attr> attrIfExists(const QualifiedName&);
+    PassRefPtr<Attr> ensureAttr(const QualifiedName&);
     
     virtual CSSStyleDeclaration* style();
 
@@ -240,7 +248,7 @@ public:
     virtual void attributeChanged(Attribute*);
 
     // Only called by the parser immediately after element construction.
-    void parserSetAttributes(PassOwnPtr<AttributeVector>, FragmentScriptingPermission);
+    void parserSetAttributes(const AttributeVector&, FragmentScriptingPermission);
 
     ElementAttributeData* attributeData() const { return m_attributeData.get(); }
     ElementAttributeData* ensureAttributeData() const;
@@ -301,7 +309,7 @@ public:
     void willRemoveAttribute(const QualifiedName&, const AtomicString& value);
     void didAddAttribute(Attribute*);
     void didModifyAttribute(Attribute*);
-    void didRemoveAttribute(Attribute*);
+    void didRemoveAttribute(const QualifiedName&);
 
     LayoutSize minimumSizeForResizing() const;
     void setMinimumSizeForResizing(const LayoutSize&);
@@ -406,6 +414,9 @@ public:
     bool hasID() const;
     bool hasClass() const;
 
+    IntSize savedLayerScrollOffset() const;
+    void setSavedLayerScrollOffset(const IntSize&);
+
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -414,10 +425,8 @@ protected:
     }
 
     virtual void willRemove();
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
-    virtual void insertedIntoTree(bool);
-    virtual void removedFromTree(bool);
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     virtual bool willRecalcStyle(StyleChange) { return true; }
     virtual void didRecalcStyle(StyleChange) { }
@@ -477,6 +486,8 @@ private:
 
     void updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
     void updateExtraNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
+
+    void unregisterNamedFlowContentNode();
 
 private:
     mutable OwnPtr<ElementAttributeData> m_attributeData;

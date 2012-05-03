@@ -59,9 +59,10 @@
 #include "FrameLoaderClient.h"
 #include "FrameLoaderTypes.h"
 #include "FrameView.h"
+#include "GOwnPtrGtk.h"
 #include "GeolocationClientGtk.h"
 #include "GeolocationClientMock.h"
-#include "GOwnPtrGtk.h"
+#include "GeolocationController.h"
 #include "GraphicsContext.h"
 #include "GtkUtilities.h"
 #include "GtkVersioning.h"
@@ -274,6 +275,7 @@ static void webkit_web_view_set_window_features(WebKitWebView* webView, WebKitWe
 
 static GtkIMContext* webkit_web_view_get_im_context(WebKitWebView*);
 
+#if ENABLE(CONTEXT_MENUS)
 static void PopupMenuPositionFunc(GtkMenu* menu, gint *x, gint *y, gboolean *pushIn, gpointer userData)
 {
     WebKitWebView* view = WEBKIT_WEB_VIEW(userData);
@@ -297,6 +299,7 @@ static void PopupMenuPositionFunc(GtkMenu* menu, gint *x, gint *y, gboolean *pus
 
     *pushIn = FALSE;
 }
+#endif
 
 static Node* getFocusedNode(Frame* frame)
 {
@@ -305,6 +308,7 @@ static Node* getFocusedNode(Frame* frame)
     return 0;
 }
 
+#if ENABLE(CONTEXT_MENUS)
 static void contextMenuItemActivated(GtkMenuItem* item, ContextMenuController* controller)
 {
     ContextMenuItem contextItem(item);
@@ -461,6 +465,7 @@ static gboolean webkit_web_view_popup_menu_handler(GtkWidget* widget)
     PlatformMouseEvent event(location, globalPoint, RightButton, PlatformEvent::MousePressed, 0, false, false, false, false, gtk_get_current_event_time());
     return webkit_web_view_forward_context_menu_event(WEBKIT_WEB_VIEW(widget), event, true);
 }
+#endif // ENABLE(CONTEXT_MENUS)
 
 static void setHorizontalAdjustment(WebKitWebView* webView, GtkAdjustment* adjustment)
 {
@@ -759,8 +764,10 @@ static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventBu
     int count = priv->clickCounter.clickCountForGdkButtonEvent(widget, event);
     platformEvent.setClickCount(count);
 
+#if ENABLE(CONTEXT_MENUS)
     if (event->button == 3)
         return webkit_web_view_forward_context_menu_event(webView, PlatformMouseEvent(event), false);
+#endif
 
     Frame* frame = core(webView)->mainFrame();
     if (!frame->view())
@@ -791,15 +798,6 @@ static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventBu
 static gboolean webkit_web_view_button_release_event(GtkWidget* widget, GdkEventButton* event)
 {
     WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-
-    Frame* focusedFrame = core(webView)->focusController()->focusedFrame();
-
-    if (focusedFrame && focusedFrame->editor()->canEdit()) {
-#ifdef MAEMO_CHANGES
-        WebKitWebViewPrivate* priv = webView->priv;
-        hildon_gtk_im_context_filter_event(priv->imContext.get(), (GdkEvent*)event);
-#endif
-    }
 
     Frame* mainFrame = core(webView)->mainFrame();
     if (mainFrame->view())
@@ -2932,7 +2930,11 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
     widgetClass->get_preferred_width = webkit_web_view_get_preferred_width;
     widgetClass->get_preferred_height = webkit_web_view_get_preferred_height;
 #endif
+#if ENABLE(CONTEXT_MENUS)
     widgetClass->popup_menu = webkit_web_view_popup_menu_handler;
+#else
+    widgetClass->popup_menu = NULL;
+#endif
     widgetClass->grab_focus = webkit_web_view_grab_focus;
     widgetClass->focus_in_event = webkit_web_view_focus_in_event;
     widgetClass->focus_out_event = webkit_web_view_focus_out_event;
@@ -3409,6 +3411,9 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     coreSettings->setEnableScrollAnimator(settingsPrivate->enableSmoothScrolling);
 #endif
 
+    // Use mock scrollbars if in DumpRenderTree mode (i.e. testing layout tests).
+    coreSettings->setMockScrollbarsEnabled(DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled());
+
     if (Page* page = core(webView))
         page->setTabKeyCyclesThroughElements(settingsPrivate->tabKeyCyclesThroughElements);
 
@@ -3563,19 +3568,23 @@ static void webkit_web_view_init(WebKitWebView* webView)
 
     Page::PageClients pageClients;
     pageClients.chromeClient = new WebKit::ChromeClient(webView);
+#if ENABLE(CONTEXT_MENUS)
     pageClients.contextMenuClient = new WebKit::ContextMenuClient(webView);
+#endif
     pageClients.editorClient = new WebKit::EditorClient(webView);
     pageClients.dragClient = new WebKit::DragClient(webView);
     pageClients.inspectorClient = new WebKit::InspectorClient(webView);
-#if ENABLE(GEOLOCATION)
-    if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled())
-        pageClients.geolocationClient = new GeolocationClientMock;
-    else
-        pageClients.geolocationClient = new WebKit::GeolocationClient(webView);
-#endif
 
     priv->corePage = new Page(pageClients);
 
+#if ENABLE(GEOLOCATION)
+    if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
+        GeolocationClientMock* mock = new GeolocationClientMock;
+        WebCore::provideGeolocationTo(priv->corePage, mock);
+        mock->setController(GeolocationController::from(priv->corePage));
+    } else
+        WebCore::provideGeolocationTo(priv->corePage, new WebKit::GeolocationClient(webView));
+#endif
 #if ENABLE(DEVICE_ORIENTATION)
     WebCore::provideDeviceMotionTo(priv->corePage, new DeviceMotionClientGtk);
     WebCore::provideDeviceOrientationTo(priv->corePage, new DeviceOrientationClientGtk);
@@ -3586,9 +3595,6 @@ static void webkit_web_view_init(WebKitWebView* webView)
 #endif
 
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
-#if ENABLE(GEOLOCATION)
-        static_cast<GeolocationClientMock*>(pageClients.geolocationClient)->setController(priv->corePage->geolocationController());
-#endif
         // Set some testing-specific settings
         priv->corePage->settings()->setInteractiveFormValidationEnabled(true);
         priv->corePage->settings()->setValidationMessageTimerMagnification(-1);
@@ -3610,7 +3616,6 @@ static void webkit_web_view_init(WebKitWebView* webView)
     priv->viewportAttributes->priv->webView = webView;
 
     gtk_widget_set_can_focus(GTK_WIDGET(webView), TRUE);
-    gtk_widget_set_double_buffered(GTK_WIDGET(webView), FALSE);
 
     priv->mainFrame = WEBKIT_WEB_FRAME(webkit_web_frame_new(webView));
     priv->lastPopupXPosition = priv->lastPopupYPosition = -1;

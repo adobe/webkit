@@ -42,6 +42,7 @@ def build(bld):
     if Options.options.port == "wx":
         if building_on_win32:
             jscore_excludes += ['OSAllocatorPosix.cpp', 'ThreadingPthreads.cpp']
+            sources.extend(['../WTF/wtf/ThreadingWin.cpp', '../WTF/wtf/ThreadSpecificWin.cpp', '../WTF/wtf/OSAllocatorWin.cpp'])
         else:
             jscore_excludes.append('JSStringRefBSTR.cpp')
 
@@ -68,7 +69,7 @@ def build(bld):
         defines = ['BUILDING_JavaScriptCore'],
         target = 'jscore',
         uselib = 'WX ICU ' + get_config(),
-        uselib_local = 'wtf',
+        uselib_local = '',
         install_path = output_dir)
 
     jscore.find_sources_in_dirs(full_dirs, excludes = jscore_excludes)
@@ -88,3 +89,5 @@ def build(bld):
         myenv.CXXFLAGS = myenv.CXXFLAGS[:]
         myenv.CXXFLAGS.remove('/EHsc')
         obj.env = myenv
+
+    bld.add_group()

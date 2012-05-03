@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,10 +27,17 @@
 #include "CSSValuePool.h"
 
 #include "CSSParser.h"
+#include "CSSStyleSheet.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 
 namespace WebCore {
+
+CSSValuePool& cssValuePool()
+{
+    DEFINE_STATIC_LOCAL(CSSValuePool, pool, ());
+    return pool;
+}
 
 CSSValuePool::CSSValuePool()
     : m_inheritedValue(CSSInheritedValue::create())
@@ -39,13 +46,6 @@ CSSValuePool::CSSValuePool()
     , m_colorTransparent(CSSPrimitiveValue::createColor(Color::transparent))
     , m_colorWhite(CSSPrimitiveValue::createColor(Color::white))
     , m_colorBlack(CSSPrimitiveValue::createColor(Color::black))
-    , m_pixelZero(CSSPrimitiveValue::create(0, CSSPrimitiveValue::CSS_PX))
-    , m_percentZero(CSSPrimitiveValue::create(0, CSSPrimitiveValue::CSS_PERCENTAGE))
-    , m_numberZero(CSSPrimitiveValue::create(0, CSSPrimitiveValue::CSS_NUMBER))
-{
-}
-
-CSSValuePool::~CSSValuePool()
 {
 }
 
@@ -54,11 +54,9 @@ PassRefPtr<CSSPrimitiveValue> CSSValuePool::createIdentifierValue(int ident)
     if (ident <= 0 || ident >= numCSSValueKeywords)
         return CSSPrimitiveValue::createIdentifier(ident);
 
-    RefPtr<CSSPrimitiveValue> dummyValue;
-    pair<IdentifierValueCache::iterator, bool> entry = m_identifierValueCache.add(ident, dummyValue);
-    if (entry.second)
-        entry.first->second = CSSPrimitiveValue::createIdentifier(ident);
-    return entry.first->second;
+    if (!m_identifierValueCache[ident])
+        m_identifierValueCache[ident] = CSSPrimitiveValue::createIdentifier(ident);
+    return m_identifierValueCache[ident];
 }
 
 PassRefPtr<CSSPrimitiveValue> CSSValuePool::createColorValue(unsigned rgbValue)
@@ -78,69 +76,59 @@ PassRefPtr<CSSPrimitiveValue> CSSValuePool::createColorValue(unsigned rgbValue)
         m_colorValueCache.clear();
 
     RefPtr<CSSPrimitiveValue> dummyValue;
-    pair<ColorValueCache::iterator, bool> entry = m_colorValueCache.add(rgbValue, dummyValue);
-    if (entry.second)
-        entry.first->second = CSSPrimitiveValue::createColor(rgbValue);
-    return entry.first->second;
+    ColorValueCache::AddResult entry = m_colorValueCache.add(rgbValue, dummyValue);
+    if (entry.isNewEntry)
+        entry.iterator->second = CSSPrimitiveValue::createColor(rgbValue);
+    return entry.iterator->second;
 }
 
 PassRefPtr<CSSPrimitiveValue> CSSValuePool::createValue(double value, CSSPrimitiveValue::UnitTypes type)
 {
-    // Small positive integers repeat often.
-    static const int maximumCacheableValue = 256;
-    if (value < 0 || value > maximumCacheableValue)
+    if (value < 0 || value > maximumCacheableIntegerValue)
         return CSSPrimitiveValue::create(value, type);
 
     int intValue = static_cast<int>(value);
     if (value != intValue)
         return CSSPrimitiveValue::create(value, type);
 
-    IntegerValueCache* cache;
+    RefPtr<CSSPrimitiveValue>* cache;
     switch (type) {
     case CSSPrimitiveValue::CSS_PX:
-        if (intValue == 0)
-            return m_pixelZero;
-        cache = &m_pixelValueCache;
+        cache = m_pixelValueCache;
         break;
     case CSSPrimitiveValue::CSS_PERCENTAGE:
-        if (intValue == 0)
-            return m_percentZero;
-        cache = &m_percentValueCache;
+        cache = m_percentValueCache;
         break;
     case CSSPrimitiveValue::CSS_NUMBER:
-        if (intValue == 0)
-            return m_numberZero;
-        cache = &m_numberValueCache;
+        cache = m_numberValueCache;
         break;
     default:
         return CSSPrimitiveValue::create(value, type);
     }
 
-    RefPtr<CSSPrimitiveValue> dummyValue;
-    pair<IntegerValueCache::iterator, bool> entry = cache->add(intValue, dummyValue);
-    if (entry.second)
-        entry.first->second = CSSPrimitiveValue::create(value, type);
-    return entry.first->second;
+    if (!cache[intValue])
+        cache[intValue] = CSSPrimitiveValue::create(value, type);
+    return cache[intValue];
 }
 
 PassRefPtr<CSSPrimitiveValue> CSSValuePool::createFontFamilyValue(const String& familyName)
 {
-    RefPtr<CSSPrimitiveValue>& value = m_fontFamilyValueCache.add(familyName, 0).first->second;
+    RefPtr<CSSPrimitiveValue>& value = m_fontFamilyValueCache.add(familyName, 0).iterator->second;
     if (!value)
         value = CSSPrimitiveValue::create(familyName, CSSPrimitiveValue::CSS_STRING);
     return value;
 }
 
-PassRefPtr<CSSValueList> CSSValuePool::createFontFaceValue(const AtomicString& string, CSSStyleSheet* contextStyleSheet)
+PassRefPtr<CSSValueList> CSSValuePool::createFontFaceValue(const AtomicString& string)
 {
     // Just wipe out the cache and start rebuilding if it gets too big.
     const int maximumFontFaceCacheSize = 128;
     if (m_fontFaceValueCache.size() > maximumFontFaceCacheSize)
         m_fontFaceValueCache.clear();
 
-    RefPtr<CSSValueList>& value = m_fontFaceValueCache.add(string, 0).first->second;
+    RefPtr<CSSValueList>& value = m_fontFaceValueCache.add(string, 0).iterator->second;
     if (!value)
-        value = CSSParser::parseFontFaceValue(string, contextStyleSheet);
+        value = CSSParser::parseFontFaceValue(string);
     return value;
 }
 

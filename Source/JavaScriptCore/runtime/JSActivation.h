@@ -92,7 +92,8 @@ namespace JSC {
         NEVER_INLINE PropertySlot::GetValueFunc getArgumentsGetter();
 
         int m_numCapturedArgs;
-        int m_numCapturedVars : 31;
+        int m_numCapturedVars : 30;
+        bool m_isTornOff : 1;
         bool m_requiresDynamicChecks : 1;
         int m_argumentsRegister;
     };
@@ -102,7 +103,7 @@ namespace JSC {
     inline JSActivation* asActivation(JSValue value)
     {
         ASSERT(asObject(value)->inherits(&JSActivation::s_info));
-        return static_cast<JSActivation*>(asObject(value));
+        return jsCast<JSActivation*>(asObject(value));
     }
     
     ALWAYS_INLINE JSActivation* Register::activation() const
@@ -127,19 +128,13 @@ namespace JSC {
         OwnArrayPtr<WriteBarrier<Unknown> > registerArray = adoptArrayPtr(new WriteBarrier<Unknown>[registerArraySize]);
         WriteBarrier<Unknown>* registers = registerArray.get() + registerOffset;
 
-        // Copy all arguments that can be captured by name or by the arguments object.
-        for (int i = 0; i < m_numCapturedArgs; ++i) {
-            int index = CallFrame::argumentOffset(i);
-            registers[index].set(globalData, this, m_registers[index].get());
-        }
-
-        // Skip 'this' and call frame.
-
-        // Copy all captured vars.
-        for (int i = 0; i < m_numCapturedVars; ++i)
+        int from = CallFrame::argumentOffset(m_numCapturedArgs - 1);
+        int to = m_numCapturedVars;
+        for (int i = from; i < to; ++i)
             registers[i].set(globalData, this, m_registers[i].get());
 
         setRegisters(registers, registerArray.release());
+        m_isTornOff = true;
     }
 
 } // namespace JSC

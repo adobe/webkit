@@ -29,6 +29,7 @@ GraphicsLayerTextureMapper::GraphicsLayerTextureMapper(GraphicsLayerClient* clie
     , m_layer(adoptPtr(new TextureMapperLayer()))
     , m_changeMask(0)
     , m_needsDisplay(false)
+    , m_fixedToViewport(false)
     , m_contentsLayer(0)
     , m_animationStartedTimer(this, &GraphicsLayerTextureMapper::animationStartedTimerFired)
 {
@@ -57,6 +58,12 @@ void GraphicsLayerTextureMapper::setName(const String& name)
 
 GraphicsLayerTextureMapper::~GraphicsLayerTextureMapper()
 {
+    willBeDestroyed();
+}
+
+void GraphicsLayerTextureMapper::willBeDestroyed()
+{
+    GraphicsLayer::willBeDestroyed();
 }
 
 /* \reimp (GraphicsLayer.h): The current size might change, thus we need to update the whole display.

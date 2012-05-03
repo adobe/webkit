@@ -86,10 +86,24 @@ WebInspector.ResourceScriptMapping.prototype = {
     addScript: function(script)
     {
         var resource = null;
+        var request = null;
         var isInlineScript = false;
         if (script.isInlineScript()) {
-            resource = WebInspector.networkManager.inflightResourceForURL(script.sourceURL) || WebInspector.resourceForURL(script.sourceURL);
-            if (resource && resource.type === WebInspector.Resource.Type.Document) {
+            // First lookup the resource that has already been loaded. We are only interested in Document resources.
+            resource = WebInspector.resourceForURL(script.sourceURL);
+            if (resource && resource.type !== WebInspector.resourceTypes.Document)
+                resource = null;
+            // Ignore resource in case it has not yet finished loading.
+            if (resource && resource.request && !resource.request.finished)
+                resource = null;
+            if (!resource) {
+                // When there is no resource, lookup in-flight requests of type Document.
+                request = WebInspector.networkManager.inflightRequestForURL(script.sourceURL);
+                if (request && request.type !== WebInspector.resourceTypes.Document)
+                    request = null;
+            }
+            // If either of these exists, we bind script to the resource.
+            if (request || resource) {
                 isInlineScript = true;
                 var rawSourceCode = this._rawSourceCodeForDocumentURL[script.sourceURL];
                 if (rawSourceCode) {
@@ -100,10 +114,9 @@ WebInspector.ResourceScriptMapping.prototype = {
             }
         }
 
-        var rawSourceCode = new WebInspector.RawSourceCode(script.scriptId, script, resource, this._formatter, this._formatSource);
+        var rawSourceCode = new WebInspector.RawSourceCode(script.scriptId, script, resource, request, this._formatter, this._formatSource);
         this._rawSourceCodes.push(rawSourceCode);
         this._bindScriptToRawSourceCode(script, rawSourceCode);
-
         if (isInlineScript)
             this._rawSourceCodeForDocumentURL[script.sourceURL] = rawSourceCode;
 
@@ -135,27 +148,15 @@ WebInspector.ResourceScriptMapping.prototype = {
             this._rawSourceCodeForUISourceCode.put(addedItem, rawSourceCode);
 
         var scriptIds = [];
-        for (var i = 0; i < rawSourceCode._scripts.length; ++i)
+        for (var i = 0; i < rawSourceCode._scripts.length; ++i) {
             scriptIds.push(rawSourceCode._scripts[i].scriptId);
+            rawSourceCode._scripts[i].setSourceMapping(this);
+        }
         var removedItems = removedItem ? [removedItem] : [];
         var addedItems = addedItem ? [addedItem] : [];
 
-        if (removedItem) {
-            for (var i = 0; i < scriptIds.length; ++i) {
-                var data = { scriptId: scriptIds[i], uiSourceCodes: [removedItem] };
-                this.dispatchEventToListeners(WebInspector.ScriptMapping.Events.ScriptUnbound, data);
-            }
-        }
-
         var data = { removedItems: removedItems, addedItems: addedItems };
         this.dispatchEventToListeners(WebInspector.ScriptMapping.Events.UISourceCodeListChanged, data);
-
-        if (addedItem) {
-            for (var i = 0; i < scriptIds.length; ++i) {
-                var data = { scriptId: scriptIds[i], uiSourceCodes: [addedItem] };
-                this.dispatchEventToListeners(WebInspector.ScriptMapping.Events.ScriptBound, data);
-            }
-        }
     },
 
     /**
@@ -166,6 +167,7 @@ WebInspector.ResourceScriptMapping.prototype = {
     {
         this._rawSourceCodeForScriptId[script.scriptId] = rawSourceCode;
         this._rawSourceCodeForURL[script.sourceURL] = rawSourceCode;
+        script.setSourceMapping(this);
     },
 
     /**

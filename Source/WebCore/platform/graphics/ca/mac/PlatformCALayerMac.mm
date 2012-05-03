@@ -239,7 +239,10 @@ PlatformCALayer::~PlatformCALayer()
     setOwner(0);
     
     // Remove the owner pointer from the delegate in case there is a pending animationStarted event.
-    [static_cast<WebAnimationDelegate*>(m_delegate.get()) setOwner:nil];        
+    [static_cast<WebAnimationDelegate*>(m_delegate.get()) setOwner:nil];
+
+    if (m_layerType == LayerTypeTileCacheLayer)
+        [static_cast<WebTileCacheLayer *>(m_layer.get()) invalidate];
 }
 
 PlatformCALayer* PlatformCALayer::platformCALayer(void* platformLayer)
@@ -775,7 +778,13 @@ void PlatformCALayer::setBlendMode(EBlendMode blendMode)
 void PlatformCALayer::setFilters(const FilterOperations& filters)
 {
     if (!filters.size()) {
-        [m_layer.get() setFilters:0];
+        BEGIN_BLOCK_OBJC_EXCEPTIONS
+        [m_layer.get() setFilters:nil];
+        [m_layer.get() setShadowOffset:CGSizeZero];
+        [m_layer.get() setShadowColor:nil];
+        [m_layer.get() setShadowRadius:0];
+        [m_layer.get() setShadowOpacity:0];
+        END_BLOCK_OBJC_EXCEPTIONS
         return;
     }
     

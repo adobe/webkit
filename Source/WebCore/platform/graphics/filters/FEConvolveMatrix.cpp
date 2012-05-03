@@ -30,8 +30,8 @@
 #include "RenderTreeAsText.h"
 #include "TextStream.h"
 
-#include <wtf/ByteArray.h>
 #include <wtf/ParallelJobs.h>
+#include <wtf/Uint8ClampedArray.h>
 
 namespace WebCore {
 
@@ -48,6 +48,8 @@ FEConvolveMatrix::FEConvolveMatrix(Filter* filter, const IntSize& kernelSize,
     , m_preserveAlpha(preserveAlpha)
     , m_kernelMatrix(kernelMatrix)
 {
+    ASSERT(m_kernelSize.width() > 0);
+    ASSERT(m_kernelSize.height() > 0);
 }
 
 PassRefPtr<FEConvolveMatrix> FEConvolveMatrix::create(Filter* filter, const IntSize& kernelSize,
@@ -66,7 +68,9 @@ IntSize FEConvolveMatrix::kernelSize() const
 
 void FEConvolveMatrix::setKernelSize(const IntSize& kernelSize)
 {
-    m_kernelSize = kernelSize; 
+    ASSERT(kernelSize.width() > 0);
+    ASSERT(kernelSize.height() > 0);
+    m_kernelSize = kernelSize;
 }
 
 const Vector<float>& FEConvolveMatrix::kernel() const
@@ -86,6 +90,7 @@ float FEConvolveMatrix::divisor() const
 
 bool FEConvolveMatrix::setDivisor(float divisor)
 {
+    ASSERT(divisor);
     if (m_divisor == divisor)
         return false;
     m_divisor = divisor;
@@ -138,6 +143,8 @@ FloatPoint FEConvolveMatrix::kernelUnitLength() const
 
 bool FEConvolveMatrix::setKernelUnitLength(const FloatPoint& kernelUnitLength)
 {
+    ASSERT(kernelUnitLength.x() > 0);
+    ASSERT(kernelUnitLength.y() > 0);
     if (m_kernelUnitLength == kernelUnitLength)
         return false;
     m_kernelUnitLength = kernelUnitLength;
@@ -223,14 +230,14 @@ static ALWAYS_INLINE unsigned char clampRGBAValue(float channel, unsigned char m
 }
 
 template<bool preserveAlphaValues>
-ALWAYS_INLINE void setDestinationPixels(ByteArray* image, int& pixel, float* totals, float divisor, float bias, ByteArray* src)
+ALWAYS_INLINE void setDestinationPixels(Uint8ClampedArray* image, int& pixel, float* totals, float divisor, float bias, Uint8ClampedArray* src)
 {
     unsigned char maxAlpha = preserveAlphaValues ? 255 : clampRGBAValue(totals[3] / divisor + bias);
     for (int i = 0; i < 3; ++i)
         image->set(pixel++, clampRGBAValue(totals[i] / divisor + bias, maxAlpha));
 
     if (preserveAlphaValues) {
-        image->set(pixel, src->get(pixel));
+        image->set(pixel, src->item(pixel));
         ++pixel;
     } else
         image->set(pixel++, maxAlpha);
@@ -267,11 +274,11 @@ ALWAYS_INLINE void FEConvolveMatrix::fastSetInteriorPixels(PaintingData& paintin
                 totals[3] = 0;
 
             while (kernelValue >= 0) {
-                totals[0] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(kernelPixel++));
-                totals[1] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(kernelPixel++));
-                totals[2] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(kernelPixel++));
+                totals[0] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(kernelPixel++));
+                totals[1] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(kernelPixel++));
+                totals[2] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(kernelPixel++));
                 if (!preserveAlphaValues)
-                    totals[3] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(kernelPixel));
+                    totals[3] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(kernelPixel));
                 ++kernelPixel;
                 --kernelValue;
                 if (!--width) {
@@ -350,12 +357,12 @@ void FEConvolveMatrix::fastSetOuterPixels(PaintingData& paintingData, int x1, in
             while (kernelValue >= 0) {
                 int pixelIndex = getPixelValue(paintingData, kernelPixelX, kernelPixelY);
                 if (pixelIndex >= 0) {
-                    totals[0] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(pixelIndex));
-                    totals[1] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(pixelIndex + 1));
-                    totals[2] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(pixelIndex + 2));
+                    totals[0] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(pixelIndex));
+                    totals[1] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(pixelIndex + 1));
+                    totals[2] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(pixelIndex + 2));
                 }
                 if (!preserveAlphaValues && pixelIndex >= 0)
-                    totals[3] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->get(pixelIndex + 3));
+                    totals[3] += m_kernelMatrix[kernelValue] * static_cast<float>(paintingData.srcPixelArray->item(pixelIndex + 3));
                 ++kernelPixelX;
                 --kernelValue;
                 if (!--width) {
@@ -403,7 +410,7 @@ void FEConvolveMatrix::platformApplySoftware()
 {
     FilterEffect* in = inputEffect(0);
 
-    ByteArray* resultImage;
+    Uint8ClampedArray* resultImage;
     if (m_preserveAlpha)
         resultImage = createUnmultipliedImageResult();
     else
@@ -413,7 +420,7 @@ void FEConvolveMatrix::platformApplySoftware()
 
     IntRect effectDrawingRect = requestedRegionOfInputImageData(in->absolutePaintRect());
 
-    RefPtr<ByteArray> srcPixelArray;
+    RefPtr<Uint8ClampedArray> srcPixelArray;
     if (m_preserveAlpha)
         srcPixelArray = in->asUnmultipliedImage(effectDrawingRect);
     else

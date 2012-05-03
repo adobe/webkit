@@ -135,6 +135,12 @@ FloatQuad TransformState::mappedQuad() const
 
 void TransformState::flattenWithTransform(const TransformationMatrix& t)
 {
+    if (m_direction == GlobalTransformationMatrix) {
+        // FIXME: implement transformation flattening.
+        *m_accumulatedTransform.get() = t;
+        return;
+    }
+    
     if (m_direction == ApplyTransformDirection) {
         if (m_mapPoint)
             m_lastPlanarPoint = t.mapPoint(m_lastPlanarPoint);
@@ -154,6 +160,13 @@ void TransformState::flattenWithTransform(const TransformationMatrix& t)
     if (m_accumulatedTransform)
         m_accumulatedTransform->makeIdentity();
     m_accumulatingTransform = false;
+}
+
+TransformationMatrix TransformState::globalTransformationMatrix() const
+{
+    if (!m_accumulatedTransform)
+        return TransformationMatrix();
+    return *m_accumulatedTransform.get();
 }
 
 } // namespace WebCore

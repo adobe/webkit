@@ -133,9 +133,10 @@ void SVGFEImageElement::parseAttribute(Attribute* attr)
         return;
     }
 
-    const AtomicString& value = attr->value();
     if (attr->name() == SVGNames::preserveAspectRatioAttr) {
-        SVGPreserveAspectRatio::parsePreserveAspectRatio(this, value);
+        SVGPreserveAspectRatio preserveAspectRatio;
+        preserveAspectRatio.parse(attr->value());
+        setPreserveAspectRatioBaseValue(preserveAspectRatio);
         return;
     }
 
@@ -174,16 +175,18 @@ void SVGFEImageElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-void SVGFEImageElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGFEImageElement::insertedInto(Node* rootParent)
 {
-    SVGFilterPrimitiveStandardAttributes::insertedIntoDocument();
+    SVGFilterPrimitiveStandardAttributes::insertedInto(rootParent);
     buildPendingResource();
+    return InsertionDone;
 }
 
-void SVGFEImageElement::removedFromDocument()
+void SVGFEImageElement::removedFrom(Node* rootParent)
 {
-    SVGFilterPrimitiveStandardAttributes::removedFromDocument();
-    clearResourceReferences();
+    SVGFilterPrimitiveStandardAttributes::removedFrom(rootParent);
+    if (rootParent->inDocument())
+        clearResourceReferences();
 }
 
 void SVGFEImageElement::notifyFinished(CachedResource*)

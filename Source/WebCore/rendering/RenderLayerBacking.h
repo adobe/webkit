@@ -95,19 +95,25 @@ public:
     // for descendants, but its contents usually render into the window (in which case this returns true).
     // This returns false for other layers, and when the document layer actually needs to paint into its backing store
     // for some reason.
-    bool paintingGoesToWindow() const;
+    bool paintsIntoWindow() const;
+    
+    // Returns true for a composited layer that has no backing store of its own, so
+    // paints into some ancestor layer.
+    bool paintsIntoCompositedAncestor() const { return !m_requiresOwnBackingStore; }
+
+    void setRequiresOwnBackingStore(bool flag) { m_requiresOwnBackingStore = flag; }
 
     void setContentsNeedDisplay();
     // r is in the coordinate space of the layer's render object
     void setContentsNeedDisplayInRect(const IntRect&);
 
     // Notification from the renderer that its content changed.
-    void contentChanged(RenderLayer::ContentChangeType);
+    void contentChanged(ContentChangeType);
 
     // Interface to start, finish, suspend and resume animations and transitions
-    bool startTransition(double timeOffset, int property, const RenderStyle* fromStyle, const RenderStyle* toStyle);
-    void transitionPaused(double timeOffset, int property);
-    void transitionFinished(int property);
+    bool startTransition(double, CSSPropertyID, const RenderStyle* fromStyle, const RenderStyle* toStyle);
+    void transitionPaused(double timeOffset, CSSPropertyID);
+    void transitionFinished(CSSPropertyID);
 
     bool startAnimation(double timeOffset, const Animation* anim, const KeyframeList& keyframes);
     void animationPaused(double timeOffset, const String& name);
@@ -136,6 +142,10 @@ public:
     virtual bool showDebugBorders(const GraphicsLayer*) const;
     virtual bool showRepaintCounter(const GraphicsLayer*) const;
 
+#ifndef NDEBUG
+    virtual void verifyNotPainting();
+#endif
+
     IntRect contentsBox() const;
     
     // For informative purposes only.
@@ -148,6 +158,11 @@ public:
 #if ENABLE(CSS_FILTERS)
     bool canCompositeFilters() const { return m_canCompositeFilters; }
 #endif
+
+    // Return an estimate of the backing store area (in pixels) allocated by this object's GraphicsLayers.
+    double backingStoreArea() const;
+
+    String nameForLayer() const;
     
     void setBlendMode(EBlendMode);
     
@@ -210,12 +225,8 @@ private:
 
     void paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*, const IntRect& paintDirtyRect, PaintBehavior, GraphicsLayerPaintingPhase, RenderObject* paintingRoot);
 
-    static int graphicsLayerToCSSProperty(AnimatedPropertyID);
-    static AnimatedPropertyID cssToGraphicsLayerProperty(int);
-
-#ifndef NDEBUG
-    String nameForLayer() const;
-#endif
+    static CSSPropertyID graphicsLayerToCSSProperty(AnimatedPropertyID);
+    static AnimatedPropertyID cssToGraphicsLayerProperty(CSSPropertyID);
 
     RenderLayer* m_owningLayer;
 
@@ -234,6 +245,7 @@ private:
     bool m_artificiallyInflatedBounds;      // bounds had to be made non-zero to make transform-origin work
     bool m_isMainFrameRenderViewLayer;
     bool m_usingTiledCacheLayer;
+    bool m_requiresOwnBackingStore;
 #if ENABLE(CSS_FILTERS)
     bool m_canCompositeFilters;
 #endif

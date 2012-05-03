@@ -23,8 +23,9 @@
 
 #include "qquickurlschemedelegate_p.h"
 #include "qwebkitglobal.h"
-#include <QtDeclarative/qdeclarativelist.h>
+#include <QtQml/qqmllist.h>
 #include <QtQuick/qquickitem.h>
+#include <private/qquickflickable_p.h>
 
 class QWebNavigationRequest;
 class QDeclarativeComponent;
@@ -46,6 +47,10 @@ class PlatformWebView;
 
 namespace WebKit {
 class QtRefCountedNetworkRequestData;
+class QtViewportInteractionEngine;
+class QtWebPageLoadClient;
+class QtWebPagePolicyClient;
+class QtWebPageUIClient;
 }
 
 namespace WTF {
@@ -66,7 +71,7 @@ QT_END_NAMESPACE
 // Instantiating the WebView in C++ is only possible by creating
 // a QDeclarativeComponent as the initialization depends on the
 // componentComplete method being called.
-class QWEBKIT_EXPORT QQuickWebView : public QQuickItem {
+class QWEBKIT_EXPORT QQuickWebView : public QQuickFlickable {
     Q_OBJECT
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(QUrl url READ url WRITE setUrl NOTIFY urlChanged)
@@ -139,8 +144,12 @@ public:
     void updateContentsSize(const QSizeF&);
     QPointF pageItemPos();
 
+    // Private C++-only API.
+    qreal zoomFactor() const;
+    void setZoomFactor(qreal);
+
 public Q_SLOTS:
-    void loadHtml(const QString& html, const QUrl& baseUrl = QUrl());
+    void loadHtml(const QString& html, const QUrl& baseUrl = QUrl(), const QUrl& unreachableUrl = QUrl());
 
     void goBack();
     void goForward();
@@ -183,8 +192,17 @@ protected:
 private:
     Q_DECLARE_PRIVATE(QQuickWebView)
 
+    void handleFlickableMousePress(const QPointF& position, qint64 eventTimestampMillis);
+    void handleFlickableMouseMove(const QPointF& position, qint64 eventTimestampMillis);
+    void handleFlickableMouseRelease(const QPointF& position, qint64 eventTimestampMillis);
+
+    QPointF contentPos() const;
+    void setContentPos(const QPointF&);
+
     QQuickWebView(WKContextRef, WKPageGroupRef, QQuickItem* parent = 0);
     WKPageRef pageRef() const;
+
+    void emitUrlChangeIfNeeded();
 
     Q_PRIVATE_SLOT(d_func(), void _q_suspend());
     Q_PRIVATE_SLOT(d_func(), void _q_resume());
@@ -198,9 +216,10 @@ private:
     QScopedPointer<QQuickWebViewPrivate> d_ptr;
     QQuickWebViewExperimental* m_experimental;
 
-    friend class QtWebPageLoadClient;
-    friend class QtWebPagePolicyClient;
-    friend class QtWebPageUIClient;
+    friend class WebKit::QtViewportInteractionEngine;
+    friend class WebKit::QtWebPageLoadClient;
+    friend class WebKit::QtWebPagePolicyClient;
+    friend class WebKit::QtWebPageUIClient;
     friend class WTR::PlatformWebView;
     friend class QQuickWebViewExperimental;
 };
@@ -229,15 +248,8 @@ class QWEBKIT_EXPORT QQuickWebViewExperimental : public QObject {
     Q_OBJECT
     Q_PROPERTY(QQuickWebPage* page READ page CONSTANT FINAL)
 
-    // QML Flickable API.
-    Q_PROPERTY(qreal contentWidth READ contentWidth WRITE setContentWidth NOTIFY contentWidthChanged)
-    Q_PROPERTY(qreal contentHeight READ contentHeight WRITE setContentHeight NOTIFY contentHeightChanged)
-    Q_PROPERTY(qreal contentX READ contentX WRITE setContentX NOTIFY contentXChanged)
-    Q_PROPERTY(qreal contentY READ contentY WRITE setContentY NOTIFY contentYChanged)
-    Q_PROPERTY(QQuickFlickable* flickable READ flickable NOTIFY flickableChanged)
-    Q_PROPERTY(QQuickItem* contentItem READ contentItem CONSTANT)
-    Q_PROPERTY(QDeclarativeListProperty<QObject> flickableData READ flickableData)
     Q_PROPERTY(bool transparentBackground WRITE setTransparentBackground READ transparentBackground)
+    Q_PROPERTY(bool useDefaultContentItemSize WRITE setUseDefaultContentItemSize READ useDefaultContentItemSize)
 
     Q_PROPERTY(QWebNavigationHistory* navigationHistory READ navigationHistory CONSTANT FINAL)
     Q_PROPERTY(QDeclarativeComponent* alertDialog READ alertDialog WRITE setAlertDialog NOTIFY alertDialogChanged)
@@ -295,22 +307,14 @@ public:
     static int schemeDelegates_Count(QDeclarativeListProperty<QQuickUrlSchemeDelegate>*);
     static void schemeDelegates_Clear(QDeclarativeListProperty<QQuickUrlSchemeDelegate>*);
     QDeclarativeListProperty<QQuickUrlSchemeDelegate> schemeDelegates();
-    QDeclarativeListProperty<QObject> flickableData();
     void invokeApplicationSchemeHandler(WTF::PassRefPtr<WebKit::QtRefCountedNetworkRequestData>);
     void sendApplicationSchemeReply(QQuickNetworkReply*);
 
-    QQuickFlickable* flickable();
-    QQuickItem* contentItem();
-    qreal contentWidth() const;
-    void setContentWidth(qreal);
-    qreal contentHeight() const;
-    void setContentHeight(qreal);
-    qreal contentX() const;
-    void setContentX(qreal);
-    qreal contentY() const;
-    void setContentY(qreal);
     bool transparentBackground() const;
     void setTransparentBackground(bool);
+
+    bool useDefaultContentItemSize() const;
+    void setUseDefaultContentItemSize(bool enable);
 
     // C++ only
     bool renderToOffscreenBuffer() const;
@@ -324,11 +328,6 @@ public Q_SLOTS:
     void postMessage(const QString&);
 
 Q_SIGNALS:
-    void flickableChanged();
-    void contentWidthChanged();
-    void contentHeightChanged();
-    void contentXChanged();
-    void contentYChanged();
     void alertDialogChanged();
     void confirmDialogChanged();
     void promptDialogChanged();
@@ -349,7 +348,7 @@ private:
     QObject* schemeParent;
     QWebViewportInfo* m_viewportInfo;
 
-    friend class QtWebPageUIClient;
+    friend class WebKit::QtWebPageUIClient;
 
     Q_DECLARE_PRIVATE(QQuickWebView)
     Q_DECLARE_PUBLIC(QQuickWebView)

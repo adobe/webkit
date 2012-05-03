@@ -1,6 +1,7 @@
 /*
     Copyright (C) 2009-2010 ProFUSION embedded systems
     Copyright (C) 2009-2010 Samsung Electronics
+    Copyright (C) 2012 Intel Corporation
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -33,6 +34,11 @@
  *
  * The following signals (see evas_object_smart_callback_add()) are emitted:
  *
+ *  - "colorchooser,create", Ewk_Color: a new color chooser should be created.
+ *  - "colorchooser,willdelete", void: reports that a previously created color
+ *    chooser will be deleted.
+ *  - "colorchooser,color,changed", Ewk_Color: the value at the color input widget
+ *    corresponding to the color chooser has changed.
  *  - "download,request", Ewk_Download: reports a download is being requested
  *  - "editorclient,contents,changed", void: reports to the view that editor
  *    client's contents were changed
@@ -54,14 +60,23 @@
  *  - "load,progress", double*: load progress is changed (overall value
  *    from 0.0 to 1.0, connect to individual frames for fine grained).
  *  - "load,provisional", void: view started provisional load.
- *  - "load,started", void: frame started loading the document.
+ *  - "load,resource,finished", unsigned long*: reports resource load finished and it gives
+ *    a pointer to its identifier.
+ *  - "load,resource,failed", Ewk_Frame_Load_Error*: reports resource load failure and it
+ *    gives a pointer to structure defining the error as an argument.
+ *  - "load,started", Evas_Object*: frame started loading the document.
  *  - "menubar,visible,get", Eina_Bool *: expects a @c EINA_TRUE if menubar is
  *    visible; @c EINA_FALSE, otherwise.
  *  - "menubar,visible,set", Eina_Bool: sets menubar visibility.
  *  - "mixedcontent,displayed", void: any of the containing frames has loaded and displayed mixed content.
  *  - "mixedcontent,run", void: any of the containing frames has loaded and run mixed content.
+ *  - "onload,event", Evas_Object*: a frame onload event has been received.
  *  - "ready", void: page is fully loaded.
- *  - "resource,request,willsend", Ewk_Frame_Resource_Request*: the network request for the main frame will be sent.
+ *  - "resource,request,new", Ewk_Frame_Resource_Request*: reports that
+ *    there's a new resource request.
+ *  - "resource,request,willsend", Ewk_Frame_Resource_Messages*: a resource will be requested.
+ *    and the possible redirect response.
+ *  - "resource,response,received", Ewk_Frame_Resource_Response*: the network response for a resource.
  *  - "scrollbars,visible,get", Eina_Bool *: expects a @c EINA_TRUE if scrollbars
  *    are visible; @c EINA_FALSE, otherwise.
  *  - "scrollbars,visible,set", Eina_Bool: sets scrollbars visibility.
@@ -281,6 +296,16 @@ typedef struct _Ewk_Scroll_Request Ewk_Scroll_Request;
 struct _Ewk_Scroll_Request {
     Evas_Coord dx, dy;
     Evas_Coord x, y, w, h, x2, y2;
+};
+
+/// Creates a type name for @a _Ewk_Color.
+typedef struct _Ewk_Color Ewk_Color;
+/// Represents a color using the RGBA format.
+struct _Ewk_Color {
+    unsigned char r; /**< Red channel. */
+    unsigned char g; /**< Green channel. */
+    unsigned char b; /**< Blue channel. */
+    unsigned char a; /**< Alpha channel. */
 };
 
 /**
@@ -747,6 +772,35 @@ typedef enum _Ewk_Editor_Command Ewk_Editor_Command;
  * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
  */
 EAPI Eina_Bool    ewk_view_execute_editor_command(Evas_Object *o, const Ewk_Editor_Command command, const char *value);
+
+/**
+ * Destroys a previously created color chooser.
+ *
+ * Before destroying, it informs client that color chooser's data is ready to be
+ * destroyed by sending a "colorchooser,willdelete". Then it removes any reference
+ * to the color chooser inside webkit. It's safe to call this function either from
+ * inside webkit or from browser.
+ *
+ * @param o view object
+ *
+ * @return @c EINA_TRUE in case color chooser was successfully destroyed or @c EINA_TRUE in
+ * case there wasn't any color chooser to be destroyed
+ */
+EAPI Eina_Bool    ewk_view_color_chooser_destroy(Evas_Object* o);
+
+/**
+ * Changes the selected color.
+ *
+ * Changes the color selected in the color input widget. The browser should call
+ * this when the user chooses a new color. It's likely that ewk_view_color_chooser_destroy
+ * will be called afterwards.
+ *
+ * @param o view object
+ * @param r red color component
+ * @param g green color component
+ * @param b blue color component
+ */
+EAPI void         ewk_view_color_chooser_color_set(Evas_Object* o, int r, int g, int b);
 
 /**
  * Changes currently selected item.
@@ -1940,6 +1994,58 @@ EAPI Eina_Bool    ewk_view_setting_minimum_timer_interval_set(Evas_Object *o, do
 EAPI double       ewk_view_setting_minimum_timer_interval_get(const Evas_Object *o);
 
 /**
+ * Queries whether WebGL support is enabled.
+ *
+ * WebGL support is enabled by default.
+ *
+ * @param o view object to query whether WebGL support is enabled
+ *
+ * @return @c EINA_TRUE if WebGL support enabled,
+ *         @c EINA_FALSE if not or on failure
+ */
+EAPI Eina_Bool ewk_view_setting_enable_webgl_get(const Evas_Object *o);
+
+/**
+ * Enables/disables WebGL support.
+ *
+ * WebGL support is enabled by default.
+ *
+ * @param o view object to set WebGL
+ * @param enable @c EINA_TRUE to enable WebGL support,
+ *        @c EINA_FALSE to disable
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ */
+EAPI Eina_Bool ewk_view_setting_enable_webgl_set(Evas_Object *o, Eina_Bool enable);
+
+/**
+ * Queries if tab key focusing of page elements is enabled.
+ *
+ * When this setting is enabled, the elements in the page (links and form controls) will be cycled through by pressing the tab key.
+ * Tab key focusing of page elements is enabled by default.
+ *
+ * @param o view object to query if tab key focusing of page elements is enabled
+ *
+ * @return @c EINA_TRUE if tab key focusing of page elements is enabled, @c EINA_FALSE
+ *         otherwise
+ */
+EAPI Eina_Bool ewk_view_setting_include_links_in_focus_chain_get(const Evas_Object *o);
+
+/**
+ * Enables/disables tab key focusing of page elements.
+ *
+ * When this setting is enabled, the elements in the page (links and form controls) will be cycled through by pressing the tab key.
+ * Tab key focusing of page elements is enabled by default.
+ *
+ * @param o view object to set tab key focusing of page elements
+ * @param enable @c EINA_TRUE to enable tab key focusing of page elements, @c EINA_FALSE to
+ *               disable
+ *
+ * @return @c EINA_TRUE on success or @EINA_FALSE on failure
+ */
+EAPI Eina_Bool ewk_view_setting_include_links_in_focus_chain_set(Evas_Object *o, Eina_Bool enable);
+
+/**
  * Gets the internal data of @a o.
  *
  * This is similar to evas_object_smart_data_get(), but additionally does type checking.
@@ -2262,7 +2368,8 @@ EAPI Eina_Bool ewk_view_js_object_add(Evas_Object *o, Ewk_JS_Object *obj, const 
 enum _Ewk_Page_Visibility_State {
     EWK_PAGE_VISIBILITY_STATE_VISIBLE,
     EWK_PAGE_VISIBILITY_STATE_HIDDEN,
-    EWK_PAGE_VISIBILITY_STATE_PRERENDER
+    EWK_PAGE_VISIBILITY_STATE_PRERENDER,
+    EWK_PAGE_VISIBILITY_STATE_PREVIEW
 };
 /// Creates a type name for @a _Ewk_Page_Visibility_State.
 typedef enum _Ewk_Page_Visibility_State Ewk_Page_Visibility_State;
@@ -2364,6 +2471,94 @@ EAPI SoupSession* ewk_view_soup_session_get(const Evas_Object *o);
  * @sa ewk_view_soup_session_get, ewk_network_default_soup_session_get
  */
 EAPI void ewk_view_soup_session_set(Evas_Object *o, SoupSession *session);
+
+/**
+ * Returns whether XSSAuditor feature is enabled.
+ *
+ * @param o view object to query whether XSSAuditor feature is enabled.
+ *
+ * @return @c EINA_TRUE if the XSSAuditor feature is enabled,
+ *         @c EINA_FALSE if not or on failure.
+ */
+EAPI Eina_Bool ewk_view_setting_enable_xss_auditor_get(const Evas_Object *o);
+
+/**
+ * Enables/disables the XSSAuditor feature.
+ * 
+ * The XSSAuditor (cross-site scripting protection) feature provides protection 
+ * from reflected XSS attacks on vulnerable web sites. When XSS is encountered
+ * in the page, frame sends a signal "xss,detected" with additional information 
+ * on whether the entire page was blocked or only injected scripts were removed. 
+ * This feature is enabled by default.
+ *
+ * @param o view object to set the XSSAuditor feature.
+ * @param enable @c EINA_TRUE to enable the XSSAuditor feature,
+ *        @c EINA_FALSE to disable.
+ */
+EAPI void ewk_view_setting_enable_xss_auditor_set(Evas_Object *o, Eina_Bool enable);
+
+/**
+ * Returns whether video captions display feature is enabled.
+ *
+ * @param o view object to query whether video captions display feature is enabled.
+ *
+ * @return @c EINA_TRUE if the video captions display feature is enabled,
+ *         @c EINA_FALSE if not or on failure.
+ */
+EAPI Eina_Bool ewk_view_setting_should_display_captions_get(const Evas_Object *o);
+
+/**
+ * Enables/disables the video captions display feature.
+ *
+ * The video captions display feature is part of track support for HTML5 video.
+ *
+ * @param o view object to set the video captions display feature.
+ * @param enable @c EINA_TRUE to enable the video captions display feature,
+ * @c EINA_FALSE to disable.
+ */
+EAPI void ewk_view_setting_should_display_captions_set(Evas_Object *o, Eina_Bool enable);
+
+/**
+ * Returns whether video subtitles display feature is enabled.
+ *
+ * @param o view object to query whether video subtitles display feature is enabled.
+ *
+ * @return @c EINA_TRUE if the video subtitles display feature is enabled,
+ *         @c EINA_FALSE if not or on failure.
+ */
+EAPI Eina_Bool ewk_view_setting_should_display_subtitles_get(const Evas_Object *o);
+
+/**
+ * Enables/disables the video subtitles display feature.
+ *
+ * The video subtitles display feature is part of track support for HTML5 video.
+ *
+ * @param o view object to set the video subtitles display feature.
+ * @param enable @c EINA_TRUE to enable the video subtitles display feature,
+ * @c EINA_FALSE to disable.
+ */
+EAPI void ewk_view_setting_should_display_subtitles_set(Evas_Object *o, Eina_Bool enable);
+
+/**
+ * Returns whether video text descriptions display feature is enabled.
+ *
+ * @param o view object to query whether video text descriptions display feature is enabled.
+ *
+ * @return @c EINA_TRUE if the video text descriptions display feature is enabled,
+ *         @c EINA_FALSE if not or on failure.
+ */
+EAPI Eina_Bool ewk_view_setting_should_display_text_descriptions_get(const Evas_Object *o);
+
+/**
+ * Enables/disables the video text descriptions display feature.
+ *
+ * The video text descriptions display feature is part of track support for HTML5 video.
+ *
+ * @param o view object to set the video text descriptions display feature.
+ * @param enable @c EINA_TRUE to enable the video text descriptions display feature,
+ * @c EINA_FALSE to disable.
+ */
+EAPI void ewk_view_setting_should_display_text_descriptions_set(Evas_Object *o, Eina_Bool enable);
 
 #ifdef __cplusplus
 }

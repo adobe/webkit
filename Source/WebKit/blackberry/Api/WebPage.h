@@ -66,6 +66,7 @@ class WebPageCompositor;
 class WebPageGroupLoadDeferrer;
 class WebPagePrivate;
 class WebSettings;
+class WebViewportArguments;
 
 enum JavaScriptDataType { JSUndefined = 0, JSNull, JSBoolean, JSNumber, JSString, JSObject, JSException, JSDataTypeMax };
 
@@ -174,6 +175,7 @@ public:
     bool pinchZoomAboutPoint(double scale, int x, int y);
 
     bool isUserScalable() const;
+    void setUserScalable(bool);
     double currentScale() const;
     double initialScale() const;
     double zoomToFitScale() const;
@@ -197,11 +199,9 @@ public:
 
     void runLayoutTests();
 
-     // Finds and selects the next utf8 string that is a case sensitive
-     // match in the web page. It will wrap the web page if it reaches
-     // the end. An empty string will result in no match and no selection.
-     // Returns true if the string matched and false if not.
-    bool findNextString(const char*, bool forward = true);
+    // Find the next utf8 string in the given direction.
+    // Case sensitivity, wrapping, and highlighting all matches are also toggleable.
+    bool findNextString(const char*, bool forward, bool caseSensitive, bool wrap, bool highlightAllMatches);
 
     // JavaScriptDebugger interface.
     bool enableScriptDebugger();
@@ -251,7 +251,7 @@ public:
     void selectionCancelled();
     bool selectionContains(const Platform::IntPoint&);
 
-    void popupListClosed(int size, bool* selecteds);
+    void popupListClosed(int size, const bool* selecteds);
     void popupListClosed(int index);
     void setDateTimeInput(const WebString& value);
     void setColorInput(const WebString& value);
@@ -329,8 +329,11 @@ public:
 
     void destroyWebPageCompositor();
 
+    void setUserViewportArguments(const WebViewportArguments&);
+    void resetUserViewportArguments();
+
 private:
-    ~WebPage();
+    virtual ~WebPage();
 
     friend class WebKit::BackingStore;
     friend class WebKit::BackingStoreClient;

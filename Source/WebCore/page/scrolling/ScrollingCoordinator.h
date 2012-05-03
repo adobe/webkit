@@ -105,7 +105,7 @@ public:
     void updateMainFrameScrollPosition(const IntPoint&);
 
     // Dispatched by the scrolling tree whenever the main frame scroll position changes and the scroll layer position needs to be updated as well.
-    void updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint&);
+    void updateMainFrameScrollPositionAndScrollLayerPosition();
 
 #if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
     // Dispatched by the scrolling tree during handleWheelEvent. This is required as long as scrollbars are painted on the main thread.
@@ -123,9 +123,22 @@ private:
 
     void setScrollLayer(GraphicsLayer*);
     void setNonFastScrollableRegion(const Region&);
-    void setScrollParameters(ScrollElasticity horizontalScrollElasticity, ScrollElasticity verticalScrollElasticity,
-                             bool hasEnabledHorizontalScrollbar, bool hasEnabledVerticalScrollbar,
-                             const IntRect& viewportRect, const IntSize& contentsSize);
+
+    struct ScrollParameters {
+        ScrollElasticity horizontalScrollElasticity;
+        ScrollElasticity verticalScrollElasticity;
+
+        bool hasEnabledHorizontalScrollbar;
+        bool hasEnabledVerticalScrollbar;
+
+        ScrollbarMode horizontalScrollbarMode;
+        ScrollbarMode verticalScrollbarMode;
+
+        IntRect viewportRect;
+        IntSize contentsSize;
+    };
+
+    void setScrollParameters(const ScrollParameters&);
     void setWheelEventHandlerCount(unsigned);
     void setShouldUpdateScrollLayerPositionOnMainThread(bool);
 

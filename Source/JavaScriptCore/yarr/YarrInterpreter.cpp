@@ -29,6 +29,7 @@
 
 #include "UString.h"
 #include "Yarr.h"
+#include "YarrCanonicalizeUCS2.h"
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/DataLog.h>
 #include <wtf/text/CString.h>
@@ -41,6 +42,7 @@ using namespace WTF;
 
 namespace JSC { namespace Yarr {
 
+template<typename CharType>
 class Interpreter {
 public:
     struct ParenthesesDisjunctionContext;
@@ -169,55 +171,9 @@ public:
         allocatorPool = allocatorPool->dealloc(context);
     }
 
-    // This class is a placeholder for future character iterator, current 
-    // proposed name StringConstCharacterIterator.
-    class CharAccess {
-    public:
-        CharAccess(const UString& s)
-        {
-            if (s.is8Bit()) {
-                m_charSize = Char8;
-                m_ptr.ptr8 = s.characters8();
-            } else {
-                m_charSize = Char16;
-                m_ptr.ptr16 = s.characters16();
-            }
-        }
-
-        CharAccess(const LChar* ptr)
-            : m_charSize(Char8)
-        {
-            m_ptr.ptr8 = ptr;
-        }
-
-        CharAccess(const UChar* ptr)
-            : m_charSize(Char16)
-        {
-            m_ptr.ptr16 = ptr;
-        }
-
-        ~CharAccess()
-        {
-        }
-
-        inline UChar operator[](unsigned index)
-        {
-            if (m_charSize == Char8)
-                return m_ptr.ptr8[index];
-            return m_ptr.ptr16[index];
-        }
-
-    private:
-        union {
-            const LChar* ptr8;
-            const UChar* ptr16;
-        } m_ptr;
-        YarrCharSize m_charSize;
-    };
-
     class InputStream {
     public:
-        InputStream(const UString& input, unsigned start, unsigned length)
+        InputStream(const CharType* input, unsigned start, unsigned length)
             : input(input)
             , pos(start)
             , length(length)
@@ -331,7 +287,7 @@ public:
         }
 
     private:
-        CharAccess input;
+        const CharType* input;
         unsigned pos;
         unsigned length;
     };
@@ -383,15 +339,22 @@ public:
 
         if (pattern->m_ignoreCase) {
             for (unsigned i = 0; i < matchSize; ++i) {
-                int ch = input.reread(matchBegin + i);
+                int oldCh = input.reread(matchBegin + i);
+                int ch = input.readChecked(negativeInputOffset + matchSize - i);
 
-                int lo = Unicode::toLower(ch);
-                int hi = Unicode::toUpper(ch);
+                if (oldCh == ch)
+                    continue;
 
-                if ((lo != hi) ? (!checkCasedCharacter(lo, hi, negativeInputOffset + matchSize - i)) : (!checkCharacter(ch, negativeInputOffset + matchSize - i))) {
-                    input.uncheckInput(matchSize);
-                    return false;
-                }
+                // The definition for canonicalize (see ES 5.1, 15.10.2.8) means that
+                // unicode values are never allowed to match against ascii ones.
+                if (isASCII(oldCh) || isASCII(ch)) {
+                    if (toASCIIUpper(oldCh) == toASCIIUpper(ch))
+                        continue;
+                } else if (areCanonicallyEquivalent(oldCh, ch))
+                    continue;
+
+                input.uncheckInput(matchSize);
+                return false;
             }
         } else {
             for (unsigned i = 0; i < matchSize; ++i) {
@@ -1481,7 +1444,7 @@ public:
         return output[0];
     }
 
-    Interpreter(BytecodePattern* pattern, unsigned* output, const UString input, unsigned start, unsigned length)
+    Interpreter(BytecodePattern* pattern, unsigned* output, const CharType* input, unsigned length, unsigned start)
         : pattern(pattern)
         , output(output)
         , input(input, start, length)
@@ -1971,18 +1934,31 @@ PassOwnPtr<BytecodePattern> byteCompile(YarrPattern& pattern, BumpPointerAllocat
     return ByteCompiler(pattern).compile(allocator);
 }
 
-unsigned interpret(BytecodePattern* bytecode, const UString& input, unsigned start, unsigned length, unsigned* output)
+unsigned interpret(BytecodePattern* bytecode, const UString& input, unsigned start, unsigned* output)
 {
-    return Interpreter(bytecode, output, input, start, length).interpret();
+    if (input.is8Bit())
+        return Interpreter<LChar>(bytecode, output, input.characters8(), input.length(), start).interpret();
+    return Interpreter<UChar>(bytecode, output, input.characters16(), input.length(), start).interpret();
 }
 
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoPatternCharacter) == (YarrStackSpaceForBackTrackInfoPatternCharacter * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoPatternCharacter);
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoCharacterClass) == (YarrStackSpaceForBackTrackInfoCharacterClass * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoCharacterClass);
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoBackReference) == (YarrStackSpaceForBackTrackInfoBackReference * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoBackReference);
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoAlternative) == (YarrStackSpaceForBackTrackInfoAlternative * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoAlternative);
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoParentheticalAssertion) == (YarrStackSpaceForBackTrackInfoParentheticalAssertion * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoParentheticalAssertion);
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoParenthesesOnce) == (YarrStackSpaceForBackTrackInfoParenthesesOnce * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoParenthesesOnce);
-COMPILE_ASSERT(sizeof(Interpreter::BackTrackInfoParentheses) == (YarrStackSpaceForBackTrackInfoParentheses * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoParentheses);
+unsigned interpret(BytecodePattern* bytecode, const LChar* input, unsigned length, unsigned start, unsigned* output)
+{
+    return Interpreter<LChar>(bytecode, output, input, length, start).interpret();
+}
+
+unsigned interpret(BytecodePattern* bytecode, const UChar* input, unsigned length, unsigned start, unsigned* output)
+{
+    return Interpreter<UChar>(bytecode, output, input, length, start).interpret();
+}
+
+// These should be the same for both UChar & LChar.
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoPatternCharacter) == (YarrStackSpaceForBackTrackInfoPatternCharacter * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoPatternCharacter);
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoCharacterClass) == (YarrStackSpaceForBackTrackInfoCharacterClass * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoCharacterClass);
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoBackReference) == (YarrStackSpaceForBackTrackInfoBackReference * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoBackReference);
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoAlternative) == (YarrStackSpaceForBackTrackInfoAlternative * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoAlternative);
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoParentheticalAssertion) == (YarrStackSpaceForBackTrackInfoParentheticalAssertion * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoParentheticalAssertion);
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoParenthesesOnce) == (YarrStackSpaceForBackTrackInfoParenthesesOnce * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoParenthesesOnce);
+COMPILE_ASSERT(sizeof(Interpreter<UChar>::BackTrackInfoParentheses) == (YarrStackSpaceForBackTrackInfoParentheses * sizeof(uintptr_t)), CheckYarrStackSpaceForBackTrackInfoParentheses);
 
 
 } }

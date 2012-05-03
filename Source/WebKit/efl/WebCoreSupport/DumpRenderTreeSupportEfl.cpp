@@ -25,6 +25,7 @@
 #include "ewk_private.h"
 
 #include <AnimationController.h>
+#include <CSSComputedStyleDeclaration.h>
 #include <DocumentLoader.h>
 #include <EditorClientEfl.h>
 #include <Eina.h>
@@ -33,8 +34,11 @@
 #include <FloatSize.h>
 #include <FrameView.h>
 #include <HTMLInputElement.h>
+#include <InspectorController.h>
 #include <IntRect.h>
+#include <JSCSSStyleDeclaration.h>
 #include <JSElement.h>
+#include <PageGroup.h>
 #include <PrintContext.h>
 #include <RenderTreeAsText.h>
 #include <Settings.h>
@@ -58,6 +62,16 @@ unsigned DumpRenderTreeSupportEfl::activeAnimationsCount(const Evas_Object* ewkF
         return 0;
 
     return animationController->numberOfActiveAnimations(frame->document());
+}
+
+bool DumpRenderTreeSupportEfl::callShouldCloseOnWebView(Evas_Object* ewkFrame)
+{
+    WebCore::Frame* frame = EWKPrivate::coreFrame(ewkFrame);
+
+    if (!frame)
+        return false;
+
+    return frame->loader()->shouldClose();
 }
 
 void DumpRenderTreeSupportEfl::clearFrameName(Evas_Object* ewkFrame)
@@ -85,6 +99,24 @@ String DumpRenderTreeSupportEfl::counterValueByElementId(const Evas_Object* ewkF
         return String();
 
     return WebCore::counterValueForElement(element);
+}
+
+bool DumpRenderTreeSupportEfl::elementDoesAutoCompleteForElementWithId(const Evas_Object* ewkFrame, const String& elementId)
+{
+    WebCore::Frame* frame = EWKPrivate::coreFrame(ewkFrame);
+
+    if (!frame)
+        return false;
+
+    WebCore::Document* document = frame->document();
+    ASSERT(document);
+
+    WebCore::HTMLInputElement* inputElement = static_cast<WebCore::HTMLInputElement*>(document->getElementById(elementId));
+
+    if (!inputElement)
+        return false;
+
+    return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
 }
 
 Eina_List* DumpRenderTreeSupportEfl::frameChildren(const Evas_Object* ewkFrame)
@@ -117,6 +149,21 @@ WebCore::Frame* DumpRenderTreeSupportEfl::frameParent(const Evas_Object* ewkFram
         return 0;
 
     return frame->tree()->parent();
+}
+
+bool DumpRenderTreeSupportEfl::isPageBoxVisible(const Evas_Object* ewkFrame, int pageIndex)
+{
+    const WebCore::Frame* frame = EWKPrivate::coreFrame(ewkFrame);
+
+    if (!frame)
+        return false;
+
+    WebCore::Document* document = frame->document();
+
+    if (!document)
+        return false;
+
+    return document->isPageBoxVisible(pageIndex);
 }
 
 void DumpRenderTreeSupportEfl::layoutFrame(Evas_Object* ewkFrame)
@@ -157,6 +204,25 @@ int DumpRenderTreeSupportEfl::numberOfPagesForElementId(const Evas_Object* ewkFr
         return 0;
 
     return WebCore::PrintContext::pageNumberForElement(element, WebCore::FloatSize(pageWidth, pageHeight));
+}
+
+String DumpRenderTreeSupportEfl::pageSizeAndMarginsInPixels(const Evas_Object* ewkFrame, int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft)
+{
+    WebCore::Frame* frame = EWKPrivate::coreFrame(ewkFrame);
+
+    if (!frame)
+        return String();
+
+    return WebCore::PrintContext::pageSizeAndMarginsInPixels(frame, pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft);
+}
+
+String DumpRenderTreeSupportEfl::pageProperty(const Evas_Object* ewkFrame, const char* propertyName, int pageNumber)
+{
+    WebCore::Frame* coreFrame = EWKPrivate::coreFrame(ewkFrame);
+    if (!coreFrame)
+        return String();
+
+    return WebCore::PrintContext::pageProperty(coreFrame, propertyName, pageNumber);
 }
 
 bool DumpRenderTreeSupportEfl::pauseAnimation(Evas_Object* ewkFrame, const char* name, const char* elementId, double time)
@@ -313,6 +379,25 @@ void DumpRenderTreeSupportEfl::setAutofilled(JSContextRef context, JSValueRef no
     inputElement->setAutofilled(autofilled);
 }
 
+void DumpRenderTreeSupportEfl::setDefersLoading(Evas_Object* ewkView, bool defers)
+{
+    WebCore::Page* page = EWKPrivate::corePage(ewkView);
+
+    if (!page)
+        return;
+
+    page->setDefersLoading(defers);
+}
+
+void DumpRenderTreeSupportEfl::addUserStyleSheet(const Evas_Object* ewkView, const char* sourceCode, bool allFrames)
+{
+    WebCore::Page* page = EWKPrivate::corePage(ewkView);
+    if (!page)
+        return;
+
+    page->group().addUserStyleSheetToWorld(WebCore::mainThreadNormalWorld(), sourceCode, WebCore::KURL(), nullptr, nullptr, allFrames ? WebCore::InjectInAllFrames : WebCore::InjectInTopFrameOnly);
+}
+
 bool DumpRenderTreeSupportEfl::findString(const Evas_Object* ewkView, const char* text, WebCore::FindOptions options)
 {
     WebCore::Page* page = EWKPrivate::corePage(ewkView);
@@ -321,6 +406,24 @@ bool DumpRenderTreeSupportEfl::findString(const Evas_Object* ewkView, const char
         return false;
 
     return page->findString(String::fromUTF8(text), options);
+}
+
+void DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(const Evas_Object* ewkView, bool enabled)
+{
+#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
+    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
+    if (!corePage)
+        return;
+
+    WebCore::InspectorController* controller = corePage->inspectorController();
+    if (!controller)
+        return;
+
+    if (enabled)
+        controller->enableProfiler();
+    else
+        controller->disableProfiler();
+#endif
 }
 
 void DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled(Evas_Object* ewkView, bool enabled)
@@ -471,4 +574,36 @@ String DumpRenderTreeSupportEfl::markerTextForListItem(JSContextRef context, JSV
         return String();
 
     return WebCore::markerTextForListItem(element);
+}
+
+void DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled(Evas_Object* ewkView, bool enabled)
+{
+    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
+    if (corePage)
+        corePage->settings()->setInteractiveFormValidationEnabled(enabled);
+}
+
+JSValueRef DumpRenderTreeSupportEfl::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
+{
+    if (!value)
+        return JSValueMakeUndefined(context);
+
+    JSC::ExecState* exec = toJS(context);
+    JSC::JSValue jsValue = toJS(exec, value);
+    if (!jsValue.inherits(&WebCore::JSElement::s_info))
+        return JSValueMakeUndefined(context);
+
+    WebCore::JSElement* jsElement = static_cast<WebCore::JSElement*>(asObject(jsValue));
+    WebCore::Element* element = jsElement->impl();
+    RefPtr<WebCore::CSSComputedStyleDeclaration> style = WebCore::CSSComputedStyleDeclaration::create(element, true);
+    return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
+}
+
+void DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(Evas_Object* ewkView, bool enabled)
+{
+    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
+    if (!corePage)
+        return;
+
+    corePage->settings()->setAuthorAndUserStylesEnabled(enabled);
 }

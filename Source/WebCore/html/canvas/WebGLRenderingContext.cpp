@@ -30,7 +30,6 @@
 #include "WebGLRenderingContext.h"
 
 #include "CachedImage.h"
-#include "CanvasPixelArray.h"
 #include "CheckedInt.h"
 #include "Console.h"
 #include "DOMWindow.h"
@@ -51,7 +50,6 @@
 #include "OESVertexArrayObject.h"
 #include "Page.h"
 #include "RenderBox.h"
-#include "RenderLayer.h"
 #include "Settings.h"
 #include "WebGLActiveInfo.h"
 #include "WebGLBuffer.h"
@@ -66,15 +64,15 @@
 #include "WebGLProgram.h"
 #include "WebGLRenderbuffer.h"
 #include "WebGLShader.h"
+#include "WebGLShaderPrecisionFormat.h"
 #include "WebGLTexture.h"
 #include "WebGLUniformLocation.h"
 
-#include <wtf/ByteArray.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 #include <wtf/Uint16Array.h>
 #include <wtf/Uint32Array.h>
-#include <wtf/text/StringBuilder.h>
+#include <wtf/text/StripComments.h>
 
 #if PLATFORM(QT)
 #undef emit
@@ -164,188 +162,11 @@ namespace {
         return false;
     }
 
-    // Strips comments from shader text. This allows non-ASCII characters
-    // to be used in comments without potentially breaking OpenGL
-    // implementations not expecting characters outside the GLSL ES set.
-    class StripComments {
-    public:
-        StripComments(const String& str)
-            : m_parseState(BeginningOfLine)
-            , m_sourceString(str)
-            , m_length(str.length())
-            , m_position(0)
-        {
-            parse();
-        }
-
-        String result()
-        {
-            return m_builder.toString();
-        }
-
-    private:
-        bool hasMoreCharacters()
-        {
-            return (m_position < m_length);
-        }
-
-        void parse()
-        {
-            while (hasMoreCharacters()) {
-                process(current());
-                // process() might advance the position.
-                if (hasMoreCharacters())
-                    advance();
-            }
-        }
-
-        void process(UChar);
-
-        bool peek(UChar& character)
-        {
-            if (m_position + 1 >= m_length)
-                return false;
-            character = m_sourceString[m_position + 1];
-            return true;
-        }
-
-        UChar current()
-        {
-            ASSERT(m_position < m_length);
-            return m_sourceString[m_position];
-        }
-
-        void advance()
-        {
-            ++m_position;
-        }
-
-        bool isNewline(UChar character)
-        {
-            // Don't attempt to canonicalize newline related characters.
-            return (character == '\n' || character == '\r');
-        }
-
-        void emit(UChar character)
-        {
-            m_builder.append(character);
-        }
-
-        enum ParseState {
-            // Have not seen an ASCII non-whitespace character yet on
-            // this line. Possible that we might see a preprocessor
-            // directive.
-            BeginningOfLine,
-
-            // Have seen at least one ASCII non-whitespace character
-            // on this line.
-            MiddleOfLine,
-
-            // Handling a preprocessor directive. Passes through all
-            // characters up to the end of the line. Disables comment
-            // processing.
-            InPreprocessorDirective,
-
-            // Handling a single-line comment. The comment text is
-            // replaced with a single space.
-            InSingleLineComment,
-
-            // Handling a multi-line comment. Newlines are passed
-            // through to preserve line numbers.
-            InMultiLineComment
-        };
-
-        ParseState m_parseState;
-        String m_sourceString;
-        unsigned m_length;
-        unsigned m_position;
-        StringBuilder m_builder;
-    };
-
-    void StripComments::process(UChar c)
+    bool isPrefixReserved(const String& name)
     {
-        if (isNewline(c)) {
-            // No matter what state we are in, pass through newlines
-            // so we preserve line numbers.
-            emit(c);
-
-            if (m_parseState != InMultiLineComment)
-                m_parseState = BeginningOfLine;
-
-            return;
-        }
-
-        UChar temp = 0;
-        switch (m_parseState) {
-        case BeginningOfLine:
-            if (WTF::isASCIISpace(c)) {
-                emit(c);
-                break;
-            }
-
-            if (c == '#') {
-                m_parseState = InPreprocessorDirective;
-                emit(c);
-                break;
-            }
-
-            // Transition to normal state and re-handle character.
-            m_parseState = MiddleOfLine;
-            process(c);
-            break;
-
-        case MiddleOfLine:
-            if (c == '/' && peek(temp)) {
-                if (temp == '/') {
-                    m_parseState = InSingleLineComment;
-                    emit(' ');
-                    advance();
-                    break;
-                }
-
-                if (temp == '*') {
-                    m_parseState = InMultiLineComment;
-                    // Emit the comment start in case the user has
-                    // an unclosed comment and we want to later
-                    // signal an error.
-                    emit('/');
-                    emit('*');
-                    advance();
-                    break;
-                }
-            }
-
-            emit(c);
-            break;
-
-        case InPreprocessorDirective:
-            // No matter what the character is, just pass it
-            // through. Do not parse comments in this state. This
-            // might not be the right thing to do long term, but it
-            // should handle the #error preprocessor directive.
-            emit(c);
-            break;
-
-        case InSingleLineComment:
-            // The newline code at the top of this function takes care
-            // of resetting our state when we get out of the
-            // single-line comment. Swallow all other characters.
-            break;
-
-        case InMultiLineComment:
-            if (c == '*' && peek(temp) && temp == '/') {
-                emit('*');
-                emit('/');
-                m_parseState = MiddleOfLine;
-                advance();
-                break;
-            }
-
-            // Swallow all other characters. Unclear whether we may
-            // want or need to just emit a space per character to try
-            // to preserve column numbers for debugging purposes.
-            break;
-        }
+        if (name.startsWith("gl_") || name.startsWith("webgl_") || name.startsWith("_webgl_"))
+            return true;
+        return false;
     }
 } // namespace anonymous
 
@@ -437,7 +258,9 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
 
 #if PLATFORM(CHROMIUM)
     // Create the DrawingBuffer and initialize the platform layer.
-    m_drawingBuffer = DrawingBuffer::create(m_context.get(), IntSize(canvas()->width(), canvas()->height()), !m_attributes.preserveDrawingBuffer);
+    DrawingBuffer::PreserveDrawingBuffer preserve = m_attributes.preserveDrawingBuffer ? DrawingBuffer::Preserve : DrawingBuffer::Discard;
+    DrawingBuffer::AlphaRequirement alpha = m_attributes.alpha ? DrawingBuffer::Alpha : DrawingBuffer::Opaque;
+    m_drawingBuffer = DrawingBuffer::create(m_context.get(), IntSize(canvas()->size()), preserve, alpha);
 #endif
 
     if (m_drawingBuffer)
@@ -589,9 +412,9 @@ void WebGLRenderingContext::markContextChanged()
     m_layerCleared = false;
 #if USE(ACCELERATED_COMPOSITING)
     RenderBox* renderBox = canvas()->renderBox();
-    if (renderBox && renderBox->hasLayer() && renderBox->layer()->hasAcceleratedCompositing()) {
+    if (renderBox && renderBox->hasAcceleratedCompositing()) {
         m_markedCanvasDirty = true;
-        renderBox->layer()->contentChanged(RenderLayer::CanvasChanged);
+        renderBox->contentChanged(CanvasChanged);
     } else {
 #endif
         if (!m_markedCanvasDirty) {
@@ -617,12 +440,6 @@ bool WebGLRenderingContext::clearIfComposited(GC3Dbitfield mask)
     // Determine if it's possible to combine the clear the user asked for and this clear.
     bool combinedClear = mask && !m_scissorEnabled;
 
-    if (m_framebufferBinding) {
-        if (m_drawingBuffer)
-            m_drawingBuffer->bind();
-        else
-            m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, 0);
-    }
     m_context->disable(GraphicsContext3D::SCISSOR_TEST);
     if (combinedClear && (mask & GraphicsContext3D::COLOR_BUFFER_BIT))
         m_context->clearColor(m_colorMask[0] ? m_clearColor[0] : 0,
@@ -647,8 +464,24 @@ bool WebGLRenderingContext::clearIfComposited(GC3Dbitfield mask)
         clearMask |= GraphicsContext3D::STENCIL_BUFFER_BIT;
         m_context->stencilMaskSeparate(GraphicsContext3D::FRONT, 0xFFFFFFFF);
     }
-    m_context->clear(clearMask);
+    if (m_drawingBuffer)
+        m_drawingBuffer->clearFramebuffers(clearMask);
+    else {
+        if (m_framebufferBinding)
+            m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, 0);
+        m_context->clear(clearMask);
+    }
 
+    restoreStateAfterClear();
+    if (m_framebufferBinding)
+        m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, objectOrZero(m_framebufferBinding.get()));
+    m_layerCleared = true;
+
+    return combinedClear;
+}
+
+void WebGLRenderingContext::restoreStateAfterClear()
+{
     // Restore the state that the context set.
     if (m_scissorEnabled)
         m_context->enable(GraphicsContext3D::SCISSOR_TEST);
@@ -660,11 +493,6 @@ bool WebGLRenderingContext::clearIfComposited(GC3Dbitfield mask)
     m_context->clearStencil(m_clearStencil);
     m_context->stencilMaskSeparate(GraphicsContext3D::FRONT, m_stencilMask);
     m_context->depthMask(m_depthMask);
-    if (m_framebufferBinding)
-        m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, objectOrZero(m_framebufferBinding.get()));
-    m_layerCleared = true;
-
-    return combinedClear;
 }
 
 void WebGLRenderingContext::markLayerComposited()
@@ -740,17 +568,18 @@ void WebGLRenderingContext::reshape(int width, int height)
     if (m_needsUpdate) {
 #if USE(ACCELERATED_COMPOSITING)
         RenderBox* renderBox = canvas()->renderBox();
-        if (renderBox && renderBox->hasLayer())
-            renderBox->layer()->contentChanged(RenderLayer::CanvasChanged);
+        if (renderBox && renderBox->hasAcceleratedCompositing())
+            renderBox->contentChanged(CanvasChanged);
 #endif
         m_needsUpdate = false;
     }
 
     // We don't have to mark the canvas as dirty, since the newly created image buffer will also start off
     // clear (and this matches what reshape will do).
-    if (m_drawingBuffer)
+    if (m_drawingBuffer) {
         m_drawingBuffer->reset(IntSize(width, height));
-    else
+        restoreStateAfterClear();
+    } else
         m_context->reshape(width, height);
 
     m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, objectOrZero(m_textureUnits[m_activeTextureUnit].m_texture2DBinding.get()));
@@ -838,6 +667,14 @@ void WebGLRenderingContext::bindAttribLocation(WebGLProgram* program, GC3Duint i
         return;
     if (!validateString("bindAttribLocation", name))
         return;
+    if (isPrefixReserved(name)) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "bindAttribLocation", "reserved prefix");
+        return;
+    }
+    if (index >= m_maxVertexAttribs) {
+        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "bindAttribLocation", "index out of range");
+        return;
+    }
     m_context->bindAttribLocation(objectOrZero(program), index, name);
     cleanupAfterGraphicsCall(false);
 }
@@ -897,6 +734,8 @@ void WebGLRenderingContext::bindFramebuffer(GC3Denum target, WebGLFramebuffer* b
         return;
     }
     m_framebufferBinding = buffer;
+    if (m_drawingBuffer)
+        m_drawingBuffer->setFramebufferBinding(objectOrZero(m_framebufferBinding.get()));
     if (!m_framebufferBinding && m_drawingBuffer) {
         // Instead of binding fb 0, bind the drawing buffer.
         m_drawingBuffer->bind();
@@ -1510,10 +1349,11 @@ void WebGLRenderingContext::deleteFramebuffer(WebGLFramebuffer* framebuffer)
         return;
     if (framebuffer == m_framebufferBinding) {
         m_framebufferBinding = 0;
-        // Have to call bindFramebuffer here to bind back to internal fbo.
-        if (m_drawingBuffer)
+        if (m_drawingBuffer) {
+            m_drawingBuffer->setFramebufferBinding(0);
+            // Have to call bindFramebuffer here to bind back to internal fbo.
             m_drawingBuffer->bind();
-        else
+        } else
             m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, 0);
     }
 }
@@ -2167,12 +2007,18 @@ bool WebGLRenderingContext::getAttachedShaders(WebGLProgram* program, Vector<Ref
 
 GC3Dint WebGLRenderingContext::getAttribLocation(WebGLProgram* program, const String& name)
 {
-    if (isContextLost())
+    if (isContextLost() || !validateWebGLObject("getAttribLocation", program))
         return -1;
     if (!validateLocationLength("getAttribLocation", name))
         return -1;
     if (!validateString("getAttribLocation", name))
         return -1;
+    if (isPrefixReserved(name))
+        return -1;
+    if (!program->getLinkStatus()) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "getAttribLocation", "program not linked");
+        return 0;
+    }
     return m_context->getAttribLocation(objectOrZero(program), name);
 }
 
@@ -2686,6 +2532,38 @@ String WebGLRenderingContext::getShaderInfoLog(WebGLShader* shader, ExceptionCod
     return ensureNotNull(m_context->getShaderInfoLog(objectOrZero(shader)));
 }
 
+PassRefPtr<WebGLShaderPrecisionFormat> WebGLRenderingContext::getShaderPrecisionFormat(GC3Denum shaderType, GC3Denum precisionType, ExceptionCode& ec)
+{
+    UNUSED_PARAM(ec);
+    if (isContextLost())
+        return 0;
+    switch (shaderType) {
+    case GraphicsContext3D::VERTEX_SHADER:
+    case GraphicsContext3D::FRAGMENT_SHADER:
+        break;
+    default:
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getShaderPrecisionFormat", "invalid shader type");
+        return 0;
+    }
+    switch (precisionType) {
+    case GraphicsContext3D::LOW_FLOAT:
+    case GraphicsContext3D::MEDIUM_FLOAT:
+    case GraphicsContext3D::HIGH_FLOAT:
+    case GraphicsContext3D::LOW_INT:
+    case GraphicsContext3D::MEDIUM_INT:
+    case GraphicsContext3D::HIGH_INT:
+        break;
+    default:
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getShaderPrecisionFormat", "invalid precision type");
+        return 0;
+    }
+
+    GC3Dint range[2] = {0, 0};
+    GC3Dint precision = 0;
+    m_context->getShaderPrecisionFormat(shaderType, precisionType, range, &precision);
+    return WebGLShaderPrecisionFormat::create(range[0], range[1], precision);
+}
+
 String WebGLRenderingContext::getShaderSource(WebGLShader* shader, ExceptionCode& ec)
 {
     UNUSED_PARAM(ec);
@@ -2903,6 +2781,12 @@ PassRefPtr<WebGLUniformLocation> WebGLRenderingContext::getUniformLocation(WebGL
         return 0;
     if (!validateString("getUniformLocation", name))
         return 0;
+    if (isPrefixReserved(name))
+        return 0;
+    if (!program->getLinkStatus()) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "getUniformLocation", "program not linked");
+        return 0;
+    }
     WebGLStateRestorer(this, false);
     GC3Dint uniformLocation = m_context->getUniformLocation(objectOrZero(program), name);
     if (uniformLocation == -1)
@@ -3071,12 +2955,6 @@ void WebGLRenderingContext::linkProgram(WebGLProgram* program, ExceptionCode& ec
 
     m_context->linkProgram(objectOrZero(program));
     program->increaseLinkCount();
-    // cache link status
-    GC3Dint value = 0;
-    m_context->getProgramiv(objectOrZero(program), GraphicsContext3D::LINK_STATUS, &value);
-    program->setLinkStatus(static_cast<bool>(value));
-    // Need to cache link status before caching active attribute locations.
-    program->cacheActiveAttribLocations(graphicsContext3D());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -4245,6 +4123,12 @@ void WebGLRenderingContext::loseContextImpl(WebGLRenderingContext::LostContextMo
 
     detachAndRemoveAllObjects();
 
+    if (m_drawingBuffer) {
+        // Make absolutely sure we do not refer to an already-deleted texture or framebuffer.
+        m_drawingBuffer->setTexture2DBinding(0);
+        m_drawingBuffer->setFramebufferBinding(0);
+    }
+
     // There is no direct way to clear errors from a GL implementation and
     // looping until getError() becomes NO_ERROR might cause an infinite loop if
     // the driver or context implementation had a bug. So, loop a reasonably
@@ -5347,7 +5231,9 @@ void WebGLRenderingContext::maybeRestoreContext(Timer<WebGLRenderingContext>*)
     // Construct a new drawing buffer with the new GraphicsContext3D.
     if (m_drawingBuffer) {
         m_drawingBuffer->discardResources();
-        m_drawingBuffer = DrawingBuffer::create(context.get(), m_drawingBuffer->size(), !m_attributes.preserveDrawingBuffer);
+        DrawingBuffer::PreserveDrawingBuffer preserve = m_attributes.preserveDrawingBuffer ? DrawingBuffer::Preserve : DrawingBuffer::Discard;
+        DrawingBuffer::AlphaRequirement alpha = m_attributes.alpha ? DrawingBuffer::Alpha : DrawingBuffer::Opaque;
+        m_drawingBuffer = DrawingBuffer::create(context.get(), m_drawingBuffer->size(), preserve, alpha);
         m_drawingBuffer->bind();
     }
 

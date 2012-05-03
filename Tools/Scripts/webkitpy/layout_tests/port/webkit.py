@@ -357,14 +357,10 @@ class WebKitPort(Port):
         return expectations
 
     def skipped_layout_tests(self, test_list):
-        # Use a set to allow duplicates
         tests_to_skip = set(self._expectations_from_skipped_files(self._skipped_file_search_paths()))
         tests_to_skip.update(self._tests_for_other_platforms())
         tests_to_skip.update(self._skipped_tests_for_unsupported_features(test_list))
         return tests_to_skip
-
-    def skipped_tests(self, test_list):
-        return self.skipped_layout_tests(test_list)
 
     def _build_path(self, *comps):
         # --root is used for running with a pre-built root (like from a nightly zip).
@@ -374,7 +370,7 @@ class WebKitPort(Port):
             # Set --build-directory here Since this modifies the options object used by the worker subprocesses,
             # it avoids the slow call out to build_directory in each subprocess.
             self.set_option_default('build_directory', build_directory)
-        return self._filesystem.join(build_directory, *comps)
+        return self._filesystem.join(self._filesystem.abspath(build_directory), *comps)
 
     def _path_to_driver(self):
         return self._build_path(self.driver_name())
@@ -456,8 +452,6 @@ class WebKitDriver(Driver):
     def cmd_line(self, pixel_tests, per_test_args):
         cmd = self._command_wrapper(self._port.get_option('wrapper'))
         cmd.append(self._port._path_to_driver())
-        if self._port.get_option('skip_pixel_test_if_no_baseline'):
-            cmd.append('--skip-pixel-test-if-no-baseline')
         if self._port.get_option('gc_between_tests'):
             cmd.append('--gc-between-tests')
         if self._port.get_option('complex_text'):
@@ -470,7 +464,7 @@ class WebKitDriver(Driver):
 
         cmd.extend(self._port.get_option('additional_drt_flag', []))
 
-        if pixel_tests or self._pixel_tests:
+        if pixel_tests:
             cmd.append('--pixel-tests')
         cmd.extend(per_test_args)
 
@@ -480,6 +474,7 @@ class WebKitDriver(Driver):
     def _start(self, pixel_tests, per_test_args):
         server_name = self._port.driver_name()
         environment = self._port.setup_environ_for_server(server_name)
+        environment['DYLD_LIBRARY_PATH'] = self._port._build_path()
         environment['DYLD_FRAMEWORK_PATH'] = self._port._build_path()
         # FIXME: We're assuming that WebKitTestRunner checks this DumpRenderTree-named environment variable.
         environment['DUMPRENDERTREE_TEMP'] = str(self._driver_tempdir)
@@ -546,14 +541,14 @@ class WebKitDriver(Driver):
         return (None, block.content_hash)
 
     def run_test(self, driver_input):
+        start_time = time.time()
         if not self._server_process:
-            self._start(driver_input.is_reftest or self._pixel_tests, [])
+            self._start(driver_input.should_run_pixel_test, driver_input.args)
         self.error_from_test = str()
         self.err_seen_eof = False
 
         command = self._command_from_driver_input(driver_input)
-        start_time = time.time()
-        deadline = time.time() + int(driver_input.timeout) / 1000.0
+        deadline = start_time + int(driver_input.timeout) / 1000.0
 
         self._server_process.write(command)
         text, audio = self._read_first_block(deadline)  # First block is either text or audio
@@ -567,11 +562,18 @@ class WebKitDriver(Driver):
 
         crash_log = ''
         if self.has_crashed():
-            crash_log = self._port._get_crash_log(self._crashed_process_name, self._crashed_pid, text, self.error_from_test)
+            crash_log = self._port._get_crash_log(self._crashed_process_name, self._crashed_pid, text, self.error_from_test,
+                                                  newer_than=start_time)
+
+        timeout = self._server_process.timed_out
+        if timeout:
+            # DRT doesn't have a built in timer to abort the test, so we might as well
+            # kill the process directly and not wait for it to shut down cleanly (since it may not).
+            self._server_process.kill()
 
         return DriverOutput(text, image, actual_image_hash, audio,
             crash=self.has_crashed(), test_time=time.time() - start_time,
-            timeout=self._server_process.timed_out, error=self.error_from_test,
+            timeout=timeout, error=self.error_from_test,
             crashed_process_name=self._crashed_process_name,
             crashed_pid=self._crashed_pid, crash_log=crash_log)
 

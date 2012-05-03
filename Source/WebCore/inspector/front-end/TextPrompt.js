@@ -278,7 +278,7 @@ WebInspector.TextPrompt.prototype = {
             handled = this.defaultKeyHandler(event);
 
         if (handled)
-            event.consume();
+            event.consume(true);
 
         return handled;
     },
@@ -303,6 +303,7 @@ WebInspector.TextPrompt.prototype = {
             clearTimeout(this._completeTimeout);
             delete this._completeTimeout;
         }
+        delete this._waitingForCompletions;
 
         if (!this.autoCompleteElement)
             return;
@@ -378,6 +379,7 @@ WebInspector.TextPrompt.prototype = {
         }
 
         var wordPrefixRange = selectionRange.startContainer.rangeOfWord(selectionRange.startOffset, this._completionStopCharacters, this._element, "backward");
+        this._waitingForCompletions = true;
         this._loadCompletions(this, wordPrefixRange, force, this._completionsReady.bind(this, selection, auto, wordPrefixRange, !!reverse));
     },
 
@@ -423,10 +425,11 @@ WebInspector.TextPrompt.prototype = {
      */
     _completionsReady: function(selection, auto, originalWordPrefixRange, reverse, completions)
     {
-        if (!completions || !completions.length) {
+        if (!this._waitingForCompletions || !completions || !completions.length) {
             this.hideSuggestBox();
             return;
         }
+        delete this._waitingForCompletions;
 
         var selectionRange = selection.getRangeAt(0);
 
@@ -508,7 +511,7 @@ WebInspector.TextPrompt.prototype = {
 
     _completeCommonPrefix: function()
     {
-        if (!this.autoCompleteElement || !this._commonPrefix || !this._userEnteredText || this._commonPrefix.indexOf(this._userEnteredText) !== 0)
+        if (!this.autoCompleteElement || !this._commonPrefix || !this._userEnteredText || !this._commonPrefix.startsWith(this._userEnteredText))
             return;
 
         if (!this.isSuggestBoxVisible()) {
@@ -880,7 +883,7 @@ WebInspector.TextPromptWithHistory.prototype = {
         }
 
         if (newText !== undefined) {
-            event.consume();
+            event.consume(true);
             this.text = newText;
 
             if (isPrevious) {
@@ -1133,7 +1136,7 @@ WebInspector.TextPrompt.SuggestBox.prototype = {
     _onItemMouseDown: function(text, event)
     {
         this.acceptSuggestion(text);
-        event.consume();
+        event.consume(true);
     },
 
     _createItemElement: function(prefix, text)

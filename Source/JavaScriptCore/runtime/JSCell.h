@@ -328,7 +328,6 @@ namespace JSC {
     void* allocateCell(Heap& heap)
     {
 #if ENABLE(GC_VALIDATION)
-        ASSERT(sizeof(T) == T::s_info.cellSize);
         ASSERT(!heap.globalData()->isInitializingObject());
         heap.globalData()->setInitializingObjectClass(&T::s_info);
 #endif
@@ -351,14 +350,14 @@ namespace JSC {
     template<typename To, typename From>
     inline To jsCast(From* from)
     {
-        ASSERT(from->inherits(&WTF::RemovePointer<To>::Type::s_info));
+        ASSERT(!from || from->JSCell::inherits(&WTF::RemovePointer<To>::Type::s_info));
         return static_cast<To>(from);
     }
 
     template<typename To>
     inline To jsCast(JSValue from)
     {
-        ASSERT(from.isCell() && from.asCell()->inherits(&WTF::RemovePointer<To>::Type::s_info));
+        ASSERT(from.isCell() && from.asCell()->JSCell::inherits(&WTF::RemovePointer<To>::Type::s_info));
         return static_cast<To>(from.asCell());
     }
 

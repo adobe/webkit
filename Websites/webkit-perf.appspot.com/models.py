@@ -95,6 +95,7 @@ class Branch(db.Model):
 class Platform(db.Model):
     id = db.IntegerProperty(required=True)
     name = db.StringProperty(required=True)
+    hidden = db.BooleanProperty()
 
     @staticmethod
     def create_if_possible(key, name):
@@ -140,7 +141,6 @@ class Build(db.Model):
             revision=log.webkit_revision(), chromiumRevision=log.chromium_revision())
 
 
-# Used to generate TestMap in the manifest efficiently
 class Test(db.Model):
     id = db.IntegerProperty(required=True)
     name = db.StringProperty(required=True)
@@ -148,9 +148,11 @@ class Test(db.Model):
     # one platform but only on some branch and vice versa.
     branches = db.ListProperty(db.Key)
     platforms = db.ListProperty(db.Key)
+    unit = db.StringProperty()
+    hidden = db.BooleanProperty()
 
     @staticmethod
-    def update_or_insert(test_name, branch, platform):
+    def update_or_insert(test_name, branch, platform, unit=None):
         existing_test = [None]
 
         def execute(id):
@@ -160,11 +162,12 @@ class Test(db.Model):
                     test.branches.append(branch.key())
                 if platform.key() not in test.platforms:
                     test.platforms.append(platform.key())
+                test.unit = unit
                 test.put()
                 existing_test[0] = test
                 return None
 
-            test = Test(id=id, name=test_name, key_name=test_name, branches=[branch.key()], platforms=[platform.key()])
+            test = Test(id=id, name=test_name, key_name=test_name, unit=unit, branches=[branch.key()], platforms=[platform.key()])
             test.put()
             return test
 
@@ -250,6 +253,33 @@ class ReportLog(db.Model):
 
     def results(self):
         return self.get_value('results')
+
+    def results_are_well_formed(self):
+
+        def _is_float_convertible(value):
+            try:
+                float(value)
+                return True
+            except TypeError:
+                return False
+            except ValueError:
+                return False
+
+        if not isinstance(self.results(), dict):
+            return False
+
+        for testResult in self.results().values():
+            if isinstance(testResult, dict):
+                for key, value in testResult.iteritems():
+                    if key != "unit" and not _is_float_convertible(value):
+                        return False
+                if 'avg' not in testResult:
+                    return False
+                continue
+            if not _is_float_convertible(testResult):
+                return False
+
+        return True
 
     def builder(self):
         return self._model_by_key_name_in_payload(Builder, 'builder-name')
@@ -418,8 +448,9 @@ class Runs(db.Model):
 
     def to_json(self):
         # date_range is never used by common.js.
-        return '{"test_runs": [%s], "averages": {%s}, "min": %s, "max": %s, "date_range": null, "stat": "ok"}' % (self.json_runs,
-            self.json_averages, str(self.json_min) if self.json_min else 'null', str(self.json_max) if self.json_max else 'null')
+        return '{"test_runs": [%s], "averages": {%s}, "min": %s, "max": %s, "unit": %s, "date_range": null, "stat": "ok"}' % (self.json_runs,
+            self.json_averages, str(self.json_min) if self.json_min else 'null', str(self.json_max) if self.json_max else 'null',
+            '"%s"' % self.test.unit if self.test.unit else 'null')
 
     def chart_params(self, display_days, now=datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)):
         chart_data_x = []
@@ -434,6 +465,9 @@ class Runs(db.Model):
                 continue
             chart_data_x.append(timestamp)
             chart_data_y.append(value)
+
+        if not chart_data_y:
+            return None
 
         dates = [end_time - timedelta(display_days / 7.0 * (7 - i)) for i in range(0, 8)]
 

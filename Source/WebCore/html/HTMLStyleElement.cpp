@@ -73,7 +73,7 @@ PassRefPtr<HTMLStyleElement> HTMLStyleElement::create(const QualifiedName& tagNa
 void HTMLStyleElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == titleAttr && m_sheet)
-        m_sheet->setTitle(attr->value());
+        m_sheet->internal()->setTitle(attr->value());
     else if (attr->name() == onloadAttr)
         setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attr));
     else if (attr->name() == onerrorAttr)
@@ -122,7 +122,7 @@ void HTMLStyleElement::registerWithScopingNode()
     scope->registerScopedHTMLStyleChild();
     scope->setNeedsStyleRecalc();
     if (inDocument() && !document()->parsing() && document()->renderer())
-        document()->styleSelectorChanged(DeferRecalcStyle);
+        document()->styleResolverChanged(DeferRecalcStyle);
 
     m_isRegisteredWithScopingNode = true;
 }
@@ -145,32 +145,37 @@ void HTMLStyleElement::unregisterWithScopingNode()
         scope->setNeedsStyleRecalc();
     }
     if (inDocument() && !document()->parsing() && document()->renderer())
-        document()->styleSelectorChanged(DeferRecalcStyle);
+        document()->styleResolverChanged(DeferRecalcStyle);
 
     m_isRegisteredWithScopingNode = false;
 }
 #endif
 
-void HTMLStyleElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLStyleElement::insertedInto(Node* insertionPoint)
 {
-    HTMLElement::insertedIntoDocument();
-    StyleElement::insertedIntoDocument(document(), this);
+    HTMLElement::insertedInto(insertionPoint);
+    if (insertionPoint->inDocument())
+        StyleElement::insertedIntoDocument(document(), this);
 #if ENABLE(STYLE_SCOPED)
     if (scoped() && !m_isRegisteredWithScopingNode)
         registerWithScopingNode();
 #endif
+    return InsertionDone;
 }
 
-void HTMLStyleElement::removedFromDocument()
+void HTMLStyleElement::removedFrom(Node* insertionPoint)
 {
+    HTMLElement::removedFrom(insertionPoint);
+
+    if (insertionPoint->inDocument()) {
 #if ENABLE(STYLE_SCOPED)
-    // In come cases on teardown willRemove is not called - test here for unregistering again
-    // FIXME: Do we need to bother?
-    if (m_isRegisteredWithScopingNode)
-        unregisterWithScopingNode();
+        // In come cases on teardown willRemove is not called - test here for unregistering again
+        // FIXME: Do we need to bother?
+        if (m_isRegisteredWithScopingNode)
+            unregisterWithScopingNode();
 #endif
-    HTMLElement::removedFromDocument();
-    StyleElement::removedFromDocument(document(), this);
+        StyleElement::removedFromDocument(document(), this);
+    }
 }
 
 
@@ -259,7 +264,7 @@ void HTMLStyleElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) cons
     HTMLElement::addSubresourceAttributeURLs(urls);
 
     if (CSSStyleSheet* styleSheet = const_cast<HTMLStyleElement*>(this)->sheet())
-        styleSheet->addSubresourceStyleURLs(urls);
+        styleSheet->internal()->addSubresourceStyleURLs(urls);
 }
 
 bool HTMLStyleElement::disabled() const

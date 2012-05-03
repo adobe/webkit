@@ -57,10 +57,10 @@ END_REGISTER_ANIMATED_PROPERTIES
 
 using namespace SVGNames;
 
-void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, int>* propertyNameToIdMap, const QualifiedName& attrName)
+void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap, const QualifiedName& attrName)
 {
     // FIXME: when CSS supports "transform-origin" the special case for transform_originAttr can be removed.
-    int propertyId = cssPropertyID(attrName.localName());
+    CSSPropertyID propertyId = cssPropertyID(attrName.localName());
     if (!propertyId && attrName == transform_originAttr)
         propertyId = CSSPropertyWebkitTransformOrigin; // cssPropertyID("-webkit-transform-origin")
     ASSERT(propertyId > 0);
@@ -134,14 +134,14 @@ bool SVGStyledElement::rendererIsNeeded(const NodeRenderingContext& context)
     return false;
 }
 
-int SVGStyledElement::cssPropertyIdForSVGAttributeName(const QualifiedName& attrName)
+CSSPropertyID SVGStyledElement::cssPropertyIdForSVGAttributeName(const QualifiedName& attrName)
 {
     if (!attrName.namespaceURI().isNull())
-        return 0;
+        return CSSPropertyInvalid;
     
-    static HashMap<AtomicStringImpl*, int>* propertyNameToIdMap = 0;
+    static HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap = 0;
     if (!propertyNameToIdMap) {
-        propertyNameToIdMap = new HashMap<AtomicStringImpl*, int>;
+        propertyNameToIdMap = new HashMap<AtomicStringImpl*, CSSPropertyID>;
         // This is a list of all base CSS and SVG CSS properties which are exposed as SVG XML attributes
         mapAttributeToCSSProperty(propertyNameToIdMap, alignment_baselineAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, baseline_shiftAttr);
@@ -298,7 +298,7 @@ bool SVGStyledElement::isPresentationAttribute(const QualifiedName& name) const
 
 void SVGStyledElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
 {
-    int propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
     if (propertyID > 0)
         addPropertyToAttributeStyle(style, propertyID, attr->value());
 }
@@ -325,7 +325,7 @@ bool SVGStyledElement::isKnownAttribute(const QualifiedName& attrName)
 
 void SVGStyledElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    int propId = SVGStyledElement::cssPropertyIdForSVGAttributeName(attrName);
+    CSSPropertyID propId = SVGStyledElement::cssPropertyIdForSVGAttributeName(attrName);
     if (propId > 0) {
         SVGElementInstance::invalidateAllInstancesOfElement(this);
         return;
@@ -357,11 +357,12 @@ void SVGStyledElement::attach()
         object->updateFromElement();
 }
 
-void SVGStyledElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGStyledElement::insertedInto(Node* rootParent)
 {
-    SVGElement::insertedIntoDocument();
+    SVGElement::insertedInto(rootParent);
     updateRelativeLengthsInformation();
     buildPendingResourcesIfNeeded();
+    return InsertionDone;
 }
 
 void SVGStyledElement::buildPendingResourcesIfNeeded()
@@ -388,14 +389,14 @@ void SVGStyledElement::buildPendingResourcesIfNeeded()
     }
 }
 
-void SVGStyledElement::removedFromDocument()
+void SVGStyledElement::removedFrom(Node* rootParent)
 {
-    updateRelativeLengthsInformation(false, this);
-    SVGElement::removedFromDocument();
+    if (rootParent->inDocument())
+        updateRelativeLengthsInformation(false, this);
+    SVGElement::removedFrom(rootParent);
     SVGElementInstance::invalidateAllInstancesOfElement(this);
-
     Document* document = this->document();
-    if (!needsPendingResourceHandling() || !document)
+    if (!rootParent->inDocument() || !needsPendingResourceHandling() || !document)
         return;
 
     document->accessSVGExtensions()->removeElementFromPendingResources(this);
@@ -420,11 +421,11 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
     if (!attr)
         return 0;
 
-    RefPtr<StylePropertySet> style = StylePropertySet::create();
-    style->setStrictParsing(false);
-    int propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
+    RefPtr<StylePropertySet> style = StylePropertySet::create(SVGAttributeMode);
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
     style->setProperty(propertyID, attr->value());
-    return style->getPropertyCSSValue(propertyID);
+    RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);
+    return cssValue ? cssValue->cloneForCSSOM() : 0;
 }
 
 bool SVGStyledElement::instanceUpdatesBlocked() const
@@ -463,7 +464,7 @@ AffineTransform SVGStyledElement::localCoordinateSpaceTransform(SVGLocatable::CT
 
 void SVGStyledElement::updateRelativeLengthsInformation(bool hasRelativeLengths, SVGStyledElement* element)
 {
-    // If we're not yet in a document, this function will be called again from insertedIntoDocument(). Do nothing now.
+    // If we're not yet in a document, this function will be called again from insertedInto(). Do nothing now.
     if (!inDocument())
         return;
 

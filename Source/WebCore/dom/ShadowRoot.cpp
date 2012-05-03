@@ -27,7 +27,8 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
-#include "CSSStyleSelector.h"
+#include "DOMSelection.h"
+#include "DOMWindow.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "Element.h"
@@ -38,6 +39,7 @@
 #include "NodeRareData.h"
 #include "ShadowTree.h"
 #include "SVGNames.h"
+#include "StyleResolver.h"
 #include "markup.h"
 
 namespace WebCore {
@@ -113,7 +115,6 @@ PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPu
         return 0;
     }
 
-    ASSERT(purpose != CreatingUserAgentShadowRoot || !element->hasShadowRoot());
     RefPtr<ShadowRoot> shadowRoot = adoptRef(new ShadowRoot(element->document()));
 
     ec = 0;
@@ -146,6 +147,13 @@ void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
     RefPtr<DocumentFragment> fragment = createFragmentFromSource(markup, host(), ec);
     if (fragment)
         replaceChildrenWithFragment(this, fragment.release(), ec);
+}
+
+DOMSelection* ShadowRoot::selection()
+{
+    if (document() && document()->domWindow())
+        return document()->domWindow()->getSelection();
+    return 0;
 }
 
 bool ShadowRoot::childTypeAllowed(NodeType type) const
@@ -192,10 +200,10 @@ void ShadowRoot::setApplyAuthorSheets(bool value)
 
 void ShadowRoot::attach()
 {
-    CSSStyleSelector* styleSelector = document()->styleSelector();
-    styleSelector->pushParentShadowRoot(this);
+    StyleResolver* styleResolver = document()->styleResolver();
+    styleResolver->pushParentShadowRoot(this);
     DocumentFragment::attach();
-    styleSelector->popParentShadowRoot(this);
+    styleResolver->popParentShadowRoot(this);
 }
 
 }

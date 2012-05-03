@@ -77,6 +77,9 @@ static inline bool isValidCSSUnitTypeForDoubleConversion(CSSPrimitiveValue::Unit
     case CSSPrimitiveValue:: CSS_REMS:
     case CSSPrimitiveValue:: CSS_S:
     case CSSPrimitiveValue:: CSS_TURN:
+    case CSSPrimitiveValue:: CSS_VW:
+    case CSSPrimitiveValue:: CSS_VH:
+    case CSSPrimitiveValue:: CSS_VMIN:
         return true;
     case CSSPrimitiveValue:: CSS_ATTR:
     case CSSPrimitiveValue:: CSS_COUNTER:
@@ -130,6 +133,10 @@ static CSSPrimitiveValue::UnitCategory unitCategory(CSSPrimitiveValue::UnitTypes
     case CSSPrimitiveValue::CSS_HZ:
     case CSSPrimitiveValue::CSS_KHZ:
         return CSSPrimitiveValue::UFrequency;
+    case CSSPrimitiveValue::CSS_VW:
+    case CSSPrimitiveValue::CSS_VH:
+    case CSSPrimitiveValue::CSS_VMIN:
+        return CSSPrimitiveValue::UViewportPercentageLength;
     default:
         return CSSPrimitiveValue::UOther;
     }
@@ -246,6 +253,18 @@ CSSPrimitiveValue::CSSPrimitiveValue(const Length& length)
             ASSERT(isfinite(length.percent()));
             m_value.num = length.percent();
             break;
+        case ViewportPercentageWidth:
+            m_primitiveUnitType = CSS_VW;
+            m_value.num = length.viewportPercentageLength();
+            break;
+        case ViewportPercentageHeight:
+            m_primitiveUnitType = CSS_VH;
+            m_value.num = length.viewportPercentageLength();
+            break;
+        case ViewportPercentageMin:
+            m_primitiveUnitType = CSS_VMIN;
+            m_value.num = length.viewportPercentageLength();
+            break;
         case Calculated:
         case Relative:
         case Undefined:
@@ -313,41 +332,69 @@ CSSPrimitiveValue::~CSSPrimitiveValue()
 void CSSPrimitiveValue::cleanup()
 {
     switch (m_primitiveUnitType) {
-        case CSS_STRING:
-        case CSS_URI:
-        case CSS_ATTR:
-        case CSS_PARSER_HEXCOLOR:
-            if (m_value.string)
-                m_value.string->deref();
-            break;
-        case CSS_COUNTER:
-            m_value.counter->deref();
-            break;
-        case CSS_RECT:
-            m_value.rect->deref();
-            break;
-        case CSS_QUAD:
-            m_value.quad->deref();
-            break;
-        case CSS_PAIR:
-            m_value.pair->deref();
-            break;
+    case CSS_STRING:
+    case CSS_URI:
+    case CSS_ATTR:
+    case CSS_COUNTER_NAME:
+    case CSS_PARSER_HEXCOLOR:
+        if (m_value.string)
+            m_value.string->deref();
+        break;
+    case CSS_COUNTER:
+        m_value.counter->deref();
+        break;
+    case CSS_RECT:
+        m_value.rect->deref();
+        break;
+    case CSS_QUAD:
+        m_value.quad->deref();
+        break;
+    case CSS_PAIR:
+        m_value.pair->deref();
+        break;
 #if ENABLE(DASHBOARD_SUPPORT)
-        case CSS_DASHBOARD_REGION:
-            if (m_value.region)
-                m_value.region->deref();
-            break;
+    case CSS_DASHBOARD_REGION:
+        if (m_value.region)
+            m_value.region->deref();
+        break;
 #endif
-        case CSS_CALC:
-            m_value.calc->deref();
-            break;
-        case CSS_SHAPE:
-            m_value.shape->deref();
-            break;
-        default:
-            break;
+    case CSS_CALC:
+        m_value.calc->deref();
+        break;
+    case CSS_SHAPE:
+        m_value.shape->deref();
+        break;
+    case CSS_NUMBER:
+    case CSS_PARSER_INTEGER:
+    case CSS_PERCENTAGE:
+    case CSS_EMS:
+    case CSS_EXS:
+    case CSS_REMS:
+    case CSS_PX:
+    case CSS_CM:
+    case CSS_MM:
+    case CSS_IN:
+    case CSS_PT:
+    case CSS_PC:
+    case CSS_DEG:
+    case CSS_RAD:
+    case CSS_GRAD:
+    case CSS_MS:
+    case CSS_S:
+    case CSS_HZ:
+    case CSS_KHZ:
+    case CSS_TURN:
+    case CSS_VW:
+    case CSS_VH:
+    case CSS_VMIN:
+    case CSS_IDENT:
+    case CSS_RGBCOLOR:
+    case CSS_DIMENSION:
+    case CSS_UNKNOWN:
+    case CSS_PARSER_OPERATOR:
+    case CSS_PARSER_IDENTIFIER:
+        break;
     }
-
     m_primitiveUnitType = 0;
     if (m_hasCachedCSSText) {
         cssTextCache().remove(this);
@@ -384,7 +431,7 @@ template<> unsigned CSSPrimitiveValue::computeLength(RenderStyle* style, RenderS
 
 template<> Length CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
-    return Length(roundForImpreciseConversion<int>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize)), Fixed);
+    return Length(roundForImpreciseConversion<float>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize)), Fixed);
 }
 
 template<> short CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
@@ -574,6 +621,8 @@ CSSPrimitiveValue::UnitTypes CSSPrimitiveValue::canonicalUnitTypeForCategory(Uni
         return CSS_DEG;
     case UFrequency:
         return CSS_HZ;
+    case UViewportPercentageLength:
+        return CSS_UNKNOWN; // Cannot convert between numbers and relative lengths.
     default:
         return CSS_UNKNOWN;
     }
@@ -994,6 +1043,15 @@ String CSSPrimitiveValue::customCssText() const
         case CSS_SHAPE:
             text = m_value.shape->cssText();
             break;
+        case CSS_VW:
+            text = formatNumber(m_value.num) + "vw";
+            break;
+        case CSS_VH:
+            text = formatNumber(m_value.num) + "vh";
+            break;
+        case CSS_VMIN:
+            text = formatNumber(m_value.num) + "vmin";
+            break;
     }
 
     ASSERT(!cssTextCache().contains(this));
@@ -1002,10 +1060,113 @@ String CSSPrimitiveValue::customCssText() const
     return text;
 }
 
-void CSSPrimitiveValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const CSSStyleSheet* styleSheet)
+void CSSPrimitiveValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetInternal* styleSheet)
 {
     if (m_primitiveUnitType == CSS_URI)
         addSubresourceURL(urls, styleSheet->completeURL(m_value.string));
+}
+
+Length CSSPrimitiveValue::viewportPercentageLength()
+{
+    ASSERT(isViewportPercentageLength());
+    Length viewportLength;
+    switch (m_primitiveUnitType) {
+    case CSS_VW:
+        viewportLength = Length(getDoubleValue(), ViewportPercentageWidth);
+        break;
+    case CSS_VH:
+        viewportLength = Length(getDoubleValue(), ViewportPercentageHeight);
+        break;
+    case CSS_VMIN:
+        viewportLength = Length(getDoubleValue(), ViewportPercentageMin);
+        break;
+    default:
+        break;
+    }
+    return viewportLength;
+}
+
+PassRefPtr<CSSPrimitiveValue> CSSPrimitiveValue::cloneForCSSOM() const
+{
+    RefPtr<CSSPrimitiveValue> result;
+
+    switch (m_primitiveUnitType) {
+    case CSS_STRING:
+    case CSS_URI:
+    case CSS_ATTR:
+    case CSS_COUNTER_NAME:
+        result = CSSPrimitiveValue::create(m_value.string, static_cast<UnitTypes>(m_primitiveUnitType));
+        break;
+    case CSS_COUNTER:
+        result = CSSPrimitiveValue::create(m_value.counter->cloneForCSSOM());
+        break;
+    case CSS_RECT:
+        result = CSSPrimitiveValue::create(m_value.rect->cloneForCSSOM());
+        break;
+    case CSS_QUAD:
+        result = CSSPrimitiveValue::create(m_value.quad->cloneForCSSOM());
+        break;
+    case CSS_PAIR:
+        // Pair is not exposed to the CSSOM, no need for a deep clone.
+        result = CSSPrimitiveValue::create(m_value.pair);
+        break;
+#if ENABLE(DASHBOARD_SUPPORT)
+    case CSS_DASHBOARD_REGION:
+        // DashboardRegion is not exposed to the CSSOM, no need for a deep clone.
+        result = CSSPrimitiveValue::create(m_value.region);
+        break;
+#endif
+    case CSS_CALC:
+        // CSSCalcValue is not exposed to the CSSOM, no need for a deep clone.
+        result = CSSPrimitiveValue::create(m_value.calc);
+        break;
+    case CSS_SHAPE:
+        // CSSShapeValue is not exposed to the CSSOM, no need for a deep clone.
+        result = CSSPrimitiveValue::create(m_value.shape);
+        break;
+    case CSS_NUMBER:
+    case CSS_PARSER_INTEGER:
+    case CSS_PERCENTAGE:
+    case CSS_EMS:
+    case CSS_EXS:
+    case CSS_REMS:
+    case CSS_PX:
+    case CSS_CM:
+    case CSS_MM:
+    case CSS_IN:
+    case CSS_PT:
+    case CSS_PC:
+    case CSS_DEG:
+    case CSS_RAD:
+    case CSS_GRAD:
+    case CSS_MS:
+    case CSS_S:
+    case CSS_HZ:
+    case CSS_KHZ:
+    case CSS_TURN:
+    case CSS_VW:
+    case CSS_VH:
+    case CSS_VMIN:
+        result = CSSPrimitiveValue::create(m_value.num, static_cast<UnitTypes>(m_primitiveUnitType));
+        break;
+    case CSS_IDENT:
+        result = CSSPrimitiveValue::createIdentifier(m_value.ident);
+        break;
+    case CSS_RGBCOLOR:
+        result = CSSPrimitiveValue::createColor(m_value.rgbcolor);
+        break;
+    case CSS_DIMENSION:
+    case CSS_UNKNOWN:
+    case CSS_PARSER_OPERATOR:
+    case CSS_PARSER_IDENTIFIER:
+    case CSS_PARSER_HEXCOLOR:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+    if (result)
+        result->setCSSOMSafe();
+
+    return result;
 }
 
 } // namespace WebCore

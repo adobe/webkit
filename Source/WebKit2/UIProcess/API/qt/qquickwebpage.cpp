@@ -26,12 +26,15 @@
 #include "QtWebPageSGNode.h"
 #include "TransformationMatrix.h"
 #include "WebLayerTreeRenderer.h"
+#include "WebPageProxy.h"
 #include "qquickwebpage_p_p.h"
 #include "qquickwebview_p.h"
 #include <QtQuick/QQuickCanvas>
 
+using namespace WebKit;
+
 QQuickWebPage::QQuickWebPage(QQuickWebView* viewportItem)
-    : QQuickItem(viewportItem)
+    : QQuickItem(viewportItem->contentItem())
     , d(new QQuickWebPagePrivate(this, viewportItem))
 {
     setFlag(ItemHasContents);
@@ -65,8 +68,12 @@ void QQuickWebPagePrivate::initialize(WebKit::WebPageProxy* webPageProxy)
 
 void QQuickWebPagePrivate::paint(QPainter* painter)
 {
-    if (webPageProxy->drawingArea())
-        webPageProxy->drawingArea()->paintLayerTree(painter);
+    if (!webPageProxy->drawingArea())
+        return;
+
+    LayerTreeHostProxy* layerTreeHostProxy = webPageProxy->drawingArea()->layerTreeHostProxy();
+    if (layerTreeHostProxy->layerTreeRenderer())
+        layerTreeHostProxy->layerTreeRenderer()->paintToGraphicsContext(painter);
 }
 
 QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
@@ -139,6 +146,9 @@ void QQuickWebPagePrivate::updateSize()
     QSizeF scaledSize = contentsSize * contentsScale;
     q->setSize(scaledSize);
     viewportItem->updateContentsSize(scaledSize);
+    DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
+    if (drawingArea && drawingArea->layerTreeHostProxy())
+        drawingArea->layerTreeHostProxy()->setContentsSize(WebCore::FloatSize(contentsSize.width(), contentsSize.height()));
 }
 
 QQuickWebPagePrivate::~QQuickWebPagePrivate()

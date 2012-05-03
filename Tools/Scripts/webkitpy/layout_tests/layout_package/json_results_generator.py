@@ -319,12 +319,18 @@ class JSONResultsGeneratorBase(object):
         # 120 seconds are more than enough to upload test results.
         uploader = FileUploader(url, 120)
         try:
-            uploader.upload_as_multipart_form_data(self._filesystem, files, attrs)
+            response = uploader.upload_as_multipart_form_data(self._filesystem, files, attrs)
+            if response:
+                if response.code == 200:
+                    _log.info("JSON uploaded.")
+                else:
+                    _log.debug("JSON upload failed, %d: '%s'" % (response.code, response.read()))
+            else:
+                _log.error("JSON upload failed; no response returned")
         except Exception, err:
             _log.error("Upload failed: %s" % err)
             return
 
-        _log.info("JSON files uploaded.")
 
     def _get_test_timing(self, test_name):
         """Returns test timing data (elapsed time) in second

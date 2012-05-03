@@ -212,6 +212,13 @@ bool TextFieldInputType::needsContainer() const
 #endif
 }
 
+bool TextFieldInputType::shouldHaveSpinButton() const
+{
+    Document* document = element()->document();
+    RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
+    return theme->shouldHaveSpinButton(element());
+}
+
 void TextFieldInputType::createShadowSubtree()
 {
     ASSERT(element()->hasShadowRoot());
@@ -221,10 +228,9 @@ void TextFieldInputType::createShadowSubtree()
     ASSERT(!m_innerSpinButton);
 
     Document* document = element()->document();
-    RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
     ChromeClient* chromeClient = document->page() ? document->page()->chrome()->client() : 0;
-    bool shouldHaveSpinButton = theme->shouldHaveSpinButton(element());
     bool shouldAddDecorations = chromeClient && chromeClient->willAddTextFieldDecorationsTo(element());
+    bool shouldHaveSpinButton = this->shouldHaveSpinButton();
     bool createsContainer = shouldHaveSpinButton || needsContainer() || shouldAddDecorations;
 
     ExceptionCode ec = 0;
@@ -387,7 +393,7 @@ void TextFieldInputType::updatePlaceholderText()
     if (!supportsPlaceholder())
         return;
     ExceptionCode ec = 0;
-    String placeholderText = element()->strippedPlaceholder();
+    String placeholderText = usesFixedPlaceholder() ? fixedPlaceholder() : element()->strippedPlaceholder();
     if (placeholderText.isEmpty()) {
         if (m_placeholder) {
             m_placeholder->parentNode()->removeChild(m_placeholder.get(), ec);

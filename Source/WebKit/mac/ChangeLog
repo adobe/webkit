@@ -1,3 +1,611 @@
+2012-04-28  Geoffrey Garen  <ggaren@apple.com>
+
+        Clarified JSGlobalData (JavaScript VM) lifetime
+        https://bugs.webkit.org/show_bug.cgi?id=85142
+
+        Reviewed by Anders Carlsson.
+
+        * Plugins/Hosted/NetscapePluginInstanceProxy.mm:
+        (WebKit::NetscapePluginInstanceProxy::invoke):
+        (WebKit::NetscapePluginInstanceProxy::invokeDefault):
+        (WebKit::NetscapePluginInstanceProxy::construct):
+
+2012-04-27  Gavin Peters  <gavinp@chromium.org>
+
+        Add new ENABLE_LINK_PRERENDER define to control the Prerendering API
+        https://bugs.webkit.org/show_bug.cgi?id=84871
+
+        Reviewed by Adam Barth.
+
+        Prerendering is currently covered by the ENABLE_LINK_PREFETCH macro, but the new Prerendering
+        API separates it from prefetching.  Having separate include guards lets ports enable prefetching,
+        a relatively easy change, without needing to build the infrastructure for prerendering, which
+        is considerably more complicated.
+
+2012-04-26  Jon Lee  <jonlee@apple.com>
+
+        [WK2] AlternativeTextClient leaks when the page is destroyed
+        https://bugs.webkit.org/show_bug.cgi?id=84307
+        <rdar://problem/11328431>
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/WebAlternativeTextClient.h: Implement pageDestroyed(), as in EditorClient.
+        (WebAlternativeTextClient):
+        * WebCoreSupport/WebAlternativeTextClient.mm:
+        (WebAlternativeTextClient::pageDestroyed): Deletes itself.
+
+2012-04-26  Jer Noble  <jer.noble@apple.com>
+
+        Full Screen mode does not preserve CALayer ordering after exiting.
+        https://bugs.webkit.org/show_bug.cgi?id=83931
+
+        Reviewed by Eric Carlson.
+
+        Further corrections to r114567. When swapping view for otherView, give the correct
+        relative view to -[NSView addSubview:positioned:relativeTo:].
+
+        * WebView/WebFullScreenController.mm:
+        (-[WebFullScreenController _swapView:with:]):
+
+2012-04-25  Jer Noble  <jer.noble@apple.com>
+
+        Placeholder view is immediately removed from hosting window upon entering full screen.
+        https://bugs.webkit.org/show_bug.cgi?id=84916
+
+        Reviewed by Darin Adler.
+
+        Correct a mistake added in r114567.  When swapping view for otherView, add otherView and 
+        remove view (rather than adding otherView and removing otherView).
+
+        * WebView/WebFullScreenController.mm:
+        (-[WebFullScreenController _swapView:with:]):
+
+2012-04-25  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=84913
+        WebKit 1: Initialize deviceScaleFactor on creation of the WebView
+        -and corresponding-
+        <rdar://problem/11322716>
+
+        Reviewed by Darin Adler.
+
+        Before this patch, we weren't setting the deviceScaleFactor until 
+        viewDidMoveToWindow which is quite late for background tabs. setHostWindow will 
+        happen early on though. For applications that don't use host windows, also set it 
+        from _initWithFrame.
+        * WebView/WebView.mm:
+        (-[WebView _initWithFrame:frameName:groupName:usesDocumentViews:]):
+        (-[WebView setHostWindow:]):
+        (-[WebView _deviceScaleFactor]):
+
+2012-04-24  Alexis Menard  <alexis.menard@openbossa.org>
+
+        Replace occurences of style selector from variables and methods names by style resolver.
+        https://bugs.webkit.org/show_bug.cgi?id=84765
+
+        Reviewed by Andreas Kling.
+
+        Rename methods and variables to follow the new name StyleResolver. It requires to update the
+        local variables, methods parameters, and function names to match the new name and to remove
+        the concept of "selector" to avoid clashing with the CSS concept. The next and last patch
+        will be to rename CSSStyleSelector file and update the includes.
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView reapplyStyles]):
+        (-[WebHTMLView _setPrinting:minimumPageLogicalWidth:logicalHeight:originalPageWidth:originalPageHeight:maximumShrinkRatio:adjustViewSize:paginateScreenContent:]):
+
+2012-04-23  Andy Estes  <aestes@apple.com>
+
+        Incremental rendering should be unsuppressed after the load event or a configurable timeout, whichever occurs first.
+        https://bugs.webkit.org/show_bug.cgi?id=84583
+
+        Add a private WebPreference for setting the incremental rendering suppression timeout.
+
+        Reviewed by Anders Carlsson.
+
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (-[WebPreferences setIncrementalRenderingSuppressionTimeoutInSeconds:]):
+        (-[WebPreferences incrementalRenderingSuppressionTimeoutInSeconds]):
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+
+2012-04-23  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Cut dependency on RenderLayer::scrollRectToVisible outside rendering
+        https://bugs.webkit.org/show_bug.cgi?id=84607
+
+        Reviewed by Simon Fraser.
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame _scrollDOMRangeToVisible:]):
+        Updated to use RenderObject::scrollRectToVisible and not depend on RenderLayer.
+
+2012-04-22  Jon Lee  <jonlee@apple.com>
+
+        Remove notifications support on Mac Lion.
+        https://bugs.webkit.org/show_bug.cgi?id=84554
+        <rdar://problem/11297128>
+
+        Reviewed by Sam Weinig.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-04-20  Jon Lee  <jonlee@apple.com>
+
+        Add Notification constructor
+        https://bugs.webkit.org/show_bug.cgi?id=80477
+        <rdar://problem/10912431>
+
+        Reviewed by Jian Li.
+
+        * WebCoreSupport/WebNotificationClient.mm:
+        (WebNotificationClient::clearNotifications): When clearing notifications, finalize
+        them so that they can be cleaned up by the GC.
+
+2012-04-20  Timothy Hatcher  <timothy@apple.com>
+
+        Make the Web Inspector be the first responder when opening docked.
+
+        <rdar://problem/11294217>
+
+        Reviewed by Brian Weinstein.
+
+        * WebCoreSupport/WebInspectorClient.mm:
+        (-[WebInspectorWindowController showWindow:]): Call makeFirstResponder: on
+        the window and pass the Inspector's WebView.
+
+2012-04-18  Hironori Bono  <hbono@chromium.org>
+
+        Split SpellChecker::didCheck() to SpellChecker::didCheckSucceeded() and SpellChecker::didCheckCanceled()
+        https://bugs.webkit.org/show_bug.cgi?id=83748
+
+        Reviewed by Ryosuke Niwa.
+
+        This change replaces a call for SpellChecker::didCheck() with one for
+        SpellChecker::didCheckSucceeded() because didCheck has been split into
+        didCheckSucceeded(0 and didCheckCanceled().
+
+        * WebCoreSupport/WebEditorClient.mm:
+        (-[WebEditorSpellCheckResponder perform]): Replaced didCheck with didCheckSucceeded.
+
+2012-04-18  Jer Noble  <jer.noble@apple.com>
+
+        Full Screen mode does not preserve CALayer ordering after exiting.
+        https://bugs.webkit.org/show_bug.cgi?id=83931
+
+        Reviewed by Eric Carlson.
+
+        When swapping the placeholder and web views, use -[NSView addSubview:positioned:relativeTo:]
+        instead of -[NSView replaceSubview:with:], as the latter does not preserve the relative order
+        of the view's backing CALayers.
+
+        * WebView/WebFullScreenController.mm:
+        (-[WebFullScreenController _swapView:with:]):
+
+2012-04-18  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Sandbox violations prevent attaching files to gmail messages
+        https://bugs.webkit.org/show_bug.cgi?id=84263
+        <rdar://problem/11248260>
+
+        Reviewed by Oliver Hunt.
+
+        * WebCoreSupport/WebDragClient.mm: (WebDragClient::willPerformDragDestinationAction):
+        DragDestinationActionUpload no longer exists, so we don't need a special case for it.
+
+2012-04-17  Jer Noble  <jer.noble@apple.com>
+
+        Exiting full screen video brings the wrong Safari window to the foreground
+        https://bugs.webkit.org/show_bug.cgi?id=83936
+
+        Reviewed by Adele Peterson.
+
+        Tell the original webView's window to makeKeyAndOrderFront once the exit
+        animation completes.
+
+        * WebView/WebFullScreenController.mm:
+        (-[WebFullScreenController finishedExitFullScreenAnimation:]):
+
+2012-04-16  Anders Carlsson  <andersca@apple.com>
+
+        Use a MIG call when creating a plug-in property list file
+        https://bugs.webkit.org/show_bug.cgi?id=84084
+        <rdar://problem/11197341>
+
+        Reviewed by Sam Weinig.
+
+        * Plugins/Hosted/NetscapePluginHostManager.mm:
+        (WebKit::NetscapePluginHostManager::createPropertyListFile):
+        Get a plug-in host and call _WKPHCreatePluginMIMETypesPreferences instead.
+
+        * Plugins/Hosted/WebKitPluginHost.defs:
+        Add PHCreatePluginMIMETypesPreferences.
+
+        * Plugins/WebNetscapePluginPackage.mm:
+        (-[WebNetscapePluginPackage createPropertyListFile]):
+        NetscapePluginHostManager::createPropertyListFile is no longer a static member function.
+
+2012-04-12  Andy Estes  <aestes@apple.com>
+
+        REGRESSION (r102262): iAd Producer relies on CSSStyleDeclaration property setters respecting '!important'
+        https://bugs.webkit.org/show_bug.cgi?id=83832
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Misc/WebKitVersionChecks.h: Indicate that 535.13.0 was the first
+        version of WebKit.framework to ignore '!important' in
+        CSSStyleDeclaration property setters.
+        * WebView/WebView.mm:
+        (shouldRespectPriorityInCSSAttributeSetters):
+        (-[WebView _commonInitializationWithFrameName:groupName:]): Enable a
+        quirk to restore pre-r102262 behavior if the application is iAd Producer
+        and was linked against a version of WebKit.framework that had the old behavior.
+
+2012-04-12  Andy Estes  <aestes@apple.com>
+
+        Remove unused WebKit1 SPI for suppressing incremental rendering.
+        https://bugs.webkit.org/show_bug.cgi?id=83801
+
+        Reviewed by Simon Fraser.
+
+        This SPI is unused and has been replaced by API ([setS|s]uppressesIncrementalRendering).
+
+        * WebView/WebPreferences.mm:
+        * WebView/WebPreferencesPrivate.h:
+
+2012-04-08  Dan Bernstein  <mitz@apple.com>
+
+        [mac] REGRESSION (r113467): Some canvas tests are failing in WebKit1 when run after compositing/tiled-layers-hidpi.html
+        https://bugs.webkit.org/show_bug.cgi?id=83453
+
+        Reviewed by Sam Weinig.
+
+        * WebView/WebView.mm:
+        (-[WebView _setCustomBackingScaleFactor:]): When the scale factor parameter was 0, meaning
+        no custom scale factor, this method was setting the Page scale factor to 0, and that value
+        was used by canvas. Changed it to correctly set the Page scale factor back to the device
+        scale factor.
+
+2012-04-06  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] Adopt a different method of telling AppKit when inline input isn't supported
+        https://bugs.webkit.org/show_bug.cgi?id=83408
+        <rdar://problem/9205734>
+
+        Reviewed by Adele Peterson.
+
+        * Plugins/Hosted/WebTextInputWindowController.m:
+        (-[WebTextInputView validAttributesForMarkedText]):
+        (-[WebTextInputPanel init]):
+        (-[WebTextInputPanel _interpretKeyEvent:string:]): Added a comment about old approach.
+
+2012-04-06  Enrica Casucci  <enrica@apple.com>
+
+        Provide Obj-C private API to simplify markup.
+        https://bugs.webkit.org/show_bug.cgi?id=83334
+        <rdar://problem/11033861>
+
+        Reviewed by Sam Weinig.
+
+        * WebView/WebView.mm:
+        (-[WebView _simplifyMarkup:endNode:]): Added.
+        * WebView/WebViewPrivate.h:
+
+2012-04-06  Tim Horton  <timothy_horton@apple.com>
+
+        Add autodetection of image orientation from EXIF information
+        https://bugs.webkit.org/show_bug.cgi?id=19688
+        <rdar://problem/4126979> and <rdar://problem/11091578>
+
+        Original patch by David Carson and Eric Seidel.
+
+        Reviewed by Simon Fraser.
+
+        Add a preference, ShouldRespectImageOrientation, which will cause WebCore to respect EXIF orientation in all images.
+
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]):
+        (-[WebPreferences setShouldRespectImageOrientation:]):
+        (-[WebPreferences shouldRespectImageOrientation]):
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+
+2012-04-06  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/10912476> HiDPI: Have canvas use a hidpi backing store, but downsample upon access
+
+        Reviewed by Sam Weinig.
+
+        * Configurations/FeatureDefines.xcconfig: Added ENABLE_HIGH_DPI_CANVAS.
+
+2012-04-05  Jia Pu  <jpu@apple.com>
+
+        Move correction panel related functions from EditorClient into separated AlternativeTextClient class.
+        https://bugs.webkit.org/show_bug.cgi?id=82970
+
+        Reviewed by Enrica Casucci.
+
+        Move correction panel related functions from WebEditorClient to the new WebAlternativeTextClient.
+        See WebCore/ChangeLog for details.
+
+        * WebCoreSupport/CorrectionPanel.h:
+        * WebCoreSupport/CorrectionPanel.mm:
+        * WebCoreSupport/WebAlternativeTextClient.h: Added.
+        (WebAlternativeTextClient):
+        * WebCoreSupport/WebAlternativeTextClient.mm: Added.
+        (WebAlternativeTextClient::WebAlternativeTextClient):
+        (WebAlternativeTextClient::~WebAlternativeTextClient):
+        (WebAlternativeTextClient::showCorrectionAlternative):
+        (WebAlternativeTextClient::dismissAlternative):
+        (WebAlternativeTextClient::dismissAlternativeSoon):
+        (WebAlternativeTextClient::recordAutocorrectionResponse):
+        * WebCoreSupport/WebEditorClient.h:
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::~WebEditorClient):
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+
+2012-03-15  Jer Noble  <jer.noble@apple.com>
+
+        Full Screen mode should cancel before navigation.
+        https://bugs.webkit.org/show_bug.cgi?id=81295
+
+        Reviewed by Anders Carlsson.
+
+        When a provisional load is started, if the page is currently in full screen mode, instruct
+        the full screen controller to close the full screen window immediately.
+
+        * WebView/WebFullScreenController.h:
+        * WebView/WebFullScreenController.mm:
+        (-[WebFullScreenController isFullScreen]): Added.
+        * WebView/WebView.mm:
+        (-[WebView _didStartProvisionalLoadForFrame:]): Close the full screen window controller, if
+            present and in full screen mode.
+
+2012-04-03  Keishi Hattori  <keishi@webkit.org>
+
+        Disable ENABLE_DATALIST for now
+        https://bugs.webkit.org/show_bug.cgi?id=82871
+
+        Reviewed by Kent Tamura.
+
+        * Configurations/FeatureDefines.xcconfig: Disabled ENABLE_DATALIST.
+
+2012-04-03  Anders Carlsson  <andersca@apple.com>
+
+        Add audit token to PHCheckInWithPluginHost
+        https://bugs.webkit.org/show_bug.cgi?id=83102
+
+        Reviewed by Sam Weinig.
+
+        * Plugins/Hosted/WebKitPluginHost.defs:
+
+2012-04-02  Jia Pu  <jpu@apple.com>
+
+        Rename SpellingCorrectionController to AlternativeTextController.
+        https://bugs.webkit.org/show_bug.cgi?id=82942
+
+        Reviewed by Enrica Casucci.
+
+        These changes are simply adopting new class names.
+
+        * WebCoreSupport/CorrectionPanel.h:
+        (CorrectionPanel):
+        * WebCoreSupport/CorrectionPanel.mm:
+        (correctionIndicatorType):
+        (CorrectionPanel::CorrectionPanel):
+        (CorrectionPanel::~CorrectionPanel):
+        (CorrectionPanel::show):
+        (CorrectionPanel::dismiss):
+        (CorrectionPanel::dismissInternal):
+        (CorrectionPanel::handleAcceptedReplacement):
+        * WebCoreSupport/WebEditorClient.h:
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::~WebEditorClient):
+        (WebEditorClient::showCorrectionPanel):
+        (WebEditorClient::dismissCorrectionPanel):
+        (WebEditorClient::dismissCorrectionPanelSoon):
+        * WebView/WebView.mm:
+        (-[WebView handleCorrectionPanelResult:]):
+
+2012-04-03  Jer Noble  <jer.noble@apple.com>
+
+        ESC key in full screen does not result in webkitFullScreenChange event.
+        https://bugs.webkit.org/show_bug.cgi?id=82755
+        <rdar://problem/11093513>
+
+        Reviewed by Eric Carlson.
+
+        Instead of exiting full screen directly, ask the document to initiate exiting full screen. This ensures
+        that the entire full screen element stack is cleared and that webkitFullScreenChange events are sent
+        out correctly.
+
+        * WebView/WebFullScreenController.mm:
+        (-[WebFullScreenController cancelOperation:]):
+        (-[WebFullScreenController requestExitFullScreen]):
+
+2012-04-01  Jon Lee  <jonlee@apple.com>
+
+        Rename notification properties and functions
+        https://bugs.webkit.org/show_bug.cgi?id=80482
+        <rdar://problem/10912432>
+
+        Reviewed by Kentaro Hara.
+
+        * WebView/WebNotification.h: Rename replaceID to tag.
+        * WebView/WebNotification.mm:
+        (-[WebNotification tag]):
+
+2012-03-31  Timothy Hatcher  <timothy@apple.com>
+
+        Prevent opening external URLs in the Web Inspector's WebView.
+
+        All URLs not handled by the Inspector's JavaScript are now opened in the inspected WebView.
+
+        https://webkit.org/b/82812
+        rdar://problem/9488558
+
+        Reviewed by Joseph Pecoraro.
+
+        * WebCoreSupport/WebInspectorClient.mm:
+        (-[WebInspectorWindowController init]): Factored the URL code out of here into inspectorPagePath.
+        (-[WebInspectorWindowController inspectorPagePath]): Added.
+        (-[WebInspectorWindowController webView:decidePolicyForNavigationAction:request:frame:decisionListener:]): Added.
+        Only allow non-main frame and the inspector page. All other URLs will be opened in the inspected page.
+
+2012-03-30  Emil A Eklund  <eae@chromium.org>
+
+        Change WebKit/WebKit2 platform code to use pixel snapped values
+        https://bugs.webkit.org/show_bug.cgi?id=82549
+
+        Change WebKit and WebKit2 platform code to use rounded locations and
+        pixel snapped rects and sizes. This largely avoids having to expose the
+        fractional layout types to the platform code.
+
+        Reviewed by Eric Seidel.
+
+        * DOM/WebDOMOperations.mm:
+        (-[DOMNode _renderRect:]):
+
+2012-03-30  Mark Pilgrim  <pilgrim@chromium.org>
+
+        GEOLOCATION should be implemented as Page Supplement
+        https://bugs.webkit.org/show_bug.cgi?id=82228
+
+        Reviewed by Adam Barth.
+
+        Geolocation is now a Supplement in Page so the interface
+        has changed for setting up the page's geolocation client
+        initially and accessing the controller later.
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+        (-[WebView _geolocationDidChangePosition:]):
+        (-[WebView _geolocationDidFailWithError:]):
+
+2012-03-30  Keishi Hattori  <keishi@webkit.org>
+
+        Change ENABLE_INPUT_COLOR to ENABLE_INPUT_TYPE_COLOR and enable it for chromium
+        https://bugs.webkit.org/show_bug.cgi?id=80972
+
+        Reviewed by Kent Tamura.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-03-28  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] REGRESSION: Removing translation of local paths in KURL constructor broke some applications
+        https://bugs.webkit.org/show_bug.cgi?id=82548
+        <rdar://problem/11125355>
+        <rdar://problem/11142152>
+
+        Reviewed by Brady Eidson.
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame loadRequest:]): Fixed this bug.
+        (-[WebFrame loadHTMLString:baseURL:]): Also added translation to another API, so that I don't
+        have to come back again.
+        (-[WebFrame loadAlternateHTMLString:baseURL:forUnreachableURL:]): Ditto.
+
+        * WebView/WebView.mm: (-[WebView setMainFrameURL:]): Changed another place where clients used
+        to pass file paths instead of URLs.
+
+2012-03-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r112553.
+        http://trac.webkit.org/changeset/112553
+        https://bugs.webkit.org/show_bug.cgi?id=82638
+
+        It made all tests crash on Qt WK2 (Requested by Ossy_away on
+        #webkit).
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+        (-[WebView _geolocationDidChangePosition:]):
+        (-[WebView _geolocationDidFailWithError:]):
+
+2012-03-29  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        HashMap<>::add should return a more descriptive object
+        https://bugs.webkit.org/show_bug.cgi?id=71063
+
+        Reviewed by Ryosuke Niwa.
+
+        Update code to use AddResult instead of a pair.
+
+        * Plugins/Hosted/NetscapePluginHostManager.mm:
+        (WebKit::NetscapePluginHostManager::hostForPlugin):
+        * Plugins/Hosted/ProxyInstance.mm:
+        (WebKit::ProxyInstance::methodsNamed):
+        (WebKit::ProxyInstance::fieldNamed):
+        * WebCoreSupport/WebNotificationClient.mm:
+        (WebNotificationClient::show):
+
+2012-03-29  Mark Pilgrim  <pilgrim@chromium.org>
+
+        GEOLOCATION should be implemented as Page Supplement
+        https://bugs.webkit.org/show_bug.cgi?id=82228
+
+        Reviewed by Adam Barth.
+
+        Geolocation is now a Supplement in Page so the interface
+        has changed for setting up the page's geolocation client
+        initially and accessing the controller later.
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+        (-[WebView _geolocationDidChangePosition:]):
+        (-[WebView _geolocationDidFailWithError:]):
+
+2012-03-28  Nate Chapin  <japhet@chromium.org>
+
+        Remove dispatchDidLoadMainResource callback, since no
+        port implements it.
+        https://bugs.webkit.org/show_bug.cgi?id=82539
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/WebFrameLoaderClient.h:
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+        * WebKit.order:
+
+2012-03-28  Joseph Pecoraro  <pecoraro@apple.com>
+
+        <http://webkit.org/b/82419> Web Inspector: Create -[DOMNode inspect] from IDL
+
+        Reviewed by Timothy Hatcher.
+
+        * MigrateHeaders.make: Copy DOMNodePrivate.h to PrivateHeaders.
+
+2012-03-27  Timothy Hatcher  <timothy@apple.com>
+
+        Make WebKit properly load a staged framework when soft linking.
+
+        https://webkit.org/b/82371
+        rdar://problem/11125989
+
+        Reviewed by Dan Bernstein.
+
+        * WebCoreSupport/WebInspectorClient.mm: Use SOFT_LINK_STAGED_FRAMEWORK_OPTIONAL to properly
+        load the WebInspector framework.
+
+2012-03-26  Adam Barth  <abarth@webkit.org>
+
+        FrameLoader::shouldAllowNavigation uses Frame for context rather than Document
+        https://bugs.webkit.org/show_bug.cgi?id=81020
+
+        Reviewed by Eric Seidel.
+
+        Update call site to new function name.
+
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+        (WebFrameLoaderClient::dispatchWillSubmitForm):
+
 2012-03-23  Alexey Proskuryakov  <ap@apple.com>
 
         [Mac] No need for platform-specific ENABLE_BLOB values

@@ -98,8 +98,10 @@ void InjectedScriptHost::disconnect()
 
 void InjectedScriptHost::inspectImpl(PassRefPtr<InspectorValue> object, PassRefPtr<InspectorValue> hints)
 {
-    if (m_inspectorAgent)
-        m_inspectorAgent->inspect(object->asObject(), hints->asObject());
+    if (m_inspectorAgent) {
+        RefPtr<TypeBuilder::Runtime::RemoteObject> remoteObject = TypeBuilder::Runtime::RemoteObject::runtimeCast(object);
+        m_inspectorAgent->inspect(remoteObject, hints->asObject());
+    }
 }
 
 void InjectedScriptHost::getEventListenersImpl(Node* node, Vector<EventListenerInfo>& listenersArray)
@@ -146,19 +148,19 @@ InjectedScriptHost::InspectableObject* InjectedScriptHost::inspectedObject(unsig
 }
 
 #if ENABLE(SQL_DATABASE)
-int InjectedScriptHost::databaseIdImpl(Database* database)
+String InjectedScriptHost::databaseIdImpl(Database* database)
 {
     if (m_databaseAgent)
         return m_databaseAgent->databaseId(database);
-    return 0;
+    return String();
 }
 #endif
 
-int InjectedScriptHost::storageIdImpl(Storage* storage)
+String InjectedScriptHost::storageIdImpl(Storage* storage)
 {
     if (m_domStorageAgent)
         return m_domStorageAgent->storageId(storage);
-    return 0;
+    return String();
 }
 
 #if ENABLE(WORKERS)

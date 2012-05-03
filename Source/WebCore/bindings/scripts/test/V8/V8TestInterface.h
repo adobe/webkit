@@ -42,7 +42,7 @@ public:
     {
         return reinterpret_cast<TestInterface*>(object->GetPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
-    inline static v8::Handle<v8::Object> wrap(TestInterface*);
+    inline static v8::Handle<v8::Object> wrap(TestInterface*, v8::Isolate* = 0);
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
@@ -50,26 +50,26 @@ public:
     static v8::Handle<v8::Value> namedPropertySetter(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::AccessorInfo&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
 private:
-    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestInterface>);
+    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestInterface>, v8::Isolate*);
 };
 
-v8::Handle<v8::Object> V8TestInterface::wrap(TestInterface* impl)
+v8::Handle<v8::Object> V8TestInterface::wrap(TestInterface* impl, v8::Isolate* isolate)
 {
         v8::Handle<v8::Object> wrapper = getActiveDOMObjectMap().get(impl);
         if (!wrapper.IsEmpty())
             return wrapper;
-    return V8TestInterface::wrapSlow(impl);
+    return V8TestInterface::wrapSlow(impl, isolate);
 }
 
-inline v8::Handle<v8::Value> toV8(TestInterface* impl)
+inline v8::Handle<v8::Value> toV8(TestInterface* impl, v8::Isolate* isolate = 0)
 {
     if (!impl)
         return v8::Null();
-    return V8TestInterface::wrap(impl);
+    return V8TestInterface::wrap(impl, isolate);
 }
-inline v8::Handle<v8::Value> toV8(PassRefPtr< TestInterface > impl)
+inline v8::Handle<v8::Value> toV8(PassRefPtr< TestInterface > impl, v8::Isolate* isolate = 0)
 {
-    return toV8(impl.get());
+    return toV8(impl.get(), isolate);
 }
 
 }

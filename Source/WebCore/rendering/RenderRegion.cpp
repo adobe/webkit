@@ -30,26 +30,28 @@
 #include "config.h"
 #include "RenderRegion.h"
 
-#include "CSSStyleSelector.h"
+#include "FlowThreadController.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "IntRect.h"
 #include "PaintInfo.h"
 #include "RenderBoxRegionInfo.h"
-#include "RenderFlowThread.h"
+#include "RenderNamedFlowThread.h"
+#include "RenderRegionMultiColumn.h"
 #include "RenderView.h"
+#include "StyleResolver.h"
 
 namespace WebCore {
 
 RenderRegion::RenderRegion(Node* node, RenderFlowThread* flowThread)
     : RenderReplaced(node, IntSize())
     , m_flowThread(flowThread)
-    , m_parentFlowThread(0)
+    , m_parentNamedFlowThread(0)
+    , m_parentMultiColumnRegion(0)
     , m_isValid(false)
     , m_hasCustomRegionStyle(false)
     , m_regionState(RegionUndefined)
     , m_dispatchRegionLayoutUpdateEvent(false)
-    , m_usedForMultiColumn(false)
     , m_computedAutoHeight(0)
     , m_hasComputedAutoHeight(false)
     , m_usesAutoHeight(false)
@@ -100,41 +102,45 @@ bool RenderRegion::isLastRegion() const
     return m_flowThread->lastRegion() == this;
 }
 
-void RenderRegion::setRegionBoxesRegionStyle()
+// Clear the style for all objects in region
+void RenderRegion::clearRegionObjectsRegionStyle()
+{
+    m_renderObjectRegionStyle.clear();
+}
+
+void RenderRegion::setRegionObjectsRegionStyle()
 {
     if (!hasCustomRegionStyle())
         return;
 
-    for (RenderBoxRegionInfoMap::iterator iter = m_renderBoxRegionInfo.begin(), end = m_renderBoxRegionInfo.end(); iter != end; ++iter) {
-        const RenderBox* box = iter->first;
-        if (!box->canHaveRegionStyle())
+    clearRegionObjectsRegionStyle();
+
+    RenderNamedFlowThread* namedFlow = view()->flowThreadController()->ensureRenderFlowThreadWithName(style()->regionThread());
+    const NamedFlowContentNodes& contentNodes = namedFlow->contentNodes();
+    for (NamedFlowContentNodes::const_iterator iter = contentNodes.begin(), end = contentNodes.end(); iter != end; ++iter) {
+        const Node* node = *iter;
+        if (!node->renderer())
             continue;
+        RenderObject* object = node->renderer();
 
-        // Save original box style to be restored later, after paint.
-        RefPtr<RenderStyle> boxOriginalStyle = box->style();
+        RefPtr<RenderStyle> objectStyleInRegion = computeStyleInRegion(object);
+        setObjectStyleInRegion(object, objectStyleInRegion);
 
-        // Set the style to be used for box as the style computed in region.
-        (const_cast<RenderBox*>(box))->setStyleInternal(renderBoxRegionStyle(box));
-
-        m_renderBoxRegionStyle.set(box, boxOriginalStyle);
+        computeChildrenStyleInRegion(object);
     }
 }
 
-void RenderRegion::restoreRegionBoxesOriginalStyle()
+void RenderRegion::restoreRegionObjectsOriginalStyle()
 {
     if (!hasCustomRegionStyle())
         return;
 
-    for (RenderBoxRegionInfoMap::iterator iter = m_renderBoxRegionInfo.begin(), end = m_renderBoxRegionInfo.end(); iter != end; ++iter) {
-        const RenderBox* box = iter->first;
-        RenderBoxRegionStyleMap::iterator it = m_renderBoxRegionStyle.find(box);
-        if (it == m_renderBoxRegionStyle.end())
-            continue;
-
-        // Restore the box style to the original style and store the box style in region for later use.
-        RefPtr<RenderStyle> boxRegionStyle = box->style();
-        (const_cast<RenderBox*>(box))->setStyleInternal(it->second);
-        m_renderBoxRegionStyle.set(box, boxRegionStyle);
+    for (RenderObjectRegionStyleMap::iterator iter = m_renderObjectRegionStyle.begin(), end = m_renderObjectRegionStyle.end(); iter != end; ++iter) {
+        RenderObject* object = const_cast<RenderObject*>(iter->first);
+        RefPtr<RenderStyle> objectRegionStyle = object->style();
+        RefPtr<RenderStyle> objectOriginalStyle = iter->second;
+        object->setStyleInternal(objectOriginalStyle);
+        // FIXME: store the computed style in region to be used later
     }
 }
 
@@ -144,9 +150,9 @@ void RenderRegion::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintO
     if (!m_flowThread || !isValid())
         return;
 
-    setRegionBoxesRegionStyle();
+    setRegionObjectsRegionStyle();
     m_flowThread->paintIntoRegion(paintInfo, this, LayoutPoint(paintOffset.x() + borderLeft() + paddingLeft(), paintOffset.y() + borderTop() + paddingTop()));
-    restoreRegionBoxesOriginalStyle();
+    restoreRegionObjectsOriginalStyle();
 }
 
 // Hit Testing
@@ -173,22 +179,32 @@ bool RenderRegion::nodeAtPoint(const HitTestRequest& request, HitTestResult& res
     return false;
 }
 
+bool RenderRegion::hasAutoHeightStyle() const
+{
+    if (hasParentMultiColumnRegion())
+        return false;
+    RenderStyle* styleToUse = style();
+    bool hasAnchoredTopAndBottom = (isPositioned() || isRelPositioned()) && styleToUse->logicalTop().isSpecified() && styleToUse->logicalBottom().isSpecified();
+    return !hasAnchoredTopAndBottom && styleToUse->logicalHeight().isAuto();
+}
+
 void RenderRegion::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderReplaced::styleDidChange(diff, oldStyle);
     bool customRegionStyle = false;
     if (node()) {
         Element* regionElement = static_cast<Element*>(node());
-        customRegionStyle = view()->document()->styleSelector()->checkRegionStyle(regionElement);
+        customRegionStyle = view()->document()->styleResolver()->checkRegionStyle(regionElement);
     }
-    
+    setHasCustomRegionStyle(customRegionStyle);
+ 
     bool didUseAutoHeight = m_usesAutoHeight;
     m_usesAutoHeight = hasAutoHeightStyle();
     if (m_flowThread && didUseAutoHeight != m_usesAutoHeight) {
         if (m_usesAutoHeight)
-            view()->view()->incrementAutoHeightRegions();
+            view()->incrementAutoHeightRegions();
         else
-            view()->view()->incrementAutoHeightRegions();
+            view()->decrementAutoHeightRegions();
         setNeedsLayout(true);
     }
 }
@@ -222,13 +238,13 @@ void RenderRegion::attachRegion()
     // so we go up the rendering parents and check that this region is not part of the same
     // flow that it actually needs to display. It would create a circular reference.
     RenderObject* parentObject = parent();
-    m_parentFlowThread = 0;
+    m_parentNamedFlowThread = 0;
     for ( ; parentObject; parentObject = parentObject->parent()) {
-        if (parentObject->isRenderFlowThread()) {
-            m_parentFlowThread = toRenderFlowThread(parentObject);
+        if (parentObject->isRenderNamedFlowThread()) {
+            m_parentNamedFlowThread = toRenderNamedFlowThread(parentObject);
             // Do not take into account a region that links a flow with itself. The dependency
             // cannot change, so it is not worth adding it to the list.
-            if (m_flowThread == m_parentFlowThread) {
+            if (m_flowThread == m_parentNamedFlowThread) {
                 m_flowThread = 0;
                 return;
             }
@@ -263,7 +279,7 @@ RenderBoxRegionInfo* RenderRegion::setRenderBoxRegionInfo(const RenderBox* box, 
     if (!m_isValid || !m_flowThread)
         return 0;
 
-    OwnPtr<RenderBoxRegionInfo>& boxInfo = m_renderBoxRegionInfo.add(box, nullptr).first->second;
+    OwnPtr<RenderBoxRegionInfo>& boxInfo = m_renderBoxRegionInfo.add(box, nullptr).iterator->second;
     if (boxInfo)
         *boxInfo = RenderBoxRegionInfo(logicalLeftInset, logicalRightInset, containingBlockChainIsInset);
     else
@@ -296,42 +312,55 @@ LayoutUnit RenderRegion::offsetFromLogicalTopOfFirstPage() const
     return regionRect().x();
 }
 
-PassRefPtr<RenderStyle> RenderRegion::renderBoxRegionStyle(const RenderBox* renderBox)
+PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderObject* object)
 {
-    // The box for which we are asking for style in region should have its info present
-    // in the region box info map.
-    ASSERT(m_renderBoxRegionInfo.find(renderBox) != m_renderBoxRegionInfo.end());
+    ASSERT(object);
+    ASSERT(object->view());
+    ASSERT(object->view()->document());
+    ASSERT(!object->isAnonymous());
+    ASSERT(object->node() && object->node()->isElementNode());
 
-    RenderBoxRegionStyleMap::iterator it = m_renderBoxRegionStyle.find(renderBox);
-    if (it != m_renderBoxRegionStyle.end())
-        return it->second;
-    return computeStyleInRegion(renderBox);
+    Element* element = toElement(object->node());
+    RefPtr<RenderStyle> renderObjectRegionStyle = object->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
+
+    return renderObjectRegionStyle.release();
 }
 
-PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderBox* box)
+void RenderRegion::computeChildrenStyleInRegion(RenderObject* object)
 {
-    ASSERT(box);
-    ASSERT(box->view());
-    ASSERT(box->view()->document());
-    ASSERT(!box->isAnonymous());
-    ASSERT(box->node() && box->node()->isElementNode());
+    for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
+        // The style in region for this child should not have been computed yet.
+        ASSERT(!m_renderObjectRegionStyle.contains(child));
+        RefPtr<RenderStyle> styleInRegion;
 
-    Element* element = toElement(box->node());
-    RefPtr<RenderStyle> renderBoxRegionStyle = box->view()->document()->styleSelector()->styleForElement(element, 0, false, false, this);
-    m_renderBoxRegionStyle.add(box, renderBoxRegionStyle);
+        if (child->isAnonymous())
+            styleInRegion = RenderStyle::createAnonymousStyle(object->style());
+        else if (child->isText())
+            styleInRegion = RenderStyle::clone(object->style());
+        else
+            styleInRegion = computeStyleInRegion(child);
 
-    if (!box->hasBoxDecorations()) {
-        bool hasBoxDecorations = box->isTableCell() || renderBoxRegionStyle->hasBackground() || renderBoxRegionStyle->hasBorder() || renderBoxRegionStyle->hasAppearance() || renderBoxRegionStyle->boxShadow();
-        (const_cast<RenderBox*>(box))->setHasBoxDecorations(hasBoxDecorations);
+        setObjectStyleInRegion(child, styleInRegion);
+
+        computeChildrenStyleInRegion(child);
+    }
+}
+
+void RenderRegion::setObjectStyleInRegion(RenderObject* object, PassRefPtr<RenderStyle> styleInRegion)
+{
+    RefPtr<RenderStyle> objectOriginalStyle = object->style();
+    object->setStyleInternal(styleInRegion);
+
+    if (object->isBoxModelObject() && !object->hasBoxDecorations()) {
+        bool hasBoxDecorations = object->isTableCell()
+            || object->style()->hasBackground()
+            || object->style()->hasBorder()
+            || object->style()->hasAppearance()
+            || object->style()->boxShadow();
+        object->setHasBoxDecorations(hasBoxDecorations);
     }
 
-    return renderBoxRegionStyle.release();
-}
-
-void RenderRegion::clearBoxStyleInRegion(const RenderBox* box)
-{
-    ASSERT(box);
-    m_renderBoxRegionStyle.remove(box);
+    m_renderObjectRegionStyle.set(object, objectOriginalStyle);
 }
 
 bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
@@ -342,34 +371,33 @@ bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)
     return true;
 }
 
-LayoutUnit RenderRegion::computeReplacedLogicalHeight() const
+void RenderRegion::computeLogicalHeight()
 {
-    if (!document()->cssRegionsAutoHeightEnabled()
-        || !usesAutoHeight()
-        || view()->inFirstLayoutPhaseOfRegionsAutoHeight()
-        || !isHorizontalWritingMode())
-        return RenderReplaced::computeReplacedLogicalHeight();
-    return computedAutoHeight();
+    RenderReplaced::computeLogicalHeight();
+    
+    if (document()->cssRegionsAutoHeightEnabled() && !view()->inFirstLayoutPhaseOfRegionsAutoHeight()) {
+        if (usesAutoHeight() && hasComputedAutoHeight()) {
+            LayoutUnit newLogicalHeight = computedAutoHeight() + borderAndPaddingLogicalHeight();
+            if (newLogicalHeight > logicalHeight())
+                setLogicalHeight(newLogicalHeight);
+        }
+        if (hasParentMultiColumnRegion() && parentMultiColumnRegion()->usesAutoHeight() 
+            && parentMultiColumnRegion()->hasComputedAutoHeight() 
+            && (parentMultiColumnRegion()->computedAutoHeight() > logicalHeight()))
+            setLogicalHeight(computedAutoHeight());
+    }
 }
 
-LayoutUnit RenderRegion::computeReplacedLogicalWidth(bool includeMaxWidth) const
-{
-    if (!document()->cssRegionsAutoHeightEnabled()
-        || !usesAutoHeight()
-        || view()->inFirstLayoutPhaseOfRegionsAutoHeight()
-        || isHorizontalWritingMode())
-        return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
-    return computedAutoHeight();
-}
-    
+// FIXME: adding borderAndPaddingLogicalWidth() is done for all classes at the end of computePrefferedLogicalWidths methods.
+// Probably we should implement computePrefferedLogicalWidths in RenderRegion too.
 LayoutUnit RenderRegion::minPreferredLogicalWidth() const
 {
-    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();
+    return m_flowThread ? m_flowThread->minPreferredLogicalWidth() + borderAndPaddingLogicalWidth() : RenderReplaced::minPreferredLogicalWidth();
 }
 
 LayoutUnit RenderRegion::maxPreferredLogicalWidth() const
 {
-    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() : RenderReplaced::maxPreferredLogicalWidth();
+    return m_flowThread ? m_flowThread->maxPreferredLogicalWidth() + borderAndPaddingLogicalWidth() : RenderReplaced::maxPreferredLogicalWidth();
 }
 
 } // namespace WebCore

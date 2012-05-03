@@ -82,6 +82,9 @@ class MockFileSystem(object):
             return self.normpath(path)
         return self.abspath(self.join(self.cwd, path))
 
+    def realpath(self, path):
+        return self.abspath(path)
+
     def basename(self, path):
         return self._split(path)[1]
 
@@ -129,7 +132,7 @@ class MockFileSystem(object):
         file_filter = file_filter or filter_all
         files = []
         if self.isfile(path):
-            if file_filter(self, self.dirname(path), self.basename(path)):
+            if file_filter(self, self.dirname(path), self.basename(path)) and self.files[path] is not None:
                 files.append(path)
             return files
 
@@ -149,7 +152,7 @@ class MockFileSystem(object):
                 continue
 
             dirpath, basename = self._split(filename)
-            if file_filter(self, dirpath, basename):
+            if file_filter(self, dirpath, basename) and self.files[filename] is not None:
                 files.append(filename)
 
         return files
@@ -275,7 +278,7 @@ class MockFileSystem(object):
     def normpath(self, path):
         # This function is called a lot, so we try to optimize the common cases
         # instead of always calling _slow_but_correct_normpath(), above.
-        if '..' in path:
+        if '..' in path or '/./' in path:
             # This doesn't happen very often; don't bother trying to optimize it.
             return self._slow_but_correct_normpath(path)
         if not path:

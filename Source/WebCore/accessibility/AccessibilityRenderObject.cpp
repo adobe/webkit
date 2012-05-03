@@ -491,6 +491,35 @@ bool AccessibilityRenderObject::isNativeTextControl() const
     return m_renderer->isTextControl();
 }
     
+bool AccessibilityRenderObject::isSearchField() const
+{
+    if (!node())
+        return false;
+    
+    HTMLInputElement* inputElement = node()->toInputElement();
+    if (!inputElement)
+        return false;
+
+    if (inputElement->isSearchField())
+        return true;
+
+    // Some websites don't label their search fields as such. However, they will
+    // use the word "search" in either the form or input type. This won't catch every case,
+    // but it will catch google.com for example.
+    
+    // Check the node name of the input type, sometimes it's "search".
+    const AtomicString& nameAttribute = getAttribute(nameAttr);
+    if (nameAttribute.contains("search", false))
+        return true;
+    
+    // Check the form action and the name, which will sometimes be "search".
+    HTMLFormElement* form = inputElement->form();
+    if (form && (form->name().contains("search", false) || form->action().contains("search", false)))
+        return true;
+    
+    return false;
+}
+    
 bool AccessibilityRenderObject::isNativeImage() const
 {
     return m_renderer->isBoxModelObject() && toRenderBoxModelObject(m_renderer)->isImage();
@@ -1492,12 +1521,6 @@ LayoutRect AccessibilityRenderObject::elementRect() const
         return checkboxOrRadioRect();
     
     return boundingBoxRect();
-}
-
-LayoutSize AccessibilityRenderObject::size() const
-{
-    LayoutRect rect = elementRect();
-    return rect.size();
 }
 
 IntPoint AccessibilityRenderObject::clickPoint()
@@ -2683,7 +2706,7 @@ VisiblePosition AccessibilityRenderObject::visiblePositionForPoint(const IntPoin
         HitTestRequest request(HitTestRequest::ReadOnly |
                                HitTestRequest::Active);
         HitTestResult result(ourpoint);
-        renderView->layer()->hitTest(request, result);
+        renderView->hitTest(request, result);
         innerNode = result.innerNode();
         if (!innerNode)
             return VisiblePosition();
@@ -2731,7 +2754,7 @@ VisiblePosition AccessibilityRenderObject::visiblePositionForIndex(unsigned inde
 // NOTE: Consider providing this utility method as AX API
 int AccessibilityRenderObject::index(const VisiblePosition& position) const
 {
-    if (!isTextControl())
+    if (position.isNull() || !isTextControl())
         return -1;
 
     if (renderObjectContainsPosition(m_renderer, position.deepEquivalent()))
@@ -3529,7 +3552,8 @@ void AccessibilityRenderObject::addAttachmentChildren()
     if (!axWidget->accessibilityIsIgnored())
         m_children.append(axWidget);
 }
-    
+
+#if PLATFORM(MAC)
 void AccessibilityRenderObject::updateAttachmentViewParents()
 {
     // Only the unignored parent should set the attachment parent, because that's what is reflected in the AX 
@@ -3543,7 +3567,8 @@ void AccessibilityRenderObject::updateAttachmentViewParents()
             m_children[k]->overrideAttachmentParent(this);
     }
 }
-    
+#endif
+
 void AccessibilityRenderObject::addChildren()
 {
     // If the need to add more children in addition to existing children arises, 
@@ -3581,7 +3606,10 @@ void AccessibilityRenderObject::addChildren()
     addAttachmentChildren();
     addImageMapChildren();
     addTextFieldChildren();
+
+#if PLATFORM(MAC)
     updateAttachmentViewParents();
+#endif
 }
         
 const AtomicString& AccessibilityRenderObject::ariaLiveRegionStatus() const

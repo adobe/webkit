@@ -11,10 +11,21 @@ LIST(APPEND WebCore_IDL_INCLUDES
     bindings/js
 )
 
+IF (PORT MATCHES "BlackBerry")
+    LIST(APPEND WebCore_IDL_INCLUDES
+        testing/js
+    )
+    LIST(APPEND WebCore_IDL_FILES
+        testing/Internals.idl
+        testing/InternalSettings.idl
+    )
+ENDIF ()
+
 LIST(APPEND WebCore_SOURCES
     bindings/js/CallbackFunction.cpp
     bindings/js/DOMObjectHashTableMap.cpp
     bindings/js/DOMWrapperWorld.cpp
+    bindings/js/Dictionary.cpp
     bindings/js/GCController.cpp
     bindings/js/JSArrayBufferCustom.cpp
     bindings/js/JSAttrCustom.cpp
@@ -169,7 +180,6 @@ LIST(APPEND WebCore_SOURCES
 )
 
 LIST(APPEND WebCoreTestSupport_SOURCES
-    testing/js/JSInternalsCustom.cpp
     testing/js/WebCoreTestSupport.cpp
 )
 
@@ -199,6 +209,7 @@ IF (ENABLE_INDEXED_DATABASE)
         bindings/js/IDBBindingUtilities.cpp
         bindings/js/JSIDBAnyCustom.cpp
         bindings/js/JSIDBKeyCustom.cpp
+        bindings/js/JSIDBVersionChangeRequestCustom.cpp
     )
 ENDIF ()
 
@@ -216,6 +227,16 @@ IF (ENABLE_WORKERS)
         bindings/js/JSWorkerCustom.cpp
         bindings/js/WorkerScriptController.cpp
         bindings/js/WorkerScriptDebugServer.cpp
+    )
+ENDIF ()
+
+IF (ENABLE_VIDEO_TRACK)
+    LIST(APPEND WebCore_SOURCES
+        bindings/js/JSTextTrackCueCustom.cpp
+        bindings/js/JSTextTrackCustom.cpp
+        bindings/js/JSTextTrackListCustom.cpp
+        bindings/js/JSTrackCustom.cpp
+        bindings/js/JSTrackEventCustom.cpp
     )
 ENDIF ()
 

@@ -52,7 +52,6 @@ class TextureMapper;
 // A 2D texture that can be the target of software or GL rendering.
 class BitmapTexture  : public RefCounted<BitmapTexture> {
 public:
-    enum PixelFormat { BGRAFormat, RGBAFormat, BGRFormat, RGBFormat };
     enum Flag {
         SupportsAlpha = 0x01
     };
@@ -65,10 +64,11 @@ public:
     }
 
     virtual ~BitmapTexture() { }
+    virtual bool isBackedByOpenGL() const { return false; }
 
     virtual IntSize size() const = 0;
-    virtual void updateContents(Image*, const IntRect&, const IntRect&, BitmapTexture::PixelFormat) = 0;
-    virtual void updateContents(const void*, const IntRect&) = 0;
+    virtual void updateContents(Image*, const IntRect&, const IntPoint& offset) = 0;
+    virtual void updateContents(const void*, const IntRect& target, const IntPoint& offset, int bytesPerLine) = 0;
     virtual bool isValid() const = 0;
     inline Flags flags() const { return m_flags; }
 
@@ -104,6 +104,11 @@ class TextureMapper {
 
 public:
     enum AccelerationMode { SoftwareMode, OpenGLMode };
+    enum PaintFlag {
+        PaintingMirrored = 1 << 0,
+    };
+    typedef unsigned PaintFlags;
+
     static PassOwnPtr<TextureMapper> create(AccelerationMode newMode = SoftwareMode);
     virtual ~TextureMapper() { }
 
@@ -124,7 +129,7 @@ public:
     TextDrawingModeFlags textDrawingMode() const { return m_textDrawingMode; }
     virtual AccelerationMode accelerationMode() const = 0;
 
-    virtual void beginPainting() { }
+    virtual void beginPainting(PaintFlags flags = 0) { }
     virtual void endPainting() { }
 
     virtual IntSize maxTextureSize() const { return IntSize(INT_MAX, INT_MAX); }

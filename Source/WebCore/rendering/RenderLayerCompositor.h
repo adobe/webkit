@@ -32,8 +32,6 @@
 
 namespace WebCore {
 
-#define PROFILE_LAYER_REBUILD 0
-
 class GraphicsLayer;
 class RenderEmbeddedObject;
 class RenderPart;
@@ -43,7 +41,8 @@ class RenderVideo;
 #endif
 
 enum CompositingUpdateType {
-    CompositingUpdateAfterLayoutOrStyleChange,
+    CompositingUpdateAfterStyleChange,
+    CompositingUpdateAfterLayout,
     CompositingUpdateOnHitTest,
     CompositingUpdateOnScroll
 };
@@ -66,7 +65,9 @@ public:
     // This will make a compositing layer at the root automatically, and hook up to
     // the native view/window system.
     void enableCompositingMode(bool enable = true);
-    
+
+    bool inForcedCompositingMode() const { return m_forceCompositingMode; }
+
     // Returns true if the accelerated compositing is enabled
     bool hasAcceleratedCompositing() const { return m_hasAcceleratedCompositing; }
 
@@ -98,7 +99,7 @@ public:
     void didFlushChangesForLayer(RenderLayer*);
     
     // Rebuild the tree of compositing layers
-    void updateCompositingLayers(CompositingUpdateType = CompositingUpdateAfterLayoutOrStyleChange, RenderLayer* updateRoot = 0);
+    void updateCompositingLayers(CompositingUpdateType, RenderLayer* updateRoot = 0);
     // This is only used when state changes and we do not exepect a style update or layout to happen soon (e.g. when
     // we discover that an iframe is overlapped during painting).
     void scheduleCompositingLayerUpdate();
@@ -133,6 +134,9 @@ public:
 
     // Repaint parts of all composited layers that intersect the given absolute rectangle.
     void repaintCompositedLayersAbsoluteRect(const IntRect&);
+
+    // Returns true if the given layer needs it own backing store.
+    bool requiresOwnBackingStore(const RenderLayer*, const RenderLayer* compositingAncestorLayer) const;
 
     RenderLayer* rootRenderLayer() const;
     GraphicsLayer* rootGraphicsLayer() const;
@@ -245,10 +249,10 @@ private:
     void computeCompositingRequirements(RenderLayer*, OverlapMap*, struct CompositingState&, bool& layersChanged);
     
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
-    void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer);
+    void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);
 
     // Recurses down the tree, updating layer geometry only.
-    void updateLayerTreeGeometry(RenderLayer*);
+    void updateLayerTreeGeometry(RenderLayer*, int depth);
     
     // Hook compositing layers together
     void setCompositingParent(RenderLayer* childLayer, RenderLayer* parentLayer);
@@ -297,6 +301,11 @@ private:
     bool requiresContentShadowLayer() const;
 #endif
 
+#if !LOG_DISABLED
+    const char* reasonForCompositing(const RenderLayer*);
+    void logLayerInfo(const RenderLayer*, int depth);
+#endif
+
 private:
     RenderView* m_renderView;
     OwnPtr<GraphicsLayer> m_rootContentLayer;
@@ -313,10 +322,7 @@ private:
 
     // When true, we have to wait until layout has happened before we can decide whether to enter compositing mode,
     // because only then do we know the final size of plugins and iframes.
-    // FIXME: once set, this is never cleared.
-    mutable bool m_compositingDependsOnGeometry;
-
-    mutable bool m_compositingNeedsUpdate;
+    mutable bool m_reevaluateCompositingAfterLayout;
 
     bool m_compositing;
     bool m_compositingLayersNeedRebuild;
@@ -340,8 +346,13 @@ private:
     OwnPtr<GraphicsLayer> m_layerForOverhangAreas;
     OwnPtr<GraphicsLayer> m_contentShadowLayer;
 #endif
-#if PROFILE_LAYER_REBUILD
+
+#if !LOG_DISABLED
     int m_rootLayerUpdateCount;
+    int m_obligateCompositedLayerCount; // count of layer that have to be composited.
+    int m_secondaryCompositedLayerCount; // count of layers that have to be composited because of stacking or overlap.
+    double m_obligatoryBackingAreaMegaPixels;
+    double m_secondaryBackingAreaMegaPixels;
 #endif
 };
 

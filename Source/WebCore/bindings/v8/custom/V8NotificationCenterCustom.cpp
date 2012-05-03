@@ -49,7 +49,7 @@ namespace WebCore {
 
 v8::Handle<v8::Value> V8NotificationCenter::createHTMLNotificationCallback(const v8::Arguments& args)
 {
-    INC_STATS(L"DOM.NotificationCenter.CreateHTMLNotification()");
+    INC_STATS("DOM.NotificationCenter.CreateHTMLNotification()");
     NotificationCenter* notificationCenter = V8NotificationCenter::toNative(args.Holder());
 
     ExceptionCode ec = 0;
@@ -60,12 +60,12 @@ v8::Handle<v8::Value> V8NotificationCenter::createHTMLNotificationCallback(const
         return throwError(ec);
 
     notification->ref();
-    return toV8(notification.get());
+    return toV8(notification.get(), args.GetIsolate());
 }
 
 v8::Handle<v8::Value> V8NotificationCenter::createNotificationCallback(const v8::Arguments& args)
 {
-    INC_STATS(L"DOM.NotificationCenter.CreateNotification()");
+    INC_STATS("DOM.NotificationCenter.CreateNotification()");
     NotificationCenter* notificationCenter = V8NotificationCenter::toNative(args.Holder());
 
     ExceptionCode ec = 0;
@@ -75,12 +75,12 @@ v8::Handle<v8::Value> V8NotificationCenter::createNotificationCallback(const v8:
         return throwError(ec);
 
     notification->ref();
-    return toV8(notification.get());
+    return toV8(notification.get(), args.GetIsolate());
 }
 
 v8::Handle<v8::Value> V8NotificationCenter::requestPermissionCallback(const v8::Arguments& args)
 {
-    INC_STATS(L"DOM.NotificationCenter.RequestPermission()");
+    INC_STATS("DOM.NotificationCenter.RequestPermission()");
     NotificationCenter* notificationCenter = V8NotificationCenter::toNative(args.Holder());
     ScriptExecutionContext* context = notificationCenter->scriptExecutionContext();
 

@@ -44,11 +44,41 @@ public:
     virtual const char* renderName() const;
     
     virtual bool canHaveChildren() const { return false; }
+    
+    unsigned columnCount() const { return m_columnCount; }
+    
+    bool hasAutoHeightStyle() const;
+    
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
+    
+    bool usesAutoHeight() const { return m_usesAutoHeight; }
+
+    bool hasComputedAutoHeight() const { return document()->cssRegionsAutoHeightEnabled() && m_hasComputedAutoHeight; }
+    LayoutUnit computedAutoHeight() const { return m_computedAutoHeight; }
+    void setComputedAutoHeight(LayoutUnit computedAutoHeight);
+    
+    void resetComputedAutoHeight() {
+        ASSERT(document()->cssRegionsAutoHeightEnabled());
+        m_computedAutoHeight = 0;
+        m_hasComputedAutoHeight = false;
+    }
+    
+    virtual void computeLogicalHeight();
+    
+    virtual LayoutUnit minPreferredLogicalWidth() const;
+    virtual LayoutUnit maxPreferredLogicalWidth() const;
+    
+    virtual bool isRenderRegionMultiColumn() const { return true; }
 private:
     void updateColumnCount(unsigned newColumnCount);
     
     RenderFlowThread* m_flowThread;
     unsigned m_columnCount;
+
+    // Store the computed region autoheight
+    LayoutUnit m_computedAutoHeight;
+    bool m_hasComputedAutoHeight;
+    bool m_usesAutoHeight;
 };
 
 }

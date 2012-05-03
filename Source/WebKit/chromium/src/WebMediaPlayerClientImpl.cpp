@@ -16,16 +16,14 @@
 #include "KURL.h"
 #include "MediaPlayer.h"
 #include "NotImplemented.h"
+#include "PlatformContextSkia.h"
 #include "RenderView.h"
 #include "TimeRanges.h"
-#include "VideoFrameChromium.h"
-#include "VideoFrameChromiumImpl.h"
 #include "VideoLayerChromium.h"
 #include "WebAudioSourceProvider.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebKit.h"
-#include "WebMediaElement.h"
 #include "WebMediaPlayer.h"
 #include "WebViewImpl.h"
 #include "cc/CCProxy.h"
@@ -40,11 +38,6 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
-#endif
-
-// WebCommon.h defines WEBKIT_USING_SKIA so this has to be included last.
-#if WEBKIT_USING_SKIA
-#include "PlatformContextSkia.h"
 #endif
 
 #include <wtf/Assertions.h>
@@ -87,12 +80,6 @@ void WebMediaPlayerClientImpl::registerSelf(MediaEngineRegistrar registrar)
     }
 }
 
-WebMediaPlayerClientImpl* WebMediaPlayerClientImpl::fromMediaElement(const WebMediaElement* element)
-{
-    PlatformMedia pm = element->constUnwrap<HTMLMediaElement>()->platformMedia();
-    return static_cast<WebMediaPlayerClientImpl*>(pm.media.chromiumMediaPlayer);
-}
-
 WebMediaPlayer* WebMediaPlayerClientImpl::mediaPlayer() const
 {
     return m_webMediaPlayer.get();
@@ -122,9 +109,9 @@ void WebMediaPlayerClientImpl::readyStateChanged()
     ASSERT(m_mediaPlayer);
     m_mediaPlayer->readyStateChanged();
 #if USE(ACCELERATED_COMPOSITING)
-    if (hasVideo() && supportsAcceleratedRendering() && !m_videoLayer) {
-        m_videoLayer = VideoLayerChromium::create(this);
-        m_videoLayer->setOpaque(m_opaque);
+    if (hasVideo() && supportsAcceleratedRendering() && m_videoLayer.isNull()) {
+        m_videoLayer = WebVideoLayer::create(this);
+        m_videoLayer.setOpaque(m_opaque);
     }
 #endif
 }
@@ -151,8 +138,8 @@ void WebMediaPlayerClientImpl::repaint()
 {
     ASSERT(m_mediaPlayer);
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_videoLayer && supportsAcceleratedRendering())
-        m_videoLayer->setNeedsDisplay();
+    if (!m_videoLayer.isNull() && supportsAcceleratedRendering())
+        m_videoLayer.invalidate();
 #endif
     m_mediaPlayer->repaint();
 }
@@ -179,8 +166,8 @@ void WebMediaPlayerClientImpl::setOpaque(bool opaque)
 {
 #if USE(ACCELERATED_COMPOSITING)
     m_opaque = opaque;
-    if (m_videoLayer)
-        m_videoLayer->setOpaque(m_opaque);
+    if (!m_videoLayer.isNull())
+        m_videoLayer.setOpaque(m_opaque);
 #endif
 }
 
@@ -225,6 +212,56 @@ WebKit::WebURL WebMediaPlayerClientImpl::sourceURL() const
     return KURL(ParsedURLString, m_mediaPlayer->sourceURL());
 #else
     return KURL();
+#endif
+}
+
+void WebMediaPlayerClientImpl::keyAdded(const WebString& keySystem, const WebString& sessionId)
+{
+#if ENABLE(ENCRYPTED_MEDIA)
+    ASSERT(m_mediaPlayer);
+    m_mediaPlayer->keyAdded(keySystem, sessionId);
+#else
+    UNUSED_PARAM(keySystem);
+    UNUSED_PARAM(sessionId);
+#endif
+}
+
+void WebMediaPlayerClientImpl::keyError(const WebString& keySystem, const WebString& sessionId, MediaKeyErrorCode errorCode, unsigned short systemCode)
+{
+#if ENABLE(ENCRYPTED_MEDIA)
+    ASSERT(m_mediaPlayer);
+    m_mediaPlayer->keyError(keySystem, sessionId, static_cast<MediaPlayerClient::MediaKeyErrorCode>(errorCode), systemCode);
+#else
+    UNUSED_PARAM(keySystem);
+    UNUSED_PARAM(sessionId);
+    UNUSED_PARAM(errorCode);
+    UNUSED_PARAM(systemCode);
+#endif
+}
+
+void WebMediaPlayerClientImpl::keyMessage(const WebString& keySystem, const WebString& sessionId, const unsigned char* message, unsigned messageLength)
+{
+#if ENABLE(ENCRYPTED_MEDIA)
+    ASSERT(m_mediaPlayer);
+    m_mediaPlayer->keyMessage(keySystem, sessionId, message, messageLength);
+#else
+    UNUSED_PARAM(keySystem);
+    UNUSED_PARAM(sessionId);
+    UNUSED_PARAM(message);
+    UNUSED_PARAM(messageLength);
+#endif
+}
+
+void WebMediaPlayerClientImpl::keyNeeded(const WebString& keySystem, const WebString& sessionId, const unsigned char* initData, unsigned initDataLength)
+{
+#if ENABLE(ENCRYPTED_MEDIA)
+    ASSERT(m_mediaPlayer);
+    m_mediaPlayer->keyNeeded(keySystem, sessionId, initData, initDataLength);
+#else
+    UNUSED_PARAM(keySystem);
+    UNUSED_PARAM(sessionId);
+    UNUSED_PARAM(initData);
+    UNUSED_PARAM(initDataLength);
 #endif
 }
 
@@ -278,7 +315,7 @@ void WebMediaPlayerClientImpl::cancelLoad()
 PlatformLayer* WebMediaPlayerClientImpl::platformLayer() const
 {
     ASSERT(m_supportsAcceleratedCompositing);
-    return m_videoLayer.get();
+    return m_videoLayer.unwrap<VideoLayerChromium>();
 }
 #endif
 
@@ -303,6 +340,22 @@ void WebMediaPlayerClientImpl::pause()
 }
 
 #if ENABLE(MEDIA_SOURCE)
+WebCore::MediaPlayer::AddIdStatus WebMediaPlayerClientImpl::sourceAddId(const String& id, const String& type)
+{
+    if (!m_webMediaPlayer)
+        return WebCore::MediaPlayer::NotSupported;
+
+    return static_cast<WebCore::MediaPlayer::AddIdStatus>(m_webMediaPlayer->sourceAddId(id, type));
+}
+
+bool WebMediaPlayerClientImpl::sourceRemoveId(const String& id)
+{
+    if (!m_webMediaPlayer)
+        return false;
+
+    return m_webMediaPlayer->sourceRemoveId(id);
+}
+
 bool WebMediaPlayerClientImpl::sourceAppend(const unsigned char* data, unsigned length)
 {
     if (m_webMediaPlayer)
@@ -314,6 +367,35 @@ void WebMediaPlayerClientImpl::sourceEndOfStream(WebCore::MediaPlayer::EndOfStre
 {
     if (m_webMediaPlayer)
         m_webMediaPlayer->sourceEndOfStream(static_cast<WebMediaPlayer::EndOfStreamStatus>(status));
+}
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA)
+MediaPlayer::MediaKeyException WebMediaPlayerClientImpl::generateKeyRequest(const String& keySystem, const unsigned char* initData, unsigned initDataLength)
+{
+    if (!m_webMediaPlayer)
+        return MediaPlayer::InvalidPlayerState;
+
+    WebMediaPlayer::MediaKeyException result = m_webMediaPlayer->generateKeyRequest(keySystem, initData, initDataLength);
+    return static_cast<MediaPlayer::MediaKeyException>(result);
+}
+
+MediaPlayer::MediaKeyException WebMediaPlayerClientImpl::addKey(const String& keySystem, const unsigned char* key, unsigned keyLength, const unsigned char* initData, unsigned initDataLength, const String& sessionId)
+{
+    if (!m_webMediaPlayer)
+        return MediaPlayer::InvalidPlayerState;
+
+    WebMediaPlayer::MediaKeyException result = m_webMediaPlayer->addKey(keySystem, key, keyLength, initData, initDataLength, sessionId);
+    return static_cast<MediaPlayer::MediaKeyException>(result);
+}
+
+MediaPlayer::MediaKeyException WebMediaPlayerClientImpl::cancelKeyRequest(const String& keySystem, const String& sessionId)
+{
+    if (!m_webMediaPlayer)
+        return MediaPlayer::InvalidPlayerState;
+
+    WebMediaPlayer::MediaKeyException result = m_webMediaPlayer->cancelKeyRequest(keySystem, sessionId);
+    return static_cast<MediaPlayer::MediaKeyException>(result);
 }
 #endif
 
@@ -502,20 +584,9 @@ void WebMediaPlayerClientImpl::paintCurrentFrameInContext(GraphicsContext* conte
     // Since we're accessing platformContext() directly we have to manually
     // check.
     if (m_webMediaPlayer && !context->paintingDisabled()) {
-#if WEBKIT_USING_SKIA
         PlatformGraphicsContext* platformContext = context->platformContext();
         WebCanvas* canvas = platformContext->canvas();
-
-        canvas->saveLayerAlpha(0, platformContext->getNormalizedAlpha());
-
-        m_webMediaPlayer->paint(canvas, rect);
-
-        canvas->restore();
-#elif WEBKIT_USING_CG
-        m_webMediaPlayer->paint(context->platformContext(), rect);
-#else
-        notImplemented();
-#endif
+        m_webMediaPlayer->paint(canvas, rect, platformContext->getNormalizedAlpha());
     }
 }
 
@@ -595,10 +666,10 @@ bool WebMediaPlayerClientImpl::supportsAcceleratedRendering() const
 
 bool WebMediaPlayerClientImpl::acceleratedRenderingInUse()
 {
-    return m_videoLayer && m_videoLayer->layerTreeHost();
+    return !m_videoLayer.isNull() && m_videoLayer.active();
 }
 
-void WebMediaPlayerClientImpl::setVideoFrameProviderClient(VideoFrameProvider::Client* client)
+void WebMediaPlayerClientImpl::setVideoFrameProviderClient(WebVideoFrameProvider::Client* client)
 {
     MutexLocker locker(m_compositingMutex);
     m_videoFrameProviderClient = client;
@@ -606,29 +677,24 @@ void WebMediaPlayerClientImpl::setVideoFrameProviderClient(VideoFrameProvider::C
         m_webMediaPlayer->setStreamTextureClient(client ? this : 0);
 }
 
-VideoFrameChromium* WebMediaPlayerClientImpl::getCurrentFrame()
+WebVideoFrame* WebMediaPlayerClientImpl::getCurrentFrame()
 {
     MutexLocker locker(m_compositingMutex);
     ASSERT(!m_currentVideoFrame);
-    if (m_webMediaPlayer) {
-        WebVideoFrame* webkitVideoFrame = m_webMediaPlayer->getCurrentFrame();
-        if (webkitVideoFrame)
-            m_currentVideoFrame = adoptPtr(new VideoFrameChromiumImpl(webkitVideoFrame));
-    }
-    return m_currentVideoFrame.get();
+    if (m_webMediaPlayer)
+        m_currentVideoFrame = m_webMediaPlayer->getCurrentFrame();
+    return m_currentVideoFrame;
 }
 
-void WebMediaPlayerClientImpl::putCurrentFrame(VideoFrameChromium* videoFrame)
+void WebMediaPlayerClientImpl::putCurrentFrame(WebVideoFrame* videoFrame)
 {
     MutexLocker locker(m_compositingMutex);
     ASSERT(videoFrame == m_currentVideoFrame);
     if (!videoFrame)
         return;
-    if (m_webMediaPlayer) {
-        m_webMediaPlayer->putCurrentFrame(
-            VideoFrameChromiumImpl::toWebVideoFrame(videoFrame));
-    }
-    m_currentVideoFrame.clear();
+    if (m_webMediaPlayer)
+        m_webMediaPlayer->putCurrentFrame(videoFrame);
+    m_currentVideoFrame = 0;
 }
 #endif
 
@@ -658,10 +724,18 @@ void WebMediaPlayerClientImpl::getSupportedTypes(HashSet<String>& supportedTypes
     notImplemented();
 }
 
+#if ENABLE(ENCRYPTED_MEDIA)
+MediaPlayer::SupportsType WebMediaPlayerClientImpl::supportsType(const String& type,
+                                                                 const String& codecs,
+                                                                 const String& keySystem)
+{
+#else
 MediaPlayer::SupportsType WebMediaPlayerClientImpl::supportsType(const String& type,
                                                                  const String& codecs)
 {
-    WebMimeRegistry::SupportsType supportsType = webKitPlatformSupport()->mimeRegistry()->supportsMediaMIMEType(type, codecs);
+    String keySystem;
+#endif
+    WebMimeRegistry::SupportsType supportsType = webKitPlatformSupport()->mimeRegistry()->supportsMediaMIMEType(type, codecs, keySystem);
 
     switch (supportsType) {
     default:
@@ -702,10 +776,10 @@ void WebMediaPlayerClientImpl::didUpdateMatrix(const float* matrix)
 
 WebMediaPlayerClientImpl::WebMediaPlayerClientImpl()
     : m_mediaPlayer(0)
+    , m_currentVideoFrame(0)
     , m_delayingLoad(false)
     , m_preload(MediaPlayer::MetaData)
 #if USE(ACCELERATED_COMPOSITING)
-    , m_videoLayer(0)
     , m_supportsAcceleratedCompositing(false)
     , m_opaque(false)
     , m_videoFrameProviderClient(0)

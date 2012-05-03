@@ -980,7 +980,8 @@ struct CursorOptions {
 class CursorImplCommon : public IDBBackingStore::Cursor {
 public:
     // IDBBackingStore::Cursor
-    virtual bool continueFunction(const IDBKey*);
+    virtual bool advance(unsigned long);
+    virtual bool continueFunction(const IDBKey* = 0, IteratorState = Seek);
     virtual PassRefPtr<IDBKey> key() { return m_currentKey; }
     virtual PassRefPtr<IDBKey> primaryKey() { return m_currentKey; }
     virtual String value() = 0;
@@ -1015,6 +1016,9 @@ protected:
 
     virtual ~CursorImplCommon() {}
 
+    bool isPastBounds() const;
+    bool haveEnteredRange() const;
+
     LevelDBTransaction* m_transaction;
     CursorOptions m_cursorOptions;
     OwnPtr<LevelDBIterator> m_iterator;
@@ -1024,84 +1028,75 @@ protected:
 bool CursorImplCommon::firstSeek()
 {
     m_iterator = m_transaction->createIterator();
-
     if (m_cursorOptions.forward)
         m_iterator->seek(m_cursorOptions.lowKey);
     else
         m_iterator->seek(m_cursorOptions.highKey);
 
+    return continueFunction(0, Ready);
+}
+
+bool CursorImplCommon::advance(unsigned long count)
+{
+    while (count--) {
+        if (!continueFunction())
+            return false;
+    }
+    return true;
+}
+
+bool CursorImplCommon::continueFunction(const IDBKey* key, IteratorState nextState)
+{
+    RefPtr<IDBKey> previousKey = m_currentKey;
+
+    // When iterating with PREV_NO_DUPLICATE, spec requires that the
+    // value we yield for each key is the first duplicate in forwards
+    // order.
+    RefPtr<IDBKey> lastDuplicateKey;
+
+    bool forward = m_cursorOptions.forward;
+
     for (;;) {
-        if (!m_iterator->isValid())
-            return false;
-
-        if (m_cursorOptions.forward && m_cursorOptions.highOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) >= 0)
-            return false;
-        if (m_cursorOptions.forward && !m_cursorOptions.highOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) > 0)
-            return false;
-        if (!m_cursorOptions.forward && m_cursorOptions.lowOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) <= 0)
-            return false;
-        if (!m_cursorOptions.forward && !m_cursorOptions.lowOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) < 0)
-            return false;
-
-        if (m_cursorOptions.forward && m_cursorOptions.lowOpen) {
-            // lowKey not included in the range.
-            if (compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) <= 0) {
-                m_iterator->next();
-                continue;
-            }
-        }
-        if (!m_cursorOptions.forward && m_cursorOptions.highOpen) {
-            // highKey not included in the range.
-            if (compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) >= 0) {
-                m_iterator->prev();
-                continue;
-            }
-        }
-
-        if (!loadCurrentRow()) {
-            if (m_cursorOptions.forward)
+        if (nextState == Seek) {
+            if (forward)
                 m_iterator->next();
             else
                 m_iterator->prev();
-            continue;
+        } else
+            nextState = Seek; // for subsequent iterations
+
+        if (!m_iterator->isValid()) {
+            if (!forward && lastDuplicateKey.get()) {
+                // We need to walk forward because we hit the end of
+                // the data.
+                forward = true;
+                continue;
+            }
+
+            return false;
         }
 
-        return true;
-    }
-}
+        if (isPastBounds()) {
+            if (!forward && lastDuplicateKey.get()) {
+                // We need to walk forward because now we're beyond the
+                // bounds defined by the cursor.
+                forward = true;
+                continue;
+            }
 
-bool CursorImplCommon::continueFunction(const IDBKey* key)
-{
-    // FIXME: This shares a lot of code with firstSeek.
-    RefPtr<IDBKey> previousKey = m_currentKey;
-
-    for (;;) {
-        if (m_cursorOptions.forward)
-            m_iterator->next();
-        else
-            m_iterator->prev();
-
-        if (!m_iterator->isValid())
             return false;
+        }
 
-        Vector<char> trash;
-        if (!m_transaction->get(m_iterator->key(), trash))
-             continue;
+        if (!haveEnteredRange())
+            continue;
 
-        if (m_cursorOptions.forward && m_cursorOptions.highOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) >= 0) // high key not included in range
-            return false;
-        if (m_cursorOptions.forward && !m_cursorOptions.highOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) > 0)
-            return false;
-        if (!m_cursorOptions.forward && m_cursorOptions.lowOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) <= 0) // low key not included in range
-            return false;
-        if (!m_cursorOptions.forward && !m_cursorOptions.lowOpen && compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) < 0)
-            return false;
-
+        // The row may not load because there's a stale entry in the
+        // index. This is not fatal.
         if (!loadCurrentRow())
             continue;
 
         if (key) {
-            if (m_cursorOptions.forward) {
+            if (forward) {
                 if (m_currentKey->isLessThan(key))
                     continue;
             } else {
@@ -1110,13 +1105,63 @@ bool CursorImplCommon::continueFunction(const IDBKey* key)
             }
         }
 
-        if (m_cursorOptions.unique && m_currentKey->isEqual(previousKey.get()))
-            continue;
+        if (m_cursorOptions.unique) {
 
+            if (m_currentKey->isEqual(previousKey.get())) {
+                // We should never be able to walk forward all the way
+                // to the previous key.
+                ASSERT(!lastDuplicateKey.get());
+                continue;
+            }
+
+            if (!forward) {
+                if (!lastDuplicateKey.get()) {
+                    lastDuplicateKey = m_currentKey;
+                    continue;
+                }
+
+                // We need to walk forward because we hit the boundary
+                // between key ranges.
+                if (!lastDuplicateKey->isEqual(m_currentKey.get())) {
+                    forward = true;
+                    continue;
+                }
+
+                continue;
+            }
+        }
         break;
     }
 
+    ASSERT(!lastDuplicateKey.get() || (forward && lastDuplicateKey->isEqual(m_currentKey.get())));
     return true;
+}
+
+bool CursorImplCommon::haveEnteredRange() const
+{
+    if (m_cursorOptions.forward) {
+        if (m_cursorOptions.lowOpen)
+            return compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) > 0;
+
+        return compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) >= 0;
+    }
+    if (m_cursorOptions.highOpen)
+        return compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) < 0;
+
+    return compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) <= 0;
+}
+
+bool CursorImplCommon::isPastBounds() const
+{
+    if (m_cursorOptions.forward) {
+        if (m_cursorOptions.highOpen)
+            return compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) >= 0;
+        return compareIndexKeys(m_iterator->key(), m_cursorOptions.highKey) > 0;
+    }
+
+    if (m_cursorOptions.lowOpen)
+        return compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) <= 0;
+    return compareIndexKeys(m_iterator->key(), m_cursorOptions.lowKey) < 0;
 }
 
 class ObjectStoreCursorImpl : public CursorImplCommon {

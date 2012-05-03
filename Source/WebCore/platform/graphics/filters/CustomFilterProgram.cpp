@@ -80,13 +80,5 @@ void CustomFilterProgram::notifyClients()
         iter->first->notifyCustomFilterProgramLoaded(this);
 }
 
-#if ENABLE(WEBGL)
-PassRefPtr<CustomFilterShader> CustomFilterProgram::createShaderWithContext(GraphicsContext3D* context)
-{
-    ASSERT(isLoaded());
-    return CustomFilterShader::create(context, vertexShaderString(), fragmentShaderString());
-}
-#endif
-
 } // namespace WebCore
 #endif // ENABLE(CSS_SHADERS)

@@ -29,11 +29,11 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
+#include "DFGArgumentPosition.h"
 #include "DFGAssemblyHelpers.h"
 #include "DFGBasicBlock.h"
 #include "DFGNode.h"
 #include "MethodOfGettingAValueProfile.h"
-#include "PredictionTracker.h"
 #include "RegisterFile.h"
 #include <wtf/BitVector.h>
 #include <wtf/HashMap.h>
@@ -147,16 +147,6 @@ public:
 
     BlockIndex blockIndexForBytecodeOffset(Vector<BlockIndex>& blocks, unsigned bytecodeBegin);
 
-    bool predictGlobalVar(unsigned varNumber, PredictedType prediction)
-    {
-        return m_predictions.predictGlobalVar(varNumber, prediction);
-    }
-    
-    PredictedType getGlobalVarPrediction(unsigned varNumber)
-    {
-        return m_predictions.getGlobalVarPrediction(varNumber);
-    }
-    
     PredictedType getJSConstantPrediction(Node& node)
     {
         return predictionFromValue(node.valueOfJSConstant(m_codeBlock));
@@ -356,6 +346,7 @@ public:
     Vector<ResolveGlobalData> m_resolveGlobalData;
     Vector<NodeIndex, 8> m_arguments;
     SegmentedVector<VariableAccessData, 16> m_variableAccessData;
+    SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     SegmentedVector<StructureSet, 16> m_structureSet;
     SegmentedVector<StructureTransitionData, 8> m_structureTransitionData;
     BitVector m_preservedVars;
@@ -388,8 +379,6 @@ private:
     // When a node's refCount goes from 0 to 1, it must (logically) recursively ref all of its children, and vice versa.
     void refChildren(NodeIndex);
     void derefChildren(NodeIndex);
-
-    PredictionTracker m_predictions;
 };
 
 class GetBytecodeBeginForBlock {

@@ -57,7 +57,8 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
         SerializedScriptValue::create(args[0],
                                       &ports,
                                       extendedTransfer ? &arrayBuffers : 0,
-                                      didThrow);
+                                      didThrow,
+                                      args.GetIsolate());
     if (didThrow)
         return v8::Undefined();
     ExceptionCode ec = 0;
@@ -67,13 +68,13 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
 
 v8::Handle<v8::Value> V8DedicatedWorkerContext::postMessageCallback(const v8::Arguments& args)
 {
-    INC_STATS(L"DOM.DedicatedWorkerContext.postMessage");
+    INC_STATS("DOM.DedicatedWorkerContext.postMessage");
     return handlePostMessageCallback(args, false);
 }
 
 v8::Handle<v8::Value> V8DedicatedWorkerContext::webkitPostMessageCallback(const v8::Arguments& args)
 {
-    INC_STATS(L"DOM.DedicatedWorkerContext.postMessage");
+    INC_STATS("DOM.DedicatedWorkerContext.postMessage");
     return handlePostMessageCallback(args, true);
 }
 

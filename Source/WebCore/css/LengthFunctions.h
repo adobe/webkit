@@ -24,14 +24,19 @@
 #ifndef LengthFunctions_h
 #define LengthFunctions_h
 
+#include "LayoutTypes.h"
+
 namespace WebCore {
 
+class RenderView;
 struct Length;
 
-int miminumValueForLength(Length, int maximumValue, bool roundPercentages = false);
-int valueForLength(Length, int maximumValue, bool roundPercentages = false);
-float floatValueForLength(Length, int maximumValue);
-float floatValueForLength(Length, float maximumValue);
+int minimumIntValueForLength(const Length&, LayoutUnit maximumValue, RenderView* = 0, bool roundPercentages = false);
+int intValueForLength(const Length&, LayoutUnit maximumValue, RenderView* = 0, bool roundPercentages = false);
+LayoutUnit minimumValueForLength(const Length&, LayoutUnit maximumValue, RenderView* = 0, bool roundPercentages = false);
+LayoutUnit valueForLength(const Length&, LayoutUnit maximumValue, RenderView* = 0, bool roundPercentages = false);
+float floatValueForLength(const Length&, LayoutUnit maximumValue, RenderView* = 0);
+float floatValueForLength(const Length&, float maximumValue, RenderView* = 0);
 
 } // namespace WebCore
 

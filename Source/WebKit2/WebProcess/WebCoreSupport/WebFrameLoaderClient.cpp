@@ -28,6 +28,9 @@
 
 #include "AuthenticationManager.h"
 #include "DataReference.h"
+#include "InjectedBundle.h"
+#include "InjectedBundleBackForwardListItem.h"
+#include "InjectedBundleDOMWindowExtension.h"
 #include "InjectedBundleNavigationAction.h"
 #include "InjectedBundleUserMessageCoders.h"
 #include "PlatformCertificateInfo.h"
@@ -77,6 +80,7 @@ WebFrameLoaderClient::WebFrameLoaderClient(WebFrame* frame)
     : m_frame(frame)
     , m_hasSentResponseToPluginView(false)
     , m_frameHasCustomRepresentation(false)
+    , m_frameCameFromPageCache(false)
 {
 }
 
@@ -740,7 +744,7 @@ void WebFrameLoaderClient::dispatchWillSubmitForm(FramePolicyFunction function, 
     RefPtr<FormState> formState = prpFormState;
     
     HTMLFormElement* form = formState->form();
-    WebFrame* sourceFrame = static_cast<WebFrameLoaderClient*>(formState->sourceFrame()->loader()->client())->webFrame();    
+    WebFrame* sourceFrame = static_cast<WebFrameLoaderClient*>(formState->sourceDocument()->frame()->loader()->client())->webFrame();
     const Vector<std::pair<String, String> >& values = formState->textFieldValues();
 
     RefPtr<APIObject> userData;
@@ -751,11 +755,6 @@ void WebFrameLoaderClient::dispatchWillSubmitForm(FramePolicyFunction function, 
     StringPairVector valuesVector(values);
 
     webPage->send(Messages::WebPageProxy::WillSubmitForm(m_frame->frameID(), sourceFrame->frameID(), valuesVector, listenerID, InjectedBundleUserMessageEncoder(userData.get())));
-}
-
-void WebFrameLoaderClient::dispatchDidLoadMainResource(DocumentLoader*)
-{
-    notImplemented();
 }
 
 void WebFrameLoaderClient::revertToProvisionalState(DocumentLoader*)
@@ -935,13 +934,20 @@ bool WebFrameLoaderClient::shouldGoToHistoryItem(HistoryItem* item) const
         ASSERT_NOT_REACHED();
         return false;
     }
+
+    RefPtr<InjectedBundleBackForwardListItem> bundleItem = InjectedBundleBackForwardListItem::create(item);
+    RefPtr<APIObject> userData;
+
+    // Ask the bundle client first
+    bool shouldGoToBackForwardListItem = webPage->injectedBundleLoaderClient().shouldGoToBackForwardListItem(webPage, bundleItem.get(), userData);
+    if (!shouldGoToBackForwardListItem)
+        return false;
     
     if (webPage->willGoToBackForwardItemCallbackEnabled()) {
-        webPage->send(Messages::WebPageProxy::WillGoToBackForwardListItem(itemID));
+        webPage->send(Messages::WebPageProxy::WillGoToBackForwardListItem(itemID, InjectedBundleUserMessageEncoder(userData.get())));
         return true;
     }
     
-    bool shouldGoToBackForwardListItem;
     if (!webPage->sendSync(Messages::WebPageProxy::ShouldGoToBackForwardListItem(itemID), Messages::WebPageProxy::ShouldGoToBackForwardListItem::Reply(shouldGoToBackForwardListItem)))
         return false;
     
@@ -1162,6 +1168,7 @@ void WebFrameLoaderClient::transitionToCommittedFromCachedFrame(CachedFrame*)
     
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
     m_frameHasCustomRepresentation = isMainFrame && WebProcess::shared().shouldUseCustomRepresentationForResponse(response);
+    m_frameCameFromPageCache = true;
 }
 
 void WebFrameLoaderClient::transitionToCommittedForNewPage()
@@ -1172,10 +1179,9 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     bool isMainFrame = webPage->mainWebFrame() == m_frame;
     bool shouldUseFixedLayout = isMainFrame && webPage->useFixedLayout();
 
-#if !USE(TILED_BACKING_STORE)
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
     m_frameHasCustomRepresentation = isMainFrame && WebProcess::shared().shouldUseCustomRepresentationForResponse(response);
-#endif
+    m_frameCameFromPageCache = false;
 
     m_frame->coreFrame()->createView(webPage->size(), backgroundColor, /* transparent */ false, IntSize(), shouldUseFixedLayout);
     m_frame->coreFrame()->view()->setTransparent(!webPage->drawsBackground());
@@ -1266,7 +1272,11 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
     parameters.names = paramNames;
     parameters.values = paramValues;
     parameters.mimeType = mimeType;
-    parameters.loadManually = loadManually;
+    parameters.isFullFramePlugin = loadManually;
+    parameters.shouldUseManualLoader = parameters.isFullFramePlugin && !m_frameCameFromPageCache;
+#if PLATFORM(MAC)
+    parameters.layerHostingMode = webPage->layerHostingMode();
+#endif
 
 #if PLUGIN_ARCHITECTURE(X11)
     // FIXME: This should really be X11-specific plug-in quirks.
@@ -1388,6 +1398,46 @@ void WebFrameLoaderClient::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld* 
     // Ensure the accessibility hierarchy is updated.
     webPage->updateAccessibilityTree();
 #endif
+}
+
+
+void WebFrameLoaderClient::dispatchGlobalObjectAvailable(DOMWrapperWorld* world)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+    
+    JSObjectRef globalObject = toRef(m_frame->coreFrame()->script()->globalObject(world));
+    
+    webPage->injectedBundleLoaderClient().didCreateGlobalObjectForFrame(webPage, globalObject, m_frame, world);
+    
+}
+
+void WebFrameLoaderClient::dispatchWillDisconnectDOMWindowExtensionFromGlobalObject(WebCore::DOMWindowExtension* extension)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+        
+    webPage->injectedBundleLoaderClient().willDisconnectDOMWindowExtensionFromGlobalObject(webPage, extension);
+}
+
+void WebFrameLoaderClient::dispatchDidReconnectDOMWindowExtensionToGlobalObject(WebCore::DOMWindowExtension* extension)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+        
+    webPage->injectedBundleLoaderClient().didReconnectDOMWindowExtensionToGlobalObject(webPage, extension);
+}
+
+void WebFrameLoaderClient::dispatchWillDestroyGlobalObjectForDOMWindowExtension(WebCore::DOMWindowExtension* extension)
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+        
+    webPage->injectedBundleLoaderClient().willDestroyGlobalObjectForDOMWindowExtension(webPage, extension);
 }
 
 void WebFrameLoaderClient::documentElementAvailable()

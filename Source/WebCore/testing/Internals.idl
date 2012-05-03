@@ -54,22 +54,26 @@ module window {
         Element createContentElement(in Document document) raises(DOMException);
         Element getElementByIdInShadowRoot(in Node shadowRoot, in DOMString id) raises(DOMException);
         boolean isValidContentSelect(in Element contentElement) raises(DOMException);
+        Node treeScopeRootNode(in Node node) raises (DOMException);
 
-        Node nextSiblingInReifiedTree(in Node node) raises(DOMException);
-        Node firstChildInReifiedTree(in Node node) raises(DOMException);
-        Node lastChildInReifiedTree(in Node node) raises(DOMException);
-        Node traverseNextNodeInReifiedTree(in Node node) raises(DOMException);
-        Node traversePreviousNodeInReifiedTree(in Node node) raises(DOMException);
+        Node nextSiblingByWalker(in Node node) raises(DOMException);
+        Node firstChildByWalker(in Node node) raises(DOMException);
+        Node lastChildByWalker(in Node node) raises(DOMException);
+        Node nextNodeByWalker(in Node node) raises(DOMException);
+        Node previousNodeByWalker(in Node node) raises(DOMException);
 
         boolean attached(in Node node) raises(DOMException);
 
-#if defined(ENABLE_INPUT_COLOR) && ENABLE_INPUT_COLOR
+        DOMString visiblePlaceholder(in Element element);
+#if defined(ENABLE_INPUT_TYPE_COLOR) && ENABLE_INPUT_TYPE_COLOR
         void selectColorInColorChooser(in Element element, in DOMString colorValue);
 #endif
 
         ClientRect boundingBox(in Element element) raises(DOMException);
 
         ClientRectList inspectorHighlightRects(in Document document) raises (DOMException);
+
+        void setBackgroundBlurOnNode(in Node node, in long blurLength) raises(DOMException);
 
         unsigned long markerCountForNode(in Node node, in DOMString markerType) raises(DOMException);
         Range markerRangeForNode(in Node node, in DOMString markerType, in unsigned long index) raises(DOMException);
@@ -92,29 +96,29 @@ module window {
         unsigned long lengthFromRange(in Element scope, in Range range) raises (DOMException);
         DOMString rangeAsText(in Range range) raises (DOMException);
 
+        void setDelegatesScrolling(in boolean enabled, in Document document) raises (DOMException);
 #if defined(ENABLE_TOUCH_ADJUSTMENT) && ENABLE_TOUCH_ADJUSTMENT
         WebKitPoint touchPositionAdjustedToBestClickableNode(in long x, in long y, in long width, in long height, in Document document) raises (DOMException);
         Node touchNodeAdjustedToBestClickableNode(in long x, in long y, in long width, in long height, in Document document) raises (DOMException);
+        ClientRect bestZoomableAreaForTouchPoint(in long x, in long y, in long width, in long height, in Document document) raises (DOMException);
 #endif
 
         long lastSpellCheckRequestSequence(in Document document) raises (DOMException);
         long lastSpellCheckProcessedSequence(in Document document) raises (DOMException);
-
-        void setMediaPlaybackRequiresUserGesture(in Document document, in boolean enabled) raises(DOMException);
 
 #if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK
         void setShouldDisplayTrackKind(in Document document, in DOMString kind, in boolean enabled) raises (DOMException);
         boolean shouldDisplayTrackKind(in Document document, in DOMString trackKind) raises (DOMException);
 #endif
 
-        attribute [Custom] Array userPreferredLanguages;
+        attribute sequence<String> userPreferredLanguages;
 
         unsigned long wheelEventHandlerCount(in Document document) raises (DOMException);
         unsigned long touchEventHandlerCount(in Document document) raises (DOMException);
 
         NodeList nodesFromRect(in Document document, in long x, in long y,
             in unsigned long topPadding, in unsigned long rightPadding, in unsigned long bottomPadding, in unsigned long leftPadding,
-            in boolean ignoreClipping) raises (DOMException);
+            in boolean ignoreClipping, in boolean allowShadowContent) raises (DOMException);
 
         void emitInspectorDidBeginFrame();
         void emitInspectorDidCancelFrame();
@@ -122,14 +126,28 @@ module window {
         boolean hasSpellingMarker(in Document document, in long from, in long length) raises (DOMException);
         boolean hasGrammarMarker(in Document document, in long from, in long length) raises (DOMException);
 
+        unsigned long numberOfScrollableAreas(in Document document) raises (DOMException);
+
         readonly attribute InternalSettings settings;
 
 #if defined(ENABLE_BATTERY_STATUS) && ENABLE_BATTERY_STATUS
         void setBatteryStatus(in Document document, in DOMString eventType, in boolean charging, in double chargingTime, in double dischargingTime, in double level) raises (DOMException);
-#endif 
+#endif
+
+#if defined(ENABLE_NETWORK_INFO) && ENABLE_NETWORK_INFO
+        void setNetworkInformation(in Document document, in DOMString eventType, in long bandwidth, in boolean metered) raises (DOMException);
+#endif
 
         [Conditional=INSPECTOR] unsigned long numberOfLiveNodes();
         [Conditional=INSPECTOR] unsigned long numberOfLiveDocuments();
+        [Conditional=INSPECTOR] sequence<String> consoleMessageArgumentCounts(in Document document);
+
+#if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
+        void webkitWillEnterFullScreenForElement(in Document document, in Element element);
+        void webkitDidEnterFullScreenForElement(in Document document, in Element element);
+        void webkitWillExitFullScreenForElement(in Document document, in Element element);
+        void webkitDidExitFullScreenForElement(in Document document, in Element element);
+#endif
     };
 }
 

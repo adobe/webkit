@@ -99,6 +99,8 @@ const unsigned historyItemIndent = 8;
 
 static void runTest(const string& testPathOrURL);
 
+static void didRunInsecureContent(WebKitWebFrame*, WebKitSecurityOrigin*, const char* url);
+
 static bool shouldLogFrameLoadDelegates(const string& pathOrURL)
 {
     return pathOrURL.find("loading/") != string::npos;
@@ -155,16 +157,6 @@ static void initializeGtkFontSettings(const char* testURL)
         g_object_set(settings, "gtk-xft-rgba", "rgb", NULL);
     else
         g_object_set(settings, "gtk-xft-rgba", "none", NULL);
-
-    GdkScreen* screen = gdk_screen_get_default();
-    ASSERT(screen);
-    const cairo_font_options_t* screenOptions = gdk_screen_get_font_options(screen);
-    ASSERT(screenOptions);
-    cairo_font_options_t* options = cairo_font_options_copy(screenOptions);
-    // Turn off text metrics hinting, which quantizes metrics to pixels in device space.
-    cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
-    gdk_screen_set_font_options(screen, options);
-    cairo_font_options_destroy(options);
 }
 
 CString getTopLevelPath()
@@ -1063,6 +1055,7 @@ static void webFrameLoadStatusNotified(WebKitWebFrame* frame, gpointer user_data
 static void frameCreatedCallback(WebKitWebView* webView, WebKitWebFrame* webFrame, gpointer user_data)
 {
     g_signal_connect(webFrame, "notify::load-status", G_CALLBACK(webFrameLoadStatusNotified), NULL);
+    g_signal_connect(webFrame, "insecure-content-run", G_CALLBACK(didRunInsecureContent), NULL);
 }
 
 
@@ -1263,6 +1256,12 @@ static void didFailLoadingWithError(WebKitWebView* webView, WebKitWebFrame* webF
     }
 }
 
+static void didRunInsecureContent(WebKitWebFrame*, WebKitSecurityOrigin*, const char* url)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks())
+        printf("didRunInsecureContent\n");
+}
+
 static WebKitWebView* createWebView()
 {
     // It is important to declare DRT is running early so when creating
@@ -1315,6 +1314,7 @@ static WebKitWebView* createWebView()
     // frame-created is not issued for main frame. That's why we must do this here
     WebKitWebFrame* frame = webkit_web_view_get_main_frame(view);
     g_signal_connect(frame, "notify::load-status", G_CALLBACK(webFrameLoadStatusNotified), NULL);
+    g_signal_connect(frame, "insecure-content-run", G_CALLBACK(didRunInsecureContent), NULL);
 
     return view;
 }

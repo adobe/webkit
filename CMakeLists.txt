@@ -19,14 +19,6 @@ ENDIF ()
 
 SET(ENABLE_TOOLS ON)
 
-OPTION(ONLY_BUILD_JAVASCRIPTCORE "only build JavaScriptCore")
-IF (ONLY_BUILD_JAVASCRIPTCORE)
-    SET(ENABLE_WEBCORE OFF)
-    SET(ENABLE_WEBKIT OFF)
-    SET(ENABLE_WEBKIT2 OFF)
-    SET(ENABLE_TOOLS OFF)
-ENDIF ()
-
 SET(WTF_DIR "${CMAKE_SOURCE_DIR}/Source/WTF")
 SET(JAVASCRIPTCORE_DIR "${CMAKE_SOURCE_DIR}/Source/JavaScriptCore")
 SET(WEBCORE_DIR "${CMAKE_SOURCE_DIR}/Source/WebCore")
@@ -39,6 +31,7 @@ SET(TOOLS_DIR "${CMAKE_SOURCE_DIR}/Tools")
 SET(DERIVED_SOURCES_DIR "${CMAKE_BINARY_DIR}/DerivedSources")
 SET(DERIVED_SOURCES_JAVASCRIPTCORE_DIR "${CMAKE_BINARY_DIR}/DerivedSources/JavaScriptCore")
 SET(DERIVED_SOURCES_WEBCORE_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebCore")
+SET(DERIVED_SOURCES_WEBKIT_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebKit")
 SET(DERIVED_SOURCES_WEBKIT2_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebKit2")
 
 SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Source/cmake")
@@ -164,7 +157,3 @@ IF (ENABLE_TOOLS)
     ADD_SUBDIRECTORY(Tools)
 ENDIF ()
 
-# -----------------------------------------------------------------------------
-# Prints a summary of all enabled/disabled features
-# -----------------------------------------------------------------------------
-WEBKIT_PRINT_FEATURES()

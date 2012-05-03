@@ -40,7 +40,15 @@ enum BackgroundBleedAvoidance {
     BackgroundBleedUseTransparencyLayer
 };
 
-enum PaddingOptions { IncludeIntrinsicPadding, ExcludeIntrinsicPadding };
+enum ContentChangeType {
+    ImageChanged,
+    MaskImageChanged,
+    CanvasChanged,
+    VideoChanged,
+    FullScreenChanged
+};
+
+class KeyframeList;
 
 // This class is the base for all objects that adhere to the CSS box model as described
 // at http://www.w3.org/TR/CSS21/box.html
@@ -64,7 +72,6 @@ public:
 
     int pixelSnappedOffsetLeft() const { return roundToInt(offsetLeft()); }
     int pixelSnappedOffsetTop() const { return roundToInt(offsetTop()); }
-    // FIXME: The implementation for these functions will change once we move to subpixel layout. See bug 60318.
     int pixelSnappedOffsetWidth() const;
     int pixelSnappedOffsetHeight() const;
 
@@ -77,17 +84,28 @@ public:
     virtual bool requiresLayer() const { return isRoot() || isPositioned() || isRelPositioned() || isTransparent() || hasTransform() || hasHiddenBackface() || hasMask() || hasReflection() || hasFilter() || style()->specifiesColumns(); }
 
     // This will work on inlines to return the bounding box of all of the lines' border boxes.
-    virtual LayoutRect borderBoundingBox() const = 0;
+    virtual IntRect borderBoundingBox() const = 0;
 
-    // Virtual since table cells override
-    virtual LayoutUnit paddingTop(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingBottom(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingLeft(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingRight(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingBefore(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingAfter(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingStart(PaddingOptions = IncludeIntrinsicPadding) const;
-    virtual LayoutUnit paddingEnd(PaddingOptions = IncludeIntrinsicPadding) const;
+    // These return the CSS computed padding values.
+    LayoutUnit computedCSSPaddingTop() const;
+    LayoutUnit computedCSSPaddingBottom() const;
+    LayoutUnit computedCSSPaddingLeft() const;
+    LayoutUnit computedCSSPaddingRight() const;
+    LayoutUnit computedCSSPaddingBefore() const;
+    LayoutUnit computedCSSPaddingAfter() const;
+    LayoutUnit computedCSSPaddingStart() const;
+    LayoutUnit computedCSSPaddingEnd() const;
+
+    // These functions are used during layout. Table cells and the MathML
+    // code override them to include some extra intrinsic padding.
+    virtual LayoutUnit paddingTop() const { return computedCSSPaddingTop(); }
+    virtual LayoutUnit paddingBottom() const { return computedCSSPaddingBottom(); }
+    virtual LayoutUnit paddingLeft() const { return computedCSSPaddingLeft(); }
+    virtual LayoutUnit paddingRight() const { return computedCSSPaddingRight(); }
+    virtual LayoutUnit paddingBefore() const { return computedCSSPaddingBefore(); }
+    virtual LayoutUnit paddingAfter() const { return computedCSSPaddingAfter(); }
+    virtual LayoutUnit paddingStart() const { return computedCSSPaddingStart(); }
+    virtual LayoutUnit paddingEnd() const { return computedCSSPaddingEnd(); }
 
     virtual int borderTop() const { return style()->borderTopWidth(); }
     virtual int borderBottom() const { return style()->borderBottomWidth(); }
@@ -145,6 +163,21 @@ public:
     void highQualityRepaintTimerFired(Timer<RenderBoxModelObject>*);
 
     virtual void setSelectionState(SelectionState s);
+
+#if USE(ACCELERATED_COMPOSITING)
+    void contentChanged(ContentChangeType);
+    bool hasAcceleratedCompositing() const;
+
+    bool startTransition(double, CSSPropertyID, const RenderStyle* fromStyle, const RenderStyle* toStyle);
+    void transitionPaused(double timeOffset, CSSPropertyID);
+    void transitionFinished(CSSPropertyID);
+
+    bool startAnimation(double timeOffset, const Animation*, const KeyframeList& keyframes);
+    void animationPaused(double timeOffset, const String& name);
+    void animationFinished(const String& name);
+
+    void suspendAnimations(double time = 0);
+#endif
 
 protected:
     virtual void willBeDestroyed();

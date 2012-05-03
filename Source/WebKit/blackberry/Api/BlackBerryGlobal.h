@@ -30,15 +30,13 @@ namespace WebKit {
 
 class WebString;
 
-void globalInitialize();
+BLACKBERRY_EXPORT void globalInitialize();
 void collectJavascriptGarbageNow();
 void clearCookieCache();
 BLACKBERRY_EXPORT void clearMemoryCaches();
 void clearAppCache(const WebString& pageGroupName);
 void reopenAllAppCaches();
 void closeAllAppCaches();
-void clearLocalStorage(const WebString& pageGroupName);
-void closeAllLocalStorages();
 void clearDatabase(const WebString& pageGroupName);
 void reopenAllTrackerDatabases();
 void closeAllTrackerDatabases();

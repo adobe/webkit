@@ -23,7 +23,6 @@
 #include "config.h"
 #include "RenderThemeQtMobile.h"
 
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "Color.h"
 #include "Document.h"
@@ -40,12 +39,12 @@
 #if ENABLE(PROGRESS_TAG)
 #include "RenderProgress.h"
 #endif
+#include "StyleResolver.h"
 
 #include <wtf/PassRefPtr.h>
 
 #include <QColor>
 #include <QFile>
-#include <QFontMetrics>
 #include <QPainter>
 #include <QPixmapCache>
 
@@ -581,7 +580,6 @@ int RenderThemeQtMobile::popupInternalPaddingBottom(RenderStyle* style) const
 void RenderThemeQtMobile::computeSizeBasedOnStyle(RenderStyle* renderStyle) const
 {
     QSize size(0, 0);
-    const QFontMetrics fm(renderStyle->font().font());
 
     switch (renderStyle->appearance()) {
     case TextAreaPart:
@@ -614,11 +612,10 @@ void RenderThemeQtMobile::computeSizeBasedOnStyle(RenderStyle* renderStyle) cons
     }
     case PushButtonPart:
     case SquareButtonPart:
-    case ListButtonPart:
     case DefaultButtonPart:
     case ButtonPart:
     case MenulistPart: {
-        const int height = fm.height() * buttonHeightRatio * renderStyle->effectiveZoom();
+        const int height = renderStyle->fontMetrics().height() * buttonHeightRatio * renderStyle->effectiveZoom();
         size = QSize(renderStyle->width().value(), height);
         break;
     }
@@ -633,7 +630,7 @@ void RenderThemeQtMobile::computeSizeBasedOnStyle(RenderStyle* renderStyle) cons
         renderStyle->setMinHeight(Length(size.height(), Fixed));
 }
 
-void RenderThemeQtMobile::adjustButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element*) const
+void RenderThemeQtMobile::adjustButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Ditch the border.
     style->resetBorder();
@@ -676,7 +673,7 @@ bool RenderThemeQtMobile::paintButton(RenderObject* o, const PaintInfo& i, const
     return false;
 }
 
-void RenderThemeQtMobile::adjustTextFieldStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeQtMobile::adjustTextFieldStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Resetting the style like this leads to differences like:
     // - RenderTextControl {INPUT} at (2,2) size 168x25 [bgcolor=#FFFFFF] border: (2px inset #000000)]
@@ -724,9 +721,9 @@ bool RenderThemeQtMobile::paintTextField(RenderObject* o, const PaintInfo& i, co
     return false;
 }
 
-void RenderThemeQtMobile::adjustMenuListStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeQtMobile::adjustMenuListStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
-    RenderThemeQt::adjustMenuListStyle(selector, style, e);
+    RenderThemeQt::adjustMenuListStyle(styleResolver, style, e);
     style->setPaddingLeft(Length(menuListPadding, Fixed));
 }
 

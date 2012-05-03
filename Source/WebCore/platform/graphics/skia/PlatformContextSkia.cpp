@@ -226,28 +226,62 @@ void PlatformContextSkia::save()
     canvas()->save();
 }
 
+void PlatformContextSkia::saveLayer(const SkRect* bounds, const SkPaint* paint)
+{
+    m_canvas->saveLayer(bounds, paint);
+    if (bounds)
+        m_canvas->clipRect(*bounds);
+    if (m_trackOpaqueRegion)
+        m_opaqueRegion.pushCanvasLayer(paint);
+}
+
+void PlatformContextSkia::saveLayer(const SkRect* bounds, const SkPaint* paint, SkCanvas::SaveFlags saveFlags)
+{
+    m_canvas->saveLayer(bounds, paint, saveFlags);
+    if (bounds)
+        m_canvas->clipRect(*bounds);
+    if (m_trackOpaqueRegion)
+        m_opaqueRegion.pushCanvasLayer(paint);
+}
+
+void PlatformContextSkia::restoreLayer()
+{
+    m_canvas->restore();
+    if (m_trackOpaqueRegion)
+        m_opaqueRegion.popCanvasLayer(this);
+}
+
 void PlatformContextSkia::beginLayerClippedToImage(const FloatRect& rect,
                                                    const ImageBuffer* imageBuffer)
 {
+    SkRect bounds = { SkFloatToScalar(rect.x()), SkFloatToScalar(rect.y()),
+                      SkFloatToScalar(rect.maxX()), SkFloatToScalar(rect.maxY()) };
+
+    if (imageBuffer->internalSize().isEmpty()) {
+        m_canvas->clipRect(bounds);
+        return;
+    }
+
     // Skia doesn't support clipping to an image, so we create a layer. The next
     // time restore is invoked the layer and |imageBuffer| are combined to
     // create the resulting image.
-    SkRect bounds = { SkFloatToScalar(rect.x()), SkFloatToScalar(rect.y()),
-                      SkFloatToScalar(rect.maxX()), SkFloatToScalar(rect.maxY()) };
+
     m_state->m_clip = bounds;
     // Get the absolute coordinates of the stored clipping rectangle to make it
     // independent of any transform changes.
     canvas()->getTotalMatrix().mapRect(&m_state->m_clip);
 
-    canvas()->clipRect(bounds);
+    SkCanvas::SaveFlags saveFlags = static_cast<SkCanvas::SaveFlags>(SkCanvas::kHasAlphaLayer_SaveFlag | SkCanvas::kFullColorLayer_SaveFlag);
+    saveLayer(&bounds, 0, saveFlags);
 
-    if (imageBuffer->internalSize().isEmpty())
-        return;
-
-    canvas()->saveLayerAlpha(&bounds, 255,
-                             static_cast<SkCanvas::SaveFlags>(SkCanvas::kHasAlphaLayer_SaveFlag | SkCanvas::kFullColorLayer_SaveFlag));
-    // Copy off the image as |imageBuffer| may be deleted before restore is invoked.
     const SkBitmap* bitmap = imageBuffer->context()->platformContext()->bitmap();
+
+    if (m_trackOpaqueRegion) {
+        SkRect opaqueRect = bitmap->isOpaque() ? m_state->m_clip : SkRect::MakeEmpty();
+        m_opaqueRegion.setImageMask(opaqueRect);
+    }
+
+    // Copy off the image as |imageBuffer| may be deleted before restore is invoked.
     if (!bitmap->pixelRef()) {
         // The bitmap owns it's pixels. This happens when we've allocated the
         // pixels in some way and assigned them directly to the bitmap (as
@@ -605,25 +639,47 @@ void PlatformContextSkia::applyClipFromImage(const SkRect& rect, const SkBitmap&
 void PlatformContextSkia::didDrawRect(const SkRect& rect, const SkPaint& paint, const SkBitmap* bitmap)
 {
     if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawRect(this, m_opaqueRegionTransform, rect, paint, bitmap);
+        m_opaqueRegion.didDrawRect(this, rect, paint, bitmap);
 }
 
 void PlatformContextSkia::didDrawPath(const SkPath& path, const SkPaint& paint)
 {
     if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawPath(this, m_opaqueRegionTransform, path, paint);
+        m_opaqueRegion.didDrawPath(this, path, paint);
 }
 
 void PlatformContextSkia::didDrawPoints(SkCanvas::PointMode mode, int numPoints, const SkPoint points[], const SkPaint& paint)
 {
     if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawPoints(this, m_opaqueRegionTransform, mode, numPoints, points, paint);
+        m_opaqueRegion.didDrawPoints(this, mode, numPoints, points, paint);
 }
 
 void PlatformContextSkia::didDrawBounded(const SkRect& rect, const SkPaint& paint)
 {
     if (m_trackOpaqueRegion)
-        m_opaqueRegion.didDrawBounded(this, m_opaqueRegionTransform, rect, paint);
+        m_opaqueRegion.didDrawBounded(this, rect, paint);
+}
+
+void PlatformContextSkia::adjustTextRenderMode(SkPaint* paint)
+{
+    if (!paint->isLCDRenderText())
+        return;
+
+    paint->setLCDRenderText(couldUseLCDRenderedText());
+}
+
+bool PlatformContextSkia::couldUseLCDRenderedText()
+{
+    // Our layers only have a single alpha channel. This means that subpixel
+    // rendered text cannot be composited correctly when the layer is
+    // collapsed. Therefore, subpixel text is disabled when we are drawing
+    // onto a layer.
+    if (canvas()->isDrawingToLayer())
+        return false;
+
+    // If this text is not in an image buffer and so won't be externally
+    // composited, then subpixel antialiasing is fine.
+    return !isDrawingToImageBuffer();
 }
 
 } // namespace WebCore

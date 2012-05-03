@@ -153,7 +153,7 @@ module window {
         // WebKit extensions
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
         CSSRuleList getMatchedCSSRules(in [Optional=DefaultIsUndefined] Element element,
-                                       in [Optional=DefaultIsUndefined] DOMString pseudoElement);
+                                       in [TreatNullAs=NullString, TreatUndefinedAs=NullString,Optional=DefaultIsUndefined] DOMString pseudoElement);
 #endif
 
         attribute [Replaceable] double devicePixelRatio;
@@ -213,7 +213,7 @@ module window {
 
 #if defined(ENABLE_REQUEST_ANIMATION_FRAME)
         // WebKit animation extensions, being standardized in the WebPerf WG
-        long webkitRequestAnimationFrame(in [Callback] RequestAnimationFrameCallback callback, in [Optional=DefaultIsUndefined] Element element);
+        long webkitRequestAnimationFrame(in [Callback] RequestAnimationFrameCallback callback);
         void webkitCancelAnimationFrame(in long id);
         void webkitCancelRequestAnimationFrame(in long id); // This is a deprecated alias for webkitCancelAnimationFrame(). Remove this when removing vendor prefix.
 #endif
@@ -404,6 +404,7 @@ module window {
         attribute HTMLButtonElementConstructor HTMLButtonElement;
         attribute HTMLCanvasElementConstructor HTMLCanvasElement;
         attribute HTMLDListElementConstructor HTMLDListElement;
+        attribute [Conditional=DATALIST] HTMLDataListElementConstructor HTMLDataListElement;
         attribute HTMLDirectoryElementConstructor HTMLDirectoryElement;
         attribute HTMLDivElementConstructor HTMLDivElement;
         attribute HTMLEmbedElementConstructor HTMLEmbedElement;
@@ -466,6 +467,9 @@ module window {
         attribute [JSCustomGetter, CustomConstructor] HTMLImageElementConstructorConstructor Image; // Usable with new operator
         attribute [JSCustomGetter] HTMLOptionElementConstructorConstructor Option; // Usable with new operator
 
+        attribute [Conditional=ENCRYPTED_MEDIA, V8EnabledAtRuntime=encryptedMedia] MediaKeyErrorConstructor MediaKeyError;
+        attribute [Conditional=ENCRYPTED_MEDIA, V8EnabledAtRuntime=encryptedMedia] MediaKeyEventConstructor MediaKeyEvent;
+
         attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] HTMLTrackElementConstructor HTMLTrackElement;
         attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TextTrackConstructor TextTrack;
         attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TextTrackCueConstructor TextTrackCue; // Usable with the new operator
@@ -496,6 +500,7 @@ module window {
         attribute [Conditional=WEBGL] WebGLRenderbufferConstructor WebGLRenderbuffer;
         attribute [Conditional=WEBGL] WebGLRenderingContextConstructor WebGLRenderingContext;
         attribute [Conditional=WEBGL] WebGLShaderConstructor WebGLShader;
+        attribute [Conditional=WEBGL] WebGLShaderPrecisionFormatConstructor WebGLShaderPrecisionFormat;
         attribute [Conditional=WEBGL] WebGLTextureConstructor WebGLTexture;
         attribute [Conditional=WEBGL] WebGLUniformLocationConstructor WebGLUniformLocation;
 

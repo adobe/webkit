@@ -81,6 +81,23 @@ void CSSSegmentedFontFace::appendFontFace(PassRefPtr<CSSFontFace> fontFace)
     m_fontFaces.append(fontFace);
 }
 
+static void appendFontDataWithInvalidUnicodeRangeIfLoading(SegmentedFontData* newFontData, const SimpleFontData* faceFontData, const Vector<CSSFontFace::UnicodeRange>& ranges)
+{
+    if (faceFontData->isLoading()) {
+        newFontData->appendRange(FontDataRange(0, 0, faceFontData));
+        return;
+    }
+
+    unsigned numRanges = ranges.size();
+    if (!numRanges) {
+        newFontData->appendRange(FontDataRange(0, 0x7FFFFFFF, faceFontData));
+        return;
+    }
+
+    for (unsigned j = 0; j < numRanges; ++j)
+        newFontData->appendRange(FontDataRange(ranges[j].from(), ranges[j].to(), faceFontData));
+}
+
 FontData* CSSSegmentedFontFace::getFontData(const FontDescription& fontDescription)
 {
     if (!isValid())
@@ -89,7 +106,7 @@ FontData* CSSSegmentedFontFace::getFontData(const FontDescription& fontDescripti
     FontTraitsMask desiredTraitsMask = fontDescription.traitsMask();
     unsigned hashKey = ((fontDescription.computedPixelSize() + 1) << (FontTraitsMaskWidth + 1)) | ((fontDescription.orientation() == Vertical ? 1 : 0) << FontTraitsMaskWidth) | desiredTraitsMask;
 
-    SegmentedFontData*& fontData = m_fontDataTable.add(hashKey, 0).first->second;
+    SegmentedFontData*& fontData = m_fontDataTable.add(hashKey, 0).iterator->second;
     if (fontData)
         return fontData;
 
@@ -104,14 +121,7 @@ FontData* CSSSegmentedFontFace::getFontData(const FontDescription& fontDescripti
         bool syntheticItalic = !(traitsMask & FontStyleItalicMask) && (desiredTraitsMask & FontStyleItalicMask);
         if (const SimpleFontData* faceFontData = m_fontFaces[i]->getFontData(fontDescription, syntheticBold, syntheticItalic)) {
             ASSERT(!faceFontData->isSegmented());
-            const Vector<CSSFontFace::UnicodeRange>& ranges = m_fontFaces[i]->ranges();
-            unsigned numRanges = ranges.size();
-            if (!numRanges)
-                newFontData->appendRange(FontDataRange(0, 0x7FFFFFFF, faceFontData));
-            else {
-                for (unsigned j = 0; j < numRanges; ++j)
-                    newFontData->appendRange(FontDataRange(ranges[j].from(), ranges[j].to(), faceFontData));
-            }
+            appendFontDataWithInvalidUnicodeRangeIfLoading(newFontData.get(), faceFontData, m_fontFaces[i]->ranges());
         }
     }
     if (newFontData->numRanges()) {

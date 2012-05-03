@@ -33,13 +33,10 @@
 
 namespace WebCore {
 
+class CCFontAtlas;
 class CCThread;
-class CCLayerTreeHost;
-class CCLayerTreeHostImpl;
-class CCLayerTreeHostImplClient;
 class GraphicsContext3D;
 struct LayerRendererCapabilities;
-class TextureManager;
 
 // Abstract class responsible for proxying commands from the main-thread side of
 // the compositor over to the compositor implementation.
@@ -70,6 +67,9 @@ public:
     // The context will not be used and no frames may be produced until initializeLayerRenderer() is called.
     virtual bool initializeContext() = 0;
 
+    // Indicates that the compositing surface associated with our context is ready to use.
+    virtual void setSurfaceReady() = 0;
+
     // Attempts to initialize the layer renderer. Returns false if the context isn't usable for compositing.
     virtual bool initializeLayerRenderer() = 0;
 
@@ -86,11 +86,21 @@ public:
     virtual void setNeedsRedraw() = 0;
     virtual void setVisible(bool) = 0;
 
+    virtual bool commitRequested() const = 0;
+
     virtual void start() = 0; // Must be called before using the proxy.
     virtual void stop() = 0; // Must be called before deleting the proxy.
 
+    // Forces 3D commands on all contexts to wait for all previous SwapBuffers to finish before executing in the GPU
+    // process.
+    virtual void forceSerializeOnSwapBuffers() = 0;
+
     // Maximum number of sub-region texture updates supported for each commit.
     virtual size_t maxPartialTextureUpdates() const = 0;
+
+    virtual void acquireLayerTextures() = 0;
+
+    virtual void setFontAtlas(PassOwnPtr<CCFontAtlas>) = 0;
 
     // Debug hooks
 #ifndef NDEBUG

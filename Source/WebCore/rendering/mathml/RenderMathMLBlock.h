@@ -56,6 +56,15 @@ public:
     virtual RenderMathMLOperator* unembellishedOperator() { return 0; }
     virtual void stretchToHeight(int height);
 
+    virtual LayoutUnit paddingTop() const OVERRIDE;
+    virtual LayoutUnit paddingBottom() const OVERRIDE;
+    virtual LayoutUnit paddingLeft() const OVERRIDE;
+    virtual LayoutUnit paddingRight() const OVERRIDE;
+    virtual LayoutUnit paddingBefore() const OVERRIDE;
+    virtual LayoutUnit paddingAfter() const OVERRIDE;
+    virtual LayoutUnit paddingStart() const OVERRIDE;
+    virtual LayoutUnit paddingEnd() const OVERRIDE;
+    
 #if ENABLE(DEBUG_MATH_LAYOUT)
     virtual void paint(PaintInfo&, const LayoutPoint&);
 #endif
@@ -86,6 +95,12 @@ protected:
 
 private:
     virtual const char* renderName() const { return isAnonymous() ? "RenderMathMLBlock (anonymous)" : "RenderMathMLBlock"; }
+    
+protected:
+    int m_intrinsicPaddingBefore;
+    int m_intrinsicPaddingAfter;
+    int m_intrinsicPaddingStart;
+    int m_intrinsicPaddingEnd;
 };
 
 inline RenderMathMLBlock* toRenderMathMLBlock(RenderObject* object)
