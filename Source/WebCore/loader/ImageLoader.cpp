@@ -261,7 +261,7 @@ void ImageLoader::dispatchProgressEvent(CachedResource* resource)
     unsigned long long total = 0;
 
     long long expectedContentLength = resource->response().expectedContentLength();
-    unsigned contentLength = resource->data()->size();
+    unsigned contentLength = resource->data() ? resource->data()->size() : 0;
 
     if (m_progressEventsAllowed && expectedContentLength > 0 && contentLength <= expectedContentLength) {
         lengthComputable = true;

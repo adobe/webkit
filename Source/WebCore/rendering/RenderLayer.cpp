@@ -4498,7 +4498,8 @@ void RenderLayer::dirtyStackingContextZOrderLists()
     RenderLayer* sc = stackingContext();
     if (sc) {
         sc->dirtyZOrderLists();
-        enclosingWrappingContext(false)->setHasDirtyChildContextsOrder();
+        if (WrappingContext* parentWrappingContext = enclosingWrappingContext(false))
+            parentWrappingContext->setHasDirtyChildContextsOrder();
     }
 }
 
