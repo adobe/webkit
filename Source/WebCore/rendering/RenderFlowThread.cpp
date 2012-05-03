@@ -92,9 +92,8 @@ void RenderFlowThread::removeFlowChildInfo(RenderObject* child)
 {
     if (child->isBox()) {
         removeRenderBoxRegionInfo(toRenderBox(child));
-        if (child->canHaveRegionStyle())
-            clearRenderBoxCustomStyle(toRenderBox(child));
     }
+    clearRenderObjectCustomStyle(child);
 }
 
 void RenderFlowThread::addRegionToThread(RenderRegion* renderRegion)
@@ -699,7 +698,7 @@ RenderRegion* RenderFlowThread::lastRegion() const
     return 0;
 }
 
-void RenderFlowThread::clearRenderBoxCustomStyle(const RenderBox* box,
+void RenderFlowThread::clearRenderObjectCustomStyle(const RenderObject* object,
     const RenderRegion* oldStartRegion, const RenderRegion* oldEndRegion,
     const RenderRegion* newStartRegion, const RenderRegion* newEndRegion)
 {
@@ -716,7 +715,7 @@ void RenderFlowThread::clearRenderBoxCustomStyle(const RenderBox* box,
             insideNewRegionRange = true;
 
         if (!(insideOldRegionRange && insideNewRegionRange))
-            region->clearBoxStyleInRegion(box);
+            region->clearObjectStyleInRegion(object);
 
         if (oldEndRegion == region)
             insideOldRegionRange = false;
@@ -759,7 +758,7 @@ void RenderFlowThread::setRegionRangeForBox(const RenderBox* box, LayoutUnit off
             break;
     }
 
-    clearRenderBoxCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
+    clearRenderObjectCustomStyle(box, range.startRegion(), range.endRegion(), startRegion, endRegion);
     range.setRange(startRegion, endRegion);
 }
 

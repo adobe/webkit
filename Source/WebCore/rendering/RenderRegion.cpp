@@ -102,18 +102,10 @@ bool RenderRegion::isLastRegion() const
     return m_flowThread->lastRegion() == this;
 }
 
-// Clear the style for all objects in region
-void RenderRegion::clearRegionObjectsRegionStyle()
-{
-    m_renderObjectRegionStyle.clear();
-}
-
 void RenderRegion::setRegionObjectsRegionStyle()
 {
     if (!hasCustomRegionStyle())
         return;
-
-    clearRegionObjectsRegionStyle();
 
     RenderNamedFlowThread* namedFlow = view()->flowThreadController()->ensureRenderFlowThreadWithName(style()->regionThread());
     const NamedFlowContentNodes& contentNodes = namedFlow->contentNodes();
@@ -123,7 +115,13 @@ void RenderRegion::setRegionObjectsRegionStyle()
             continue;
         RenderObject* object = node->renderer();
 
-        RefPtr<RenderStyle> objectStyleInRegion = computeStyleInRegion(object);
+        // If the object has style in region, use that instead of computing a new one.
+        RenderObjectRegionStyleMap::iterator it = m_renderObjectRegionStyle.find(object);
+        RefPtr<RenderStyle> objectStyleInRegion;
+        if (it != m_renderObjectRegionStyle.end()) {
+            objectStyleInRegion = it->second;
+        } else
+            objectStyleInRegion = computeStyleInRegion(object);
         setObjectStyleInRegion(object, objectStyleInRegion);
 
         computeChildrenStyleInRegion(object);
@@ -135,13 +133,15 @@ void RenderRegion::restoreRegionObjectsOriginalStyle()
     if (!hasCustomRegionStyle())
         return;
 
+    RenderObjectRegionStyleMap temp;
     for (RenderObjectRegionStyleMap::iterator iter = m_renderObjectRegionStyle.begin(), end = m_renderObjectRegionStyle.end(); iter != end; ++iter) {
         RenderObject* object = const_cast<RenderObject*>(iter->first);
         RefPtr<RenderStyle> objectRegionStyle = object->style();
         RefPtr<RenderStyle> objectOriginalStyle = iter->second;
         object->setStyleInternal(objectOriginalStyle);
-        // FIXME: store the computed style in region to be used later
+        temp.set(object, objectRegionStyle);
     }
+    m_renderObjectRegionStyle.swap(temp);
 }
 
 void RenderRegion::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -329,18 +329,22 @@ PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderObject* o
 void RenderRegion::computeChildrenStyleInRegion(RenderObject* object)
 {
     for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
-        // The style in region for this child should not have been computed yet.
-        ASSERT(!m_renderObjectRegionStyle.contains(child));
-        RefPtr<RenderStyle> styleInRegion;
 
-        if (child->isAnonymous())
-            styleInRegion = RenderStyle::createAnonymousStyle(object->style());
-        else if (child->isText())
-            styleInRegion = RenderStyle::clone(object->style());
-        else
-            styleInRegion = computeStyleInRegion(child);
+        RenderObjectRegionStyleMap::iterator it = m_renderObjectRegionStyle.find(child);
 
-        setObjectStyleInRegion(child, styleInRegion);
+        RefPtr<RenderStyle> childStyleInRegion;
+        if (it != m_renderObjectRegionStyle.end()) {
+            childStyleInRegion = it->second;
+        } else {
+            if (child->isAnonymous())
+                childStyleInRegion = RenderStyle::createAnonymousStyle(object->style());
+            else if (child->isText())
+                childStyleInRegion = RenderStyle::clone(object->style());
+            else
+                childStyleInRegion = computeStyleInRegion(child);
+        }
+
+        setObjectStyleInRegion(child, childStyleInRegion);
 
         computeChildrenStyleInRegion(child);
     }
@@ -361,6 +365,17 @@ void RenderRegion::setObjectStyleInRegion(RenderObject* object, PassRefPtr<Rende
     }
 
     m_renderObjectRegionStyle.set(object, objectOriginalStyle);
+}
+
+void RenderRegion::clearObjectStyleInRegion(const RenderObject* object)
+{
+    ASSERT(object);
+    m_renderObjectRegionStyle.remove(object);
+
+    // Clear the style for the children of this object.
+    for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
+        clearObjectStyleInRegion(child);
+    }
 }
 
 bool RenderRegion::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize)

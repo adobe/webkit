@@ -125,8 +125,7 @@ public:
     // (to avoid the computation path for inline replaced elements in RenderBox::computeLogicalWidthInRegion).
     virtual bool isInlineBlockOrInlineTable() const { return isInline() && isReplaced(); }
 
-    // Do nothing for the moment as styles are computed for every paint.
-    void clearBoxStyleInRegion(const RenderBox*) { }
+    void clearObjectStyleInRegion(const RenderObject*);
 
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
@@ -141,7 +140,6 @@ private:
     void setRegionObjectsRegionStyle();
     void restoreRegionObjectsOriginalStyle();
 
-    void clearRegionObjectsRegionStyle();
     void setObjectStyleInRegion(RenderObject*, PassRefPtr<RenderStyle>);
 
     RenderFlowThread* m_flowThread;
