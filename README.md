@@ -6,7 +6,7 @@ may2012-f2f-prototype
 General Changes
 ---------------
 
-In order to make it easy to test the new experimental features, the prototype build will enable CSS Regions and CSS Shaders by default. It will only enable them the first time it runs, so it will add a new flag called "browser.adobe-may2012-prototype-features-enabled" in the Chromium's settings.
+In order to make it easy to test the new experimental features, the prototype build enables CSS Regions and CSS Shaders by default. It will only enable them the first time it runs, so it adds a new flag called "browser.adobe-may2012-prototype-features-enabled" in the Chromium's settings.
 
 CSS Regions
 -----------
