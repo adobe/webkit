@@ -57,7 +57,23 @@ static const struct CompositOpToXfermodeMode {
     { CompositeDestinationAtop, SkXfermode::kDstATop_Mode },
     { CompositeXOR,             SkXfermode::kXor_Mode },
     { CompositePlusDarker,      SkXfermode::kDarken_Mode },
-    { CompositePlusLighter,     SkXfermode::kPlus_Mode }
+    { CompositePlusLighter,     SkXfermode::kPlus_Mode },
+    { CompositeMultiply,		SkXfermode::kMultiply_Mode },
+    { CompositeScreen,			SkXfermode::kScreen_Mode },
+    { CompositeOverlay,			SkXfermode::kOverlay_Mode },
+    { CompositeDarken,			SkXfermode::kDarken_Mode },
+    { CompositeLighten,			SkXfermode::kLighten_Mode },
+    { CompositeColorDodge,		SkXfermode::kColorDodge_Mode },
+    { CompositeColorBurn,		SkXfermode::kColorBurn_Mode },
+    { CompositeHardLight,		SkXfermode::kHardLight_Mode },
+    { CompositeSoftLight,		SkXfermode::kSoftLight_Mode },
+    { CompositeDifference,		SkXfermode::kDifference_Mode },
+    { CompositeExclusion,		SkXfermode::kExclusion_Mode }
+    //{ CompositeHue,				SkXfermode::kPlus_Mode }
+    //{ CompositeSaturation,		SkXfermode::kPlus_Mode }
+    //{ CompositeColor,			SkXfermode::kPlus_Mode }
+    //{ CompositeLuminosity		SkXfermode::kPlus_Mode }
+
 };
 
 SkXfermode::Mode WebCoreCompositeToSkiaComposite(CompositeOperator op)
