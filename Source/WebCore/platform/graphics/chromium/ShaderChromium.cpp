@@ -98,9 +98,24 @@ static String formulaForBlendMode(EBlendMode blendMode)
         case BlendModeOverlay:
             blendComponents(builder, "return float(backgroundColor <= 0.5) * sourceColor * backgroundColor + float(backgroundColor > 0.5) * (sourceColor + backgroundColor - sourceColor * backgroundColor);");
             break;
-        
         case BlendModeHardLight:
+            blendComponents(builder, SHADER(
+                if (sourceColor <= 0.5)
+                    return backgroundColor * 2.0 * sourceColor;
+                sourceColor = 2.0 * sourceColor - 1.0;
+                return backgroundColor + sourceColor - (backgroundColor * sourceColor);
+            ));
+            break;
         case BlendModeSoftLight:
+            blendComponents(builder, SHADER(
+                if (sourceColor <= 0.5)
+                    return backgroundColor - (1.0 - 2.0 * sourceColor) * backgroundColor * (1.0 - backgroundColor);
+                float D = (backgroundColor <= 0.25)
+                            ? ((16.0 * backgroundColor - 12.0) * backgroundColor + 4.0) * backgroundColor 
+                            : sqrt(backgroundColor);
+                return backgroundColor + (2.0 * sourceColor - 1.0) * (D - backgroundColor);
+            ));
+            break;
         case BlendModeHue:
         case BlendModeSaturation:
         case BlendModeColor:
