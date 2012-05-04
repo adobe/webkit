@@ -6,12 +6,14 @@ may2012-f2f-prototype
 General Changes
 ---------------
 
-
 CSS Regions
 -----------
+The prototype includes support to specify *height: auto* and *width: auto* on Region elements. For more information please visit the [CSS Regions Specification](http://dev.w3.org/csswg/css3-regions/#regions-visual-formatting-steps).
+Added experimental support for multi-column regions: for example, you can use "-webkit-columns: 2" to make a region layout the content inside it using two column.
 
 CSS Exclusions
------------
+--------------
+Experimental support for the CSS Exclusions processing model is included in the prototype. The model is explained in the (CSS Exclusions Specification)[http://dev.w3.org/csswg/css3-exclusions/#exclusions-processing-model]. Note, that only the "-webkit-wrap-flow: clear" property is implemented.
 
 CSS Shaders
 -----------
@@ -34,5 +36,10 @@ CSS Compositing
 + Added support for additional blending modes in Canvas in WebKit and Safari
 
 + Added set of files that show proof-of-concept of these features in Safari, Chromium and a custom FireFox
-+ 
+
+Windows Build
+-------------
+Note that DirectX is needed, which can be downloaded from the following address: 
+(http://www.microsoft.com/download/en/details.aspx?displaylang=en%3fWT.mc_id%3dMSCOM_DLC_US_DR_111SXX02959&id=35)
+
 
