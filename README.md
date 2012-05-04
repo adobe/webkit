@@ -41,6 +41,8 @@ CSS Transforms
 -------------
 The [CSS3 Transforms Module](http://dev.w3.org/csswg/css3-transforms/) provides the possibility to transform the two- and three-dimensional coordinate space of elements in the SVG and HTML namespace. This turns the SVG 'transform' attribute into a presentation attribute.
 
+This change temporarily breaks SVG animations and SVG DOM access for the 'transform' attribute.
+
 Windows Build
 -------------
 Note that DirectX is needed, which can be downloaded from the following address: 
