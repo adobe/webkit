@@ -3,10 +3,16 @@ may2012-f2f-prototype
 
 `may2012-f2f-prototype` branch contains various changes intended for presentation at the May 2012 CSS WG F2F meeting in Hamburg. This branch includes prototype and experimental work. It should not be considered final or ready for submission into the WebKit trunk.
 
+The source for this binary can be found at `https://github.com/adobe/webkit/tree/may2012-f2f-prototype`
+
+Demos of prototype features in this build can be found at
+* `https://github.com/adobe/web-platform/blob/may2012-f2f-prototype/`
+* `https://hg.csswg.org/test/file/7e6cd72828e8/contributors/adobe/incoming/css3-regions` (location will change after tests have been reviewed and accepted)
+
 General Changes
 ---------------
 
-In order to make it easy to test the new experimental features, the prototype build will enable CSS Regions and CSS Shaders by default. It will only enable them the first time it runs, so it will add a new flag called "browser.adobe-may2012-prototype-features-enabled" in the Chromium's settings.
+In order to make it easy to test the new experimental features, the prototype build enables CSS Regions and CSS Shaders by default. It only enables them the first time it runs, adding a new flag called "browser.adobe-may2012-prototype-features-enabled" in the Chromium's settings to prevent subsequent changes. Other developer builds of Chromium will also be affected by the changed settings for CSS Regions and CSS Shaders.
 
 CSS Regions
 -----------
