@@ -47,7 +47,7 @@ This change temporarily breaks SVG animations and SVG DOM access for the 'transf
 
 Windows Build
 -------------
-Note that DirectX is needed, which can be downloaded from the following address: 
+Note that if you are using the Windows build DirectX is needed, which can be downloaded from the following address: 
 (http://www.microsoft.com/download/en/details.aspx?displaylang=en%3fWT.mc_id%3dMSCOM_DLC_US_DR_111SXX02959&id=35)
 
 
