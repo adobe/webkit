@@ -800,7 +800,7 @@ float RenderLayerBacking::compositingOpacity(float rendererOpacity) const
 
 static bool hasBoxDecorations(const RenderStyle* style)
 {
-    return style->hasBorder() || style->hasBorderRadius() || style->hasOutline() || style->hasAppearance() || style->boxShadow() || style->hasFilter();
+    return style->hasBorder() || style->hasBorderRadius() || style->hasOutline() || style->hasAppearance() || style->boxShadow() || style->hasFilter() || style->blendMode() != BlendModeNormal;
 }
 
 static bool hasBoxDecorationsOrBackground(const RenderObject* renderer)

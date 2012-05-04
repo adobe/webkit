@@ -2088,7 +2088,8 @@ void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
     // FIXME: when dropping the -webkit prefix on transform-style, we should also have opacity < 1 cause flattening.
     if (style->preserves3D() && (style->overflowX() != OVISIBLE
         || style->overflowY() != OVISIBLE
-        || style->hasFilter()))
+        || style->hasFilter()
+        || style->blendMode() != BlendModeNormal))
         style->setTransformStyle3D(TransformStyle3DFlat);
 
 #if ENABLE(SVG)

@@ -64,7 +64,7 @@ private:
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
 
     // We need to allocate a layer whenever we have an overflow clip as RenderTableSection::paintObject does not push rows' clips.
-    virtual bool requiresLayer() const OVERRIDE { return isTransparent() || hasOverflowClip() || hasTransform() || hasHiddenBackface() || hasMask() || hasFilter(); }
+    virtual bool requiresLayer() const OVERRIDE { return isTransparent() || hasOverflowClip() || hasTransform() || hasHiddenBackface() || hasMask() || hasFilter() || (style()->blendMode() != BlendModeNormal); }
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
 

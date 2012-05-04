@@ -592,6 +592,9 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             return StyleDifferenceRepaintLayer;
     }
 
+    if (noninherited_flags._effectiveBlendMode != other->noninherited_flags._effectiveBlendMode)
+        return StyleDifferenceRepaintLayer;
+
     if (rareNonInheritedData->opacity != other->rareNonInheritedData->opacity) {
 #if USE(ACCELERATED_COMPOSITING)
         changedContextSensitiveProperties |= ContextSensitivePropertyOpacity;
@@ -646,9 +649,6 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             return StyleDifferenceRepaint;
 
 #if USE(ACCELERATED_COMPOSITING)
-    if (noninherited_flags._effectiveBlendMode != other->noninherited_flags._effectiveBlendMode)
-        return StyleDifferenceRecompositeLayer;
-
     if (rareNonInheritedData.get() != other->rareNonInheritedData.get()) {
         if (rareNonInheritedData->m_transformStyle3D != other->rareNonInheritedData->m_transformStyle3D
             || rareNonInheritedData->m_backfaceVisibility != other->rareNonInheritedData->m_backfaceVisibility

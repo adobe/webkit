@@ -4676,6 +4676,7 @@ bool RenderLayer::shouldBeNormalFlowOnly() const
 #if ENABLE(CSS_FILTERS)
             && !renderer()->hasFilter()
 #endif
+            && renderer()->style()->blendMode() == BlendModeNormal
             && !isTransparent();
 }
 
