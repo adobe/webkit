@@ -11,8 +11,8 @@ Demos of prototype features in this build can be found at
 
 General Changes
 ---------------
-
 In order to make it easy to test the new experimental features, the prototype build enables CSS Regions and CSS Shaders by default. It only enables them the first time it runs, adding a new flag called "browser.adobe-may2012-prototype-features-enabled" in the Chromium's settings to prevent subsequent changes. Other developer builds of Chromium will also be affected by the changed settings for CSS Regions and CSS Shaders.
+
 
 CSS Regions
 -----------
@@ -53,7 +53,7 @@ This change temporarily breaks SVG animations and SVG DOM access for the 'transf
 
 Windows Build
 -------------
-Note that DirectX is needed, which can be downloaded from the following address: 
+Note that if you are using the Windows build DirectX is needed, which can be downloaded from the following address: 
 (http://www.microsoft.com/download/en/details.aspx?displaylang=en%3fWT.mc_id%3dMSCOM_DLC_US_DR_111SXX02959&id=35)
 
 
