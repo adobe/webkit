@@ -32,10 +32,103 @@
 #include "GraphicsContext.h"
 #include "GraphicsContext3D.h"
 
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
+#include <wtf/text/StringBuilder.h>
+
 #define SHADER0(Src) #Src
 #define SHADER(Src) SHADER0(Src)
 
 namespace WebCore {
+
+static void blendComponents(StringBuilder& builder, const char* formula)
+{
+    builder.append("float blendColorComponents(float backgroundColor, float sourceColor) {");
+    builder.append(formula);
+    builder.append("}");
+    builder.append("vec3 blendColors(vec3 backgroundColor, vec3 sourceColor) {");
+    builder.append("    return vec3(blendColorComponents(backgroundColor.r, sourceColor.r), blendColorComponents(backgroundColor.g, sourceColor.g), blendColorComponents(backgroundColor.b, sourceColor.b));");
+    builder.append("}");
+}
+
+static void blendColors(StringBuilder& builder, const char* formula)
+{
+    builder.append("vec3 blendColors(vec3 backgroundColor, vec3 sourceColor) {");
+    builder.append(formula);
+    builder.append("}");
+}
+
+// The result of the method expects to have a method called blend, that will do the blending.
+// vec4 blend(vec4 sourceColor)
+static String formulaForBlendMode(EBlendMode blendMode)
+{
+    StringBuilder builder;
+    builder.append("uniform sampler2D s_backgroundTexture;");
+    switch (blendMode) {
+        case BlendModeNormal:
+            blendColors(builder, "return sourceColor;");
+            break;
+        case BlendModePlus:
+            blendColors(builder, "return sourceColor + backgroundColor;");
+            break;
+        case BlendModeMultiply:
+            blendColors(builder, "return sourceColor * backgroundColor;");
+            break;
+        case BlendModeScreen:
+            blendColors(builder, "return backgroundColor + sourceColor - (backgroundColor * sourceColor);");
+            break;
+        case BlendModeDifference:
+            blendColors(builder, "return abs(backgroundColor - sourceColor);");
+            break;
+        case BlendModeExclusion:
+            blendColors(builder, "return backgroundColor + sourceColor - 2.0 * backgroundColor * sourceColor;");
+            break;
+        case BlendModeDarken:
+            blendColors(builder, "return min(sourceColor, backgroundColor);");
+            break;
+        case BlendModeLighten:
+            blendColors(builder, "return max(sourceColor, backgroundColor);");
+            break;
+        case BlendModeColorDodge:
+            blendComponents(builder, "return clamp(1.0 - min(1.0, sourceColor / (1.0 - backgroundColor)), 0.0, 1.0);");
+            break;
+        case BlendModeColorBurn:
+            blendComponents(builder, "return clamp(1.0 - min(1.0, (1.0 - backgroundColor) / sourceColor), 0.0, 1.0);");
+            break;
+        case BlendModeOverlay:
+            blendComponents(builder, "return float(backgroundColor <= 0.5) * sourceColor * backgroundColor + float(backgroundColor > 0.5) * (sourceColor + backgroundColor - sourceColor * backgroundColor);");
+            break;
+        
+        case BlendModeHardLight:
+        case BlendModeSoftLight:
+        case BlendModeHue:
+        case BlendModeSaturation:
+        case BlendModeColor:
+        case BlendModeLuminosity:
+            blendColors(builder, "return sourceColor;");
+            break;
+    }
+    builder.append(
+        SHADER(
+            vec4 unmultiply(vec4 premultipliedSourceColor) {
+                return vec4(clamp(premultipliedSourceColor.rgb / premultipliedSourceColor.a, 0.0, 1.0), premultipliedSourceColor.a);
+            }
+            vec4 composite(float alphaA, float Fa, vec3 Ca, 
+                           float alphaB, float Fb, vec3 Cb) {
+                return clamp(vec4(alphaA * Fa * Ca + alphaB * Fb * Cb, 
+                                  alphaA * Fa + alphaB * Fb), 0.0, 1.0);
+            }
+            vec4 blend(vec4 sourceColor) {
+                vec4 backgroundColor = (texture2D(s_backgroundTexture, v_texCoord));
+                float Fa = 1.0;
+                float Fb = 1.0 - sourceColor.a;
+                return composite(sourceColor.a, Fa, blendColors(backgroundColor.rgb, sourceColor.rgb),
+                                 backgroundColor.a, Fb, backgroundColor.rgb);
+            }
+        )
+    );
+    return builder.toString();
+}
 
 VertexShaderPosTex::VertexShaderPosTex()
     : m_matrixLocation(-1)
@@ -271,16 +364,22 @@ String VertexShaderVideoTransform::getShaderString() const
 
 FragmentTexAlphaBinding::FragmentTexAlphaBinding()
     : m_samplerLocation(-1)
+    , m_backgroundSamplerLocation(-1)
     , m_alphaLocation(-1)
 {
 }
 
-void FragmentTexAlphaBinding::init(GraphicsContext3D* context, unsigned program)
+void FragmentTexAlphaBinding::init(GraphicsContext3D* context, unsigned program, bool needsBackgroundTexture)
 {
     m_samplerLocation = context->getUniformLocation(program, "s_texture");
     m_alphaLocation = context->getUniformLocation(program, "alpha");
 
     ASSERT(m_samplerLocation != -1 && m_alphaLocation != -1);
+    
+    if (needsBackgroundTexture) {
+        m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
+        ASSERT(m_backgroundSamplerLocation != -1);
+    }
 }
 
 FragmentTexOpaqueBinding::FragmentTexOpaqueBinding()
@@ -344,6 +443,23 @@ String FragmentShaderRGBATexAlpha::getShaderString() const
             gl_FragColor = texColor * alpha;
         }
     );
+}
+
+String FragmentShaderRGBATexAlpha::getShaderString(EBlendMode blendMode) const
+{
+    String blending = formulaForBlendMode(blendMode);
+    return String::format(SHADER(
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform sampler2D s_texture;
+        uniform float alpha;
+        %s
+        void main()
+        {
+            vec4 texColor = texture2D(s_texture, v_texCoord);
+            gl_FragColor = blend(texColor * alpha);
+        }
+    ), blending.latin1().data());
 }
 
 String FragmentShaderRGBATexRectFlipAlpha::getShaderString() const
@@ -435,18 +551,24 @@ String FragmentShaderRGBATexSwizzleOpaque::getShaderString() const
 
 FragmentShaderRGBATexAlphaAA::FragmentShaderRGBATexAlphaAA()
     : m_samplerLocation(-1)
+    , m_backgroundSamplerLocation(-1)
     , m_alphaLocation(-1)
     , m_edgeLocation(-1)
 {
 }
 
-void FragmentShaderRGBATexAlphaAA::init(GraphicsContext3D* context, unsigned program)
+void FragmentShaderRGBATexAlphaAA::init(GraphicsContext3D* context, unsigned program, bool needsBackgroundTexture)
 {
     m_samplerLocation = context->getUniformLocation(program, "s_texture");
     m_alphaLocation = context->getUniformLocation(program, "alpha");
     m_edgeLocation = context->getUniformLocation(program, "edge");
 
     ASSERT(m_samplerLocation != -1 && m_alphaLocation != -1 && m_edgeLocation != -1);
+    
+    if (needsBackgroundTexture) {
+        m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
+        ASSERT(m_backgroundSamplerLocation != -1);
+    }
 }
 
 String FragmentShaderRGBATexAlphaAA::getShaderString() const
@@ -472,6 +594,33 @@ String FragmentShaderRGBATexAlphaAA::getShaderString() const
             gl_FragColor = texColor * alpha * min(min(a0, a2) * min(a1, a3), min(a4, a6) * min(a5, a7));
         }
     );
+}
+
+String FragmentShaderRGBATexAlphaAA::getShaderString(EBlendMode blendMode) const
+{
+    String blending = formulaForBlendMode(blendMode);
+    return String::format(SHADER(
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform sampler2D s_texture;
+        uniform float alpha;
+        uniform vec3 edge[8];
+        %s
+        void main()
+        {
+            vec4 texColor = texture2D(s_texture, v_texCoord);
+            vec3 pos = vec3(gl_FragCoord.xy, 1);
+            float a0 = clamp(dot(edge[0], pos), 0.0, 1.0);
+            float a1 = clamp(dot(edge[1], pos), 0.0, 1.0);
+            float a2 = clamp(dot(edge[2], pos), 0.0, 1.0);
+            float a3 = clamp(dot(edge[3], pos), 0.0, 1.0);
+            float a4 = clamp(dot(edge[4], pos), 0.0, 1.0);
+            float a5 = clamp(dot(edge[5], pos), 0.0, 1.0);
+            float a6 = clamp(dot(edge[6], pos), 0.0, 1.0);
+            float a7 = clamp(dot(edge[7], pos), 0.0, 1.0);
+            gl_FragColor = blend(texColor * alpha * min(min(a0, a2) * min(a1, a3), min(a4, a6) * min(a5, a7)));
+        }
+    ), blending.latin1().data());
 }
 
 FragmentTexClampAlphaAABinding::FragmentTexClampAlphaAABinding()
@@ -548,17 +697,23 @@ String FragmentShaderRGBATexClampSwizzleAlphaAA::getShaderString() const
 
 FragmentShaderRGBATexAlphaMask::FragmentShaderRGBATexAlphaMask()
     : m_samplerLocation(-1)
+    , m_backgroundSamplerLocation(-1)
     , m_maskSamplerLocation(-1)
     , m_alphaLocation(-1)
 {
 }
 
-void FragmentShaderRGBATexAlphaMask::init(GraphicsContext3D* context, unsigned program)
+void FragmentShaderRGBATexAlphaMask::init(GraphicsContext3D* context, unsigned program, bool needsBackgroundTexture)
 {
     m_samplerLocation = context->getUniformLocation(program, "s_texture");
     m_maskSamplerLocation = context->getUniformLocation(program, "s_mask");
     m_alphaLocation = context->getUniformLocation(program, "alpha");
     ASSERT(m_samplerLocation != -1 && m_maskSamplerLocation != -1 && m_alphaLocation != -1);
+    
+    if (needsBackgroundTexture) {
+        m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
+        ASSERT(m_backgroundSamplerLocation != -1);
+    }
 }
 
 String FragmentShaderRGBATexAlphaMask::getShaderString() const
@@ -578,21 +733,46 @@ String FragmentShaderRGBATexAlphaMask::getShaderString() const
     );
 }
 
+String FragmentShaderRGBATexAlphaMask::getShaderString(EBlendMode blendMode) const
+{
+    String blending = formulaForBlendMode(blendMode);
+    return String::format(SHADER(
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform sampler2D s_texture;
+        uniform sampler2D s_mask;
+        uniform float alpha;
+        %s
+        void main()
+        {
+            vec4 texColor = texture2D(s_texture, v_texCoord);
+            vec4 maskColor = texture2D(s_mask, v_texCoord);
+            gl_FragColor = blend(vec4(texColor.x, texColor.y, texColor.z, texColor.w) * alpha * maskColor.w);
+        }
+    ), blending.latin1().data());
+}
+
 FragmentShaderRGBATexAlphaMaskAA::FragmentShaderRGBATexAlphaMaskAA()
     : m_samplerLocation(-1)
+    , m_backgroundSamplerLocation(-1)
     , m_maskSamplerLocation(-1)
     , m_alphaLocation(-1)
     , m_edgeLocation(-1)
 {
 }
 
-void FragmentShaderRGBATexAlphaMaskAA::init(GraphicsContext3D* context, unsigned program)
+void FragmentShaderRGBATexAlphaMaskAA::init(GraphicsContext3D* context, unsigned program, bool needsBackgroundTexture)
 {
     m_samplerLocation = context->getUniformLocation(program, "s_texture");
     m_maskSamplerLocation = context->getUniformLocation(program, "s_mask");
     m_alphaLocation = context->getUniformLocation(program, "alpha");
     m_edgeLocation = context->getUniformLocation(program, "edge");
     ASSERT(m_samplerLocation != -1 && m_maskSamplerLocation != -1 && m_alphaLocation != -1 && m_edgeLocation != -1);
+    
+    if (needsBackgroundTexture) {
+        m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
+        ASSERT(m_backgroundSamplerLocation != -1);
+    }
 }
 
 String FragmentShaderRGBATexAlphaMaskAA::getShaderString() const
@@ -620,6 +800,35 @@ String FragmentShaderRGBATexAlphaMaskAA::getShaderString() const
             gl_FragColor = vec4(texColor.x, texColor.y, texColor.z, texColor.w) * alpha * maskColor.w * min(min(a0, a2) * min(a1, a3), min(a4, a6) * min(a5, a7));
         }
     );
+}
+
+String FragmentShaderRGBATexAlphaMaskAA::getShaderString(EBlendMode blendMode) const
+{
+    String blending = formulaForBlendMode(blendMode);
+    return String::format(SHADER(
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform sampler2D s_texture;
+        uniform sampler2D s_mask;
+        uniform float alpha;
+        uniform vec3 edge[8];
+        %s
+        void main()
+        {
+            vec4 texColor = texture2D(s_texture, v_texCoord);
+            vec4 maskColor = texture2D(s_mask, v_texCoord);
+            vec3 pos = vec3(gl_FragCoord.xy, 1);
+            float a0 = clamp(dot(edge[0], pos), 0.0, 1.0);
+            float a1 = clamp(dot(edge[1], pos), 0.0, 1.0);
+            float a2 = clamp(dot(edge[2], pos), 0.0, 1.0);
+            float a3 = clamp(dot(edge[3], pos), 0.0, 1.0);
+            float a4 = clamp(dot(edge[4], pos), 0.0, 1.0);
+            float a5 = clamp(dot(edge[5], pos), 0.0, 1.0);
+            float a6 = clamp(dot(edge[6], pos), 0.0, 1.0);
+            float a7 = clamp(dot(edge[7], pos), 0.0, 1.0);
+            gl_FragColor = blend(vec4(texColor.x, texColor.y, texColor.z, texColor.w) * alpha * maskColor.w * min(min(a0, a2) * min(a1, a3), min(a4, a6) * min(a5, a7)));
+        }
+    ), blending.latin1().data());
 }
 
 FragmentShaderYUVVideo::FragmentShaderYUVVideo()

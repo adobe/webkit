@@ -122,6 +122,8 @@ public:
     // Exposed for tests.
     LayerChromium* contentsLayer() const { return m_contentsLayer.get(); }
 
+    virtual void setBlendMode(EBlendMode);
+
 private:
     virtual void willBeDestroyed();
 

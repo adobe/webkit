@@ -60,8 +60,8 @@ public:
 
     void setScissorRect(LayerRendererChromium*, const FloatRect& surfaceDamageRect) const;
 
-    void drawContents(LayerRendererChromium*);
-    void drawReplica(LayerRendererChromium*);
+    void drawContents(LayerRendererChromium*, EBlendMode);
+    void drawReplica(LayerRendererChromium*, EBlendMode);
 
     // Takes a texture with pixels in device space, and a transform from content space to the device. Copies the device-space texture back into
     // content space for the surface, storing the result in the backgroundTexture(). The surface's backgroundTexture() must be the active drawing target.
@@ -154,9 +154,10 @@ private:
     IntRect computeDeviceBoundingBox(LayerRendererChromium*, const TransformationMatrix& drawTransform) const;
     IntRect computeReadbackDeviceBoundingBox(LayerRendererChromium*, const TransformationMatrix& drawTransform) const;
 
-    void drawLayer(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix&, int contentsTextureId);
+    void drawLayer(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix&, int contentsTextureId, EBlendMode);
     template <class T>
-    void drawSurface(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad&, int contentsTextureId, const T* program, int shaderMaskSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation);
+    void drawSurface(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad&, int contentsTextureId, int backgroundTextureId, 
+                     const T* program, int shaderMaskSamplerLocation, int shaderBackgroundSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation);
 
     static void copyTextureToFramebuffer(LayerRendererChromium*, int textureId, const IntSize& bounds, const TransformationMatrix& drawMatrix);
 

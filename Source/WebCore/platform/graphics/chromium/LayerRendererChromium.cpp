@@ -562,14 +562,9 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     // Pixel copies in this algorithm occur at steps 2, 3, 4, and 5.
 
     CCRenderSurface* drawingSurface = quad->layer()->renderSurface();
-    if (drawingSurface->backgroundFilters().isEmpty())
+    if (drawingSurface->backgroundFilters().isEmpty() && quad->layer()->blendMode() == BlendModeNormal)
         return;
-
-    // FIXME: We only allow background filters on the root render surface because other surfaces may contain
-    // translucent pixels, and the contents behind those translucent pixels wouldn't have the filter applied.
-    if (!isCurrentRenderSurface(m_defaultRenderSurface))
-        return;
-
+    
     const TransformationMatrix& surfaceDrawTransform = quad->isReplica() ? drawingSurface->replicaDrawTransform() : drawingSurface->drawTransform();
 
     // FIXME: Do a single readback for both the surface and replica and cache the filtered results (once filter textures are not reused).
@@ -580,12 +575,16 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     if (!getFramebufferTexture(deviceBackgroundTexture.get(), deviceRect))
         return;
 
-    SkBitmap filteredDeviceBackground = drawingSurface->applyFilters(this, drawingSurface->backgroundFilters(), deviceBackgroundTexture.get());
-    if (!filteredDeviceBackground.getTexture())
-        return;
+    int filteredDeviceBackgroundTextureId = deviceBackgroundTexture->textureId();
 
-    GrTexture* texture = reinterpret_cast<GrTexture*>(filteredDeviceBackground.getTexture());
-    int filteredDeviceBackgroundTextureId = texture->getTextureHandle();
+    if (!drawingSurface->backgroundFilters().isEmpty()) {
+        SkBitmap filteredDeviceBackground = drawingSurface->applyFilters(this, drawingSurface->backgroundFilters(), deviceBackgroundTexture.get());
+        if (!filteredDeviceBackground.getTexture())
+            return;
+
+        GrTexture* texture = reinterpret_cast<GrTexture*>(filteredDeviceBackground.getTexture());
+        filteredDeviceBackgroundTextureId = texture->getTextureHandle();
+    }
 
     if (!drawingSurface->prepareBackgroundTexture(this))
         return;
@@ -608,9 +607,9 @@ void LayerRendererChromium::drawRenderSurfaceQuad(const CCRenderSurfaceDrawQuad*
 
     layer->renderSurface()->setScissorRect(this, quad->surfaceDamageRect());
     if (quad->isReplica())
-        layer->renderSurface()->drawReplica(this);
+        layer->renderSurface()->drawReplica(this, layer->blendMode());
     else
-        layer->renderSurface()->drawContents(this);
+        layer->renderSurface()->drawContents(this, layer->blendMode());
     layer->renderSurface()->releaseBackgroundTexture();
     layer->renderSurface()->releaseContentsTexture();
 }
@@ -1465,6 +1464,82 @@ const LayerRendererChromium::RenderSurfaceMaskProgramAA* LayerRendererChromium::
         m_renderSurfaceMaskProgramAA->initialize(m_context.get());
     }
     return m_renderSurfaceMaskProgramAA.get();
+}
+
+LayerRendererChromium::ProgramsWithBlending* LayerRendererChromium::getProgramsWithBlending(EBlendMode blendMode)
+{
+    if (!m_programsWithBlendingMap)
+        m_programsWithBlendingMap = adoptPtr(new ProgramsWithBlendingMap());
+    ProgramsWithBlendingMap::iterator iter = m_programsWithBlendingMap->find(blendMode);
+    if (iter != m_programsWithBlendingMap->end())
+        return iter->second.get();
+    ProgramsWithBlending* programs = new ProgramsWithBlending();
+    m_programsWithBlendingMap->add(blendMode, adoptPtr(programs));
+    return programs;
+}
+
+const LayerRendererChromium::RenderSurfaceProgram* LayerRendererChromium::renderSurfaceWithBlendingProgram(EBlendMode blendMode, bool hasBackgroundTexture)
+{
+    if (!hasBackgroundTexture) {
+        ASSERT(!hasBackgroundTexture);
+        return renderSurfaceProgram();
+    }
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    if (!programs->m_renderSurfaceProgram)
+        programs->m_renderSurfaceProgram = adoptPtr(new RenderSurfaceProgram(m_context.get(), blendMode));
+    if (!programs->m_renderSurfaceProgram->initialized()) {
+        TRACE_EVENT("LayerRendererChromium::RenderSurfaceWithBlendingProgram::initialize", this, 0);
+        programs->m_renderSurfaceProgram->initializeWithBackgroundTexture(m_context.get());
+    }
+    return programs->m_renderSurfaceProgram.get();
+}
+
+const LayerRendererChromium::RenderSurfaceProgramAA* LayerRendererChromium::renderSurfaceWithBlendingProgramAA(EBlendMode blendMode, bool hasBackgroundTexture)
+{
+    if (!hasBackgroundTexture) {
+        ASSERT(!hasBackgroundTexture);
+        return renderSurfaceProgramAA();
+    }
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    if (!programs->m_renderSurfaceProgramAA)
+        programs->m_renderSurfaceProgramAA = adoptPtr(new RenderSurfaceProgramAA(m_context.get(), blendMode));
+    if (!programs->m_renderSurfaceProgramAA->initialized()) {
+        TRACE_EVENT("LayerRendererChromium::RenderSurfaceWithBlendingProgramAA::initialize", this, 0);
+        programs->m_renderSurfaceProgramAA->initializeWithBackgroundTexture(m_context.get());
+    }
+    return programs->m_renderSurfaceProgramAA.get();
+}
+
+const LayerRendererChromium::RenderSurfaceMaskProgram* LayerRendererChromium::renderSurfaceMaskWithBlendingProgram(EBlendMode blendMode, bool hasBackgroundTexture)
+{
+    if (!hasBackgroundTexture) {
+        ASSERT(!hasBackgroundTexture);
+        return renderSurfaceMaskProgram();
+    }
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    if (!programs->m_renderSurfaceMaskProgram)
+        programs->m_renderSurfaceMaskProgram = adoptPtr(new RenderSurfaceMaskProgram(m_context.get(), blendMode));
+    if (!programs->m_renderSurfaceMaskProgram->initialized()) {
+        TRACE_EVENT("LayerRendererChromium::RenderSurfaceMaskWithBlendingProgram::initialize", this, 0);
+        programs->m_renderSurfaceMaskProgram->initializeWithBackgroundTexture(m_context.get());
+    }
+    return programs->m_renderSurfaceMaskProgram.get();
+}
+
+const LayerRendererChromium::RenderSurfaceMaskProgramAA* LayerRendererChromium::renderSurfaceMaskWithBlendingProgramAA(EBlendMode blendMode, bool hasBackgroundTexture)
+{
+    if (!hasBackgroundTexture) {
+        ASSERT(!hasBackgroundTexture);
+        return renderSurfaceMaskProgramAA();
+    }
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    if (!programs->m_renderSurfaceMaskProgramAA)
+        programs->m_renderSurfaceMaskProgramAA = adoptPtr(new RenderSurfaceMaskProgramAA(m_context.get(), blendMode));
+    if (!programs->m_renderSurfaceMaskProgramAA->initialized()) {
+        TRACE_EVENT("LayerRendererChromium::RenderSurfaceMaskWithBlendingProgramAA::initialize", this, 0);
+        programs->m_renderSurfaceMaskProgramAA->initializeWithBackgroundTexture(m_context.get());
+    }
+    return programs->m_renderSurfaceMaskProgramAA.get();
 }
 
 const LayerRendererChromium::TileProgram* LayerRendererChromium::tileProgram()

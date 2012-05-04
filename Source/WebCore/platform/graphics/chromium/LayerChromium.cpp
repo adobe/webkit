@@ -69,6 +69,7 @@ LayerChromium::LayerChromium()
     , m_backgroundColor(0, 0, 0, 0)
     , m_debugBorderWidth(0)
     , m_opacity(1.0)
+    , m_blendMode(BlendModeNormal)
     , m_anchorPointZ(0)
     , m_isDrawable(false)
     , m_masksToBounds(false)
@@ -323,6 +324,16 @@ void LayerChromium::setBackgroundFilters(const FilterOperations& backgroundFilte
     setNeedsCommit();
 }
 
+void LayerChromium::setBlendMode(EBlendMode blendMode)
+{
+    if (m_blendMode == blendMode)
+        return;
+    m_blendMode = blendMode;
+    setNeedsCommit();
+    if (m_blendMode != BlendModeNormal)
+        CCLayerTreeHost::setNeedsFilterContext(true);
+}
+
 void LayerChromium::setOpacity(float opacity)
 {
     if (m_opacity == opacity)
@@ -492,6 +503,7 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
 
     layer->setFilters(filters());
     layer->setBackgroundFilters(backgroundFilters());
+    layer->setBlendMode(blendMode());
     layer->setIsNonCompositedContent(m_isNonCompositedContent);
     layer->setMasksToBounds(m_masksToBounds);
     layer->setScrollable(m_scrollable);

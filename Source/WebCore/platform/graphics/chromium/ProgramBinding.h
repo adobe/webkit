@@ -30,6 +30,7 @@
 
 #include "PlatformString.h"
 #include "TraceEvent.h"
+#include "RenderStyleConstants.h"
 
 namespace WebCore {
 
@@ -62,8 +63,13 @@ public:
     {
         ProgramBindingBase::init(context, m_vertexShader.getShaderString(), m_fragmentShader.getShaderString());
     }
+    
+    explicit ProgramBinding(GraphicsContext3D* context, EBlendMode blendMode)
+    {
+        ProgramBindingBase::init(context, m_vertexShader.getShaderString(), m_fragmentShader.getShaderString(blendMode));
+    }
 
-    void initialize(GraphicsContext3D* context)
+    void initialize(GraphicsContext3D* context, bool needsBackgroundTexture = false)
     {
         ASSERT(context);
         ASSERT(m_program);
@@ -71,6 +77,17 @@ public:
 
         m_vertexShader.init(context, m_program);
         m_fragmentShader.init(context, m_program);
+        m_initialized = true;
+    }
+    
+    void initializeWithBackgroundTexture(GraphicsContext3D* context)
+    {
+        ASSERT(context);
+        ASSERT(m_program);
+        ASSERT(!m_initialized);
+
+        m_vertexShader.init(context, m_program);
+        m_fragmentShader.init(context, m_program, true);
         m_initialized = true;
     }
 

@@ -464,7 +464,7 @@ enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowStart, WrapFlowEnd, WrapFlow
 
 enum WrapThrough { WrapThroughWrap, WrapThroughNone };
     
-enum EBlendMode { BlendModeNormal, BlendModePlus, BlendModeMultiply, BlendModeScreen, BlendModeOverlay, BlendModeDarken, BlendModeLighten, BlendModeColorDodge, BlendModeColorBurn, BlendModeHardLight, BlendModeSoftLight, BlendModeDifference, BlendModeExclusion, BlendModeHue, BlendModeSaturation, BlendModeColor, BlendModeLuminosity };
+enum EBlendMode { BlendModeNormal = 1, BlendModePlus, BlendModeMultiply, BlendModeScreen, BlendModeOverlay, BlendModeDarken, BlendModeLighten, BlendModeColorDodge, BlendModeColorBurn, BlendModeHardLight, BlendModeSoftLight, BlendModeDifference, BlendModeExclusion, BlendModeHue, BlendModeSaturation, BlendModeColor, BlendModeLuminosity };
 
 } // namespace WebCore
 

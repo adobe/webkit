@@ -30,6 +30,7 @@
 
 #include "PlatformString.h"
 #include "SkColorPriv.h"
+#include "RenderStyleConstants.h"
 
 namespace WebCore {
 
@@ -152,14 +153,16 @@ class FragmentTexAlphaBinding {
 public:
     FragmentTexAlphaBinding();
 
-    void init(GraphicsContext3D*, unsigned program);
+    void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     int alphaLocation() const { return m_alphaLocation; }
     int edgeLocation() const { return -1; }
     int fragmentTexTransformLocation() const { return -1; }
     int samplerLocation() const { return m_samplerLocation; }
+    int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
 
 private:
     int m_samplerLocation;
+    int m_backgroundSamplerLocation;
     int m_alphaLocation;
 };
 
@@ -185,6 +188,7 @@ public:
 class FragmentShaderRGBATexAlpha : public FragmentTexAlphaBinding {
 public:
     String getShaderString() const;
+    String getShaderString(EBlendMode) const;
 };
 
 class FragmentShaderRGBATexRectFlipAlpha : public FragmentTexAlphaBinding {
@@ -232,15 +236,18 @@ class FragmentShaderRGBATexAlphaAA {
 public:
     FragmentShaderRGBATexAlphaAA();
 
-    void init(GraphicsContext3D*, unsigned program);
+    void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     String getShaderString() const;
+    String getShaderString(EBlendMode) const;
 
     int alphaLocation() const { return m_alphaLocation; }
     int samplerLocation() const { return m_samplerLocation; }
+    int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
     int edgeLocation() const { return m_edgeLocation; }
 
 private:
     int m_samplerLocation;
+    int m_backgroundSamplerLocation;
     int m_alphaLocation;
     int m_edgeLocation;
 };
@@ -277,14 +284,18 @@ class FragmentShaderRGBATexAlphaMask {
 public:
     FragmentShaderRGBATexAlphaMask();
     String getShaderString() const;
+    String getShaderString(EBlendMode) const;
 
-    void init(GraphicsContext3D*, unsigned program);
+    void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     int alphaLocation() const { return m_alphaLocation; }
     int samplerLocation() const { return m_samplerLocation; }
+    
+    int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
     int maskSamplerLocation() const { return m_maskSamplerLocation; }
 
 private:
     int m_samplerLocation;
+    int m_backgroundSamplerLocation;
     int m_maskSamplerLocation;
     int m_alphaLocation;
 };
@@ -293,15 +304,18 @@ class FragmentShaderRGBATexAlphaMaskAA {
 public:
     FragmentShaderRGBATexAlphaMaskAA();
     String getShaderString() const;
+    String getShaderString(EBlendMode) const;
 
-    void init(GraphicsContext3D*, unsigned program);
+    void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     int alphaLocation() const { return m_alphaLocation; }
     int samplerLocation() const { return m_samplerLocation; }
+    int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
     int maskSamplerLocation() const { return m_maskSamplerLocation; }
     int edgeLocation() const { return m_edgeLocation; }
 
 private:
     int m_samplerLocation;
+    int m_backgroundSamplerLocation;
     int m_maskSamplerLocation;
     int m_alphaLocation;
     int m_edgeLocation;

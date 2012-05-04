@@ -113,6 +113,9 @@ public:
     void setBackgroundFilters(const FilterOperations&);
     const FilterOperations& backgroundFilters() const { return m_backgroundFilters; }
 
+    void setBlendMode(EBlendMode);
+    EBlendMode blendMode() const { return m_blendMode; }
+
     void setMasksToBounds(bool);
     bool masksToBounds() const { return m_masksToBounds; }
 
@@ -335,6 +338,8 @@ private:
 
     FilterOperations m_filters;
     FilterOperations m_backgroundFilters;
+    
+    EBlendMode m_blendMode;
 
     TransformationMatrix m_drawTransform;
     TransformationMatrix m_screenSpaceTransform;

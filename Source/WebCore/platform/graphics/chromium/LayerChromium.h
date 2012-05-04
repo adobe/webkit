@@ -118,6 +118,9 @@ public:
     void setFilters(const FilterOperations&);
     const FilterOperations& filters() const { return m_filters; }
 
+    void setBlendMode(EBlendMode);
+    EBlendMode blendMode() const { return m_blendMode; }
+
     // Background filters are filters applied to what is behind this layer, when they are viewed through non-opaque
     // regions in this layer. They are used through the WebLayer interface, and are not exposed to HTML.
     void setBackgroundFilters(const FilterOperations&);
@@ -322,6 +325,7 @@ private:
     float m_opacity;
     FilterOperations m_filters;
     FilterOperations m_backgroundFilters;
+    EBlendMode m_blendMode;
     float m_anchorPointZ;
     bool m_isDrawable;
     bool m_masksToBounds;

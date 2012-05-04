@@ -75,6 +75,7 @@ unsigned ProgramBindingBase::loadShader(GraphicsContext3D* context, unsigned typ
     String sourceString(shaderSource);
     GLC(context, context->shaderSource(shader, sourceString));
     GLC(context, context->compileShader(shader));
+    printf("Compiled shader: %s\n", shaderSource.latin1().data());
 #ifndef NDEBUG
     int compiled = 0;
     GLC(context, context->getShaderiv(shader, GraphicsContext3D::COMPILE_STATUS, &compiled));

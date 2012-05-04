@@ -222,7 +222,7 @@ void CCRenderSurface::setScissorRect(LayerRendererChromium* layerRenderer, const
         GLC(layerRenderer->context(), layerRenderer->context()->disable(GraphicsContext3D::SCISSOR_TEST));
 }
 
-void CCRenderSurface::drawContents(LayerRendererChromium* layerRenderer)
+void CCRenderSurface::drawContents(LayerRendererChromium* layerRenderer, EBlendMode blendMode)
 {
     if (m_skipsDraw || !m_contentsTexture)
         return;
@@ -232,10 +232,10 @@ void CCRenderSurface::drawContents(LayerRendererChromium* layerRenderer)
     SkBitmap filterBitmap = applyFilters(layerRenderer, m_filters, m_contentsTexture.get());
 
     int contentsTextureId = getSkBitmapTextureId(filterBitmap, m_contentsTexture->textureId());
-    drawLayer(layerRenderer, m_maskLayer, m_drawTransform, contentsTextureId);
+    drawLayer(layerRenderer, m_maskLayer, m_drawTransform, contentsTextureId, blendMode);
 }
 
-void CCRenderSurface::drawReplica(LayerRendererChromium* layerRenderer)
+void CCRenderSurface::drawReplica(LayerRendererChromium* layerRenderer, EBlendMode blendMode)
 {
     ASSERT(hasReplica());
     if (!hasReplica() || m_skipsDraw || !m_contentsTexture)
@@ -255,20 +255,16 @@ void CCRenderSurface::drawReplica(LayerRendererChromium* layerRenderer)
         replicaMaskLayer = m_owningLayer->replicaLayer()->maskLayer();
 
     int contentsTextureId = getSkBitmapTextureId(filterBitmap, m_contentsTexture->textureId());
-    drawLayer(layerRenderer, replicaMaskLayer, m_replicaDrawTransform, contentsTextureId);
+    drawLayer(layerRenderer, replicaMaskLayer, m_replicaDrawTransform, contentsTextureId, blendMode);
 }
 
-void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, int contentsTextureId)
+void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, int contentsTextureId, EBlendMode blendMode)
 {
     TransformationMatrix deviceMatrix = computeDeviceTransform(layerRenderer, drawTransform);
 
     // Can only draw surface if device matrix is invertible.
     if (!deviceMatrix.isInvertible())
         return;
-
-    // Draw the background texture if there is one.
-    if (m_backgroundTexture && m_backgroundTexture->isReserved())
-        copyTextureToFramebuffer(layerRenderer, m_backgroundTexture->textureId(), m_contentRect.size(), drawTransform);
 
     FloatQuad quad = deviceMatrix.mapQuad(layerRenderer->sharedGeometryQuad());
     CCLayerQuad deviceRect = CCLayerQuad(FloatQuad(quad.boundingBox()));
@@ -287,29 +283,30 @@ void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImp
         if (!maskLayer->bounds().isEmpty())
             useMask = true;
 
-    // FIXME: pass in backgroundTextureId and blend the background in with this draw instead of having a separate drawBackground() pass.
-
+    bool hasBackgroundTexture = m_backgroundTexture && m_backgroundTexture->isReserved();
+    int backgroundTextureId = hasBackgroundTexture ? m_backgroundTexture->textureId() : -1;
     if (useMask) {
         if (useAA) {
-            const LayerRendererChromium::RenderSurfaceMaskProgramAA* program = layerRenderer->renderSurfaceMaskProgramAA();
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, program, program->fragmentShader().maskSamplerLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
+            const LayerRendererChromium::RenderSurfaceMaskProgramAA* program = layerRenderer->renderSurfaceMaskWithBlendingProgramAA(blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
         } else {
-            const LayerRendererChromium::RenderSurfaceMaskProgram* program = layerRenderer->renderSurfaceMaskProgram();
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, program, program->fragmentShader().maskSamplerLocation(), -1, -1);
+            const LayerRendererChromium::RenderSurfaceMaskProgram* program = layerRenderer->renderSurfaceMaskWithBlendingProgram(blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), -1, -1);
         }
     } else {
         if (useAA) {
-            const LayerRendererChromium::RenderSurfaceProgramAA* program = layerRenderer->renderSurfaceProgramAA();
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, program, -1, program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
+            const LayerRendererChromium::RenderSurfaceProgramAA* program = layerRenderer->renderSurfaceWithBlendingProgramAA(blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, program->fragmentShader().backgroundSamplerLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
         } else {
-            const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceProgram();
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, program, -1, -1, -1);
+            const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceWithBlendingProgram(blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, program->fragmentShader().backgroundSamplerLocation(), -1, -1);
         }
     }
 }
 
 template <class T>
-void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad& layerQuad, int contentsTextureId, const T* program, int shaderMaskSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation)
+void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad& layerQuad, int contentsTextureId, 
+                                  int backgroundTextureId, const T* program, int shaderMaskSamplerLocation, int shaderBackgroundSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation)
 {
     GraphicsContext3D* context3D = layerRenderer->context();
 
@@ -324,6 +321,15 @@ void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerI
         GLC(context3D, context3D->activeTexture(GraphicsContext3D::TEXTURE1));
         GLC(context3D, context3D->uniform1i(shaderMaskSamplerLocation, 1));
         maskLayer->bindContentsTexture(layerRenderer);
+        GLC(context3D, context3D->activeTexture(GraphicsContext3D::TEXTURE0));
+    }
+    
+    if (shaderBackgroundSamplerLocation != -1) {
+        // Disable the blending as we are doing the blending in the shader.
+        GLC(context3D, context3D->disable(GraphicsContext3D::BLEND));
+        GLC(context3D, context3D->activeTexture(GraphicsContext3D::TEXTURE2));
+        GLC(context3D, context3D->uniform1i(shaderBackgroundSamplerLocation, 2));
+        context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, backgroundTextureId);
         GLC(context3D, context3D->activeTexture(GraphicsContext3D::TEXTURE0));
     }
 

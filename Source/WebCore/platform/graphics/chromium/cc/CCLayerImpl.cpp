@@ -67,6 +67,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_drawOpacityIsAnimating(false)
     , m_debugBorderColor(0, 0, 0, 0)
     , m_debugBorderWidth(0)
+    , m_blendMode(BlendModeNormal)
     , m_drawTransformIsAnimating(false)
     , m_screenSpaceTransformIsAnimating(false)
 #ifndef NDEBUG
@@ -425,6 +426,15 @@ void CCLayerImpl::setBackgroundFilters(const FilterOperations& backgroundFilters
 
     m_backgroundFilters = backgroundFilters;
     m_layerPropertyChanged = true;
+}
+
+void CCLayerImpl::setBlendMode(EBlendMode blendMode)
+{
+    if (m_blendMode == blendMode)
+        return;
+
+    m_blendMode = blendMode;
+    noteLayerPropertyChangedForSubtree();
 }
 
 void CCLayerImpl::setMasksToBounds(bool masksToBounds)

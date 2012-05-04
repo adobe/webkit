@@ -456,6 +456,12 @@ void GraphicsLayerChromium::setContentsToMedia(PlatformLayer* layer)
         updateChildList();
 }
 
+void GraphicsLayerChromium::setBlendMode(EBlendMode blendMode)
+{
+    m_layer->setBlendMode(blendMode);
+    GraphicsLayer::setBlendMode(blendMode);
+}
+
 PlatformLayer* GraphicsLayerChromium::hostLayerForChildren() const
 {
     return m_transformLayer ? m_transformLayer.get() : m_layer.get();
