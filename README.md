@@ -6,6 +6,8 @@ may2012-f2f-prototype
 General Changes
 ---------------
 
+In order to make it easy to test the new experimental features, the prototype build will enable CSS Regions and CSS Shaders by default. It will only enable them the first time it runs, so it will add a new flag called "browser.adobe-may2012-prototype-features-enabled" in the Chromium's settings.
+
 CSS Regions
 -----------
 The prototype includes support to specify *height: auto* and *width: auto* on Region elements. For more information please visit the [CSS Regions Specification](http://dev.w3.org/csswg/css3-regions/#regions-visual-formatting-steps).
