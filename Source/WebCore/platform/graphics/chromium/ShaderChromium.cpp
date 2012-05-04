@@ -96,7 +96,12 @@ static String formulaForBlendMode(EBlendMode blendMode)
             blendComponents(builder, "return clamp(1.0 - min(1.0, (1.0 - backgroundColor) / sourceColor), 0.0, 1.0);");
             break;
         case BlendModeOverlay:
-            blendComponents(builder, "return float(backgroundColor <= 0.5) * sourceColor * backgroundColor + float(backgroundColor > 0.5) * (sourceColor + backgroundColor - sourceColor * backgroundColor);");
+            blendComponents(builder, SHADER(
+                if (backgroundColor <= 0.5)
+                    return sourceColor * 2.0 * backgroundColor;
+                backgroundColor = 2.0 * backgroundColor - 1.0;
+                return sourceColor + backgroundColor - (sourceColor * backgroundColor);
+            ));
             break;
         case BlendModeHardLight:
             blendComponents(builder, SHADER(

@@ -593,7 +593,7 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     TransformationMatrix contentsDeviceTransform = drawingSurface->computeDeviceTransform(this, surfaceDrawTransform);
 
     CCRenderSurface* targetRenderSurface = m_currentRenderSurface;
-    if (useManagedTexture(drawingSurface->backgroundTexture(), drawingSurface->contentRect())) {
+    if (useManagedTexture(drawingSurface->backgroundTexture(), IntRect(0, 0, drawingSurface->contentRect().width(), drawingSurface->contentRect().height()))) {
         drawingSurface->copyDeviceToBackgroundTexture(this, filteredDeviceBackgroundTextureId, deviceRect, contentsDeviceTransform);
         useRenderSurface(targetRenderSurface);
     }

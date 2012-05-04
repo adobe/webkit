@@ -172,7 +172,7 @@ IntRect CCRenderSurface::readbackDeviceContentRect(LayerRendererChromium* layerR
 void CCRenderSurface::copyTextureToFramebuffer(LayerRendererChromium* layerRenderer, int textureId, const IntSize& bounds, const TransformationMatrix& drawMatrix)
 {
     const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceProgram();
-
+    GLC(layerRenderer->context(), layerRenderer->context()->clear(GraphicsContext3D::COLOR_BUFFER_BIT));
     GLC(layerRenderer->context(), layerRenderer->context()->activeTexture(GraphicsContext3D::TEXTURE0));
     GLC(layerRenderer->context(), layerRenderer->context()->bindTexture(GraphicsContext3D::TEXTURE_2D, textureId));
     GLC(layerRenderer->context(), layerRenderer->context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR));
