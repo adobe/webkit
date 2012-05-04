@@ -37,6 +37,10 @@ CSS Compositing
 
 + Added set of files that show proof-of-concept of these features in Safari, Chromium and a custom FireFox
 
+CSS Transforms
+-------------
+The [CSS3 Transforms Module](http://dev.w3.org/csswg/css3-transforms/) provides the possibility to transform the two- and three-dimensional coordinate space of elements in the SVG and HTML namespace. This turns the SVG 'transform' attribute into a presentation attribute.
+
 Windows Build
 -------------
 Note that DirectX is needed, which can be downloaded from the following address: 
