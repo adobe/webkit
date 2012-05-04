@@ -291,7 +291,12 @@ void GraphicsLayerChromium::setContentsOpaque(bool opaque)
 bool GraphicsLayerChromium::setFilters(const FilterOperations& filters)
 {
     m_layer->setFilters(filters);
-    return GraphicsLayer::setFilters(filters);
+    bool canRenderFilters = true;
+#if ENABLE(CSS_SHADERS)
+    if (filters.hasCustomFilter())
+        canRenderFilters = false;
+#endif
+    return GraphicsLayer::setFilters(filters) && canRenderFilters;
 }
 
 void GraphicsLayerChromium::setMaskLayer(GraphicsLayer* maskLayer)

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Adobe Systems, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,6 +42,9 @@
 
 namespace WebCore {
 
+// The following methods are building the shaders for the blend modes explained in CSS Compositing and Blending.
+// https://dvcs.w3.org/hg/FXTF/raw-file/782834d5c66c/compositing/index.html
+
 static void blendComponents(StringBuilder& builder, const char* formula)
 {
     builder.append("float blendColorComponents(float backgroundColor, float sourceColor) {");
@@ -56,6 +60,74 @@ static void blendColors(StringBuilder& builder, const char* formula)
     builder.append("vec3 blendColors(vec3 backgroundColor, vec3 sourceColor) {");
     builder.append(formula);
     builder.append("}");
+}
+
+
+static void nonSeparableBlendModesHelper(StringBuilder& builder, const char* formula)
+{
+    builder.append(
+        SHADER(
+            float sat(vec3 c) {
+                float cMin = min(min(c.r, c.g), c.b);
+                float cMax = max(max(c.r, c.g), c.b);
+                return cMax - cMin;
+            }
+
+            float lum(vec3 c) {
+                return 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+            }
+
+            vec3 clipColor(vec3 c) {
+                float l = lum(c);
+                float n = min(min(c.r, c.g), c.b);
+                float x = max(max(c.r, c.g), c.b);
+                if (n < 0.0)
+                    c = l + (((c - l) * l) / (l - n));
+                if (x > 1.0)
+                    c = l + (((c - l) * (1.0 - l) / (x - l)));
+                return c;
+            }
+
+            vec3 setLum(vec3 c, float l) {
+                c += l - lum(c);
+                return clipColor(c);
+            }
+
+            void setSatHelper(inout float cMin, inout float cMid, inout float cMax, float s) {
+                if(cMax > cMin) {
+                    cMid = (((cMid - cMin) * s) / (cMax - cMin));
+                    cMax = s;
+                } else {
+                    cMid = cMax = 0.0;
+                    cMin = 0.0;
+                }
+            }
+
+            vec3 setSat(vec3 c, float s) {
+                if (c.r <= c.g) {
+                    if (c.g <= c.b)
+                        setSatHelper(c.r, c.g, c.b, s); // r <= g <= b
+                    else {
+                        if (c.r <= c.b)
+                            setSatHelper(c.r, c.b, c.g, s); // r <= b <= g
+                        else
+                            setSatHelper(c.b, c.r, c.g, s); // // b <= r <= g
+                    }
+                } else {
+                    if (c.r <= c.b)
+                        setSatHelper(c.g, c.r, c.b, s); // g <= r <= b
+                    else {
+                        if (c.g <= c.b)
+                            setSatHelper(c.g, c.b, c.r, s); // y <= b <= r
+                        else 
+                            setSatHelper(c.b, c.g, c.r, s); // // b <= g <= r
+                    }
+                }
+                return c;
+            }
+        )
+    );
+    blendColors(builder, formula);
 }
 
 // The result of the method expects to have a method called blend, that will do the blending.
@@ -122,10 +194,16 @@ static String formulaForBlendMode(EBlendMode blendMode)
             ));
             break;
         case BlendModeHue:
+            nonSeparableBlendModesHelper(builder, "return setLum(setSat(sourceColor, sat(backgroundColor)), lum(backgroundColor));");
+            break;
         case BlendModeSaturation:
+            nonSeparableBlendModesHelper(builder, "return setLum(setSat(backgroundColor, sat(sourceColor)), lum(backgroundColor));");
+            break;
         case BlendModeColor:
+            nonSeparableBlendModesHelper(builder, "return setLum(sourceColor, lum(backgroundColor));");
+            break;
         case BlendModeLuminosity:
-            blendColors(builder, "return sourceColor;");
+            nonSeparableBlendModesHelper(builder, "return setLum(backgroundColor, lum(sourceColor));");
             break;
     }
     builder.append(
