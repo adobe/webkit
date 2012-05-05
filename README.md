@@ -6,7 +6,7 @@ may2012-f2f-prototype
 The source for this binary can be found at [webkit/may2012-f2f-prototype](https://github.com/adobe/webkit/tree/may2012-f2f-prototype)
 
 Demos of prototype features in this build can be found at
-* [web-platform/may2012-f2f-prototype](https://github.com/adobe/web-platform/blob/may2012-f2f-prototype/)
+* [web-platform/may2012-f2f-prototype](https://github.com/adobe/web-platform/tree/may2012-f2f-prototype/)
 * [hg.csswg.org](https://hg.csswg.org/test/file/7e6cd72828e8/contributors/adobe/incoming/css3-regions) (location will change after tests have been reviewed and accepted)
 
 General Changes
