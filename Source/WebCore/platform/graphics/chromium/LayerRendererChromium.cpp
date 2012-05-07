@@ -1262,7 +1262,7 @@ void LayerRendererChromium::getFramebufferPixels(void *pixels, const IntRect& re
 
 bool LayerRendererChromium::getFramebufferTexture(ManagedTexture* texture, const IntRect& deviceRect)
 {
-    if (!texture->reserve(deviceRect.size(), GraphicsContext3D::RGB))
+    if (!texture->reserve(deviceRect.size(), GraphicsContext3D::RGBA))
         return false;
 
     texture->bindTexture(m_context.get(), m_renderSurfaceTextureAllocator.get());
