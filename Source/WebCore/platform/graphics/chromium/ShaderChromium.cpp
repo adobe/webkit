@@ -99,8 +99,8 @@ static void nonSeparableBlendModesHelper(StringBuilder& builder, const char* for
                     cMax = s;
                 } else {
                     cMid = cMax = 0.0;
-                    cMin = 0.0;
                 }
+                cMin = 0.0;
             }
 
             vec3 setSat(vec3 c, float s) {
@@ -118,7 +118,7 @@ static void nonSeparableBlendModesHelper(StringBuilder& builder, const char* for
                         setSatHelper(c.g, c.r, c.b, s); // g <= r <= b
                     else {
                         if (c.g <= c.b)
-                            setSatHelper(c.g, c.b, c.r, s); // y <= b <= r
+                            setSatHelper(c.g, c.b, c.r, s); // g <= b <= r
                         else 
                             setSatHelper(c.b, c.g, c.r, s); // // b <= g <= r
                     }
@@ -163,10 +163,10 @@ static String formulaForBlendMode(EBlendMode blendMode)
             blendColors(builder, "return max(sourceColor, backgroundColor);");
             break;
         case BlendModeColorDodge:
-            blendComponents(builder, "return clamp(1.0 - min(1.0, sourceColor / (1.0 - backgroundColor)), 0.0, 1.0);");
+            blendComponents(builder, "return (sourceColor == 1.0) ? 0.0 : min(1.0, backgroundColor / (1.0 - sourceColor));");
             break;
         case BlendModeColorBurn:
-            blendComponents(builder, "return clamp(1.0 - min(1.0, (1.0 - backgroundColor) / sourceColor), 0.0, 1.0);");
+            blendComponents(builder, "return (sourceColor == 0.0) ? 0.0 : (1.0 - min(1.0, (1.0 - backgroundColor) / sourceColor));");
             break;
         case BlendModeOverlay:
             blendComponents(builder, SHADER(
