@@ -73,6 +73,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
 #if USE(ACCELERATED_COMPOSITING)
     , m_runningAcceleratedAnimation(false)
 #endif
+    , m_effectiveBlendMode(RenderStyle::initialBlendMode())
 {
     m_maskBoxImage.setMaskDefaults();
 }
@@ -142,6 +143,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
 #if USE(ACCELERATED_COMPOSITING)
     , m_runningAcceleratedAnimation(o.m_runningAcceleratedAnimation)
 #endif
+    , m_effectiveBlendMode(o.m_effectiveBlendMode)
 {
 }
 
@@ -216,7 +218,8 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_visitedLinkBorderBottomColor == o.m_visitedLinkBorderBottomColor
         && (m_regionBreakAfter == o.m_regionBreakAfter)
         && (m_regionBreakBefore == o.m_regionBreakBefore)
-        && (m_regionBreakInside == o.m_regionBreakInside);
+        && (m_regionBreakInside == o.m_regionBreakInside)
+        && (m_effectiveBlendMode == o.m_effectiveBlendMode);
 }
 
 bool StyleRareNonInheritedData::contentDataEquivalent(const StyleRareNonInheritedData& o) const

@@ -179,6 +179,8 @@ public:
     bool m_runningAcceleratedAnimation : 1;
 #endif
 
+    unsigned m_effectiveBlendMode: 5; // EBlendMode
+
 private:
     StyleRareNonInheritedData();
     StyleRareNonInheritedData(const StyleRareNonInheritedData&);

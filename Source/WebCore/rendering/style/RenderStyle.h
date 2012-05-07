@@ -291,7 +291,6 @@ protected:
                 && _page_break_after == other._page_break_after
                 && _page_break_inside == other._page_break_inside
                 && _styleType == other._styleType
-                && _effectiveBlendMode == other._effectiveBlendMode
                 && _affectedByHover == other._affectedByHover
                 && _affectedByActive == other._affectedByActive
                 && _affectedByDrag == other._affectedByDrag
@@ -320,8 +319,6 @@ protected:
 
         unsigned _styleType : 6; // PseudoId
         unsigned _pseudoBits : 7;
-        // FIXME: Having _effectiveBlendMode here is totally wrong!
-        unsigned _effectiveBlendMode: 5;
 
         bool affectedByHover() const { return _affectedByHover; }
         void setAffectedByHover(bool value) { _affectedByHover = value; }
@@ -382,7 +379,6 @@ protected:
         noninherited_flags.setAffectedByActive(false);
         noninherited_flags.setAffectedByDrag(false);
         noninherited_flags.setIsLink(false);
-        noninherited_flags._effectiveBlendMode = initialBlendMode();
     }
 
 private:
@@ -986,9 +982,8 @@ public:
     bool hasFilter() const { return false; }
 #endif
     
-    EBlendMode blendMode() const { return static_cast<EBlendMode>(noninherited_flags._effectiveBlendMode); }
-    void setBlendMode(EBlendMode v) { noninherited_flags._effectiveBlendMode = v; }
-    
+    EBlendMode blendMode() const { return static_cast<EBlendMode>(rareNonInheritedData->m_effectiveBlendMode); }
+    void setBlendMode(EBlendMode v) { rareNonInheritedData.access()->m_effectiveBlendMode = v; }
 
 #if USE(RTL_SCROLLBAR)
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
