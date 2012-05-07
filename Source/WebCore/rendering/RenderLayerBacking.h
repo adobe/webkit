@@ -166,6 +166,8 @@ public:
     
     void setBlendMode(EBlendMode);
     
+    void setAlphaCompositingMode(EAlphaCompositingMode);
+    
 private:
     void createPrimaryGraphicsLayer();
     void destroyGraphicsLayers();

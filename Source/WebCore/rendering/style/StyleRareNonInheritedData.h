@@ -180,6 +180,7 @@ public:
 #endif
 
     unsigned m_effectiveBlendMode: 5; // EBlendMode
+    unsigned m_alphaCompositingMode: 4; // EAlphaCompositingMode
 
 private:
     StyleRareNonInheritedData();

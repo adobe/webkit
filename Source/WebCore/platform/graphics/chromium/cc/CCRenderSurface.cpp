@@ -56,6 +56,7 @@ CCRenderSurface::CCRenderSurface(CCLayerImpl* owningLayer)
     , m_targetSurfaceTransformsAreAnimating(false)
     , m_screenSpaceTransformsAreAnimating(false)
     , m_blendMode(BlendModeNormal)
+    , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
     , m_nearestAncestorThatMovesPixels(0)
     , m_targetRenderSurfaceLayerIndexHistory(0)
     , m_currentLayerIndexHistory(0)
@@ -277,22 +278,22 @@ void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImp
     int backgroundTextureId = hasBackgroundTexture ? m_backgroundTexture->textureId() : -1;
     if (useMask) {
         if (useAA) {
-            const LayerRendererChromium::RenderSurfaceMaskProgramAA* program = layerRenderer->renderSurfaceMaskWithBlendingProgramAA(m_blendMode, hasBackgroundTexture);
+            const LayerRendererChromium::RenderSurfaceMaskProgramAA* program = layerRenderer->renderSurfaceMaskWithBlendingProgramAA(m_blendMode, m_alphaCompositingMode, hasBackgroundTexture);
             drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, 
                         program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), 
                         program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
         } else {
-            const LayerRendererChromium::RenderSurfaceMaskProgram* program = layerRenderer->renderSurfaceMaskWithBlendingProgram(m_blendMode, hasBackgroundTexture);
+            const LayerRendererChromium::RenderSurfaceMaskProgram* program = layerRenderer->renderSurfaceMaskWithBlendingProgram(m_blendMode, m_alphaCompositingMode, hasBackgroundTexture);
             drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, 
                         program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), -1, -1);
         }
     } else {
         if (useAA) {
-            const LayerRendererChromium::RenderSurfaceProgramAA* program = layerRenderer->renderSurfaceWithBlendingProgramAA(m_blendMode, hasBackgroundTexture);
+            const LayerRendererChromium::RenderSurfaceProgramAA* program = layerRenderer->renderSurfaceWithBlendingProgramAA(m_blendMode, m_alphaCompositingMode, hasBackgroundTexture);
             drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, 
                         program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
         } else {
-            const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceWithBlendingProgram(m_blendMode, hasBackgroundTexture);
+            const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceWithBlendingProgram(m_blendMode, m_alphaCompositingMode, hasBackgroundTexture);
             drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, 
                         program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), -1, -1);
         }

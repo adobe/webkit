@@ -543,6 +543,8 @@ public:
     bool hasFilter() const { return false; }
 #endif
 
+    bool hasBlendingOrCompositing() const { return style() && style()->hasBlendingOrCompositing(); }
+
     bool needsWrappingContext() const { return style() && ((style()->wrapThrough() == WrapThroughNone) || (style()->wrapFlow() != WrapFlowAuto)); }
 
     inline bool preservesNewline() const;

@@ -121,6 +121,9 @@ public:
     void setBlendMode(EBlendMode);
     EBlendMode blendMode() const { return m_blendMode; }
 
+    void setAlphaCompositingMode(EAlphaCompositingMode);
+    EAlphaCompositingMode alphaCompositingMode() const { return m_alphaCompositingMode; }
+
     // Background filters are filters applied to what is behind this layer, when they are viewed through non-opaque
     // regions in this layer. They are used through the WebLayer interface, and are not exposed to HTML.
     void setBackgroundFilters(const FilterOperations&);
@@ -326,6 +329,7 @@ private:
     FilterOperations m_filters;
     FilterOperations m_backgroundFilters;
     EBlendMode m_blendMode;
+    EAlphaCompositingMode m_alphaCompositingMode;
     float m_anchorPointZ;
     bool m_isDrawable;
     bool m_masksToBounds;

@@ -646,6 +646,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitSvgShadow:
 #endif
     case CSSPropertyWebkitBlendMode:
+    case CSSPropertyWebkitAlphaCompositing:
 #if ENABLE(DASHBOARD_SUPPORT)
     case CSSPropertyWebkitDashboardRegion:
 #endif

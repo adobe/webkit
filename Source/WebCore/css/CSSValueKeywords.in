@@ -932,3 +932,18 @@ hue
 saturation
 color
 luminosity 
+
+// -webkit-alpha-compositing
+// clear
+src
+dst
+src-over
+dst-over
+src-in
+dst-in
+src-out
+dst-out
+src-atop
+dst-atop
+// xor
+// plus

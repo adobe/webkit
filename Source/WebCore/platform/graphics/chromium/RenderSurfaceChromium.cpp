@@ -46,6 +46,7 @@ RenderSurfaceChromium::RenderSurfaceChromium(LayerChromium* owningLayer)
     , m_targetSurfaceTransformsAreAnimating(false)
     , m_screenSpaceTransformsAreAnimating(false)
     , m_blendMode(BlendModeNormal)
+    , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
     , m_nearestAncestorThatMovesPixels(0)
 {
 }

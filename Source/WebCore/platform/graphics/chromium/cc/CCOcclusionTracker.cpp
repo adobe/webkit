@@ -120,7 +120,8 @@ void CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::finishedTargetRenderS
     enterTargetRenderSurface(finishedTarget);
 
     // If the occlusion within the surface can not be applied to things outside of the surface's subtree, then clear the occlusion here so it won't be used.
-    if (owningLayer->maskLayer() || !surfaceOpacityKnown(finishedTarget) || finishedTarget->drawOpacity() < 1 || finishedTarget->filters().hasFilterThatAffectsOpacity() || finishedTarget->blendMode() != BlendModeNormal) {
+    if (owningLayer->maskLayer() || !surfaceOpacityKnown(finishedTarget) || finishedTarget->drawOpacity() < 1 || finishedTarget->filters().hasFilterThatAffectsOpacity() 
+        || finishedTarget->blendMode() != BlendModeNormal || finishedTarget->alphaCompositingMode() != AlphaCompositingModeSrcOver) {
         m_stack.last().occlusionInScreen = Region();
         m_stack.last().occlusionInTarget = Region();
     } else {

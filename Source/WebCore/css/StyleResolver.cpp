@@ -2089,7 +2089,7 @@ void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
     if (style->preserves3D() && (style->overflowX() != OVISIBLE
         || style->overflowY() != OVISIBLE
         || style->hasFilter()
-        || style->blendMode() != BlendModeNormal))
+        || style->hasBlendingOrCompositing()))
         style->setTransformStyle3D(TransformStyle3DFlat);
 
 #if ENABLE(SVG)

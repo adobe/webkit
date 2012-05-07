@@ -123,6 +123,7 @@ public:
     LayerChromium* contentsLayer() const { return m_contentsLayer.get(); }
 
     virtual void setBlendMode(EBlendMode);
+    virtual void setAlphaCompositingMode(EAlphaCompositingMode);
 
 private:
     virtual void willBeDestroyed();

@@ -98,6 +98,9 @@ public:
 
     void setBlendMode(EBlendMode blendMode) { m_blendMode = blendMode; }
     EBlendMode blendMode() const { return m_blendMode; }
+    
+    void setAlphaCompositingMode(EAlphaCompositingMode alphaCompositingMode) { m_alphaCompositingMode = alphaCompositingMode; }
+    EAlphaCompositingMode alphaCompositingMode() const { return m_alphaCompositingMode; }
 
     bool skipsDraw() const { return m_skipsDraw; }
     void setSkipsDraw(bool skipsDraw) { m_skipsDraw = skipsDraw; }
@@ -132,6 +135,7 @@ private:
     FilterOperations m_filters;
     FilterOperations m_backgroundFilters;
     EBlendMode m_blendMode;
+    EAlphaCompositingMode m_alphaCompositingMode;
     IntRect m_clipRect;
     Vector<RefPtr<LayerChromium> > m_layerList;
 

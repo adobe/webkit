@@ -193,6 +193,7 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_scrollCorner(0)
     , m_resizer(0)
     , m_blendMode(BlendModeNormal)
+    , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
 {
     m_isNormalFlowOnly = shouldBeNormalFlowOnly();
 
@@ -518,13 +519,19 @@ void RenderLayer::updateLayerPositionsAfterScroll(UpdateLayerPositionsAfterScrol
         m_marquee->updateMarqueePosition();
 }
 
-void RenderLayer::updateBlendMode()
+void RenderLayer::updateBlendModeAndCompositing()
 {
     EBlendMode newBlendMode = renderer()->style()->blendMode();
     if (newBlendMode != m_blendMode) {
         m_blendMode = newBlendMode;
         if (backing())
             backing()->setBlendMode(newBlendMode);
+    }
+    EAlphaCompositingMode newAlphaCompositingMode = renderer()->style()->alphaCompositingMode();
+    if (newAlphaCompositingMode != m_alphaCompositingMode) {
+        m_alphaCompositingMode = newAlphaCompositingMode;
+        if (backing())
+            backing()->setAlphaCompositingMode(newAlphaCompositingMode);
     }
 }
 
@@ -4292,6 +4299,7 @@ RenderLayerBacking* RenderLayer::ensureBacking()
         updateOrRemoveFilterEffect();
 #endif
         backing()->setBlendMode(m_blendMode);
+        backing()->setAlphaCompositingMode(m_alphaCompositingMode);
     }
     return m_backing.get();
 }
@@ -4776,7 +4784,7 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 #if USE(ACCELERATED_COMPOSITING)
     updateVisibilityStatus();
     updateTransform();
-    updateBlendMode();
+    updateBlendModeAndCompositing();
     
     if (compositor()->updateLayerCompositingState(this))
         compositor()->setCompositingLayersNeedRebuild();

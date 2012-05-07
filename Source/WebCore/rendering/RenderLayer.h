@@ -368,7 +368,7 @@ public:
     void updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerPositionsFlags = defaultFlags);
 
     void updateTransform();
-    void updateBlendMode();
+    void updateBlendModeAndCompositing();
 
     void relativePositionOffset(LayoutUnit& relX, LayoutUnit& relY) const { relX += m_relativeOffset.width(); relY += m_relativeOffset.height(); }
     const LayoutSize& relativePositionOffset() const { return m_relativeOffset; }
@@ -926,6 +926,7 @@ private:
 #endif
 
     EBlendMode m_blendMode;
+    EAlphaCompositingMode m_alphaCompositingMode;
     
     // FIXME: This should stay in a hash-map.
     OwnPtr<WrappingContext> m_wrappingContext;

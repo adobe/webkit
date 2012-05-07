@@ -562,7 +562,7 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     // Pixel copies in this algorithm occur at steps 2, 3, 4, and 5.
 
     CCRenderSurface* drawingSurface = quad->layer()->renderSurface();
-    if (drawingSurface->backgroundFilters().isEmpty() && quad->layer()->blendMode() == BlendModeNormal)
+    if (drawingSurface->backgroundFilters().isEmpty() && quad->layer()->blendMode() == BlendModeNormal  && quad->layer()->alphaCompositingMode() == AlphaCompositingModeSrcOver)
         return;
     
     const TransformationMatrix& surfaceDrawTransform = quad->isReplica() ? drawingSurface->replicaDrawTransform() : drawingSurface->drawTransform();
@@ -576,7 +576,7 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     if (!getFramebufferTexture(drawingSurface->backgroundTexture(), deviceRect))
         return;
     
-    // Disabled background filters for now.
+    // FIXME: Disabled background filters for now.
     /*OwnPtr<ManagedTexture> deviceBackgroundTexture = ManagedTexture::create(m_renderSurfaceTextureManager.get());
     if (!getFramebufferTexture(deviceBackgroundTexture.get(), deviceRect))
         return;
@@ -1472,27 +1472,28 @@ const LayerRendererChromium::RenderSurfaceMaskProgramAA* LayerRendererChromium::
     return m_renderSurfaceMaskProgramAA.get();
 }
 
-LayerRendererChromium::ProgramsWithBlending* LayerRendererChromium::getProgramsWithBlending(EBlendMode blendMode)
+LayerRendererChromium::ProgramsWithBlending* LayerRendererChromium::getProgramsWithBlending(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode)
 {
     if (!m_programsWithBlendingMap)
         m_programsWithBlendingMap = adoptPtr(new ProgramsWithBlendingMap());
-    ProgramsWithBlendingMap::iterator iter = m_programsWithBlendingMap->find(blendMode);
+    int programKey = (static_cast<int>(blendMode) << 5) | static_cast<int>(alphaCompositingMode);
+    ProgramsWithBlendingMap::iterator iter = m_programsWithBlendingMap->find(programKey);
     if (iter != m_programsWithBlendingMap->end())
         return iter->second.get();
     ProgramsWithBlending* programs = new ProgramsWithBlending();
-    m_programsWithBlendingMap->add(blendMode, adoptPtr(programs));
+    m_programsWithBlendingMap->add(programKey, adoptPtr(programs));
     return programs;
 }
 
-const LayerRendererChromium::RenderSurfaceProgram* LayerRendererChromium::renderSurfaceWithBlendingProgram(EBlendMode blendMode, bool hasBackgroundTexture)
+const LayerRendererChromium::RenderSurfaceProgram* LayerRendererChromium::renderSurfaceWithBlendingProgram(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode, bool hasBackgroundTexture)
 {
     if (!hasBackgroundTexture) {
         ASSERT(!hasBackgroundTexture);
         return renderSurfaceProgram();
     }
-    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode, alphaCompositingMode);
     if (!programs->m_renderSurfaceProgram)
-        programs->m_renderSurfaceProgram = adoptPtr(new RenderSurfaceProgram(m_context.get(), blendMode));
+        programs->m_renderSurfaceProgram = adoptPtr(new RenderSurfaceProgram(m_context.get(), blendMode, alphaCompositingMode));
     if (!programs->m_renderSurfaceProgram->initialized()) {
         TRACE_EVENT("LayerRendererChromium::RenderSurfaceWithBlendingProgram::initialize", this, 0);
         programs->m_renderSurfaceProgram->initializeWithBackgroundTexture(m_context.get());
@@ -1500,15 +1501,15 @@ const LayerRendererChromium::RenderSurfaceProgram* LayerRendererChromium::render
     return programs->m_renderSurfaceProgram.get();
 }
 
-const LayerRendererChromium::RenderSurfaceProgramAA* LayerRendererChromium::renderSurfaceWithBlendingProgramAA(EBlendMode blendMode, bool hasBackgroundTexture)
+const LayerRendererChromium::RenderSurfaceProgramAA* LayerRendererChromium::renderSurfaceWithBlendingProgramAA(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode, bool hasBackgroundTexture)
 {
     if (!hasBackgroundTexture) {
         ASSERT(!hasBackgroundTexture);
         return renderSurfaceProgramAA();
     }
-    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode, alphaCompositingMode);
     if (!programs->m_renderSurfaceProgramAA)
-        programs->m_renderSurfaceProgramAA = adoptPtr(new RenderSurfaceProgramAA(m_context.get(), blendMode));
+        programs->m_renderSurfaceProgramAA = adoptPtr(new RenderSurfaceProgramAA(m_context.get(), blendMode, alphaCompositingMode));
     if (!programs->m_renderSurfaceProgramAA->initialized()) {
         TRACE_EVENT("LayerRendererChromium::RenderSurfaceWithBlendingProgramAA::initialize", this, 0);
         programs->m_renderSurfaceProgramAA->initializeWithBackgroundTexture(m_context.get());
@@ -1516,15 +1517,15 @@ const LayerRendererChromium::RenderSurfaceProgramAA* LayerRendererChromium::rend
     return programs->m_renderSurfaceProgramAA.get();
 }
 
-const LayerRendererChromium::RenderSurfaceMaskProgram* LayerRendererChromium::renderSurfaceMaskWithBlendingProgram(EBlendMode blendMode, bool hasBackgroundTexture)
+const LayerRendererChromium::RenderSurfaceMaskProgram* LayerRendererChromium::renderSurfaceMaskWithBlendingProgram(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode, bool hasBackgroundTexture)
 {
     if (!hasBackgroundTexture) {
         ASSERT(!hasBackgroundTexture);
         return renderSurfaceMaskProgram();
     }
-    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode, alphaCompositingMode);
     if (!programs->m_renderSurfaceMaskProgram)
-        programs->m_renderSurfaceMaskProgram = adoptPtr(new RenderSurfaceMaskProgram(m_context.get(), blendMode));
+        programs->m_renderSurfaceMaskProgram = adoptPtr(new RenderSurfaceMaskProgram(m_context.get(), blendMode, alphaCompositingMode));
     if (!programs->m_renderSurfaceMaskProgram->initialized()) {
         TRACE_EVENT("LayerRendererChromium::RenderSurfaceMaskWithBlendingProgram::initialize", this, 0);
         programs->m_renderSurfaceMaskProgram->initializeWithBackgroundTexture(m_context.get());
@@ -1532,15 +1533,15 @@ const LayerRendererChromium::RenderSurfaceMaskProgram* LayerRendererChromium::re
     return programs->m_renderSurfaceMaskProgram.get();
 }
 
-const LayerRendererChromium::RenderSurfaceMaskProgramAA* LayerRendererChromium::renderSurfaceMaskWithBlendingProgramAA(EBlendMode blendMode, bool hasBackgroundTexture)
+const LayerRendererChromium::RenderSurfaceMaskProgramAA* LayerRendererChromium::renderSurfaceMaskWithBlendingProgramAA(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode, bool hasBackgroundTexture)
 {
     if (!hasBackgroundTexture) {
         ASSERT(!hasBackgroundTexture);
         return renderSurfaceMaskProgramAA();
     }
-    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode);
+    ProgramsWithBlending* programs = getProgramsWithBlending(blendMode, alphaCompositingMode);
     if (!programs->m_renderSurfaceMaskProgramAA)
-        programs->m_renderSurfaceMaskProgramAA = adoptPtr(new RenderSurfaceMaskProgramAA(m_context.get(), blendMode));
+        programs->m_renderSurfaceMaskProgramAA = adoptPtr(new RenderSurfaceMaskProgramAA(m_context.get(), blendMode, alphaCompositingMode));
     if (!programs->m_renderSurfaceMaskProgramAA->initialized()) {
         TRACE_EVENT("LayerRendererChromium::RenderSurfaceMaskWithBlendingProgramAA::initialize", this, 0);
         programs->m_renderSurfaceMaskProgramAA->initializeWithBackgroundTexture(m_context.get());

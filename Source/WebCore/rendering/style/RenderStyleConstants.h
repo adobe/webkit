@@ -466,6 +466,8 @@ enum WrapThrough { WrapThroughWrap, WrapThroughNone };
     
 enum EBlendMode { BlendModeNormal = 1, BlendModePlus, BlendModeMultiply, BlendModeScreen, BlendModeOverlay, BlendModeDarken, BlendModeLighten, BlendModeColorDodge, BlendModeColorBurn, BlendModeHardLight, BlendModeSoftLight, BlendModeDifference, BlendModeExclusion, BlendModeHue, BlendModeSaturation, BlendModeColor, BlendModeLuminosity };
 
+enum EAlphaCompositingMode { AlphaCompositingModeClear = 1, AlphaCompositingModeSrc, AlphaCompositingModeDst, AlphaCompositingModeSrcOver, AlphaCompositingModeDstOver, AlphaCompositingModeSrcIn, AlphaCompositingModeDstIn, AlphaCompositingModeSrcOut, AlphaCompositingModeDstOut, AlphaCompositingModeSrcAtop, AlphaCompositingModeDstAtop, AlphaCompositingModeXor, AlphaCompositingModePlus };
+
 } // namespace WebCore
 
 #endif // RenderStyleConstants_h

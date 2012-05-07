@@ -388,3 +388,4 @@ z-index
 -webkit-overflow-scrolling
 #endif
 -webkit-blend-mode
+-webkit-alpha-compositing

@@ -64,9 +64,9 @@ public:
         ProgramBindingBase::init(context, m_vertexShader.getShaderString(), m_fragmentShader.getShaderString());
     }
     
-    explicit ProgramBinding(GraphicsContext3D* context, EBlendMode blendMode)
+    explicit ProgramBinding(GraphicsContext3D* context, EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode)
     {
-        ProgramBindingBase::init(context, m_vertexShader.getShaderString(), m_fragmentShader.getShaderString(blendMode));
+        ProgramBindingBase::init(context, m_vertexShader.getShaderString(), m_fragmentShader.getShaderString(blendMode, alphaCompositingMode));
     }
 
     void initialize(GraphicsContext3D* context, bool needsBackgroundTexture = false)

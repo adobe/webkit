@@ -1438,7 +1438,7 @@ bool RenderLayerCompositor::requiresOwnBackingStore(const RenderLayer* layer, co
         || renderer->hasMask()
         || renderer->hasReflection()
         || renderer->hasFilter()
-        || renderer->style()->blendMode() != BlendModeNormal
+        || renderer->hasBlendingOrCompositing()
         || layer->mustOverlapCompositedLayers();
 }
 
@@ -1668,7 +1668,7 @@ bool RenderLayerCompositor::requiresCompositingForAnimation(RenderObject* render
 
 bool RenderLayerCompositor::requiresCompositingWhenDescendantsAreCompositing(RenderObject* renderer) const
 {
-    return renderer->hasTransform() || renderer->isTransparent() || renderer->hasMask() || renderer->hasReflection() || renderer->hasFilter() || renderer->style()->blendMode() != BlendModeNormal;
+    return renderer->hasTransform() || renderer->isTransparent() || renderer->hasMask() || renderer->hasReflection() || renderer->hasFilter() || renderer->hasBlendingOrCompositing();
 }
     
 bool RenderLayerCompositor::requiresCompositingForFilters(RenderObject* renderer) const
@@ -1686,7 +1686,7 @@ bool RenderLayerCompositor::requiresCompositingForFilters(RenderObject* renderer
 
 bool RenderLayerCompositor::requiresCompositingForBlending(RenderObject* renderer) const
 {
-    return renderer->style()->blendMode() != BlendModeNormal;
+    return renderer->hasBlendingOrCompositing();
 }
 
 bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* renderer, const RenderLayer* layer) const

@@ -68,6 +68,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_debugBorderColor(0, 0, 0, 0)
     , m_debugBorderWidth(0)
     , m_blendMode(BlendModeNormal)
+    , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
     , m_drawTransformIsAnimating(false)
     , m_screenSpaceTransformIsAnimating(false)
 #ifndef NDEBUG
@@ -434,6 +435,15 @@ void CCLayerImpl::setBlendMode(EBlendMode blendMode)
         return;
 
     m_blendMode = blendMode;
+    noteLayerPropertyChangedForSubtree();
+}
+
+void CCLayerImpl::setAlphaCompositingMode(EAlphaCompositingMode alphaCompositingMode)
+{
+    if (m_alphaCompositingMode == alphaCompositingMode)
+        return;
+
+    m_alphaCompositingMode = alphaCompositingMode;
     noteLayerPropertyChangedForSubtree();
 }
 

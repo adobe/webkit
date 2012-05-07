@@ -226,7 +226,7 @@ private:
         OwnPtr<RenderSurfaceMaskProgram> m_renderSurfaceMaskProgram;
         OwnPtr<RenderSurfaceMaskProgramAA> m_renderSurfaceMaskProgramAA;
     };
-    typedef HashMap<EBlendMode, OwnPtr<ProgramsWithBlending>, DefaultHash<int>::Hash, HashTraits<int> > ProgramsWithBlendingMap;
+    typedef HashMap<int, OwnPtr<ProgramsWithBlending> > ProgramsWithBlendingMap;
 
     // Texture shaders.
     typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexAlpha> TextureProgram;
@@ -257,12 +257,12 @@ private:
     const RenderSurfaceMaskProgram* renderSurfaceMaskProgram();
     const RenderSurfaceMaskProgramAA* renderSurfaceMaskProgramAA();
 
-    const RenderSurfaceProgram* renderSurfaceWithBlendingProgram(EBlendMode, bool hasBackgroundTexture);
-    const RenderSurfaceProgramAA* renderSurfaceWithBlendingProgramAA(EBlendMode, bool hasBackgroundTexture);
-    const RenderSurfaceMaskProgram* renderSurfaceMaskWithBlendingProgram(EBlendMode, bool hasBackgroundTexture);
-    const RenderSurfaceMaskProgramAA* renderSurfaceMaskWithBlendingProgramAA(EBlendMode, bool hasBackgroundTexture);
+    const RenderSurfaceProgram* renderSurfaceWithBlendingProgram(EBlendMode, EAlphaCompositingMode, bool hasBackgroundTexture);
+    const RenderSurfaceProgramAA* renderSurfaceWithBlendingProgramAA(EBlendMode, EAlphaCompositingMode, bool hasBackgroundTexture);
+    const RenderSurfaceMaskProgram* renderSurfaceMaskWithBlendingProgram(EBlendMode, EAlphaCompositingMode, bool hasBackgroundTexture);
+    const RenderSurfaceMaskProgramAA* renderSurfaceMaskWithBlendingProgramAA(EBlendMode, EAlphaCompositingMode, bool hasBackgroundTexture);
     
-    ProgramsWithBlending* getProgramsWithBlending(EBlendMode);
+    ProgramsWithBlending* getProgramsWithBlending(EBlendMode, EAlphaCompositingMode);
 
     const TextureProgram* textureProgram();
     const TextureProgramFlip* textureProgramFlip();

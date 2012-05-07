@@ -985,6 +985,11 @@ public:
     EBlendMode blendMode() const { return static_cast<EBlendMode>(rareNonInheritedData->m_effectiveBlendMode); }
     void setBlendMode(EBlendMode v) { rareNonInheritedData.access()->m_effectiveBlendMode = v; }
 
+    EAlphaCompositingMode alphaCompositingMode() const { return static_cast<EAlphaCompositingMode>(rareNonInheritedData->m_alphaCompositingMode); }
+    void setAlphaCompositingMode(EAlphaCompositingMode v) { rareNonInheritedData.access()->m_alphaCompositingMode = v; }
+    
+    bool hasBlendingOrCompositing() const { return blendMode() != initialBlendMode() || alphaCompositingMode() != initialAlphaCompositingMode(); }
+
 #if USE(RTL_SCROLLBAR)
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
 #else
@@ -1698,6 +1703,7 @@ public:
     static const FilterOperations& initialFilter() { DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
 #endif
     static EBlendMode initialBlendMode() { return BlendModeNormal; }
+    static EAlphaCompositingMode initialAlphaCompositingMode() { return AlphaCompositingModeSrcOver; }
 private:
     void setVisitedLinkColor(const Color& v) { SET_VAR(inherited, visitedLinkColor, v) }
     void setVisitedLinkBackgroundColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBackgroundColor, v) }

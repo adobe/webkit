@@ -1065,8 +1065,6 @@ template<> inline CSSPrimitiveValue::operator ECursor() const
         return CURSOR_NONE;
     return static_cast<ECursor>(m_value.ident - CSSValueAuto);
 }
-    
-    
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBlendMode e)
     : CSSValue(PrimitiveClass)
@@ -1128,60 +1126,141 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBlendMode e)
 }
     
 template<> inline CSSPrimitiveValue::operator EBlendMode() const
-    {
-        switch (m_value.ident) {
-            case CSSValueNormal:
-                return BlendModeNormal;
-            case CSSValuePlus: 
-                return BlendModePlus;
-            case CSSValueMultiply:
-                return BlendModeMultiply;
-            case CSSValueScreen:
-                return BlendModeScreen; 
-            case CSSValueOverlay:
-                return BlendModeOverlay; 
-                break;
-            case CSSValueDarken:
-                return BlendModeDarken; 
-                break;
-            case CSSValueLighten:
-                return BlendModeLighten; 
-                break;
-            case CSSValueColorDodge:
-                return BlendModeColorDodge; 
-                break;
-            case CSSValueColorBurn:
-                return BlendModeColorBurn; 
-                break;
-            case CSSValueHardLight:
-                return BlendModeHardLight; 
-                break;
-            case CSSValueSoftLight:
-                return BlendModeSoftLight; 
-                break;
-            case CSSValueDifference:
-                return BlendModeDifference; 
-                break;
-            case CSSValueExclusion:
-                return BlendModeExclusion; 
-                break;
-            case CSSValueHue:
-                return BlendModeHue; 
-                break;
-            case CSSValueSaturation:
-                return BlendModeSaturation; 
-                break;
-            case CSSValueColor:
-                return BlendModeColor; 
-                break;
-            case CSSValueLuminosity :                
-                return BlendModeLuminosity; 
-                break;
-            default:
-                return BlendModeNormal;
-        }
+{
+    switch (m_value.ident) {
+        case CSSValueNormal:
+            return BlendModeNormal;
+        case CSSValuePlus: 
+            return BlendModePlus;
+        case CSSValueMultiply:
+            return BlendModeMultiply;
+        case CSSValueScreen:
+            return BlendModeScreen; 
+        case CSSValueOverlay:
+            return BlendModeOverlay; 
+            break;
+        case CSSValueDarken:
+            return BlendModeDarken; 
+            break;
+        case CSSValueLighten:
+            return BlendModeLighten; 
+            break;
+        case CSSValueColorDodge:
+            return BlendModeColorDodge; 
+            break;
+        case CSSValueColorBurn:
+            return BlendModeColorBurn; 
+            break;
+        case CSSValueHardLight:
+            return BlendModeHardLight; 
+            break;
+        case CSSValueSoftLight:
+            return BlendModeSoftLight; 
+            break;
+        case CSSValueDifference:
+            return BlendModeDifference; 
+            break;
+        case CSSValueExclusion:
+            return BlendModeExclusion; 
+            break;
+        case CSSValueHue:
+            return BlendModeHue; 
+            break;
+        case CSSValueSaturation:
+            return BlendModeSaturation; 
+            break;
+        case CSSValueColor:
+            return BlendModeColor; 
+            break;
+        case CSSValueLuminosity :                
+            return BlendModeLuminosity; 
+            break;
+        default:
+            return BlendModeNormal;
     }
-    
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EAlphaCompositingMode e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch(e){
+    case AlphaCompositingModeClear:
+        m_value.ident = CSSValueClear;
+        break;
+    case AlphaCompositingModeSrc:
+        m_value.ident = CSSValueSrc;
+        break;
+    case AlphaCompositingModeDst:
+        m_value.ident = CSSValueDst;
+        break;
+    case AlphaCompositingModeSrcOver:
+        m_value.ident = CSSValueSrcOver;
+        break;
+    case AlphaCompositingModeDstOver:
+        m_value.ident = CSSValueDstOver;
+        break;
+    case AlphaCompositingModeSrcIn:
+        m_value.ident = CSSValueSrcIn;
+        break;
+    case AlphaCompositingModeDstIn:
+        m_value.ident = CSSValueDstIn;
+        break;
+    case AlphaCompositingModeSrcOut:
+        m_value.ident = CSSValueSrcOut;
+        break;
+    case AlphaCompositingModeDstOut:
+        m_value.ident = CSSValueDstOut;
+        break;
+    case AlphaCompositingModeSrcAtop:
+        m_value.ident = CSSValueSrcAtop;
+        break;
+    case AlphaCompositingModeDstAtop:
+        m_value.ident = CSSValueDstAtop;
+        break;
+    case AlphaCompositingModeXor:
+        m_value.ident = CSSValueXor;
+        break;
+    case AlphaCompositingModePlus:
+        m_value.ident = CSSValuePlus;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator EAlphaCompositingMode() const
+{
+    switch (m_value.ident) {
+        case CSSValueClear:
+            return AlphaCompositingModeClear;
+        case CSSValueSrc:
+            return AlphaCompositingModeSrc;
+        case CSSValueDst:
+            return AlphaCompositingModeDst;
+        case CSSValueSrcOver:
+            return AlphaCompositingModeSrcOver;
+        case CSSValueDstOver:
+            return AlphaCompositingModeDstOver;
+        case CSSValueSrcIn:
+            return AlphaCompositingModeSrcIn;
+        case CSSValueDstIn:
+            return AlphaCompositingModeDstIn;
+        case CSSValueSrcOut:
+            return AlphaCompositingModeSrcOut;
+        case CSSValueDstOut:
+            return AlphaCompositingModeDstOut;
+        case CSSValueSrcAtop:
+            return AlphaCompositingModeSrcAtop;
+        case CSSValueDstAtop:
+            return AlphaCompositingModeDstAtop;
+        case CSSValueXor:
+            return AlphaCompositingModeXor;
+        case CSSValuePlus:
+            return AlphaCompositingModePlus;
+        default:
+            return AlphaCompositingModeSrcOver;
+    }
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
     : CSSValue(PrimitiveClass)
 {

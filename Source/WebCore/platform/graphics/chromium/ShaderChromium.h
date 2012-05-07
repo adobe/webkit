@@ -190,7 +190,7 @@ public:
 class FragmentShaderRGBATexAlpha : public FragmentTexAlphaBinding {
 public:
     String getShaderString() const;
-    String getShaderString(EBlendMode) const;
+    String getShaderString(EBlendMode, EAlphaCompositingMode) const;
 };
 
 class FragmentShaderRGBATexRectFlipAlpha : public FragmentTexAlphaBinding {
@@ -240,7 +240,7 @@ public:
 
     void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     String getShaderString() const;
-    String getShaderString(EBlendMode) const;
+    String getShaderString(EBlendMode, EAlphaCompositingMode) const;
 
     int alphaLocation() const { return m_alphaLocation; }
     int samplerLocation() const { return m_samplerLocation; }
@@ -288,7 +288,7 @@ class FragmentShaderRGBATexAlphaMask {
 public:
     FragmentShaderRGBATexAlphaMask();
     String getShaderString() const;
-    String getShaderString(EBlendMode) const;
+    String getShaderString(EBlendMode, EAlphaCompositingMode) const;
 
     void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     int alphaLocation() const { return m_alphaLocation; }
@@ -310,7 +310,7 @@ class FragmentShaderRGBATexAlphaMaskAA {
 public:
     FragmentShaderRGBATexAlphaMaskAA();
     String getShaderString() const;
-    String getShaderString(EBlendMode) const;
+    String getShaderString(EBlendMode, EAlphaCompositingMode) const;
 
     void init(GraphicsContext3D*, unsigned program, bool needsBackgroundTexture = false);
     int alphaLocation() const { return m_alphaLocation; }

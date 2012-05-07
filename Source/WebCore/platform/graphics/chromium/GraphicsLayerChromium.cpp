@@ -467,6 +467,12 @@ void GraphicsLayerChromium::setBlendMode(EBlendMode blendMode)
     GraphicsLayer::setBlendMode(blendMode);
 }
 
+void GraphicsLayerChromium::setAlphaCompositingMode(EAlphaCompositingMode alphaCompositingMode)
+{
+    m_layer->setAlphaCompositingMode(alphaCompositingMode);
+    GraphicsLayer::setAlphaCompositingMode(alphaCompositingMode);
+}
+
 PlatformLayer* GraphicsLayerChromium::hostLayerForChildren() const
 {
     return m_transformLayer ? m_transformLayer.get() : m_layer.get();

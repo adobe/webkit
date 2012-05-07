@@ -2046,7 +2046,19 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
 #endif
     case CSSPropertyWebkitBlendMode:
-            validPrimitive = true;
+        validPrimitive = id == CSSValueNormal || id == CSSValuePlus || id == CSSValueMultiply 
+                         || id == CSSValueScreen || id == CSSValueOverlay || id == CSSValueDarken 
+                         || id == CSSValueLighten || id == CSSValueColorDodge || id == CSSValueColorBurn 
+                         || id == CSSValueHardLight || id == CSSValueSoftLight || id == CSSValueDifference 
+                         || id == CSSValueExclusion || id == CSSValueHue || id == CSSValueSaturation 
+                         || id == CSSValueColor || id == CSSValueLuminosity;
+        break;
+    case CSSPropertyWebkitAlphaCompositing:
+        validPrimitive = id == CSSValueClear || id == CSSValueSrc || id == CSSValueDst 
+                         || id == CSSValueSrcOver || id == CSSValueDstOver || id == CSSValueSrcIn 
+                         || id == CSSValueDstIn || id == CSSValueSrcOut || id == CSSValueDstOut 
+                         || id == CSSValueSrcAtop || id == CSSValueDstAtop || id == CSSValueXor 
+                         || id == CSSValuePlus;
         break;
     case CSSPropertyWebkitFlex:
         if (id == CSSValueNone)

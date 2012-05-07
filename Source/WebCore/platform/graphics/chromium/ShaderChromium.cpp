@@ -130,9 +130,75 @@ static void nonSeparableBlendModesHelper(StringBuilder& builder, const char* for
     blendColors(builder, formula);
 }
 
+static void computeAlphaCompositingValues(StringBuilder& builder, EAlphaCompositingMode alphaCompositingMode)
+{
+    const char* Fa = 0;
+    const char* Fb = 0;
+    switch (alphaCompositingMode) {
+    case AlphaCompositingModeClear:
+        Fa = "0.0";
+        Fb = "0.0";
+        break;
+    case AlphaCompositingModeSrc:
+        Fa = "1.0";
+        Fb = "0.0";
+        break;
+    case AlphaCompositingModeDst:
+        Fa = "0.0";
+        Fb = "1.0";
+        break;
+    case AlphaCompositingModeSrcOver:
+        Fa = "1.0";
+        Fb = "1.0 - sourceColor.a";
+        break;
+    case AlphaCompositingModeDstOver:
+        Fa = "1.0 - backgroundColor.a";
+        Fb = "1.0";
+        break;
+    case AlphaCompositingModeSrcIn:
+        Fa = "backgroundColor.a";
+        Fb = "0.0";
+        break;
+    case AlphaCompositingModeDstIn:
+        Fa = "0.0";
+        Fb = "sourceColor.a";
+        break;
+    case AlphaCompositingModeSrcOut:
+        Fa = "1.0 - backgroundColor.a";
+        Fb = "0.0";
+        break;
+    case AlphaCompositingModeDstOut:
+        Fa = "0.0";
+        Fb = "1.0 - sourceColor.a";
+        break;
+    case AlphaCompositingModeSrcAtop:
+        Fa = "backgroundColor.a";
+        Fb = "1.0 - sourceColor.a";
+        break;
+    case AlphaCompositingModeDstAtop:
+        Fa = "1.0 - backgroundColor.a";
+        Fb = "sourceColor.a";
+        break;
+    case AlphaCompositingModeXor:
+        Fa = "1.0 - backgroundColor.a";
+        Fb = "1.0 - sourceColor.a";
+        break;
+    case AlphaCompositingModePlus:
+        Fa = "1.0";
+        Fb = "1.0";
+        break;
+    }
+    ASSERT(Fa && Fb);
+    builder.append("float Fa = ");
+    builder.append(Fa);
+    builder.append("; float Fb = ");
+    builder.append(Fb);
+    builder.append(";\n");
+}
+
 // The result of the method expects to have a method called blend, that will do the blending.
 // vec4 blend(vec4 sourceColor)
-static String formulaForBlendMode(EBlendMode blendMode)
+static String formulaForBlendMode(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode)
 {
     StringBuilder builder;
     builder.append("uniform sampler2D s_backgroundTexture;");
@@ -222,8 +288,11 @@ static String formulaForBlendMode(EBlendMode blendMode)
                 bgTexCoord.x /= backgroundRect.b; 
                 bgTexCoord.y /= backgroundRect.a;
                 vec4 backgroundColor = (texture2D(s_backgroundTexture, bgTexCoord));
-                float Fa = 1.0;
-                float Fb = 1.0 - sourceColor.a;
+        )
+    );
+    computeAlphaCompositingValues(builder, alphaCompositingMode);
+    builder.append(
+        SHADER(
                 return composite(sourceColor.a, Fa, blendColors(backgroundColor.rgb, sourceColor.rgb),
                                  backgroundColor.a, Fb, backgroundColor.rgb);
             }
@@ -549,9 +618,9 @@ String FragmentShaderRGBATexAlpha::getShaderString() const
     );
 }
 
-String FragmentShaderRGBATexAlpha::getShaderString(EBlendMode blendMode) const
+String FragmentShaderRGBATexAlpha::getShaderString(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode) const
 {
-    String blending = formulaForBlendMode(blendMode);
+    String blending = formulaForBlendMode(blendMode, alphaCompositingMode);
     return String::format(SHADER(
         precision mediump float;
         varying vec2 v_texCoord;
@@ -702,9 +771,9 @@ String FragmentShaderRGBATexAlphaAA::getShaderString() const
     );
 }
 
-String FragmentShaderRGBATexAlphaAA::getShaderString(EBlendMode blendMode) const
+String FragmentShaderRGBATexAlphaAA::getShaderString(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode) const
 {
-    String blending = formulaForBlendMode(blendMode);
+    String blending = formulaForBlendMode(blendMode, alphaCompositingMode);
     return String::format(SHADER(
         precision mediump float;
         varying vec2 v_texCoord;
@@ -841,9 +910,9 @@ String FragmentShaderRGBATexAlphaMask::getShaderString() const
     );
 }
 
-String FragmentShaderRGBATexAlphaMask::getShaderString(EBlendMode blendMode) const
+String FragmentShaderRGBATexAlphaMask::getShaderString(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode) const
 {
-    String blending = formulaForBlendMode(blendMode);
+    String blending = formulaForBlendMode(blendMode, alphaCompositingMode);
     return String::format(SHADER(
         precision mediump float;
         varying vec2 v_texCoord;
@@ -912,9 +981,9 @@ String FragmentShaderRGBATexAlphaMaskAA::getShaderString() const
     );
 }
 
-String FragmentShaderRGBATexAlphaMaskAA::getShaderString(EBlendMode blendMode) const
+String FragmentShaderRGBATexAlphaMaskAA::getShaderString(EBlendMode blendMode, EAlphaCompositingMode alphaCompositingMode) const
 {
-    String blending = formulaForBlendMode(blendMode);
+    String blending = formulaForBlendMode(blendMode, alphaCompositingMode);
     return String::format(SHADER(
         precision mediump float;
         varying vec2 v_texCoord;

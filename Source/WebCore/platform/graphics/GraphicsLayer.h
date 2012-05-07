@@ -338,6 +338,7 @@ public:
 #endif
 
     virtual void setBlendMode(EBlendMode) { }
+    virtual void setAlphaCompositingMode(EAlphaCompositingMode) { }
 
     // Some GraphicsLayers paint only the foreground or the background content
     GraphicsLayerPaintingPhase paintingPhase() const { return m_paintingPhase; }

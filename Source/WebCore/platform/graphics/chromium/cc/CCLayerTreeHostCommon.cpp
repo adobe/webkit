@@ -209,7 +209,7 @@ static bool subtreeShouldRenderToSeparateSurface(LayerType* layer, bool axisAlig
     if (!layer->filters().isEmpty() || !layer->backgroundFilters().isEmpty())
         return true;
 
-    if (layer->blendMode() != BlendModeNormal)
+    if (layer->blendMode() != BlendModeNormal || layer->alphaCompositingMode() != AlphaCompositingModeSrcOver)
         return true;
 
     // If the layer flattens its subtree (i.e. the layer doesn't preserve-3d), but it is
@@ -443,6 +443,7 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
         renderSurface->setBackgroundFilters(layer->backgroundFilters());
         
         renderSurface->setBlendMode(layer->blendMode());
+        renderSurface->setAlphaCompositingMode(layer->alphaCompositingMode());
 
         renderSurfaceLayerList.append(layer);
     } else {

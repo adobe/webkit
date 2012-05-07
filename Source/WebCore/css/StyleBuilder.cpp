@@ -2025,6 +2025,7 @@ StyleBuilder::StyleBuilder()
     setPropertyHandler(CSSPropertyZoom, ApplyPropertyZoom::createHandler());
     
     setPropertyHandler(CSSPropertyWebkitBlendMode, ApplyPropertyDefault<EBlendMode, &RenderStyle::blendMode, EBlendMode, &RenderStyle::setBlendMode, EBlendMode, &RenderStyle::initialBlendMode>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitAlphaCompositing, ApplyPropertyDefault<EAlphaCompositingMode, &RenderStyle::alphaCompositingMode, EAlphaCompositingMode, &RenderStyle::setAlphaCompositingMode, EAlphaCompositingMode, &RenderStyle::initialAlphaCompositingMode>::createHandler());
 }
 
 

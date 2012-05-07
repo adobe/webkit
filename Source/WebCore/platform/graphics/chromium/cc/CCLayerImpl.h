@@ -116,6 +116,9 @@ public:
     void setBlendMode(EBlendMode);
     EBlendMode blendMode() const { return m_blendMode; }
 
+    void setAlphaCompositingMode(EAlphaCompositingMode);
+    EAlphaCompositingMode alphaCompositingMode() const { return m_alphaCompositingMode; }
+
     void setMasksToBounds(bool);
     bool masksToBounds() const { return m_masksToBounds; }
 
@@ -340,6 +343,7 @@ private:
     FilterOperations m_backgroundFilters;
     
     EBlendMode m_blendMode;
+    EAlphaCompositingMode m_alphaCompositingMode;
 
     TransformationMatrix m_drawTransform;
     TransformationMatrix m_screenSpaceTransform;
