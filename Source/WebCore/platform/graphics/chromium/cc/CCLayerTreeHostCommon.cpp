@@ -441,6 +441,8 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
         renderSurface->setNearestAncestorThatMovesPixels(nearestAncestorThatMovesPixels);
 
         renderSurface->setBackgroundFilters(layer->backgroundFilters());
+        
+        renderSurface->setBlendMode(layer->blendMode());
 
         renderSurfaceLayerList.append(layer);
     } else {

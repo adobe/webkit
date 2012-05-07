@@ -571,7 +571,13 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     IntRect deviceRect = drawingSurface->readbackDeviceContentRect(this, surfaceDrawTransform);
     deviceRect.intersect(m_currentRenderSurface->contentRect());
 
-    OwnPtr<ManagedTexture> deviceBackgroundTexture = ManagedTexture::create(m_renderSurfaceTextureManager.get());
+    if (!drawingSurface->prepareBackgroundTexture(this))
+        return;
+    if (!getFramebufferTexture(drawingSurface->backgroundTexture(), deviceRect))
+        return;
+    
+    // Disabled background filters for now.
+    /*OwnPtr<ManagedTexture> deviceBackgroundTexture = ManagedTexture::create(m_renderSurfaceTextureManager.get());
     if (!getFramebufferTexture(deviceBackgroundTexture.get(), deviceRect))
         return;
 
@@ -593,10 +599,10 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
     TransformationMatrix contentsDeviceTransform = drawingSurface->computeDeviceTransform(this, surfaceDrawTransform);
 
     CCRenderSurface* targetRenderSurface = m_currentRenderSurface;
-    if (useManagedTexture(drawingSurface->backgroundTexture(), IntRect(0, 0, drawingSurface->contentRect().width(), drawingSurface->contentRect().height()))) {
+    if (useManagedTexture(drawingSurface->backgroundTexture(), IntRect(-drawingSurface->contentRect().width() / 2, - drawingSurface->contentRect().height() / 2, drawingSurface->contentRect().width(), drawingSurface->contentRect().height()))) {
         drawingSurface->copyDeviceToBackgroundTexture(this, filteredDeviceBackgroundTextureId, deviceRect, contentsDeviceTransform);
         useRenderSurface(targetRenderSurface);
-    }
+    }*/
 }
 
 void LayerRendererChromium::drawRenderSurfaceQuad(const CCRenderSurfaceDrawQuad* quad)
@@ -607,9 +613,9 @@ void LayerRendererChromium::drawRenderSurfaceQuad(const CCRenderSurfaceDrawQuad*
 
     layer->renderSurface()->setScissorRect(this, quad->surfaceDamageRect());
     if (quad->isReplica())
-        layer->renderSurface()->drawReplica(this, layer->blendMode());
+        layer->renderSurface()->drawReplica(this);
     else
-        layer->renderSurface()->drawContents(this, layer->blendMode());
+        layer->renderSurface()->drawContents(this);
     layer->renderSurface()->releaseBackgroundTexture();
     layer->renderSurface()->releaseContentsTexture();
 }

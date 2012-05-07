@@ -136,6 +136,7 @@ static String formulaForBlendMode(EBlendMode blendMode)
 {
     StringBuilder builder;
     builder.append("uniform sampler2D s_backgroundTexture;");
+    builder.append("uniform vec4 backgroundRect;");
     switch (blendMode) {
         case BlendModeNormal:
             blendColors(builder, "return sourceColor;");
@@ -217,7 +218,10 @@ static String formulaForBlendMode(EBlendMode blendMode)
                                   alphaA * Fa + alphaB * Fb), 0.0, 1.0);
             }
             vec4 blend(vec4 sourceColor) {
-                vec4 backgroundColor = (texture2D(s_backgroundTexture, v_texCoord));
+                vec2 bgTexCoord = gl_FragCoord.xy - backgroundRect.xy;
+                bgTexCoord.x /= backgroundRect.b; 
+                bgTexCoord.y /= backgroundRect.a;
+                vec4 backgroundColor = (texture2D(s_backgroundTexture, bgTexCoord));
                 float Fa = 1.0;
                 float Fb = 1.0 - sourceColor.a;
                 return composite(sourceColor.a, Fa, blendColors(backgroundColor.rgb, sourceColor.rgb),
@@ -463,6 +467,7 @@ String VertexShaderVideoTransform::getShaderString() const
 FragmentTexAlphaBinding::FragmentTexAlphaBinding()
     : m_samplerLocation(-1)
     , m_backgroundSamplerLocation(-1)
+    , m_backgroundRectLocation(-1)
     , m_alphaLocation(-1)
 {
 }
@@ -476,7 +481,8 @@ void FragmentTexAlphaBinding::init(GraphicsContext3D* context, unsigned program,
     
     if (needsBackgroundTexture) {
         m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
-        ASSERT(m_backgroundSamplerLocation != -1);
+        m_backgroundRectLocation = context->getUniformLocation(program, "backgroundRect");
+        ASSERT(m_backgroundSamplerLocation != -1 && m_backgroundRectLocation != -1);
     }
 }
 
@@ -650,6 +656,7 @@ String FragmentShaderRGBATexSwizzleOpaque::getShaderString() const
 FragmentShaderRGBATexAlphaAA::FragmentShaderRGBATexAlphaAA()
     : m_samplerLocation(-1)
     , m_backgroundSamplerLocation(-1)
+    , m_backgroundRectLocation(-1)
     , m_alphaLocation(-1)
     , m_edgeLocation(-1)
 {
@@ -665,7 +672,8 @@ void FragmentShaderRGBATexAlphaAA::init(GraphicsContext3D* context, unsigned pro
     
     if (needsBackgroundTexture) {
         m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
-        ASSERT(m_backgroundSamplerLocation != -1);
+        m_backgroundRectLocation = context->getUniformLocation(program, "backgroundRect");
+        ASSERT(m_backgroundSamplerLocation != -1 && m_backgroundRectLocation != -1);
     }
 }
 
@@ -796,6 +804,7 @@ String FragmentShaderRGBATexClampSwizzleAlphaAA::getShaderString() const
 FragmentShaderRGBATexAlphaMask::FragmentShaderRGBATexAlphaMask()
     : m_samplerLocation(-1)
     , m_backgroundSamplerLocation(-1)
+    , m_backgroundRectLocation(-1)
     , m_maskSamplerLocation(-1)
     , m_alphaLocation(-1)
 {
@@ -810,7 +819,8 @@ void FragmentShaderRGBATexAlphaMask::init(GraphicsContext3D* context, unsigned p
     
     if (needsBackgroundTexture) {
         m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
-        ASSERT(m_backgroundSamplerLocation != -1);
+        m_backgroundRectLocation = context->getUniformLocation(program, "backgroundRect");
+        ASSERT(m_backgroundSamplerLocation != -1 && m_backgroundRectLocation != -1);
     }
 }
 
@@ -853,6 +863,7 @@ String FragmentShaderRGBATexAlphaMask::getShaderString(EBlendMode blendMode) con
 FragmentShaderRGBATexAlphaMaskAA::FragmentShaderRGBATexAlphaMaskAA()
     : m_samplerLocation(-1)
     , m_backgroundSamplerLocation(-1)
+    , m_backgroundRectLocation(-1)
     , m_maskSamplerLocation(-1)
     , m_alphaLocation(-1)
     , m_edgeLocation(-1)
@@ -869,7 +880,8 @@ void FragmentShaderRGBATexAlphaMaskAA::init(GraphicsContext3D* context, unsigned
     
     if (needsBackgroundTexture) {
         m_backgroundSamplerLocation = context->getUniformLocation(program, "s_backgroundTexture");
-        ASSERT(m_backgroundSamplerLocation != -1);
+        m_backgroundRectLocation = context->getUniformLocation(program, "backgroundRect");
+        ASSERT(m_backgroundSamplerLocation != -1 && m_backgroundRectLocation != -1);
     }
 }
 

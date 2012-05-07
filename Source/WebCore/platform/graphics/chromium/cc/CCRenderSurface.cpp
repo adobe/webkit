@@ -55,6 +55,7 @@ CCRenderSurface::CCRenderSurface(CCLayerImpl* owningLayer)
     , m_drawOpacityIsAnimating(false)
     , m_targetSurfaceTransformsAreAnimating(false)
     , m_screenSpaceTransformsAreAnimating(false)
+    , m_blendMode(BlendModeNormal)
     , m_nearestAncestorThatMovesPixels(0)
     , m_targetRenderSurfaceLayerIndexHistory(0)
     , m_currentLayerIndexHistory(0)
@@ -173,10 +174,6 @@ void CCRenderSurface::copyTextureToFramebuffer(LayerRendererChromium* layerRende
 {
     const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceProgram();
     GLC(layerRenderer->context(), layerRenderer->context()->clear(GraphicsContext3D::COLOR_BUFFER_BIT));
-    GLC(layerRenderer->context(), layerRenderer->context()->activeTexture(GraphicsContext3D::TEXTURE0));
-    GLC(layerRenderer->context(), layerRenderer->context()->bindTexture(GraphicsContext3D::TEXTURE_2D, textureId));
-    GLC(layerRenderer->context(), layerRenderer->context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR));
-    GLC(layerRenderer->context(), layerRenderer->context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR));
 
     GLC(layerRenderer->context(), layerRenderer->context()->useProgram(program->program()));
     GLC(layerRenderer->context(), layerRenderer->context()->uniform1i(program->fragmentShader().samplerLocation(), 0));
@@ -189,11 +186,6 @@ void CCRenderSurface::copyTextureToFramebuffer(LayerRendererChromium* layerRende
 void CCRenderSurface::copyDeviceToBackgroundTexture(LayerRendererChromium* layerRenderer, int deviceBackgroundTextureId, const IntRect& deviceTextureRect, const TransformationMatrix& deviceTransform) const
 {
     TransformationMatrix deviceToSurfaceTransform;
-    deviceToSurfaceTransform.translate(m_contentRect.width() / 2.0, m_contentRect.height() / 2.0);
-    deviceToSurfaceTransform.scale3d(m_contentRect.width(), m_contentRect.height(), 1);
-    deviceToSurfaceTransform *= deviceTransform.inverse();
-    deviceToSurfaceTransform.translate(deviceTextureRect.width() / 2.0, deviceTextureRect.height() / 2.0);
-    deviceToSurfaceTransform.translate(deviceTextureRect.x(), deviceTextureRect.y());
 
     copyTextureToFramebuffer(layerRenderer, deviceBackgroundTextureId, deviceTextureRect.size(), deviceToSurfaceTransform);
 }
@@ -220,7 +212,7 @@ void CCRenderSurface::setScissorRect(LayerRendererChromium* layerRenderer, const
         GLC(layerRenderer->context(), layerRenderer->context()->disable(GraphicsContext3D::SCISSOR_TEST));
 }
 
-void CCRenderSurface::drawContents(LayerRendererChromium* layerRenderer, EBlendMode blendMode)
+void CCRenderSurface::drawContents(LayerRendererChromium* layerRenderer)
 {
     if (m_skipsDraw || !m_contentsTexture)
         return;
@@ -230,10 +222,10 @@ void CCRenderSurface::drawContents(LayerRendererChromium* layerRenderer, EBlendM
     SkBitmap filterBitmap = applyFilters(layerRenderer, m_filters, m_contentsTexture.get());
 
     int contentsTextureId = getSkBitmapTextureId(filterBitmap, m_contentsTexture->textureId());
-    drawLayer(layerRenderer, m_maskLayer, m_drawTransform, contentsTextureId, blendMode);
+    drawLayer(layerRenderer, m_maskLayer, m_drawTransform, contentsTextureId);
 }
 
-void CCRenderSurface::drawReplica(LayerRendererChromium* layerRenderer, EBlendMode blendMode)
+void CCRenderSurface::drawReplica(LayerRendererChromium* layerRenderer)
 {
     ASSERT(hasReplica());
     if (!hasReplica() || m_skipsDraw || !m_contentsTexture)
@@ -253,10 +245,10 @@ void CCRenderSurface::drawReplica(LayerRendererChromium* layerRenderer, EBlendMo
         replicaMaskLayer = m_owningLayer->replicaLayer()->maskLayer();
 
     int contentsTextureId = getSkBitmapTextureId(filterBitmap, m_contentsTexture->textureId());
-    drawLayer(layerRenderer, replicaMaskLayer, m_replicaDrawTransform, contentsTextureId, blendMode);
+    drawLayer(layerRenderer, replicaMaskLayer, m_replicaDrawTransform, contentsTextureId);
 }
 
-void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, int contentsTextureId, EBlendMode blendMode)
+void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, int contentsTextureId)
 {
     TransformationMatrix deviceMatrix = computeDeviceTransform(layerRenderer, drawTransform);
 
@@ -285,26 +277,31 @@ void CCRenderSurface::drawLayer(LayerRendererChromium* layerRenderer, CCLayerImp
     int backgroundTextureId = hasBackgroundTexture ? m_backgroundTexture->textureId() : -1;
     if (useMask) {
         if (useAA) {
-            const LayerRendererChromium::RenderSurfaceMaskProgramAA* program = layerRenderer->renderSurfaceMaskWithBlendingProgramAA(blendMode, hasBackgroundTexture);
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
+            const LayerRendererChromium::RenderSurfaceMaskProgramAA* program = layerRenderer->renderSurfaceMaskWithBlendingProgramAA(m_blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, 
+                        program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), 
+                        program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
         } else {
-            const LayerRendererChromium::RenderSurfaceMaskProgram* program = layerRenderer->renderSurfaceMaskWithBlendingProgram(blendMode, hasBackgroundTexture);
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), -1, -1);
+            const LayerRendererChromium::RenderSurfaceMaskProgram* program = layerRenderer->renderSurfaceMaskWithBlendingProgram(m_blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, 
+                        program->fragmentShader().maskSamplerLocation(), program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), -1, -1);
         }
     } else {
         if (useAA) {
-            const LayerRendererChromium::RenderSurfaceProgramAA* program = layerRenderer->renderSurfaceWithBlendingProgramAA(blendMode, hasBackgroundTexture);
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, program->fragmentShader().backgroundSamplerLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
+            const LayerRendererChromium::RenderSurfaceProgramAA* program = layerRenderer->renderSurfaceWithBlendingProgramAA(m_blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, 
+                        program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), program->vertexShader().pointLocation(), program->fragmentShader().edgeLocation());
         } else {
-            const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceWithBlendingProgram(blendMode, hasBackgroundTexture);
-            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, program->fragmentShader().backgroundSamplerLocation(), -1, -1);
+            const LayerRendererChromium::RenderSurfaceProgram* program = layerRenderer->renderSurfaceWithBlendingProgram(m_blendMode, hasBackgroundTexture);
+            drawSurface(layerRenderer, maskLayer, drawTransform, deviceMatrix, deviceRect, layerQuad, contentsTextureId, backgroundTextureId, program, -1, 
+                        program->fragmentShader().backgroundSamplerLocation(), program->fragmentShader().backgroundRectLocation(), -1, -1);
         }
     }
 }
 
 template <class T>
-void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad& layerQuad, int contentsTextureId, 
-                                  int backgroundTextureId, const T* program, int shaderMaskSamplerLocation, int shaderBackgroundSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation)
+void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerImpl* maskLayer, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad& layerQuad, 
+                                  int contentsTextureId, int backgroundTextureId, const T* program, int shaderMaskSamplerLocation, int shaderBackgroundSamplerLocation, int shaderBackgroundRectLocation, int shaderQuadLocation, int shaderEdgeLocation)
 {
     GraphicsContext3D* context3D = layerRenderer->context();
 
@@ -329,6 +326,11 @@ void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerI
         GLC(context3D, context3D->uniform1i(shaderBackgroundSamplerLocation, 2));
         context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, backgroundTextureId);
         GLC(context3D, context3D->activeTexture(GraphicsContext3D::TEXTURE0));
+    }
+    
+    if (shaderBackgroundRectLocation != -1) {
+        IntRect screenRect = readbackDeviceContentRect(layerRenderer, drawTransform);
+        GLC(context3D, context3D->uniform4f(shaderBackgroundRectLocation, screenRect.x(), screenRect.y(), screenRect.width(), screenRect.height()));
     }
 
     if (shaderEdgeLocation != -1) {

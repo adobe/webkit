@@ -45,6 +45,7 @@ RenderSurfaceChromium::RenderSurfaceChromium(LayerChromium* owningLayer)
     , m_drawOpacityIsAnimating(false)
     , m_targetSurfaceTransformsAreAnimating(false)
     , m_screenSpaceTransformsAreAnimating(false)
+    , m_blendMode(BlendModeNormal)
     , m_nearestAncestorThatMovesPixels(0)
 {
 }

@@ -159,10 +159,12 @@ public:
     int fragmentTexTransformLocation() const { return -1; }
     int samplerLocation() const { return m_samplerLocation; }
     int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
+    int backgroundRectLocation() const { return m_backgroundRectLocation; }
 
 private:
     int m_samplerLocation;
     int m_backgroundSamplerLocation;
+    int m_backgroundRectLocation;
     int m_alphaLocation;
 };
 
@@ -243,11 +245,13 @@ public:
     int alphaLocation() const { return m_alphaLocation; }
     int samplerLocation() const { return m_samplerLocation; }
     int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
+    int backgroundRectLocation() const { return m_backgroundRectLocation; }
     int edgeLocation() const { return m_edgeLocation; }
 
 private:
     int m_samplerLocation;
     int m_backgroundSamplerLocation;
+    int m_backgroundRectLocation;
     int m_alphaLocation;
     int m_edgeLocation;
 };
@@ -291,11 +295,13 @@ public:
     int samplerLocation() const { return m_samplerLocation; }
     
     int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
+    int backgroundRectLocation() const { return m_backgroundRectLocation; }
     int maskSamplerLocation() const { return m_maskSamplerLocation; }
 
 private:
     int m_samplerLocation;
     int m_backgroundSamplerLocation;
+    int m_backgroundRectLocation;
     int m_maskSamplerLocation;
     int m_alphaLocation;
 };
@@ -310,12 +316,14 @@ public:
     int alphaLocation() const { return m_alphaLocation; }
     int samplerLocation() const { return m_samplerLocation; }
     int backgroundSamplerLocation() const { return m_backgroundSamplerLocation; }
+    int backgroundRectLocation() const { return m_backgroundRectLocation; }
     int maskSamplerLocation() const { return m_maskSamplerLocation; }
     int edgeLocation() const { return m_edgeLocation; }
 
 private:
     int m_samplerLocation;
     int m_backgroundSamplerLocation;
+    int m_backgroundRectLocation;
     int m_maskSamplerLocation;
     int m_alphaLocation;
     int m_edgeLocation;

@@ -320,7 +320,8 @@ protected:
 
         unsigned _styleType : 6; // PseudoId
         unsigned _pseudoBits : 7;
-        unsigned _effectiveBlendMode: 4;
+        // FIXME: Having _effectiveBlendMode here is totally wrong!
+        unsigned _effectiveBlendMode: 5;
 
         bool affectedByHover() const { return _affectedByHover; }
         void setAffectedByHover(bool value) { _affectedByHover = value; }

@@ -96,6 +96,9 @@ public:
     void setBackgroundFilters(const FilterOperations& filters) { m_backgroundFilters = filters; }
     const FilterOperations& backgroundFilters() const { return m_backgroundFilters; }
 
+    void setBlendMode(EBlendMode blendMode) { m_blendMode = blendMode; }
+    EBlendMode blendMode() const { return m_blendMode; }
+
     bool skipsDraw() const { return m_skipsDraw; }
     void setSkipsDraw(bool skipsDraw) { m_skipsDraw = skipsDraw; }
 
@@ -128,6 +131,7 @@ private:
     bool m_screenSpaceTransformsAreAnimating;
     FilterOperations m_filters;
     FilterOperations m_backgroundFilters;
+    EBlendMode m_blendMode;
     IntRect m_clipRect;
     Vector<RefPtr<LayerChromium> > m_layerList;
 
