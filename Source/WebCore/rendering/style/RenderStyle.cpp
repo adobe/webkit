@@ -592,7 +592,8 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
     }
 
     if (rareNonInheritedData->m_effectiveBlendMode != other->rareNonInheritedData->m_effectiveBlendMode
-        || rareNonInheritedData->m_alphaCompositingMode != other->rareNonInheritedData->m_alphaCompositingMode)
+        || rareNonInheritedData->m_alphaCompositingMode != other->rareNonInheritedData->m_alphaCompositingMode
+        || rareNonInheritedData->m_isolationMode != other->rareNonInheritedData->m_isolationMode)
         return StyleDifferenceRepaintLayer;
 
     if (rareNonInheritedData->opacity != other->rareNonInheritedData->opacity) {

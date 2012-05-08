@@ -988,7 +988,10 @@ public:
     EAlphaCompositingMode alphaCompositingMode() const { return static_cast<EAlphaCompositingMode>(rareNonInheritedData->m_alphaCompositingMode); }
     void setAlphaCompositingMode(EAlphaCompositingMode v) { rareNonInheritedData.access()->m_alphaCompositingMode = v; }
     
-    bool hasBlendingOrCompositing() const { return blendMode() != initialBlendMode() || alphaCompositingMode() != initialAlphaCompositingMode(); }
+    EIsolationMode isolationMode() const { return static_cast<EIsolationMode>(rareNonInheritedData->m_isolationMode); }
+    void setIsolationMode(EIsolationMode v) { rareNonInheritedData.access()->m_isolationMode = v; }
+    
+    bool hasBlendingOrCompositing() const { return blendMode() != initialBlendMode() || alphaCompositingMode() != initialAlphaCompositingMode() || isolationMode() != initialIsolationMode(); }
 
 #if USE(RTL_SCROLLBAR)
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
@@ -1704,6 +1707,7 @@ public:
 #endif
     static EBlendMode initialBlendMode() { return BlendModeNormal; }
     static EAlphaCompositingMode initialAlphaCompositingMode() { return AlphaCompositingModeSrcOver; }
+    static EIsolationMode initialIsolationMode() { return IsolationModeAccumulate; }
 private:
     void setVisitedLinkColor(const Color& v) { SET_VAR(inherited, visitedLinkColor, v) }
     void setVisitedLinkBackgroundColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBackgroundColor, v) }

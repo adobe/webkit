@@ -2026,6 +2026,7 @@ StyleBuilder::StyleBuilder()
     
     setPropertyHandler(CSSPropertyWebkitBlendMode, ApplyPropertyDefault<EBlendMode, &RenderStyle::blendMode, EBlendMode, &RenderStyle::setBlendMode, EBlendMode, &RenderStyle::initialBlendMode>::createHandler());
     setPropertyHandler(CSSPropertyWebkitAlphaCompositing, ApplyPropertyDefault<EAlphaCompositingMode, &RenderStyle::alphaCompositingMode, EAlphaCompositingMode, &RenderStyle::setAlphaCompositingMode, EAlphaCompositingMode, &RenderStyle::initialAlphaCompositingMode>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitIsolation, ApplyPropertyDefault<EIsolationMode, &RenderStyle::isolationMode, EIsolationMode, &RenderStyle::setIsolationMode, EIsolationMode, &RenderStyle::initialIsolationMode>::createHandler());
 }
 
 

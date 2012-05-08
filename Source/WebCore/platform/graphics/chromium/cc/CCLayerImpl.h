@@ -119,6 +119,9 @@ public:
     void setAlphaCompositingMode(EAlphaCompositingMode);
     EAlphaCompositingMode alphaCompositingMode() const { return m_alphaCompositingMode; }
 
+    void setIsolationMode(EIsolationMode);
+    EIsolationMode isolationMode() const { return m_isolationMode; }
+
     void setMasksToBounds(bool);
     bool masksToBounds() const { return m_masksToBounds; }
 
@@ -344,6 +347,7 @@ private:
     
     EBlendMode m_blendMode;
     EAlphaCompositingMode m_alphaCompositingMode;
+    EIsolationMode m_isolationMode;
 
     TransformationMatrix m_drawTransform;
     TransformationMatrix m_screenSpaceTransform;

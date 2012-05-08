@@ -165,8 +165,8 @@ public:
     String nameForLayer() const;
     
     void setBlendMode(EBlendMode);
-    
     void setAlphaCompositingMode(EAlphaCompositingMode);
+    void setIsolationMode(EIsolationMode);
     
 private:
     void createPrimaryGraphicsLayer();

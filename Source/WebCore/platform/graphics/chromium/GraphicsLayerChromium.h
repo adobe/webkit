@@ -124,6 +124,7 @@ public:
 
     virtual void setBlendMode(EBlendMode);
     virtual void setAlphaCompositingMode(EAlphaCompositingMode);
+    virtual void setIsolationMode(EIsolationMode);
 
 private:
     virtual void willBeDestroyed();

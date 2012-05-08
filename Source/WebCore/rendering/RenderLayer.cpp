@@ -194,6 +194,7 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_resizer(0)
     , m_blendMode(BlendModeNormal)
     , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
+    , m_isolationMode(IsolationModeAccumulate)
 {
     m_isNormalFlowOnly = shouldBeNormalFlowOnly();
 
@@ -532,6 +533,12 @@ void RenderLayer::updateBlendModeAndCompositing()
         m_alphaCompositingMode = newAlphaCompositingMode;
         if (backing())
             backing()->setAlphaCompositingMode(newAlphaCompositingMode);
+    }
+    EIsolationMode newIsolationMode = renderer()->style()->isolationMode();
+    if (newIsolationMode != m_isolationMode) {
+        m_isolationMode = newIsolationMode;
+        if (backing())
+            backing()->setIsolationMode(newIsolationMode);
     }
 }
 
@@ -4300,6 +4307,7 @@ RenderLayerBacking* RenderLayer::ensureBacking()
 #endif
         backing()->setBlendMode(m_blendMode);
         backing()->setAlphaCompositingMode(m_alphaCompositingMode);
+        backing()->setIsolationMode(m_isolationMode);
     }
     return m_backing.get();
 }

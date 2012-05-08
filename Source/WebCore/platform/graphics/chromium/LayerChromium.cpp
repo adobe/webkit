@@ -71,6 +71,7 @@ LayerChromium::LayerChromium()
     , m_opacity(1.0)
     , m_blendMode(BlendModeNormal)
     , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
+    , m_isolationMode(IsolationModeAccumulate)
     , m_anchorPointZ(0)
     , m_isDrawable(false)
     , m_masksToBounds(false)
@@ -341,6 +342,14 @@ void LayerChromium::setAlphaCompositingMode(EAlphaCompositingMode alphaCompositi
     setNeedsCommit();
 }
 
+void LayerChromium::setIsolationMode(EIsolationMode isolationMode)
+{
+    if (m_isolationMode == isolationMode)
+        return;
+    m_isolationMode = isolationMode;
+    setNeedsCommit();
+}
+
 void LayerChromium::setOpacity(float opacity)
 {
     if (m_opacity == opacity)
@@ -512,6 +521,7 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
     layer->setBackgroundFilters(backgroundFilters());
     layer->setBlendMode(blendMode());
     layer->setAlphaCompositingMode(alphaCompositingMode());
+    layer->setIsolationMode(isolationMode());
     layer->setIsNonCompositedContent(m_isNonCompositedContent);
     layer->setMasksToBounds(m_masksToBounds);
     layer->setScrollable(m_scrollable);

@@ -389,3 +389,4 @@ z-index
 #endif
 -webkit-blend-mode
 -webkit-alpha-compositing
+-webkit-isolation

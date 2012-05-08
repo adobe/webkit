@@ -1125,6 +1125,12 @@ void RenderLayerBacking::setAlphaCompositingMode(EAlphaCompositingMode alphaComp
         m_graphicsLayer->setAlphaCompositingMode(alphaCompositingMode);
 }
 
+void RenderLayerBacking::setIsolationMode(EIsolationMode isolationMode)
+{
+    if (m_graphicsLayer)
+        m_graphicsLayer->setIsolationMode(isolationMode);
+}
+
 void RenderLayerBacking::setContentsNeedDisplay()
 {
     ASSERT(!paintsIntoCompositedAncestor());

@@ -473,6 +473,12 @@ void GraphicsLayerChromium::setAlphaCompositingMode(EAlphaCompositingMode alphaC
     GraphicsLayer::setAlphaCompositingMode(alphaCompositingMode);
 }
 
+void GraphicsLayerChromium::setIsolationMode(EIsolationMode isolationMode)
+{
+    m_layer->setIsolationMode(isolationMode);
+    GraphicsLayer::setIsolationMode(isolationMode);
+}
+
 PlatformLayer* GraphicsLayerChromium::hostLayerForChildren() const
 {
     return m_transformLayer ? m_transformLayer.get() : m_layer.get();

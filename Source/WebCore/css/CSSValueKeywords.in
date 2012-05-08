@@ -947,3 +947,7 @@ src-atop
 dst-atop
 // xor
 // plus
+
+// -webkit-isolation
+accumulate
+isolate

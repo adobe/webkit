@@ -468,6 +468,8 @@ enum EBlendMode { BlendModeNormal = 1, BlendModePlus, BlendModeMultiply, BlendMo
 
 enum EAlphaCompositingMode { AlphaCompositingModeClear = 1, AlphaCompositingModeSrc, AlphaCompositingModeDst, AlphaCompositingModeSrcOver, AlphaCompositingModeDstOver, AlphaCompositingModeSrcIn, AlphaCompositingModeDstIn, AlphaCompositingModeSrcOut, AlphaCompositingModeDstOut, AlphaCompositingModeSrcAtop, AlphaCompositingModeDstAtop, AlphaCompositingModeXor, AlphaCompositingModePlus };
 
+enum EIsolationMode { IsolationModeAccumulate, IsolationModeIsolate };
+
 } // namespace WebCore
 
 #endif // RenderStyleConstants_h

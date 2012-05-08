@@ -2060,6 +2060,9 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
                          || id == CSSValueSrcAtop || id == CSSValueDstAtop || id == CSSValueXor 
                          || id == CSSValuePlus;
         break;
+    case CSSPropertyWebkitIsolation:
+        validPrimitive = id == CSSValueAccumulate || id == CSSValueIsolate;
+        break;
     case CSSPropertyWebkitFlex:
         if (id == CSSValueNone)
             validPrimitive = true;

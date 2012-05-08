@@ -69,6 +69,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_debugBorderWidth(0)
     , m_blendMode(BlendModeNormal)
     , m_alphaCompositingMode(AlphaCompositingModeSrcOver)
+    , m_isolationMode(IsolationModeAccumulate)
     , m_drawTransformIsAnimating(false)
     , m_screenSpaceTransformIsAnimating(false)
 #ifndef NDEBUG
@@ -444,6 +445,15 @@ void CCLayerImpl::setAlphaCompositingMode(EAlphaCompositingMode alphaCompositing
         return;
 
     m_alphaCompositingMode = alphaCompositingMode;
+    noteLayerPropertyChangedForSubtree();
+}
+
+void CCLayerImpl::setIsolationMode(EIsolationMode isolationMode)
+{
+    if (m_isolationMode == isolationMode)
+        return;
+
+    m_isolationMode = isolationMode;
     noteLayerPropertyChangedForSubtree();
 }
 

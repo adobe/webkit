@@ -1261,6 +1261,32 @@ template<> inline CSSPrimitiveValue::operator EAlphaCompositingMode() const
     }
 }
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EIsolationMode e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch(e){
+    case IsolationModeAccumulate:
+        m_value.ident = CSSValueAccumulate;
+        break;
+    case IsolationModeIsolate:
+        m_value.ident = CSSValueIsolate;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator EIsolationMode() const
+{
+    switch (m_value.ident) {
+        case CSSValueAccumulate:
+            return IsolationModeAccumulate;
+        case CSSValueIsolate:
+            return IsolationModeIsolate;
+        default:
+            return IsolationModeAccumulate;
+    }
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
     : CSSValue(PrimitiveClass)
 {

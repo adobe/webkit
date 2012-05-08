@@ -927,6 +927,7 @@ private:
 
     EBlendMode m_blendMode;
     EAlphaCompositingMode m_alphaCompositingMode;
+    EIsolationMode m_isolationMode;
     
     // FIXME: This should stay in a hash-map.
     OwnPtr<WrappingContext> m_wrappingContext;

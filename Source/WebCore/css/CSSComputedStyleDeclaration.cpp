@@ -2371,6 +2371,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->blendMode());
         case CSSPropertyWebkitAlphaCompositing: 
             return cssValuePool().createValue(style->alphaCompositingMode());
+        case CSSPropertyWebkitIsolation: 
+            return cssValuePool().createValue(style->isolationMode());
         case CSSPropertyBackground: {
             const CSSPropertyID properties[5] = { CSSPropertyBackgroundColor, CSSPropertyBackgroundImage,
                                         CSSPropertyBackgroundRepeat, CSSPropertyBackgroundAttachment,

@@ -339,6 +339,7 @@ public:
 
     virtual void setBlendMode(EBlendMode) { }
     virtual void setAlphaCompositingMode(EAlphaCompositingMode) { }
+    virtual void setIsolationMode(EIsolationMode) { }
 
     // Some GraphicsLayers paint only the foreground or the background content
     GraphicsLayerPaintingPhase paintingPhase() const { return m_paintingPhase; }

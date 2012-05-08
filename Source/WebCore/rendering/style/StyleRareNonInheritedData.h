@@ -181,6 +181,7 @@ public:
 
     unsigned m_effectiveBlendMode: 5; // EBlendMode
     unsigned m_alphaCompositingMode: 4; // EAlphaCompositingMode
+    unsigned m_isolationMode: 1; // EIsolationMode
 
 private:
     StyleRareNonInheritedData();

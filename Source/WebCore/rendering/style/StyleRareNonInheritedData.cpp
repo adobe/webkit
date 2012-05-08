@@ -75,6 +75,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
 #endif
     , m_effectiveBlendMode(RenderStyle::initialBlendMode())
     , m_alphaCompositingMode(RenderStyle::initialAlphaCompositingMode())
+    , m_isolationMode(RenderStyle::initialIsolationMode())
 {
     m_maskBoxImage.setMaskDefaults();
 }
@@ -146,6 +147,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
 #endif
     , m_effectiveBlendMode(o.m_effectiveBlendMode)
     , m_alphaCompositingMode(o.m_alphaCompositingMode)
+    , m_isolationMode(o.m_isolationMode)
 {
 }
 
@@ -222,7 +224,8 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && (m_regionBreakBefore == o.m_regionBreakBefore)
         && (m_regionBreakInside == o.m_regionBreakInside)
         && (m_effectiveBlendMode == o.m_effectiveBlendMode)
-        && (m_alphaCompositingMode == o.m_alphaCompositingMode);
+        && (m_alphaCompositingMode == o.m_alphaCompositingMode)
+        && (m_isolationMode == o.m_isolationMode);
 }
 
 bool StyleRareNonInheritedData::contentDataEquivalent(const StyleRareNonInheritedData& o) const
