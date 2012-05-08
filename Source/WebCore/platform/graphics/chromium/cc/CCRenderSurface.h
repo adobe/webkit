@@ -55,7 +55,7 @@ public:
     bool prepareContentsTexture(LayerRendererChromium*);
     void releaseContentsTexture();
 
-    bool prepareBackgroundTexture(LayerRendererChromium*);
+    bool prepareBackgroundTexture(LayerRendererChromium*, const IntSize&);
     void releaseBackgroundTexture();
 
     void setScissorRect(LayerRendererChromium*, const FloatRect& surfaceDamageRect) const;
@@ -155,6 +155,9 @@ public:
 
     PassOwnPtr<CCSharedQuadState> createSharedQuadState() const;
     PassOwnPtr<CCSharedQuadState> createReplicaSharedQuadState() const;
+    
+    void setBackgroundScreenRect(const IntRect& backgroundScreenRect) { m_backgroundScreenRect = backgroundScreenRect; }
+    const IntRect& backgroundScreenRect() const { return m_backgroundScreenRect; }
 
 private:
     IntRect computeDeviceBoundingBox(LayerRendererChromium*, const TransformationMatrix& drawTransform) const;
@@ -202,6 +205,8 @@ private:
 
     // Stored in the "surface space" where this damage can be used for scissoring.
     FloatRect m_damageRect;
+    
+    IntRect m_backgroundScreenRect;
 
     // For CCLayerIteratorActions
     int m_targetRenderSurfaceLayerIndexHistory;

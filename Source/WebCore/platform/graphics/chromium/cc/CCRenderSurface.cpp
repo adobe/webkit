@@ -106,9 +106,8 @@ void CCRenderSurface::releaseContentsTexture()
     m_contentsTexture->unreserve();
 }
 
-bool CCRenderSurface::prepareBackgroundTexture(LayerRendererChromium* layerRenderer)
+bool CCRenderSurface::prepareBackgroundTexture(LayerRendererChromium* layerRenderer, const IntSize& requiredSize)
 {
-    IntSize requiredSize(m_contentRect.size());
     TextureManager* textureManager = layerRenderer->renderSurfaceTextureManager();
 
     if (!m_backgroundTexture)
@@ -329,10 +328,8 @@ void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerI
         GLC(context3D, context3D->activeTexture(GraphicsContext3D::TEXTURE0));
     }
     
-    if (shaderBackgroundRectLocation != -1) {
-        IntRect screenRect = readbackDeviceContentRect(layerRenderer, drawTransform);
-        GLC(context3D, context3D->uniform4f(shaderBackgroundRectLocation, screenRect.x(), screenRect.y(), screenRect.width(), screenRect.height()));
-    }
+    if (shaderBackgroundRectLocation != -1)
+        GLC(context3D, context3D->uniform4f(shaderBackgroundRectLocation, m_backgroundScreenRect.x(), m_backgroundScreenRect.y(), m_backgroundScreenRect.width(), m_backgroundScreenRect.height()));
 
     if (shaderEdgeLocation != -1) {
         float edge[24];

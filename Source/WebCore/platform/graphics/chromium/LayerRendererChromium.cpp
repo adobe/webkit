@@ -569,12 +569,13 @@ void LayerRendererChromium::drawBackgroundFilters(const CCRenderSurfaceDrawQuad*
 
     // FIXME: Do a single readback for both the surface and replica and cache the filtered results (once filter textures are not reused).
     IntRect deviceRect = drawingSurface->readbackDeviceContentRect(this, surfaceDrawTransform);
-    deviceRect.intersect(m_currentRenderSurface->contentRect());
+    //deviceRect.intersect(m_currentRenderSurface->contentRect());
 
-    if (!drawingSurface->prepareBackgroundTexture(this))
+    if (!drawingSurface->prepareBackgroundTexture(this, deviceRect.size()))
         return;
     if (!getFramebufferTexture(drawingSurface->backgroundTexture(), deviceRect))
         return;
+    drawingSurface->setBackgroundScreenRect(deviceRect);
     
     // FIXME: Disabled background filters for now.
     /*OwnPtr<ManagedTexture> deviceBackgroundTexture = ManagedTexture::create(m_renderSurfaceTextureManager.get());
