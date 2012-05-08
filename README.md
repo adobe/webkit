@@ -39,11 +39,11 @@ List of CSS Shaders changes in this branch:
 
 CSS Compositing
 -----------
-+ Added support for css blending with -webkit-blend-mode for chromium and safari (Chromium bugs remain)
++ Added support for css blending and alpha compositing with -webkit-blend-mode and -webkit-alpha-compositing for Chromium
 
 + Added support for additional blending modes in Canvas in WebKit and Safari
 
-+ Added set of files that show proof-of-concept of these features in Safari, Chromium and a custom FireFox (Chromium bugs remain)
++ Added set of files that show proof-of-concept of these features in Safari, Chromium and a custom FireFox
 
 CSS Transforms
 -------------
