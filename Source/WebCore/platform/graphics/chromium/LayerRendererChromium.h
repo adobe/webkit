@@ -119,11 +119,13 @@ public:
     bool getFramebufferTexture(ManagedTexture*, const IntRect& deviceRect);
 
     TextureManager* renderSurfaceTextureManager() const { return m_renderSurfaceTextureManager.get(); }
+    TextureManager* renderSurfaceBackgroundTextureManager() const { return m_renderSurfaceBackgroundTextureManager.get(); }
     TextureCopier* textureCopier() const { return m_textureCopier.get(); }
     TextureUploader* textureUploader() const { return m_textureUploader.get(); }
     TextureAllocator* renderSurfaceTextureAllocator() const { return m_renderSurfaceTextureAllocator.get(); }
+    TextureAllocator* renderSurfaceBackgroundTextureAllocator() const { return m_renderSurfaceTextureAllocator.get(); }
     TextureAllocator* contentsTextureAllocator() const { return m_contentsTextureAllocator.get(); }
-
+    
     void setScissorToRect(const IntRect&);
 
     bool isContextLost();
@@ -299,10 +301,12 @@ private:
     OwnPtr<HeadsUpDisplayProgram> m_headsUpDisplayProgram;
 
     OwnPtr<TextureManager> m_renderSurfaceTextureManager;
+    OwnPtr<TextureManager> m_renderSurfaceBackgroundTextureManager;
     OwnPtr<AcceleratedTextureCopier> m_textureCopier;
     OwnPtr<AcceleratedTextureUploader> m_textureUploader;
     OwnPtr<TrackingTextureAllocator> m_contentsTextureAllocator;
     OwnPtr<TrackingTextureAllocator> m_renderSurfaceTextureAllocator;
+    OwnPtr<TrackingTextureAllocator> m_renderSurfaceBackgroundTextureAllocator;
 
     RefPtr<GraphicsContext3D> m_context;
     

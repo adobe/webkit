@@ -108,7 +108,7 @@ void CCRenderSurface::releaseContentsTexture()
 
 bool CCRenderSurface::prepareBackgroundTexture(LayerRendererChromium* layerRenderer, const IntSize& requiredSize)
 {
-    TextureManager* textureManager = layerRenderer->renderSurfaceTextureManager();
+    TextureManager* textureManager = layerRenderer->renderSurfaceBackgroundTextureManager();
 
     if (!m_backgroundTexture)
         m_backgroundTexture = ManagedTexture::create(textureManager);

@@ -347,6 +347,8 @@ void LayerRendererChromium::releaseRenderSurfaceTextures()
 {
     if (m_renderSurfaceTextureManager)
         m_renderSurfaceTextureManager->evictAndDeleteAllTextures(m_renderSurfaceTextureAllocator.get());
+    if (m_renderSurfaceBackgroundTextureManager)
+        m_renderSurfaceBackgroundTextureManager->evictAndDeleteAllTextures(m_renderSurfaceBackgroundTextureAllocator.get());
 }
 
 void LayerRendererChromium::viewportChanged()
@@ -395,6 +397,7 @@ void LayerRendererChromium::beginDrawingFrame(CCRenderSurface* defaultRenderSurf
     size_t contentsMemoryUseBytes = m_contentsTextureAllocator->currentMemoryUseBytes();
     size_t maxLimit = TextureManager::highLimitBytes(viewportSize());
     m_renderSurfaceTextureManager->setMaxMemoryLimitBytes(maxLimit - contentsMemoryUseBytes);
+    m_renderSurfaceBackgroundTextureManager->setMaxMemoryLimitBytes(maxLimit - contentsMemoryUseBytes);
 
     if (viewportSize().isEmpty())
         return;
@@ -1085,6 +1088,9 @@ void LayerRendererChromium::finishDrawingFrame()
     m_renderSurfaceTextureManager->setPreferredMemoryLimitBytes(preferredLimit);
     m_renderSurfaceTextureManager->reduceMemoryToLimit(preferredLimit);
     m_renderSurfaceTextureManager->deleteEvictedTextures(m_renderSurfaceTextureAllocator.get());
+    m_renderSurfaceBackgroundTextureManager->setPreferredMemoryLimitBytes(preferredLimit);
+    m_renderSurfaceBackgroundTextureManager->reduceMemoryToLimit(preferredLimit);
+    m_renderSurfaceBackgroundTextureManager->deleteEvictedTextures(m_renderSurfaceBackgroundTextureAllocator.get());
 }
 
 void LayerRendererChromium::toGLMatrix(float* flattened, const TransformationMatrix& m)
@@ -1266,7 +1272,7 @@ bool LayerRendererChromium::getFramebufferTexture(ManagedTexture* texture, const
     if (!texture->reserve(deviceRect.size(), GraphicsContext3D::RGBA))
         return false;
 
-    texture->bindTexture(m_context.get(), m_renderSurfaceTextureAllocator.get());
+    texture->bindTexture(m_context.get(), m_renderSurfaceBackgroundTextureAllocator.get());
     GLC(m_context, m_context->copyTexImage2D(GraphicsContext3D::TEXTURE_2D, 0, texture->format(),
                                              deviceRect.x(), deviceRect.y(), deviceRect.width(), deviceRect.height(), 0));
     return true;
@@ -1383,10 +1389,14 @@ bool LayerRendererChromium::initializeSharedObjects()
     m_renderSurfaceTextureManager = TextureManager::create(TextureManager::highLimitBytes(viewportSize()),
                                                            TextureManager::reclaimLimitBytes(viewportSize()),
                                                            m_capabilities.maxTextureSize);
+    m_renderSurfaceBackgroundTextureManager = TextureManager::create(TextureManager::highLimitBytes(viewportSize()),
+                                                           TextureManager::reclaimLimitBytes(viewportSize()),
+                                                           m_capabilities.maxTextureSize);
     m_textureCopier = AcceleratedTextureCopier::create(m_context.get());
     m_textureUploader = AcceleratedTextureUploader::create(m_context.get());
     m_contentsTextureAllocator = TrackingTextureAllocator::create(m_context.get());
     m_renderSurfaceTextureAllocator = TrackingTextureAllocator::create(m_context.get());
+    m_renderSurfaceBackgroundTextureAllocator = TrackingTextureAllocator::create(m_context.get());
     if (m_capabilities.usingTextureUsageHint)
         m_renderSurfaceTextureAllocator->setTextureUsageHint(TrackingTextureAllocator::FramebufferAttachment);
     if (m_capabilities.usingTextureStorageExtension) {
