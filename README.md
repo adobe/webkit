@@ -56,4 +56,7 @@ Windows Build
 Note that if you are using the Windows build DirectX is needed, which can be downloaded from the following address: 
 (http://www.microsoft.com/download/en/details.aspx?displaylang=en%3fWT.mc_id%3dMSCOM_DLC_US_DR_111SXX02959&id=35)
 
+Downloads
+---------
+You can download both Mac and Windows builds of this branch [here](https://github.com/adobe/webkit/downloads).
 
