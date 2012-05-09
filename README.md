@@ -3,7 +3,7 @@ may2012-f2f-prototype
 
 `may2012-f2f-prototype` branch contains various changes intended for presentation at the May 2012 CSS WG F2F meeting in Hamburg. This branch includes prototype and experimental work. It should not be considered final or ready for submission into the WebKit trunk.
 
-The source for this binary can be found at [webkit/may2012-f2f-prototype](https://github.com/adobe/webkit/tree/may2012-f2f-prototype)
+The source for this prototype can be found at [webkit/may2012-f2f-prototype](https://github.com/adobe/webkit/tree/may2012-f2f-prototype)
 
 Demos of prototype features in this build can be found at
 * [web-platform/may2012-f2f-prototype](https://github.com/adobe/web-platform/tree/may2012-f2f-prototype/)
