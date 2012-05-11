@@ -59,6 +59,7 @@ class RenderBlock;
 class RenderFlowThread;
 class RenderGeometryMap;
 class RenderLayer;
+class RenderRegion;
 class RenderTable;
 class RenderTheme;
 class TransformState;
@@ -612,6 +613,7 @@ public:
     void setHasBoxDecorations(bool b = true) { m_bitfields.setPaintBackground(b); }
     void setIsText() { m_bitfields.setIsText(true); }
     void setIsBox() { m_bitfields.setIsBox(true); }
+    void resetHasRegionStyle();
     void setReplaced(bool b = true) { m_bitfields.setIsReplaced(b); }
     void setHorizontalWritingMode(bool b = true) { m_bitfields.setHorizontalWritingMode(b); }
     void setHasOverflowClip(bool b = true) { m_bitfields.setHasOverflowClip(b); }
@@ -900,10 +902,14 @@ public:
     RenderObject* rendererForRootBackground();
 
     RespectImageOrientationEnum shouldRespectImageOrientation() const;
+    
+    StyleDifference updateStyleInRegion(RenderRegion*);
 
 protected:
     inline bool layerCreationAllowedForSubtree() const;
 
+    virtual void styleInRegionDidChange(StyleDifference, const RenderStyle*) { };
+    
     // Overrides should call the superclass at the end
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     // Overrides should call the superclass at the start
@@ -1057,6 +1063,8 @@ private:
 private:
     // Store state between styleWillChange and styleDidChange
     static bool s_affectsParentBlock;
+    bool m_hasRegionStyle;
+    RefPtr<RenderStyle> m_beforeRegionStyle;
 };
 
 inline bool RenderObject::documentBeingDestroyed() const

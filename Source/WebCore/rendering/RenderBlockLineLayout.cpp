@@ -1175,6 +1175,8 @@ static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, Ro
 
 void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInlineChild)
 {
+    updateRegionStyleForOffset(logicalHeight());
+    
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;
     RootInlineBox* startLine = determineStartPosition(layoutState, resolver);
@@ -1239,7 +1241,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
 
 void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
 {
-    RenderStyle* styleToUse = style();
+    RenderStyle* styleToUse;
     bool paginated = view()->layoutState() && view()->layoutState()->isPaginated();
     LineMidpointState& lineMidpointState = resolver.midpointState();
     InlineIterator end = resolver.position();
@@ -1250,6 +1252,9 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
     LineBreaker lineBreaker(this);
 
     while (!end.atEnd()) {
+        updateRegionStyleForOffset(logicalHeight() + paginationStrut());
+        styleToUse = style();
+        
         // FIXME: Is this check necessary before the first iteration or can it be moved to the end?
         if (checkForEndLineMatch) {
             layoutState.setEndLineMatched(matchedEndLine(layoutState, resolver, cleanLineStart, cleanLineBidiStatus));
@@ -1321,24 +1326,31 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
                 if (paginated) {
                     LayoutUnit adjustment = 0;
-                    adjustLinePositionForPagination(lineBox, adjustment);
-                    if (adjustment) {
+                    if (adjustLinePositionForPagination(lineBox, adjustment)) {
                         LayoutUnit oldLineWidth = availableLogicalWidthForLine(oldLogicalHeight, layoutState.lineInfo().isFirstLine());
                         lineBox->adjustBlockDirectionPosition(adjustment);
                         if (layoutState.usesRepaintBounds())
                             layoutState.updateRepaintRangeFromBox(lineBox);
 
-                        if (availableLogicalWidthForLine(oldLogicalHeight + adjustment, layoutState.lineInfo().isFirstLine()) != oldLineWidth) {
+                        //FIXME: Find a better way to detect font size changes.
+                        updateRegionStyleForOffset(oldLogicalHeight + adjustment + paginationStrut());
+
+                        // FIXME: The invalidation logic needs to be reworked; for now just assume that if the block has paginationStrut the line needs to be recreated.
+                        if (availableLogicalWidthForLine(oldLogicalHeight + adjustment, layoutState.lineInfo().isFirstLine()) != oldLineWidth || m_invalidateLines) {
+                            m_invalidateLines = false;
+                            
                             // We have to delete this line, remove all floats that got added, and let line layout re-run.
                             lineBox->deleteLine(renderArena());
                             removeFloatingObjectsBelow(lastFloatFromPreviousLine, oldLogicalHeight);
                             setLogicalHeight(oldLogicalHeight + adjustment);
+                            updateRegionStyleForOffset(logicalHeight() + paginationStrut());
                             resolver.setPositionIgnoringNestedIsolates(oldEnd);
                             end = oldEnd;
                             continue;
                         }
 
                         setLogicalHeight(lineBox->lineBottomWithLeading());
+                        updateRegionStyleForOffset(logicalHeight() + paginationStrut());
                     }
                 }
             }
@@ -1467,6 +1479,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
 {
     m_overflow.clear();
 
+    updateRegionStyleForOffset(logicalHeight());
     setLogicalHeight(borderBefore() + paddingBefore());
     
     // Lay out our hypothetical grid line as though it occurs at the top of the block.
@@ -1542,9 +1555,13 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
 
     // Now add in the bottom border/padding.
     setLogicalHeight(logicalHeight() + lastLineAnnotationsAdjustment + borderAfter() + paddingAfter() + scrollbarLogicalHeight());
+    
+    updateRegionStyleForOffset(logicalHeight());
 
     if (!firstLineBox() && hasLineIfEmpty())
         setLogicalHeight(logicalHeight() + lineHeight(true, isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
+    
+    updateRegionStyleForOffset(logicalHeight());
 
     // See if we have any lines that spill out of our block.  If we do, then we will possibly need to
     // truncate text.
@@ -1597,10 +1614,11 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
         size_t floatIndex = 0;
         for (curr = firstRootBox(); curr && !curr->isDirty(); curr = curr->nextRootBox()) {
             if (paginated) {
-                if (lineWidthForPaginatedLineChanged(curr)) {
+                if (lineWidthForPaginatedLineChanged(curr, curr->lineBottomWithLeading()) || lineWidthForPaginatedLineChanged(curr)) {
                     curr->markDirty();
                     break;
                 }
+                
                 paginationDelta -= curr->paginationStrut();
                 adjustLinePositionForPagination(curr, paginationDelta);
                 if (paginationDelta) {
@@ -1613,6 +1631,14 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
                     layoutState.updateRepaintRangeFromBox(curr, paginationDelta);
                     curr->adjustBlockDirectionPosition(paginationDelta);
                 }
+                
+                updateRegionStyleForOffset(curr->lineBottomWithLeading());
+                
+                if (m_invalidateLines) {
+                    m_invalidateLines = false;
+                    layoutState.markForFullLayout();
+                    break;
+                }
             }
 
             // If a new float has been inserted before this line or before its last known float, just do a full layout.
@@ -1624,6 +1650,7 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
             if (dirtiedByFloat || layoutState.isFullLayout())
                 break;
         }
+        
         // Check if a new float has been inserted after the last known float.
         if (!curr && floatIndex < layoutState.floats().size())
             layoutState.markForFullLayout();

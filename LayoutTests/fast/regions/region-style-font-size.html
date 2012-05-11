@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+    <!--
+    Test for https://bugs.webkit.org/show_bug.cgi?id=71488 (Add support for background-color in region styling).
+    Test setting the background-color property using region styling fox boxes.
+    You should not see any red background below.
+    -->
+    <head>
+        <style>
+            body, html {width: 99%; height: 99%;}
+            .regionBox {
+                border:5px solid black;
+                width:30%;
+                height:20%;
+                -webkit-flow-from: flow;
+            }
+
+            p {
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+            }
+
+            #article {
+                -webkit-flow-into: flow;
+            }
+
+            #subarticle {
+                margin-top: 40px;
+                margin-bottom: 10px;
+            }
+
+            #floater {
+                float: left;
+                width: 50px;
+                border: 1px solid red;
+            }
+
+            @-webkit-region #region1 {
+                #subarticle {
+                    margin-top: 50px;
+                    margin-bottom: 40px;
+                }
+
+                #floater {
+                    font-size: 20px;
+                }
+
+                p {
+                    background-color: green;
+                    font-size: 15px;
+                }
+            }
+
+            @-webkit-region #region2 { 
+                #subarticle {
+                    margin-top: 100px;
+                    margin-bottom: 40px;
+                }
+
+                #floater {
+                    font-size: 15px;
+                }
+
+                p {
+                    background-color: yellow;
+                    font-size: 10px;
+                }
+            }
+
+        </style>
+        <script>
+        function resizeWindow() {
+            window.resizeTo(window.outerWidth, window.outerHeight + 100);
+        }
+        </script>
+   </head>
+    <body class="body">
+        <!-- Style a single paragraph in a single region -->
+        <div id="article">
+            <div id="floater"> The red fox is here to steal your stuff</div><p id="subarticle">Lorem ipsum dolor sit amet, consectetur adipiscing elit. In cursus ipsum id ligula consectetur viverra. Mauris ac metus eget nunc euismod accumsan at ut orci. Etiam euismod, dui vitae vestibulum tempus, diam sem semper leo, a ultrices enim magna id ligula.</p><p>Cras hendrerit lorem eu est malesuada lacinia. In placerat sem sit amet metus pellentesque elementum. Donec dapibus varius mauris eget molestie. Curabitur erat enim, luctus at porttitor sed, lobortis vitae risus. Suspendisse lacinia, enim ac vehicula dignissim, ante libero adipiscing enim, in pulvinar purus neque at ipsum. Cras interdum felis a mauris volutpat ac auctor dolor tincidunt. Etiam et dolor libero. Duis mollis ultricies erat at rhoncus.</p>
+        </div>
+            <div id="region1" class="regionBox"></div>
+            <div id="region2" class="regionBox"></div>
+    </body>
+</html>

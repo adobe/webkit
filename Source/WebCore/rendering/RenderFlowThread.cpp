@@ -827,5 +827,88 @@ bool RenderFlowThread::objectInFlowRegion(const RenderObject* object, const Rend
 
     return false;
 }
+    
+StyleDifference RenderFlowThread::updateRegionStyleIfNecessary(RenderRegion* region, RenderBox* box, bool propagate)
+{
+    RenderRegion* startRegion = 0;
+    RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
+    if (it != m_regionRangeMap.end()) {
+        RenderRegionRange& range = it->second;
+        RenderRegion* currentRegion = range.currentRegion();
+        if (currentRegion && currentRegion == region) {
+            return StyleDifferenceEqual; // The region for this block didn't change so don't do anything
+        }
+        
+        range.setCurrentRegion(region);
+        startRegion = range.startRegion();
+    }
+    
+    // First time the block is laid out or when the region changes we need to update the style
+    StyleDifference diff = box->updateStyleInRegion(region);
+    
+    if (propagate) {
+        for (RenderObject* child = box->firstChild(); child; child = child->nextSibling()) {
+            if (child->isBox()) {
+                StyleDifference childDiff = updateRegionStyleIfNecessary(region, toRenderBox(child), true);
+                if (childDiff > diff)
+                    diff = childDiff;
+                continue;
+            }
+            
+            child->updateStyleInRegion(region);
+        }
+    }
+    
+    if (diff == StyleDifferenceLayout) {
+        if (!startRegion)
+            box->setNeedsLayout(true, MarkOnlyThis);
+    }
+    
+    return diff;
+}
+    
+void RenderFlowThread::resetCurrentRegion(RenderObject* object) {
+    RenderBox* box = 0;
+    if (!object->isBox())
+        return;
+    
+    box = toRenderBox(object);
+    
+    RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
+    if (it != m_regionRangeMap.end()) {
+        RenderRegionRange& range = it->second;
+        range.setCurrentRegion(0);
+    }
+}
+    
+void RenderFlowThread::updateRegionStyleIfNecessary(LayoutUnit position, RenderBlock* block, bool propagate)
+{
+    if (block != this && block->parent()) {
+        updateRegionStyleIfNecessary(position, toRenderBlock(block->parent()), false);
+    }
+    
+    //TODO: put this in the layout state
+    RenderRegion* regionForPosition = renderRegionForLine(position, true);
+    if (regionForPosition) {
+        updateRegionStyleIfNecessary(regionForPosition, block, propagate);
+    }
+}
+    
+RenderFlowThread::PositionInRegion RenderFlowThread::getRegionPositionForBox(RenderBox* box)
+{
+    RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
+    if (it == m_regionRangeMap.end())
+        return PositionUndefined;
+    
+    RenderRegionRange& range = it->second;
+    if (range.currentRegion()) {
+        if (range.currentRegion() == range.startRegion())
+            return PositionStart;
+        if (range.currentRegion() == range.endRegion())
+            return PositionEnd;
+    }
+    
+    return PositionUndefined;
+}
 
 } // namespace WebCore

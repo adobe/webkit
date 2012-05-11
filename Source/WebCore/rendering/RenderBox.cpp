@@ -75,6 +75,8 @@ RenderBox::RenderBox(Node* node)
     , m_minPreferredLogicalWidth(-1)
     , m_maxPreferredLogicalWidth(-1)
     , m_inlineBoxWrapper(0)
+    , m_marginBeforeComputed(false)
+    , m_marginAfterComputed(false)
 {
     setIsBox();
 }
@@ -1959,8 +1961,9 @@ void RenderBox::computeLogicalHeight()
         RenderBlock* cb = containingBlock();
         bool hasPerpendicularContainingBlock = cb->isHorizontalWritingMode() != isHorizontalWritingMode();
     
-        if (!hasPerpendicularContainingBlock)
-            computeBlockDirectionMargins(cb);
+        if (!hasPerpendicularContainingBlock) {
+            computeBlockDirectionMarginsBefore(cb);
+        }
 
         // For tables, calculate margins only.
         if (isTable()) {
@@ -2323,13 +2326,22 @@ LayoutUnit RenderBox::availableLogicalHeightUsing(const Length& h) const
     return containingBlock()->availableLogicalHeight();
 }
 
-void RenderBox::computeBlockDirectionMargins(const RenderBlock* containingBlock)
+void RenderBox::resetBeforeAfterMarginsComputed()
 {
+    m_marginBeforeComputed = m_marginAfterComputed = false;
+}
+    
+void RenderBox::computeBlockDirectionMarginsBefore(RenderBlock* containingBlock)
+{
+    if (m_marginBeforeComputed)
+        return;
+    
+    m_marginBeforeComputed = true;
+    
     if (isTableCell()) {
         // FIXME: Not right if we allow cells to have different directionality than the table.  If we do allow this, though,
         // we may just do it with an extra anonymous block inside the cell.
         setMarginBefore(0);
-        setMarginAfter(0);
         return;
     }
 
@@ -2339,8 +2351,29 @@ void RenderBox::computeBlockDirectionMargins(const RenderBlock* containingBlock)
     RenderView* renderView = view();
     RenderStyle* containingBlockStyle = containingBlock->style();
     containingBlock->setMarginBeforeForChild(this, minimumValueForLength(style()->marginBeforeUsing(containingBlockStyle), cw, renderView));
-    containingBlock->setMarginAfterForChild(this, minimumValueForLength(style()->marginAfterUsing(containingBlockStyle), cw, renderView));
 }
+
+void RenderBox::computeBlockDirectionMarginsAfter(RenderBlock* containingBlock)
+{
+    if (m_marginAfterComputed)
+        return;
+    
+    m_marginAfterComputed = true;
+    
+    if (isTableCell()) {
+        // FIXME: Not right if we allow cells to have different directionality than the table.  If we do allow this, though,
+        // we may just do it with an extra anonymous block inside the cell.
+        setMarginAfter(0);
+        return;
+    }
+    
+    // Margins are calculated with respect to the logical width of
+    // the containing block (8.3)
+    LayoutUnit cw = containingBlockLogicalWidthForContent();
+    RenderView* renderView = view();
+    RenderStyle* containingBlockStyle = containingBlock->style();
+    containingBlock->setMarginAfterForChild(this, minimumValueForLength(style()->marginAfterUsing(containingBlockStyle), cw, renderView));
+}    
 
 LayoutUnit RenderBox::containingBlockLogicalWidthForPositioned(const RenderBoxModelObject* containingBlock, RenderRegion* region,
     LayoutUnit offsetFromLogicalTopOfFirstPage, bool checkForPerpendicularWritingMode) const

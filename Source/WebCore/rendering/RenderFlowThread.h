@@ -128,6 +128,18 @@ public:
 
     // Check if the object is in region and the region is part of this flow thread.
     bool objectInFlowRegion(const RenderObject*, const RenderRegion*) const;
+    
+    StyleDifference updateRegionStyleIfNecessary(RenderRegion*, RenderBox*, bool);
+    void updateRegionStyleIfNecessary(LayoutUnit position, RenderBlock* block, bool propagate = true);
+    void resetCurrentRegion(RenderObject*);
+    
+    enum PositionInRegion {
+        PositionUndefined,
+        PositionStart,
+        PositionEnd
+    };
+    
+    PositionInRegion getRegionPositionForBox(RenderBox*);
 
 protected:
     virtual const char* renderName() const = 0;
@@ -141,11 +153,13 @@ protected:
     class RenderRegionRange {
     public:
         RenderRegionRange()
+        : m_currentRegion(0)
         {
             setRange(0, 0);
         }
 
         RenderRegionRange(RenderRegion* start, RenderRegion* end)
+        : m_currentRegion(0)
         {
             setRange(start, end);
         }
@@ -155,11 +169,18 @@ protected:
             m_startRegion = start;
             m_endRegion = end;
         }
+        
+        void setCurrentRegion(RenderRegion* current)
+        {
+            m_currentRegion = current;
+        }
 
         RenderRegion* startRegion() const { return m_startRegion; }
         RenderRegion* endRegion() const { return m_endRegion; }
+        RenderRegion* currentRegion() const { return m_currentRegion; }
 
     private:
+        RenderRegion* m_currentRegion;
         RenderRegion* m_startRegion;
         RenderRegion* m_endRegion;
     };

@@ -290,7 +290,8 @@ public:
     void computeInlineDirectionMargins(RenderBlock* containingBlock, LayoutUnit containerWidth, LayoutUnit childWidth);
 
     // Used to resolve margins in the containing block's block-flow direction.
-    void computeBlockDirectionMargins(const RenderBlock* containingBlock);
+    void computeBlockDirectionMarginsBefore(RenderBlock* containingBlock);
+    void computeBlockDirectionMarginsAfter(RenderBlock* containingBlock);
 
     enum RenderBoxRegionInfoFlags { CacheRenderBoxRegionInfo, DoNotCacheRenderBoxRegionInfo };
     LayoutRect borderBoxRectInRegion(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage = 0, RenderBoxRegionInfoFlags = CacheRenderBoxRegionInfo) const;
@@ -492,10 +493,12 @@ public:
         ASSERT_NOT_REACHED();
         return 0;
     }
+    
+    void resetBeforeAfterMarginsComputed();
 
 protected:
     virtual void willBeDestroyed();
-
+    
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
     virtual void updateBoxModelInfoFromStyle();
@@ -575,6 +578,9 @@ protected:
 
     // Our overflow information.
     OwnPtr<RenderOverflow> m_overflow;
+    
+    bool m_marginBeforeComputed;
+    bool m_marginAfterComputed;
 
 private:
     // Used to store state between styleWillChange and styleDidChange

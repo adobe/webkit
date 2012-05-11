@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+    <!--
+    Test for https://bugs.webkit.org/show_bug.cgi?id=71488 (Add support for background-color in region styling).
+    Test setting the background-color property using region styling fox boxes.
+    You should not see any red background below.
+    -->
+    <head>
+        <style>
+            #region1 {
+                border:5px solid black;
+                width:200px;
+                height:200px;
+                -webkit-flow-from: flow1;
+            }
+
+            #region2 {
+                border:5px solid black;
+                width:300px;
+                height:400px;
+                -webkit-flow-from: flow2;
+            }
+
+            #flow1 {
+                -webkit-flow-into: flow1;
+            }
+
+            #flow2 {
+                -webkit-flow-into: flow2;
+            }
+
+            p {
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+            }
+
+        </style>
+   </head>
+    <body class="body">
+        <!-- Style a single paragraph in a single region -->
+        <div id="article">
+            <p id="flow1">Lorem ipsum dolor sit amet, consectetur adipiscing elit. In cursus ipsum id ligula consectetur viverra. Mauris ac metus eget nunc euismod accumsan at ut orci. Etiam euismod, dui vitae vestibulum tempus, diam sem semper leo, a ultrices enim magna id ligula.</p>
+            <div id="flow2"><p>Cras hendrerit lorem eu est malesuada lacinia. In placerat sem sit amet metus pellentesque elementum. Donec dapibus varius mauris eget molestie. Curabitur erat enim, luctus at porttitor sed, lobortis vitae risus. Suspendisse lacinia, enim ac vehicula dignissim, ante libero adipiscing enim, in pulvinar purus neque at ipsum. Cras interdum felis a mauris volutpat ac auctor dolor tincidunt. Etiam et dolor libero. Duis mollis ultricies erat at rhoncus.</p><div id="region1"></div></div>
+        </div>
+        <div id="region2"></div>
+
+        <script>
+            setTimeout(function() {
+                document.getElementById("region1").id = "";
+                document.getElementById("region2").id = "";
+                document.getElementById("flow1").id = "";
+                document.getElementById("flow2").id = "";
+                alert(document.webkitGetFlowByName("flow1"));
+            }, 1000);
+        </script>
+    </body>
+</html>

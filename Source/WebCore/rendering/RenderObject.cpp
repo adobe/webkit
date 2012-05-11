@@ -95,11 +95,12 @@ static void* baseOfRenderObjectBeingDeleted;
 
 struct SameSizeAsRenderObject {
     virtual ~SameSizeAsRenderObject() { } // Allocate vtable pointer.
-    void* pointers[5];
+    void* pointers[6];
 #ifndef NDEBUG
     unsigned m_debugBitfields : 2;
 #endif
     unsigned m_bitfields;
+    bool m_hasRegionStyle;
 };
 
 COMPILE_ASSERT(sizeof(RenderObject) == sizeof(SameSizeAsRenderObject), RenderObject_should_stay_small);
@@ -212,6 +213,7 @@ RenderObject::RenderObject(Node* node)
     , m_setNeedsLayoutForbidden(false)
 #endif
     , m_bitfields(node)
+    , m_hasRegionStyle(false)
 {
 #ifndef NDEBUG
     renderObjectCounter.increment();
@@ -1785,6 +1787,47 @@ void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
 void RenderObject::setStyleInternal(PassRefPtr<RenderStyle> style)
 {
     m_style = style;
+}
+    
+void RenderObject::resetHasRegionStyle()
+{
+    if (m_hasRegionStyle) {
+        setStyleInternal(m_beforeRegionStyle);
+        m_hasRegionStyle = false;
+        m_beforeRegionStyle = 0;
+        
+        enclosingRenderFlowThread()->resetCurrentRegion(this);
+    }
+}
+    
+StyleDifference RenderObject::updateStyleInRegion(RenderRegion* region)
+{
+    RenderStyle* oldStyle = 0;
+    if (!isRenderFlowThread()) {
+        oldStyle = m_style.get();
+        
+        if (!m_hasRegionStyle) {
+            m_beforeRegionStyle = m_style;
+            m_hasRegionStyle = true;
+        }
+        
+        if (node() && node()->isElementNode() && !isAnonymous())
+            setStyleInternal(region->getRegionStyleForObject(this));
+        else
+            setStyleInternal(region->getRegionStyleForObject(parent()));
+    }
+    
+    StyleDifference diff = StyleDifferenceEqual;
+    if (oldStyle) {
+        unsigned contextSensitiveProperties = ContextSensitivePropertyNone;
+   
+        diff = oldStyle->diff(m_style.get(), contextSensitiveProperties);
+        diff = adjustStyleDifference(diff, contextSensitiveProperties);
+        
+        styleInRegionDidChange(diff, oldStyle);
+    }
+    
+    return diff;
 }
 
 void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newStyle)

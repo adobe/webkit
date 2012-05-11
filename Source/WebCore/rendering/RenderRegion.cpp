@@ -404,4 +404,31 @@ void RenderRegion::clearObjectStyleInRegion(const RenderObject* object)
         clearObjectStyleInRegion(child);
 }
 
+void RenderRegion::restoreStyleForBlock(RenderBlock* )
+{
+}
+    
+PassRefPtr<RenderStyle> RenderRegion::getRegionStyleForObject(const RenderObject* obj)
+{
+    ASSERT(obj);
+    ASSERT(obj->view());
+    ASSERT(obj->view()->document());
+    ASSERT(!obj->isAnonymous());
+    ASSERT(obj->node() && obj->node()->isElementNode());
+    
+    RenderObjectRegionStyleMap::iterator it = m_renderObjectRegionStyle.find(obj);
+    if (it != m_renderObjectRegionStyle.end())
+        return it->second.style;
+    
+    Element* element = toElement(obj->node());
+    RefPtr<RenderStyle> regionStyle = obj->view()->document()->styleResolver()->styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
+    
+    ObjectRegionStyleInfo styleInfo;
+	styleInfo.style = regionStyle;
+	styleInfo.cached = true;
+	m_renderObjectRegionStyle.set(obj, styleInfo);
+
+    return regionStyle.release();
+}
+    
 } // namespace WebCore

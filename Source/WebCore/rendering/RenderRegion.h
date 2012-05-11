@@ -83,6 +83,9 @@ public:
     bool isLastRegion() const;
 
     void clearObjectStyleInRegion(const RenderObject*);
+    
+    void restoreStyleForBlock(RenderBlock* block);
+    PassRefPtr<RenderStyle> getRegionStyleForObject(const RenderObject*);
 
     enum RegionState {
         RegionUndefined,

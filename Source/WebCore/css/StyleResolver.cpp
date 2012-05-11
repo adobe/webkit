@@ -3232,6 +3232,12 @@ inline bool StyleResolver::isValidRegionStyleProperty(CSSPropertyID id)
     switch (id) {
     case CSSPropertyBackgroundColor:
     case CSSPropertyColor:
+    case CSSPropertyFontSize:
+    case CSSPropertyMargin:
+    case CSSPropertyMarginBottom:
+    case CSSPropertyMarginLeft:
+    case CSSPropertyMarginRight:
+    case CSSPropertyMarginTop:
         return true;
     default:
         break;
