@@ -200,6 +200,7 @@ public:
     void setStatus(const BidiStatus s) { m_status = s; }
 
     MidpointState<Iterator>& midpointState() { return m_midpointState; }
+    Vector<Iterator> m_segmentState;
 
     // The current algorithm handles nested isolates one layer of nesting at a time.
     // But when we layout each isolated span, we will walk into (and ignore) all

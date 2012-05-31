@@ -28,6 +28,7 @@
 #include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "Logging.h"
+#include "NodeRenderStyle.h"
 #include "RenderArena.h"
 #include "RenderCombineText.h"
 #include "RenderFlowThread.h"
@@ -62,6 +63,14 @@ namespace WebCore {
 // We don't let our line box tree for a single line get any deeper than this.
 const unsigned cMaxLineDepth = 200;
 
+class LineSegment {
+public:
+    int left;
+    int right;
+    InlineIterator start;
+    InlineIterator end;
+};
+
 class LineWidth {
 public:
     LineWidth(RenderBlock* block, bool isFirstLine)
@@ -77,6 +86,22 @@ public:
         ASSERT(block);
         updateAvailableWidth();
     }
+    
+    LineWidth(RenderBlock* block, bool isFirstLine, LineSegment* lineSegment) 
+        : m_block(block)
+        , m_uncommittedWidth(0)
+        , m_committedWidth(0)
+        , m_overhangWidth(0)
+        , m_availableWidth(0)
+        , m_isFirstLine(isFirstLine)
+    {
+        ASSERT(block);
+        ASSERT(lineSegment);
+        m_left = lineSegment->left;
+        m_right = lineSegment->right;
+        computeAvailableWidthFromLeftAndRight();
+    }
+
     bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
     bool fitsOnLine(float extra) const { return currentWidth() + extra <= m_availableWidth; }
     float currentWidth() const { return m_committedWidth + m_uncommittedWidth; }
@@ -322,6 +347,20 @@ void RenderBlock::appendRunsForObject(BidiRunList<BidiRun>& runs, int start, int
         return;
 
     LineMidpointState& lineMidpointState = resolver.midpointState();
+    
+    /* Exclusions Experiment */
+    InlineIterator nextSegmentBreak;
+    if (resolver.m_segmentState.size()) {
+        nextSegmentBreak = resolver.m_segmentState[0];
+        if (nextSegmentBreak.m_obj == obj && nextSegmentBreak.m_pos < (unsigned) end) {
+            resolver.m_segmentState.remove(0);
+            appendRunsForObject(runs, start, nextSegmentBreak.m_pos, obj, resolver);
+            appendRunsForObject(runs, nextSegmentBreak.m_pos, end, obj, resolver);
+            return;
+        }
+    }
+    /* Exclusions Experiment */
+    
     bool haveNextMidpoint = (lineMidpointState.currentMidpoint < lineMidpointState.numMidpoints);
     InlineIterator nextMidpoint;
     if (haveNextMidpoint)
@@ -758,7 +797,7 @@ void RenderBlock::updateLogicalWidthForAlignment(const ETextAlign& textAlign, Bi
 }
 
 void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox, const LineInfo& lineInfo, BidiRun* firstRun, BidiRun* trailingSpaceRun, bool reachedEnd,
-                                                         GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache)
+                                                         GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache, Vector<LineSegment>* segments)
 {
     ETextAlign textAlign = textAlignmentForLine(!reachedEnd && !lineBox->endsWithBreak());
     float logicalLeft = pixelSnappedLogicalLeftOffsetForLine(logicalHeight(), lineInfo.isFirstLine());
@@ -820,7 +859,7 @@ void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox,
     // The widths of all runs are now known.  We can now place every inline box (and
     // compute accurate widths for the inline flow boxes).
     needsWordSpacing = false;
-    lineBox->placeBoxesInInlineDirection(logicalLeft, needsWordSpacing, textBoxDataMap);
+    lineBox->placeBoxesInInlineDirection(logicalLeft, needsWordSpacing, textBoxDataMap, segments);
 }
 
 void RenderBlock::computeBlockDirectionPositionsForLine(RootInlineBox* lineBox, BidiRun* firstRun, GlyphOverflowAndFallbackFontsMap& textBoxDataMap,
@@ -1015,7 +1054,7 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
 }
 
 // This function constructs line boxes for all of the text runs in the resolver and computes their position.
-RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bidiRuns, const InlineIterator& end, LineInfo& lineInfo, VerticalPositionCache& verticalPositionCache, BidiRun* trailingSpaceRun)
+RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bidiRuns, const InlineIterator& end, LineInfo& lineInfo, VerticalPositionCache& verticalPositionCache, BidiRun* trailingSpaceRun, Vector<LineSegment>* segments)
 {
     if (!bidiRuns.runCount())
         return 0;
@@ -1039,7 +1078,7 @@ RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bi
     
     // Now we position all of our text runs horizontally.
     if (!isSVGRootInlineBox)
-        computeInlineDirectionPositionsForLine(lineBox, lineInfo, bidiRuns.firstRun(), trailingSpaceRun, end.atEnd(), textBoxDataMap, verticalPositionCache);
+        computeInlineDirectionPositionsForLine(lineBox, lineInfo, bidiRuns.firstRun(), trailingSpaceRun, end.atEnd(), textBoxDataMap, verticalPositionCache, segments);
     
     // Now position our text runs vertically.
     computeBlockDirectionPositionsForLine(lineBox, bidiRuns.firstRun(), textBoxDataMap, verticalPositionCache);
@@ -1227,6 +1266,38 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     repaintDirtyFloats(layoutState.floats());
 }
 
+// TODO: cleanup params -> line dims, style & rootstyle
+static bool getSegmentsForLine(RenderBlock* block, Vector<LineSegment>& segments)
+{
+    RenderStyle* currStyle = block->style();
+    RenderStyle* rootStyle = block->document()->documentElement()->renderStyle();
+    
+    CSSWrapShape* shape = block->style()->wrapShapeInside();
+    if (!shape || shape->type() != CSSWrapShape::CSS_WRAP_SHAPE_RECTANGLE)
+            return false;
+    segments.clear();
+    int lineTop = block->logicalHeight();
+    int lineHeight = block->lineHeight(false, HorizontalLine, PositionOfInteriorLineBoxes);
+    CSSWrapShapeRectangle* rect = static_cast<CSSWrapShapeRectangle *>(shape);
+    int shapeLeft = rect->left()->computeLength<int>(currStyle, rootStyle);
+    int shapeWidth = rect->width()->computeLength<int>(currStyle, rootStyle);
+    int shapeTop = rect->top()->computeLength<int>(currStyle, rootStyle);
+    int shapeHeight = rect->height()->computeLength<int>(currStyle, rootStyle);
+    
+    fprintf(stderr, "Line [%d, %d] Shape [%d, %d, %d, %d] \n", lineTop, lineHeight, shapeLeft, shapeWidth, shapeTop, shapeHeight);
+    if (lineTop > shapeTop && lineTop + lineHeight < shapeTop + shapeHeight) {
+        LineSegment segment;
+        segment.left = shapeLeft;
+        segment.right = shapeLeft + shapeWidth / 2 - 5;
+        segments.append(segment);
+        LineSegment segment2;
+        segment2.left = 5 + shapeLeft + shapeWidth / 2;
+        segment2.right = shapeLeft + shapeWidth - 10;
+        segments.append(segment2);
+    }
+    return true;
+}
+
 void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
 {
     RenderStyle* styleToUse = style();
@@ -1258,7 +1329,35 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         const InlineIterator oldEnd = end;
         bool isNewUBAParagraph = layoutState.lineInfo().previousLineBrokeCleanly();
         FloatingObject* lastFloatFromPreviousLine = (m_floatingObjects && !m_floatingObjects->set().isEmpty()) ? m_floatingObjects->set().last() : 0;
-        end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines);
+        
+        Vector<LineSegment> segments;
+        resolver.m_segmentState.clear();
+        if (getSegmentsForLine(this, segments))
+        {
+            if (segments.size() == 0) {
+                int lineHeight = RenderBlock::lineHeight(false, HorizontalLine, PositionOfInteriorLineBoxes);
+                if (lineHeight <= 0)
+                        lineHeight = 1;
+                setLogicalHeight(logicalHeight() + lineHeight);
+                continue;
+            }
+            
+            for (size_t i = 0; i < segments.size(); i++) {
+                segments[i].start = resolver.position();
+                // todo: insert segment size into linebreaker
+                // todo: actual line break should break this
+                segments[i].end = end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, &segments[i]);
+                resolver.setPositionIgnoringNestedIsolates(end);
+            }
+
+            for (size_t i=0; i < segments.size() - 1; i++) {
+                resolver.m_segmentState.append(segments[i].end);
+            }
+            resolver.setPositionIgnoringNestedIsolates(segments[0].start);
+        }
+        else
+                end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, 0);
+
         if (resolver.position().atEnd()) {
             // FIXME: We shouldn't be creating any runs in nextLineBreak to begin with!
             // Once BidiRunList is separated from BidiResolver this will not be needed.
@@ -1268,7 +1367,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             resolver.setPosition(InlineIterator(resolver.position().root(), 0, 0), 0);
             break;
         }
-        ASSERT(end != resolver.position());
+        ASSERT(segments.size() || end != resolver.position());
 
         // This is a short-cut for empty lines.
         if (layoutState.lineInfo().isEmpty()) {
@@ -1300,7 +1399,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             // inline flow boxes.
 
             LayoutUnit oldLogicalHeight = logicalHeight();
-            RootInlineBox* lineBox = createLineBoxesFromBidiRuns(bidiRuns, end, layoutState.lineInfo(), verticalPositionCache, trailingSpaceRun);
+            RootInlineBox* lineBox = createLineBoxesFromBidiRuns(bidiRuns, end, layoutState.lineInfo(), verticalPositionCache, trailingSpaceRun, segments.size() ? &segments : 0);
 
             bidiRuns.deleteRuns();
             resolver.markCurrentRunEmpty(); // FIXME: This can probably be replaced by an ASSERT (or just removed).
@@ -2137,7 +2236,7 @@ void RenderBlock::LineBreaker::reset()
 }
 
 InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resolver, LineInfo& lineInfo,
-    LineBreakIteratorInfo& lineBreakIteratorInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines)
+    LineBreakIteratorInfo& lineBreakIteratorInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, LineSegment* segment)
 {
     reset();
 
@@ -2147,7 +2246,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
     bool includeEndWidth = true;
     LineMidpointState& lineMidpointState = resolver.midpointState();
 
-    LineWidth width(m_block, lineInfo.isFirstLine());
+    LineWidth width = segment ? LineWidth(m_block, lineInfo.isFirstLine(), segment) : LineWidth(m_block, lineInfo.isFirstLine());
 
     skipLeadingWhitespace(resolver, lineInfo, lastFloatFromPreviousLine, width);
 

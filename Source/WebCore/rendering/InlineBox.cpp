@@ -219,6 +219,10 @@ void InlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, Layo
     if (!paintInfo.shouldPaintWithinRoot(renderer()) || (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection))
         return;
 
+    Color color; color.setRGB(0, 0, 255);
+    paintInfo.context->setStrokeColor(color, m_renderer->style()->colorSpace());
+    paintInfo.context->strokeRect(FloatRect(paintOffset.x() + x(), paintOffset.y() + y(), width(), height()), 2);
+    
     LayoutPoint childPoint = paintOffset;
     if (parent()->renderer()->style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
         childPoint = renderer()->containingBlock()->flipForWritingModeForChild(toRenderBox(renderer()), childPoint);

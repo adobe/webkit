@@ -30,10 +30,19 @@ namespace WebCore {
 class HitTestRequest;
 class HitTestResult;
 class InlineTextBox;
+class LineSegment;
 class RenderLineBoxList;
 class VerticalPositionCache;
 
 typedef HashMap<const InlineTextBox*, pair<Vector<const SimpleFontData*>, GlyphOverflow> > GlyphOverflowAndFallbackFontsMap;
+
+//class LineSegment {
+//public:
+//    int left;
+//    int right;
+//    InlineIterator start;
+//    InlineIterator end;
+//};
 
 class InlineFlowBox : public InlineBox {
 public:
@@ -169,7 +178,7 @@ public:
     // Helper functions used during line construction and placement.
     void determineSpacingForFlowBoxes(bool lastLine, bool isLogicallyLastRunWrapped, RenderObject* logicallyLastRunRenderer);
     LayoutUnit getFlowSpacingLogicalWidth();
-    float placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap&);
+    float placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap&, Vector<LineSegment>* = 0);
     void computeLogicalBoxHeights(RootInlineBox*, LayoutUnit& maxPositionTop, LayoutUnit& maxPositionBottom,
                                   LayoutUnit& maxAscent, LayoutUnit& maxDescent, bool& setMaxAscent, bool& setMaxDescent,
                                   bool strictMode, GlyphOverflowAndFallbackFontsMap&, FontBaseline, VerticalPositionCache&);

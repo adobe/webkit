@@ -25,6 +25,7 @@
 #include "Document.h"
 #include "EllipsisBox.h"
 #include "GraphicsContext.h"
+#include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "HitTestResult.h"
 #include "RootInlineBox.h"
@@ -44,6 +45,14 @@
 using namespace std;
 
 namespace WebCore {
+
+class LineSegment {
+public:
+    int left;
+    int right;
+    InlineIterator start;
+    InlineIterator end;
+};
 
 class SameSizeAsInlineFlowBox : public InlineBox {
     void* pointers[5];
@@ -355,7 +364,7 @@ void InlineFlowBox::determineSpacingForFlowBoxes(bool lastLine, bool isLogically
     }
 }
 
-float InlineFlowBox::placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap& textBoxDataMap)
+float InlineFlowBox::placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap& textBoxDataMap, Vector<LineSegment>* segments)
 {
     // Set our x position.
     setLogicalLeft(logicalLeft);
@@ -366,9 +375,21 @@ float InlineFlowBox::placeBoxesInInlineDirection(float logicalLeft, bool& needsW
     float minLogicalLeft = startLogicalLeft;
     float maxLogicalRight = logicalLeft;
 
+    size_t segmentIndex = 0;
+    
     for (InlineBox* curr = firstChild(); curr; curr = curr->nextOnLine()) {
         if (curr->renderer()->isText()) {
             InlineTextBox* text = toInlineTextBox(curr);
+            
+            //TODO: expand this to things other than text
+            if (segments && segmentIndex < segments->size()) {
+                InlineIterator segmentPosition = segments->at(segmentIndex).start;
+                if (segmentPosition.m_obj == text->renderer() && segmentPosition.m_pos == text->start()) {
+                    logicalLeft = segments->at(segmentIndex).left;
+                    segmentIndex++;
+                }
+            }
+            
             RenderText* rt = toRenderText(text->renderer());
             if (rt->textLength()) {
                 if (needsWordSpacing && isSpaceOrNewline(rt->characters()[text->start()]))
@@ -1017,6 +1038,11 @@ void InlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     
     if (!paintInfo.rect.intersects(pixelSnappedIntRect(overflowRect)))
         return;
+
+    Color color;
+    color.setRGB(0, 255, 0);
+    paintInfo.context->setStrokeColor(color, m_renderer->style()->colorSpace());
+    paintInfo.context->strokeRect(overflowRect, 2);
 
     if (paintInfo.phase != PaintPhaseChildOutlines) {
         if (paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) {
