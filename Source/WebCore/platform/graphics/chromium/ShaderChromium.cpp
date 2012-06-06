@@ -223,10 +223,10 @@ static String formulaForBlendMode(EBlendMode blendMode, EAlphaCompositingMode al
             blendColors(builder, "return backgroundColor + sourceColor - 2.0 * backgroundColor * sourceColor;");
             break;
         case BlendModeDarken:
-            blendColors(builder, "return min(sourceColor, backgroundColor);");
+            blendComponents(builder, "return min(sourceColor, backgroundColor);");
             break;
         case BlendModeLighten:
-            blendColors(builder, "return max(sourceColor, backgroundColor);");
+            blendComponents(builder, "return max(sourceColor, backgroundColor);");
             break;
         case BlendModeColorDodge:
             blendComponents(builder, "return (sourceColor == 1.0) ? 0.0 : min(1.0, backgroundColor / (1.0 - sourceColor));");
@@ -287,7 +287,8 @@ static String formulaForBlendMode(EBlendMode blendMode, EAlphaCompositingMode al
                 vec2 bgTexCoord = gl_FragCoord.xy - backgroundRect.xy;
                 bgTexCoord.x /= backgroundRect.b; 
                 bgTexCoord.y /= backgroundRect.a;
-                vec4 backgroundColor = (texture2D(s_backgroundTexture, bgTexCoord));
+                vec4 backgroundColor = unmultiply(texture2D(s_backgroundTexture, bgTexCoord));
+                sourceColor = unmultiply(sourceColor);
         )
     );
     computeAlphaCompositingValues(builder, alphaCompositingMode);
