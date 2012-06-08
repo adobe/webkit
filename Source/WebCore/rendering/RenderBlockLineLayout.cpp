@@ -23,6 +23,7 @@
 #include "config.h"
 
 #include "BidiResolver.h"
+#include "ExclusionBox.h"
 #include "Hyphenation.h"
 #include "InlineIterator.h"
 #include "InlineTextBox.h"
@@ -1158,6 +1159,15 @@ static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, Ro
 
 void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInlineChild)
 {
+    WrappingContext* context = wrappingContext();
+    if (context) {
+        ExclusionBoxes boxes;
+        context->exclusionBoxesForBlock(this, boxes);
+        if (boxes.size()) {
+            for (size_t i = 0; i < boxes.size(); ++i)
+                printf("%ld - %p\n", i, boxes.at(i)->renderer());
+        }
+    }
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;
     RootInlineBox* startLine = determineStartPosition(layoutState, resolver);

@@ -40,6 +40,7 @@ namespace WebCore {
 class ExclusionBox;
 class RenderBox;
 class RenderBlock;
+class RenderObject;
 
 typedef HashMap<const RenderBox*, RefPtr<ExclusionBox> > ExclusionBoxMap;
 typedef Vector<RefPtr<ExclusionBox> > ExclusionBoxes;
@@ -65,8 +66,8 @@ private:
 
     static WrappingContext* lookupContextForBlock(const RenderBlock*);
 
-    const RenderBlock* parentWithNewWrappingContext(const RenderBlock*);
-    void pushParentExclusionBoxes(const RenderBlock* parentWithNewWrappingContext, ExclusionBoxes&);
+    const RenderObject* parentWithNewWrappingContext(const RenderBlock*);
+    void pushParentExclusionBoxes(const RenderObject* parentWithNewWrappingContext, ExclusionBoxes&);
 
     RenderBlock* m_block;
     ExclusionBoxMap m_boxes;

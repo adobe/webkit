@@ -104,16 +104,16 @@ WrappingContext* WrappingContext::contextForBlock(const RenderBlock* block)
     return context;
 }
 
-const RenderBlock* WrappingContext::parentWithNewWrappingContext(const RenderBlock* block)
+const RenderObject* WrappingContext::parentWithNewWrappingContext(const RenderBlock* block)
 {
-    while (block && block != m_block) {
-        if (block->style()->wrapThrough() == WrapThroughNone)
-            return block;
+    for (const RenderObject* object = block; object && object != m_block; object = object->parent()) {
+        if (object->style()->wrapThrough() == WrapThroughNone)
+            return object;
     }
     return 0;
 }
 
-void WrappingContext::pushParentExclusionBoxes(const RenderBlock* parentWithNewWrappingContext, ExclusionBoxes& boxes)
+void WrappingContext::pushParentExclusionBoxes(const RenderObject* parentWithNewWrappingContext, ExclusionBoxes& boxes)
 {
     for (ExclusionBoxMap::iterator iter = m_boxes.begin(), end = m_boxes.end(); iter != end; ++iter) {
         ExclusionBox* box = iter->second.get();
@@ -135,7 +135,7 @@ void WrappingContext::exclusionBoxesForBlock(const RenderBlock* block, Exclusion
     WrappingContext* context = contextForBlock(block);
     if (!context)
         return;
-    const RenderBlock* parentWithNewWrappingContext = context->parentWithNewWrappingContext(block);
+    const RenderObject* parentWithNewWrappingContext = context->parentWithNewWrappingContext(block);
     context->pushParentExclusionBoxes(parentWithNewWrappingContext, boxes);
 }
 
