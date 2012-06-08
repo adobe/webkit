@@ -202,6 +202,9 @@ public:
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
     virtual HostWindow* customFiltersHostWindow() const;
 #endif
+
+    bool canUseExclusions() const { return m_canUseExclusions; }
+    void setCanUseExclusions(bool value) { m_canUseExclusions = value; }
 protected:
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
@@ -292,9 +295,8 @@ private:
     OwnPtr<FlowThreadController> m_flowThreadController;
 	bool m_inFirstLayoutPhaseOfRegionsAutoHeight;
     unsigned m_autoHeightRegionsCount;
-    bool m_inFirstLayoutPhaseOfExclusionsPositioning;
-    unsigned m_cssExclusionsCount;
     RefPtr<IntervalArena> m_intervalArena;
+    bool m_canUseExclusions;
 };
 
 inline RenderView* toRenderView(RenderObject* object)

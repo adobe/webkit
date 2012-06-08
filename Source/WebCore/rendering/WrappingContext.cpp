@@ -32,11 +32,30 @@
 
 #include "ExclusionBox.h"
 #include "RenderBlock.h"
+#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
 typedef WTF::HashMap<const RenderBlock*, WrappingContext*> WrappingContextMap;
 static WrappingContextMap* s_wrappingContextMap = 0;
+
+ExclusionAreaMaintainer* ExclusionAreaMaintainer::s_current = 0;
+
+ExclusionAreaData::ExclusionAreaData(RenderBlock* block, WrappingContext* context)
+    : m_block(block)
+    , m_context(context)
+{
+}
+
+ExclusionAreaData::~ExclusionAreaData()
+{
+}
+
+void ExclusionAreaMaintainer::init(RenderBlock* block, WrappingContext* context)
+{
+    m_data = adoptPtr(new ExclusionAreaData(block, context));
+    context->exclusionBoxesForBlock(block, m_data->boxes());
+}
 
 WrappingContext::WrappingContext(RenderBlock* block)
     : m_block(block)
@@ -92,8 +111,10 @@ void WrappingContext::removeContextForBlock(const RenderBlock* block)
         return;
     delete iter->second;
     s_wrappingContextMap->remove(iter);
-    if (!s_wrappingContextMap->size())
+    if (!s_wrappingContextMap->size()) {
         delete s_wrappingContextMap;
+        s_wrappingContextMap = 0;
+    }
 }
 
 WrappingContext* WrappingContext::contextForBlock(const RenderBlock* block)

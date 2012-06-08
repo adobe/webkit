@@ -1159,14 +1159,10 @@ static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, Ro
 
 void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInlineChild)
 {
-    WrappingContext* context = wrappingContext();
-    if (context) {
-        ExclusionBoxes boxes;
-        context->exclusionBoxesForBlock(this, boxes);
-        if (boxes.size()) {
-            for (size_t i = 0; i < boxes.size(); ++i)
-                printf("%ld - %p\n", i, boxes.at(i)->renderer());
-        }
+    ExclusionAreaMaintainer exclusionAreaMaintainer(this, wrappingContext());
+    if (exclusionAreaMaintainer.hasExclusionBoxes()) {
+        for (size_t i = 0; i < exclusionAreaMaintainer.data()->boxes().size(); ++i)
+            printf("%ld - %p\n", i, exclusionAreaMaintainer.data()->boxes().at(i)->renderer());
     }
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;

@@ -34,6 +34,7 @@
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+ #include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
@@ -41,9 +42,51 @@ class ExclusionBox;
 class RenderBox;
 class RenderBlock;
 class RenderObject;
+class WrappingContext;
 
 typedef HashMap<const RenderBox*, RefPtr<ExclusionBox> > ExclusionBoxMap;
 typedef Vector<RefPtr<ExclusionBox> > ExclusionBoxes;
+
+class ExclusionAreaData {
+public:
+    ExclusionAreaData(RenderBlock*, WrappingContext*);
+    ~ExclusionAreaData();
+
+    const ExclusionBoxes& boxes() const { return m_boxes; }
+    ExclusionBoxes& boxes() { return m_boxes; }
+
+private:
+    ExclusionBoxes m_boxes;
+    RenderBlock* m_block;
+    WrappingContext* m_context;
+};
+
+class ExclusionAreaMaintainer {
+public:
+    ExclusionAreaMaintainer(RenderBlock* block, WrappingContext* context)
+    {
+        m_previous = s_current;
+        s_current = this;
+        if (context)
+            init(block, context);
+    }
+    ~ExclusionAreaMaintainer()
+    {
+        s_current = m_previous;
+    }
+
+    bool hasExclusionBoxes() const { return m_data.get() && m_data->boxes().size(); }
+    ExclusionAreaData* data() const { return m_data.get(); }
+
+    static ExclusionAreaMaintainer* active() { return s_current; }
+private:
+    void init(RenderBlock*, WrappingContext*);
+    
+    static ExclusionAreaMaintainer* s_current;
+
+    ExclusionAreaMaintainer* m_previous;
+    OwnPtr<ExclusionAreaData> m_data;
+};
 
 class WrappingContext {
     WTF_MAKE_NONCOPYABLE(WrappingContext);
