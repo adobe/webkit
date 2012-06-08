@@ -49,7 +49,6 @@
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "StylePropertySet.h"
-#include "WrappingContext.h"
 #include <wtf/HexNumber.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
@@ -657,22 +656,6 @@ static void write(TextStream& ts, RenderLayer& l,
 #else
     UNUSED_PARAM(behavior);
 #endif
-    
-    if (l.hasWrappingContext()) {
-        WrappingContext* wrappingContext = l.wrappingContext();
-        ts << " (wrapping context " << static_cast<const void*>(wrappingContext);
-        writeNodeIdAndClasses(ts, l.renderer()->node());
-        ts << ": ";
-        wrappingContext->sortChildContextsIfNeeded();
-        for (size_t i = 0; i < wrappingContext->childCount(); ++i) {
-            WrappingContext* child = wrappingContext->childAt(i);
-            if (i)
-                ts << ", ";
-            ts << static_cast<const void*>(child);
-            writeNodeIdAndClasses(ts, child->layer()->renderer()->node());
-        }
-        ts << ")";
-    }
     
     ts << "\n";
 

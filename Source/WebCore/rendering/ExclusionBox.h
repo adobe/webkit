@@ -27,49 +27,32 @@
  * SUCH DAMAGE.
  */
 
-#ifndef WrappingContext_h
-#define WrappingContext_h
+#ifndef ExclusionBox_h
+#define ExclusionBox_h
 
-#include <wtf/Noncopyable.h>
-#include <wtf/HashMap.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
-class ExclusionBox;
 class RenderBox;
-class RenderBlock;
 
-typedef HashMap<const RenderBox*, RefPtr<ExclusionBox> > ExclusionBoxMap;
-typedef Vector<RefPtr<ExclusionBox> > ExclusionBoxes;
-
-class WrappingContext {
-    WTF_MAKE_NONCOPYABLE(WrappingContext);
+class ExclusionBox : public RefCounted<ExclusionBox> {
 public:
-    static WrappingContext* contextForBlock(const RenderBlock*);
+    static PassRefPtr<ExclusionBox> create(RenderBox* box)
+    {
+        return adoptRef(new ExclusionBox(box)); 
+    }
 
-    static WrappingContext* createContextForBlockIfNeeded(const RenderBlock*);
-    static void removeContextForBlock(const RenderBlock*);
-
-    ExclusionBox* addExclusionBox(const RenderBox*);
-    void removeExclusionBox(const RenderBox*);
-
-    RenderBlock* block() const { return m_block; }
-
-    void exclusionBoxesForBlock(const RenderBlock*, ExclusionBoxes&);
+    RenderBox* renderer() const { return m_renderBox; }
 
 private:
-    WrappingContext(RenderBlock*);
-    ~WrappingContext();
+    ExclusionBox(RenderBox* box)
+        : m_renderBox(box)
+    {
+    }
 
-    static WrappingContext* lookupContextForBlock(const RenderBlock*);
-
-    const RenderBlock* parentWithNewWrappingContext(const RenderBlock*);
-    void pushParentExclusionBoxes(const RenderBlock* parentWithNewWrappingContext, ExclusionBoxes&);
-
-    RenderBlock* m_block;
-    ExclusionBoxMap m_boxes;
+    RenderBox* m_renderBox;
 };
 
 } // Namespace WebCore

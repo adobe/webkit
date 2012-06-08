@@ -545,7 +545,7 @@ public:
 
     bool hasBlendingOrCompositing() const { return style() && style()->hasBlendingOrCompositing(); }
 
-    bool needsWrappingContext() const { return style() && ((style()->wrapThrough() == WrapThroughNone) || (style()->wrapFlow() != WrapFlowAuto)); }
+    bool isExclusionBox() const { return style() && style()->isCSSExclusion(); }
 
     inline bool preservesNewline() const;
 

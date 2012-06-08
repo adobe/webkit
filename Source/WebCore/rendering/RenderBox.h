@@ -42,7 +42,7 @@ public:
     RenderBox(Node*);
     virtual ~RenderBox();
 
-    virtual bool requiresLayer() const OVERRIDE { return isRoot() || isPositioned() || isRelPositioned() || isTransparent() || requiresLayerForOverflowClip() || hasTransform() || hasHiddenBackface() || hasMask() || hasReflection() || hasFilter() || needsWrappingContext() || style()->specifiesColumns() || hasBlendingOrCompositing(); }
+    virtual bool requiresLayer() const OVERRIDE { return isRoot() || isPositioned() || isRelPositioned() || isTransparent() || requiresLayerForOverflowClip() || hasTransform() || hasHiddenBackface() || hasMask() || hasReflection() || hasFilter() || style()->specifiesColumns() || hasBlendingOrCompositing(); }
     bool requiresLayerForOverflowClip() const;
 
     bool hasOverflowClipWithLayer() const { return hasOverflowClip() && hasLayer(); }

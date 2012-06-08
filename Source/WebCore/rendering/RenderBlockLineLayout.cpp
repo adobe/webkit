@@ -1158,15 +1158,6 @@ static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, Ro
 
 void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInlineChild)
 {
-    WrappingContext* wrappingContext = 0;
-    Vector<WrappingContext*> exclusionList;
-    if (!view()->inFirstLayoutPhaseOfExclusionsPositioning()) {
-        wrappingContext = enclosingLayer()->enclosingWrappingContext();
-        wrappingContext->computeExclusionListForBlock(this, exclusionList);
-        if (exclusionList.size())
-            layoutState.markForFullLayout();
-    }
-
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;
     RootInlineBox* startLine = determineStartPosition(layoutState, resolver);
@@ -1224,13 +1215,12 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
         }
     }
 
-    layoutRunsAndFloatsInRange(layoutState, resolver, cleanLineStart, cleanLineBidiStatus, consecutiveHyphenatedLines, wrappingContext, exclusionList);
+    layoutRunsAndFloatsInRange(layoutState, resolver, cleanLineStart, cleanLineBidiStatus, consecutiveHyphenatedLines);
     linkToEndLineIfNeeded(layoutState);
     repaintDirtyFloats(layoutState.floats());
 }
 
-void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines,
-                                             WrappingContext* wrappingContext, Vector<WrappingContext*>& exclusionList)
+void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
 {
     RenderStyle* styleToUse = style();
     bool paginated = view()->layoutState() && view()->layoutState()->isPaginated();
@@ -1312,7 +1302,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                 if (layoutState.usesRepaintBounds())
                     layoutState.updateRepaintRangeFromBox(lineBox);
 
-                if (wrappingContext && exclusionList.size()) {
+                /*if (wrappingContext && exclusionList.size()) {
                     LayoutUnit adjustment = 0;
                     wrappingContext->adjustLinePositionForExclusions(this, lineBox, adjustment, exclusionList);
                     if (adjustment) {
@@ -1333,7 +1323,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
                         setLogicalHeight(lineBox->lineBottomWithLeading());
                     }
-                }
+                }*/
                 
                 if (paginated) {
                     LayoutUnit adjustment = 0;

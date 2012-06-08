@@ -43,13 +43,12 @@ class LineLayoutState;
 class LineWidth;
 class RenderInline;
 class RenderText;
+class WrappingContext;
 
 struct BidiRun;
 struct PaintInfo;
 class LineInfo;
 class RenderRubyRun;
-
-class WrappingContext;
 
 template <class Iterator, class Run> class BidiResolver;
 template <class Run> class BidiRunList;
@@ -129,8 +128,6 @@ public:
     
     bool containsFloats() const { return m_floatingObjects && !m_floatingObjects->set().isEmpty(); }
     bool containsFloat(RenderBox*) const;
-
-    void setNeedsLayoutForWrappingContextChange();
 
     // Versions that can compute line offsets with the region and page offset passed in. Used for speed to avoid having to
     // compute the region all over again when you already know it.
@@ -380,11 +377,12 @@ public:
     void setStaticInlinePositionForChild(RenderBox*, LayoutUnit blockOffset, LayoutUnit inlinePosition);
 
     LayoutUnit computeStartPositionDeltaForChildAvoidingFloats(const RenderBox* child, LayoutUnit childMarginStart, RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = 0);
+    
+    WrappingContext* wrappingContext(bool create = false) const;
 
 #ifndef NDEBUG
     void showLineTreeAndMark(const InlineBox* = 0, const char* = 0, const InlineBox* = 0, const char* = 0, const RenderObject* = 0) const;
 #endif
-
 protected:
     virtual void willBeDestroyed();
 
@@ -932,11 +930,9 @@ private:
     // Helper function for layoutInlineChildren()
     RootInlineBox* createLineBoxesFromBidiRuns(BidiRunList<BidiRun>&, const InlineIterator& end, LineInfo&, VerticalPositionCache&, BidiRun* trailingSpaceRun);
     void layoutRunsAndFloats(LineLayoutState&, bool hasInlineChild);
-    void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines,
-                                    WrappingContext* wrappingContext, Vector<WrappingContext*>& exclusionList);
+    void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines);
     void linkToEndLineIfNeeded(LineLayoutState&);
     static void repaintDirtyFloats(Vector<FloatWithRect>& floats);
-
 protected:
     // Pagination routines.
     

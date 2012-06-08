@@ -53,6 +53,7 @@
 #include "RenderView.h"
 #include "ScrollbarTheme.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 #include <algorithm>
 #include <math.h>
 
@@ -403,6 +404,20 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
         }
 
         frame()->view()->recalculateScrollbarOverlayStyle();
+    }
+
+    bool wasExclusionBox = oldStyle && oldStyle->isCSSExclusion();
+    if (wasExclusionBox != isExclusionBox()) {
+        RenderBlock* containingBlock = this->containingBlock();
+        if (containingBlock) {
+            WrappingContext* context = containingBlock->wrappingContext(isExclusionBox());
+            if (isExclusionBox()) {
+                ASSERT(context);
+                context->addExclusionBox(this);
+            } else if (context) {
+                context->removeExclusionBox(this);
+            }
+        }
     }
 }
 

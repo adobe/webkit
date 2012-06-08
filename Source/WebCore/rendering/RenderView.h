@@ -188,13 +188,6 @@ public:
     bool hasAutoHeightRegions() const { return m_autoHeightRegionsCount; }
     void incrementAutoHeightRegions() { ++m_autoHeightRegionsCount; }
     void decrementAutoHeightRegions() { ASSERT(m_autoHeightRegionsCount > 0); --m_autoHeightRegionsCount; }
-    
-    bool inFirstLayoutPhaseOfExclusionsPositioning() const { return m_inFirstLayoutPhaseOfExclusionsPositioning; }
-    bool hasCSSExclusions() const { return m_cssExclusionsCount; }
-    void incrementCSSExclusionsCount() { ++m_cssExclusionsCount; }
-    void decrementCSSExclusionsCount() { ASSERT(m_cssExclusionsCount > 0); --m_cssExclusionsCount; }
-    void resetCSSExclusionsForFirstLayoutPass();
-    void markCSSExclusionDependentBlocksForLayout();
 
     void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 

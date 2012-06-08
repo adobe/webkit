@@ -38,7 +38,6 @@
 #include "RenderWidget.h"
 #include "RenderWidgetProtector.h"
 #include "TransformState.h"
-#include "WrappingContext.h"
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -147,29 +146,17 @@ void RenderView::layout()
     // If one of the render flow threads has a region with auto-height
     // then we need a second pass layout.
     if (needsLayout()) {
-        m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
         if (document()->cssRegionsAutoHeightEnabled() && hasRenderNamedFlowThreads() && hasAutoHeightRegions() && flowThreadController()->resetAutoHeightRegionsForFirstLayoutPhase())
             m_inFirstLayoutPhaseOfRegionsAutoHeight = true;
-        if (hasCSSExclusions()) {
-            m_inFirstLayoutPhaseOfExclusionsPositioning = true;
-            resetCSSExclusionsForFirstLayoutPass();
-        }
         RenderBlock::layout();
         if (hasRenderNamedFlowThreads())
             flowThreadController()->layoutRenderNamedFlowThreads();
     }
     
-    if (m_inFirstLayoutPhaseOfRegionsAutoHeight || m_inFirstLayoutPhaseOfExclusionsPositioning) {
+    if (m_inFirstLayoutPhaseOfRegionsAutoHeight) {
         m_inFirstLayoutPhaseOfRegionsAutoHeight = false;
-        m_inFirstLayoutPhaseOfExclusionsPositioning = false;
         setNeedsLayout(false);
-        if (hasCSSExclusions()) {
-            // Exclusions are first, because we must not have any "needsLayout == true" in the tree.
-            m_layoutState = 0;
-            markCSSExclusionDependentBlocksForLayout();
-            m_layoutState = &state;
-        }
         if (document()->cssRegionsAutoHeightEnabled() && hasRenderNamedFlowThreads() && hasAutoHeightRegions())
             flowThreadController()->markAutoHeightRegionsForSecondLayoutPhase();
         if (needsLayout()) {
@@ -983,20 +970,6 @@ void RenderView::removeFixedPositionedObject(RenderBox* object)
         return;
 
     m_positionedObjects->remove(object);
-}
-
-void RenderView::resetCSSExclusionsForFirstLayoutPass()
-{
-    ASSERT(layer());
-    if (layer()->hasWrappingContext())
-        layer()->wrappingContext()->resetExclusionsForFirstLayoutPass();
-}
-    
-void RenderView::markCSSExclusionDependentBlocksForLayout()
-{
-    ASSERT(layer());
-    if (layer()->hasWrappingContext())
-        layer()->wrappingContext()->markDescendantsForSecondLayoutPass();
 }
 
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)

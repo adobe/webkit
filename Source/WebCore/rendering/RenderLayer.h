@@ -68,7 +68,6 @@ class RenderStyle;
 class RenderView;
 class Scrollbar;
 class TransformationMatrix;
-class WrappingContext;
 
 #if USE(ACCELERATED_COMPOSITING)
 class RenderLayerBacking;
@@ -599,10 +598,6 @@ public:
     void setLayerListMutationAllowed(bool flag) { m_layerListMutationAllowed = flag; }
 #endif
 
-    bool hasWrappingContext() const { return m_wrappingContext.get(); }
-    WrappingContext* wrappingContext() const { return m_wrappingContext.get(); }
-    WrappingContext* enclosingWrappingContext(bool includeSelf = true) const;
-
     void updateLayerListsIfNeeded();
 
 private:
@@ -803,10 +798,6 @@ private:
     LayoutUnit verticalScrollbarStart(int minX, int maxX) const;
     LayoutUnit horizontalScrollbarStart(int minX) const;
 
-    void updateOrRemoveWrappingContext(const RenderStyle* oldStyle);
-    void ensureWrappingContext();
-    void clearWrappingContext();
-
 protected:
     // The bitfields are up here so they will fall into the padding from ScrollableArea on 64-bit.
 
@@ -928,9 +919,6 @@ private:
     EBlendMode m_blendMode;
     EAlphaCompositingMode m_alphaCompositingMode;
     EIsolationMode m_isolationMode;
-    
-    // FIXME: This should stay in a hash-map.
-    OwnPtr<WrappingContext> m_wrappingContext;
 };
 
 inline void RenderLayer::updateZOrderLists()
