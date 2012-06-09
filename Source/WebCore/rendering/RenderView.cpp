@@ -59,7 +59,7 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_layoutStateDisableCount(0)
     , m_inFirstLayoutPhaseOfRegionsAutoHeight(false)
     , m_autoHeightRegionsCount(0)
-    , m_canUseExclusions(false)
+    , m_activeWrappingContext(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
     // any renderer with document as the node is anonymous.

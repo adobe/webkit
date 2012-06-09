@@ -36,6 +36,7 @@ namespace WebCore {
 
 class FlowThreadController;
 class RenderWidget;
+class WrappingContext;
 
 #if USE(ACCELERATED_COMPOSITING)
 class RenderLayerCompositor;
@@ -203,8 +204,9 @@ public:
     virtual HostWindow* customFiltersHostWindow() const;
 #endif
 
-    bool canUseExclusions() const { return m_canUseExclusions; }
-    void setCanUseExclusions(bool value) { m_canUseExclusions = value; }
+    bool canUseExclusions() const { return !m_activeWrappingContext; }
+    WrappingContext* activeWrappingContext() const { return m_activeWrappingContext; }
+    void setActiveWrappingContext(WrappingContext* context) { m_activeWrappingContext = context; }
 protected:
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
@@ -296,7 +298,7 @@ private:
 	bool m_inFirstLayoutPhaseOfRegionsAutoHeight;
     unsigned m_autoHeightRegionsCount;
     RefPtr<IntervalArena> m_intervalArena;
-    bool m_canUseExclusions;
+    WrappingContext* m_activeWrappingContext;
 };
 
 inline RenderView* toRenderView(RenderObject* object)

@@ -1163,6 +1163,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     if (exclusionAreaMaintainer.hasExclusionBoxes()) {
         for (size_t i = 0; i < exclusionAreaMaintainer.data()->boxes().size(); ++i)
             printf("%ld - %p\n", i, exclusionAreaMaintainer.data()->boxes().at(i)->renderer());
+        layoutState.markForFullLayout();
     }
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;
@@ -1235,6 +1236,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
     bool checkForEndLineMatch = layoutState.endLine();
     LineBreakIteratorInfo lineBreakIteratorInfo;
     VerticalPositionCache verticalPositionCache;
+    bool canUseExclusions = view()->canUseExclusions();
 
     LineBreaker lineBreaker(this);
 
@@ -1308,9 +1310,9 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                 if (layoutState.usesRepaintBounds())
                     layoutState.updateRepaintRangeFromBox(lineBox);
 
-                /*if (wrappingContext && exclusionList.size()) {
+                if (canUseExclusions && ExclusionAreaMaintainer::active()->hasExclusionBoxes()) {
                     LayoutUnit adjustment = 0;
-                    wrappingContext->adjustLinePositionForExclusions(this, lineBox, adjustment, exclusionList);
+                    ExclusionAreaMaintainer::active()->adjustLinePositionForExclusions(lineBox, adjustment);
                     if (adjustment) {
                         LayoutUnit oldLineWidth = availableLogicalWidthForLine(oldLogicalHeight, layoutState.lineInfo().isFirstLine());
                         lineBox->adjustBlockDirectionPosition(adjustment);
@@ -1329,7 +1331,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
                         setLogicalHeight(lineBox->lineBottomWithLeading());
                     }
-                }*/
+                }
                 
                 if (paginated) {
                     LayoutUnit adjustment = 0;

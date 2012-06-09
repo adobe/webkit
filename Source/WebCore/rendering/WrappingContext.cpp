@@ -30,6 +30,8 @@
 #include "config.h"
 #include "WrappingContext.h"
 
+#include "RenderView.h"
+#include "RootInlineBox.h"
 #include "ExclusionBox.h"
 #include "RenderBlock.h"
 #include <wtf/PassOwnPtr.h>
@@ -57,8 +59,57 @@ void ExclusionAreaMaintainer::init(RenderBlock* block, WrappingContext* context)
     context->exclusionBoxesForBlock(block, m_data->boxes());
 }
 
+static bool overlapping(int t0, int t1, int y0, int y1)
+{
+    return t0 <= y1 && t1 >= y0;
+}
+
+void ExclusionAreaMaintainer::adjustLinePositionForExclusions(RootInlineBox* lineBox, LayoutUnit& deltaOffset)
+{
+    ASSERT(m_data.get());
+    RenderBlock* block = m_data->block();
+    LayoutStateDisabler disableLayoutState(block->view());
+
+    deltaOffset = 0;
+    
+    LayoutRect logicalVisualOverflow = lineBox->logicalVisualOverflowRect(lineBox->lineTop(), lineBox->lineBottom());
+    LayoutUnit logicalOffset = std::min(lineBox->lineTopWithLeading(), logicalVisualOverflow.y());
+    LayoutUnit lineHeight = std::max(lineBox->lineBottomWithLeading(), logicalVisualOverflow.maxY()) - logicalOffset;
+    
+    FloatPoint upperLeftCorner = block->localToAbsolute(FloatPoint(0, logicalOffset), false, true);
+    FloatPoint lowerRightCorner = block->localToAbsolute(FloatPoint(10, logicalOffset + lineHeight), false, true);
+    
+    int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
+    int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
+    
+    printf("line (%d %d)\n", t0, t1);
+
+    bool hadNoChange = false;
+    
+    // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
+    // It will be fixed when we will have the shapes in place.
+    while (!hadNoChange) {
+        hadNoChange = true;
+        for (size_t i = 0; i < m_data->boxes().size(); ++i) {
+            ExclusionBox* exclusion = m_data->boxes().at(i).get();
+            const IntRect& exclusionBoundingBox = exclusion->boundingBox();
+            printf("   exclusion (%d %d)\n", exclusionBoundingBox.y(), exclusionBoundingBox.maxY());
+            if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
+                int newDelta = std::max(deltaOffset + t0, exclusionBoundingBox.maxY()) - t0;
+                if (newDelta == deltaOffset)
+                    continue;
+                deltaOffset = newDelta;
+                // We need to start checking again.
+                hadNoChange = false;
+                break;
+            }
+        }
+    }
+}
+
 WrappingContext::WrappingContext(RenderBlock* block)
     : m_block(block)
+    , m_state(ExclusionsLayoutPhase)
 {
 }
 
@@ -89,6 +140,11 @@ WrappingContext* WrappingContext::lookupContextForBlock(const RenderBlock* block
     if (iter == s_wrappingContextMap->end())
         return 0;
     return iter->second;
+}
+
+bool WrappingContext::blockHasOwnWrappingContext(const RenderBlock* block)
+{
+    return lookupContextForBlock(block);
 }
 
 WrappingContext* WrappingContext::createContextForBlockIfNeeded(const RenderBlock* block)
@@ -132,6 +188,19 @@ const RenderObject* WrappingContext::parentWithNewWrappingContext(const RenderBl
             return object;
     }
     return 0;
+}
+
+void WrappingContext::prepareExlusionRects()
+{
+    LayoutStateDisabler disableLayoutState(m_block->view());
+
+    for (ExclusionBoxMap::iterator iter = m_boxes.begin(), end = m_boxes.end(); iter != end; ++iter) {
+        ExclusionBox* box = iter->second.get();
+        RenderBox* renderer = box->renderer();
+        // FIXME: We should really just use transforms here.
+        box->setBoundingBox(renderer->absoluteBoundingBoxRect());
+        printf("  prepared exclusion (%d %d)\n", box->boundingBox().y(), box->boundingBox().maxY());
+    }
 }
 
 void WrappingContext::pushParentExclusionBoxes(const RenderObject* parentWithNewWrappingContext, ExclusionBoxes& boxes)

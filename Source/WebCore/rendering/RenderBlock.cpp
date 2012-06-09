@@ -1374,6 +1374,14 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     if (!relayoutChildren && simplifiedLayout())
         return;
 
+    if (view()->canUseExclusions() && hasOwnWrappingContext()) {
+        WrappingContext* wrappingContext = this->wrappingContext();
+        if (wrappingContext->state() == WrappingContext::ExclusionsLayoutPhase) {
+            view()->setActiveWrappingContext(wrappingContext);
+            printf("first exclusions pass on %p\n", this);
+        }
+    }
+
     LayoutRepainter repainter(*this, everHadLayout() && checkForRepaintDuringLayout());
 
     if (recomputeLogicalWidth())
@@ -1565,8 +1573,22 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     if (needAnotherLayoutPass && layoutPass == NormalLayoutPass) {
         setChildNeedsLayout(true, MarkOnlyThis);
         layoutBlock(false, pageLogicalHeight, PositionedFloatLayoutPass);
-    } else
+    } else {
+        if (hasOwnWrappingContext()) {
+            WrappingContext* wrappingContext = this->wrappingContext();
+            if (wrappingContext == view()->activeWrappingContext() && wrappingContext->state() == WrappingContext::ExclusionsLayoutPhase) {
+                wrappingContext->setState(WrappingContext::ContentLayoutPhase);
+                view()->setActiveWrappingContext(0);
+                wrappingContext->prepareExlusionRects();
+                setNeedsLayoutForWrappingContextChange();
+                printf("second exclusions layout pass on %p\n", this);
+                layoutBlock(false, pageLogicalHeight);
+                wrappingContext->setState(WrappingContext::ExclusionsLayoutPhase);
+                return;
+            }
+        }
         setNeedsLayout(false);
+    }
 }
 
 void RenderBlock::addOverflowFromChildren()
@@ -2374,7 +2396,7 @@ void RenderBlock::simplifiedNormalFlowLayout()
 
 bool RenderBlock::simplifiedLayout()
 {
-    if ((!posChildNeedsLayout() && !needsSimplifiedNormalFlowLayout()) || normalChildNeedsLayout() || selfNeedsLayout())
+    if ((!posChildNeedsLayout() && !needsSimplifiedNormalFlowLayout()) || normalChildNeedsLayout() || selfNeedsLayout() || hasOwnWrappingContext())
         return false;
 
     LayoutStateMaintainer statePusher(view(), this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
@@ -4359,6 +4381,18 @@ bool RenderBlock::avoidsFloats() const
 bool RenderBlock::containsFloat(RenderBox* renderer) const
 {
     return m_floatingObjects && m_floatingObjects->set().contains<RenderBox*, FloatingObjectHashTranslator>(renderer);
+}
+
+void RenderBlock::setNeedsLayoutForWrappingContextChange()
+{
+    setNeedsLayout(true);
+    if (childrenInline())
+        return;
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
+        if (!child->isRenderBlock() || child->style()->wrapThrough() == WrapThroughNone)
+            continue;
+        toRenderBlock(child)->setNeedsLayoutForWrappingContextChange();
+    }
 }
 
 void RenderBlock::markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove, bool inLayout)
@@ -7409,6 +7443,11 @@ RenderBlock* RenderBlock::createAnonymousColumnSpanWithParentRenderer(const Rend
 WrappingContext* RenderBlock::wrappingContext(bool create) const
 {
     return create ? WrappingContext::createContextForBlockIfNeeded(this) : WrappingContext::contextForBlock(this);
+}
+
+bool RenderBlock::hasOwnWrappingContext() const
+{
+    return WrappingContext::blockHasOwnWrappingContext(this);
 }
 
 #ifndef NDEBUG

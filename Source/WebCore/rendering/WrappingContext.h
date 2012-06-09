@@ -30,11 +30,13 @@
 #ifndef WrappingContext_h
 #define WrappingContext_h
 
+#include "IntRect.h"
+#include "LayoutTypes.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
- #include <wtf/OwnPtr.h>
+#include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
@@ -43,6 +45,7 @@ class RenderBox;
 class RenderBlock;
 class RenderObject;
 class WrappingContext;
+class RootInlineBox;
 
 typedef HashMap<const RenderBox*, RefPtr<ExclusionBox> > ExclusionBoxMap;
 typedef Vector<RefPtr<ExclusionBox> > ExclusionBoxes;
@@ -55,10 +58,16 @@ public:
     const ExclusionBoxes& boxes() const { return m_boxes; }
     ExclusionBoxes& boxes() { return m_boxes; }
 
+    RenderBlock* block() const { return m_block; }
+
+    void setBoundingBox(const IntRect& boundingBox) { m_boundingBox = boundingBox; }
+    const IntRect& boundingBox() const { return m_boundingBox; }
+
 private:
     ExclusionBoxes m_boxes;
     RenderBlock* m_block;
     WrappingContext* m_context;
+    IntRect m_boundingBox;
 };
 
 class ExclusionAreaMaintainer {
@@ -79,6 +88,8 @@ public:
     ExclusionAreaData* data() const { return m_data.get(); }
 
     static ExclusionAreaMaintainer* active() { return s_current; }
+
+    void adjustLinePositionForExclusions(RootInlineBox* lineBox, LayoutUnit& deltaOffset);
 private:
     void init(RenderBlock*, WrappingContext*);
     
@@ -91,6 +102,12 @@ private:
 class WrappingContext {
     WTF_MAKE_NONCOPYABLE(WrappingContext);
 public:
+    enum WrappingContextState {
+        ExclusionsLayoutPhase,
+        ContentLayoutPhase
+    };
+
+    static bool blockHasOwnWrappingContext(const RenderBlock*);
     static WrappingContext* contextForBlock(const RenderBlock*);
 
     static WrappingContext* createContextForBlockIfNeeded(const RenderBlock*);
@@ -103,6 +120,10 @@ public:
 
     void exclusionBoxesForBlock(const RenderBlock*, ExclusionBoxes&);
 
+    WrappingContextState state() const { return m_state; }
+    void setState(WrappingContextState state) { m_state = state; }
+
+    void prepareExlusionRects();
 private:
     WrappingContext(RenderBlock*);
     ~WrappingContext();
@@ -114,6 +135,7 @@ private:
 
     RenderBlock* m_block;
     ExclusionBoxMap m_boxes;
+    WrappingContextState m_state;
 };
 
 } // Namespace WebCore

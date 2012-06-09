@@ -121,6 +121,8 @@ public:
 
     bool generatesLineBoxesForInlineChild(RenderObject*);
 
+    void setNeedsLayoutForWrappingContextChange();
+
     void markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove = 0, bool inLayout = true);
     void markSiblingsWithFloatsForLayout(RenderBox* floatToRemove = 0);
     void markPositionedObjectsForLayout();
@@ -379,6 +381,7 @@ public:
     LayoutUnit computeStartPositionDeltaForChildAvoidingFloats(const RenderBox* child, LayoutUnit childMarginStart, RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = 0);
     
     WrappingContext* wrappingContext(bool create = false) const;
+    bool hasOwnWrappingContext() const;
 
 #ifndef NDEBUG
     void showLineTreeAndMark(const InlineBox* = 0, const char* = 0, const InlineBox* = 0, const char* = 0, const RenderObject* = 0) const;

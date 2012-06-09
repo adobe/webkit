@@ -30,6 +30,7 @@
 #ifndef ExclusionBox_h
 #define ExclusionBox_h
 
+#include "IntRect.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -46,6 +47,9 @@ public:
 
     RenderBox* renderer() const { return m_renderBox; }
 
+    void setBoundingBox(const IntRect& boundingBox) { m_boundingBox = boundingBox; }
+    const IntRect& boundingBox() const { return m_boundingBox; }
+
 private:
     ExclusionBox(RenderBox* box)
         : m_renderBox(box)
@@ -53,6 +57,7 @@ private:
     }
 
     RenderBox* m_renderBox;
+    IntRect m_boundingBox;
 };
 
 } // Namespace WebCore
