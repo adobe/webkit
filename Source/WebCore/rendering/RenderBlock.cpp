@@ -1378,6 +1378,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
         WrappingContext* wrappingContext = this->wrappingContext();
         if (wrappingContext->state() == WrappingContext::ExclusionsLayoutPhase) {
             view()->setActiveWrappingContext(wrappingContext);
+            setNeedsLayoutForWrappingContextChange();
             printf("first exclusions pass on %p\n", this);
         }
     }

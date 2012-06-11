@@ -34,7 +34,9 @@
 #include "RootInlineBox.h"
 #include "ExclusionBox.h"
 #include "RenderBlock.h"
+#include "RenderLayer.h"
 #include <wtf/PassOwnPtr.h>
+ #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
@@ -53,10 +55,129 @@ ExclusionAreaData::~ExclusionAreaData()
 {
 }
 
+static bool findLayerInList(Vector<RenderLayer*>* list, RenderLayer* layer, size_t& position)
+{
+    if (!list)
+        return false;
+    size_t positionInList = list->find(layer);
+    if (positionInList != notFound) {
+        position += positionInList;
+        return true;
+    }
+    position += list->size();
+    return false;
+}
+
+static size_t layerPositionInStackingContext(RenderLayer* stackingContext, RenderLayer* layer)
+{
+    size_t position = 0;
+    
+    if (!findLayerInList(stackingContext->negZOrderList(), layer, position)) {
+        if (!findLayerInList(stackingContext->normalFlowList(), layer, position)) {
+            if (!findLayerInList(stackingContext->posZOrderList(), layer, position)) {
+                ASSERT_NOT_REACHED();
+                return notFound;
+            }
+        }
+    }
+
+    return position;
+}
+
+static bool compareLayerInSameStackingContext(RenderLayer* layerA, RenderLayer* layerB)
+{
+    RenderLayer* stackingContext = layerA->stackingContext();
+    ASSERT(stackingContext == layerB->stackingContext());
+    stackingContext->updateLayerListsIfNeeded();
+    // We just need to iterate on the lists and see which one is first.
+    size_t positionA = layerPositionInStackingContext(stackingContext, layerA);
+    size_t positionB = layerPositionInStackingContext(stackingContext, layerB);
+    return positionA < positionB;
+}
+
+static void fillWithLayerStackContextChain(RenderLayer* layer, Vector<RenderLayer*>& chain)
+{
+    for (; layer; layer = layer->stackingContext()) {
+        chain.prepend(layer);
+        if (layer->renderer()->isRenderView() || layer->renderer()->isRoot())
+            return;
+    }
+}
+
+static bool compareLayerOrder(RenderLayer* layerA, RenderLayer* layerB)
+{
+    ASSERT(layerA != layerB);
+    
+    if (layerA->stackingContext() == layerB->stackingContext())
+        return compareLayerInSameStackingContext(layerA, layerB);
+    
+    Vector<RenderLayer*> stackContextChainA;
+    fillWithLayerStackContextChain(layerA, stackContextChainA);
+    
+    Vector<RenderLayer*> stackContextChainB;
+    fillWithLayerStackContextChain(layerB, stackContextChainB);
+    
+    size_t i = 0;
+    for (; i < stackContextChainA.size() && i < stackContextChainB.size(); ++i) {
+        if (stackContextChainA.at(i) != stackContextChainB.at(i))
+            break;
+    }
+    if (!i)
+        return true;
+    if (i == stackContextChainA.size())
+        return true;
+    if (i == stackContextChainB.size())
+        return false;
+    ASSERT(i < stackContextChainA.size() && i < stackContextChainB.size());
+    return compareLayerInSameStackingContext(stackContextChainA.at(i), stackContextChainB.at(i));
+}
+
+
+static bool compareExclusions(const RefPtr<ExclusionBox>& boxA, const RefPtr<ExclusionBox>& boxB)
+{
+    RenderBox* renderBoxA = boxA->renderer();
+    RenderBox* renderBoxB = boxB->renderer();
+
+    if (renderBoxA->layer() && renderBoxB->layer())
+        return compareLayerOrder(renderBoxA->layer(), renderBoxB->layer());
+    // Use DOM order.
+
+    unsigned short position = renderBoxB->node()->compareDocumentPosition(renderBoxA->node());
+    return position & Node::DOCUMENT_POSITION_FOLLOWING;
+}
+
 void ExclusionAreaMaintainer::init(RenderBlock* block, WrappingContext* context)
 {
     m_data = adoptPtr(new ExclusionAreaData(block, context));
     context->exclusionBoxesForBlock(block, m_data->boxes());
+    if (!m_data->boxes().size()) {
+        m_data.clear();
+        return;
+    }
+    std::sort(m_data->boxes().begin(), m_data->boxes().end(), compareExclusions);
+
+    size_t lastParentExclusion = notFound;
+    for (RenderObject* object = block; object != context->block(); object = object->parent()) {
+        if (object->isExclusionBox() && object->isBox()) {
+            ExclusionBox* box = context->exclusionForBox(toRenderBox(object));
+            if (!box) {
+                ASSERT_NOT_REACHED();
+                continue;
+            }
+            size_t i = m_data->boxes().find(box);
+            if (i == notFound)
+                continue;
+            if (lastParentExclusion == notFound || i > lastParentExclusion)
+                lastParentExclusion = i;
+        }
+    }
+
+    if (lastParentExclusion != notFound) {
+        ExclusionBoxes result;
+        for (size_t i = lastParentExclusion + 1; i < m_data->boxes().size(); ++i)
+            result.append(m_data->boxes().at(i).get());
+        m_data->boxes().swap(result);
+    }
 }
 
 static bool overlapping(int t0, int t1, int y0, int y1)
@@ -130,6 +251,12 @@ void WrappingContext::removeExclusionBox(const RenderBox* renderBox)
 {
     ASSERT(m_boxes.find(renderBox) != m_boxes.end());
     m_boxes.remove(renderBox);
+}
+
+ExclusionBox* WrappingContext::exclusionForBox(const RenderBox* renderBox) const
+{
+    ExclusionBoxMap::const_iterator iter = m_boxes.find(renderBox);
+    return (iter == m_boxes.end()) ? 0 : iter->second.get();
 }
 
 WrappingContext* WrappingContext::lookupContextForBlock(const RenderBlock* block)

@@ -115,6 +115,7 @@ public:
 
     ExclusionBox* addExclusionBox(const RenderBox*);
     void removeExclusionBox(const RenderBox*);
+    ExclusionBox* exclusionForBox(const RenderBox* renderBox) const;
 
     RenderBlock* block() const { return m_block; }
 
