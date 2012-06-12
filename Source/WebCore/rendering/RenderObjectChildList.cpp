@@ -124,12 +124,8 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
         if (RenderNamedFlowThread* containerFlowThread = renderNamedFlowThreadContainer(owner))
             containerFlowThread->removeFlowChild(oldChild);
 
-        if (oldChild->isBox() && oldChild->isExclusionBox()) {
-            if (RenderBlock* containingBlock = oldChild->containingBlock()) {
-                if (WrappingContext* context = containingBlock->wrappingContext(false))
-                    context->removeExclusionBox(toRenderBox(oldChild));
-            }
-        }
+        if (oldChild->isBox() && oldChild->isExclusionBox())
+            WrappingContext::removeExclusionBox(toRenderBox(oldChild));
 
 #if ENABLE(SVG)
         // Update cached boundaries in SVG renderers, if a child is removed.
@@ -214,12 +210,8 @@ void RenderObjectChildList::appendChildNode(RenderObject* owner, RenderObject* n
         if (RenderNamedFlowThread* containerFlowThread = renderNamedFlowThreadContainer(owner))
             containerFlowThread->addFlowChild(newChild);
 
-        if (newChild->isBox() && newChild->isExclusionBox()) {
-            if (RenderBlock* containingBlock = newChild->containingBlock()) {
-                if (WrappingContext* context = containingBlock->wrappingContext(true))
-                    context->addExclusionBox(toRenderBox(newChild));
-            }
-        }
+        if (newChild->isBox() && newChild->isExclusionBox())
+            WrappingContext::addExclusionBox(toRenderBox(newChild));
     }
 
     RenderCounter::rendererSubtreeAttached(newChild);
@@ -288,12 +280,8 @@ void RenderObjectChildList::insertChildNode(RenderObject* owner, RenderObject* c
         if (RenderNamedFlowThread* containerFlowThread = renderNamedFlowThreadContainer(owner))
             containerFlowThread->addFlowChild(child, beforeChild);
 
-        if (child->isBox() && child->isExclusionBox()) {
-            if (RenderBlock* containingBlock = child->containingBlock()) {
-                if (WrappingContext* context = containingBlock->wrappingContext(true))
-                    context->addExclusionBox(toRenderBox(child));
-            }
-        }
+        if (child->isBox() && child->isExclusionBox())
+            WrappingContext::addExclusionBox(toRenderBox(child));
     }
 
     RenderCounter::rendererSubtreeAttached(child);

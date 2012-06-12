@@ -44,6 +44,7 @@ class ExclusionBox;
 class RenderBox;
 class RenderBlock;
 class RenderObject;
+class RenderView;
 class WrappingContext;
 class RootInlineBox;
 
@@ -92,6 +93,7 @@ public:
     void adjustLinePositionForExclusions(RootInlineBox* lineBox, LayoutUnit& deltaOffset);
 private:
     void init(RenderBlock*, WrappingContext*);
+    void prepareExlusionRects();
     
     static ExclusionAreaMaintainer* s_current;
 
@@ -113,9 +115,9 @@ public:
     static WrappingContext* createContextForBlockIfNeeded(const RenderBlock*);
     static void removeContextForBlock(const RenderBlock*);
 
-    ExclusionBox* addExclusionBox(const RenderBox*);
-    void removeExclusionBox(const RenderBox*);
-    ExclusionBox* exclusionForBox(const RenderBox* renderBox) const;
+    static ExclusionBox* addExclusionBox(const RenderBox*);
+    static void removeExclusionBox(const RenderBox*);
+    static ExclusionBox* exclusionForBox(const RenderBox* renderBox);
 
     RenderBlock* block() const { return m_block; }
 
@@ -124,7 +126,10 @@ public:
     WrappingContextState state() const { return m_state; }
     void setState(WrappingContextState state) { m_state = state; }
 
-    void prepareExlusionRects();
+    static void sortPositionedObjects(Vector<RenderBox*>&);
+
+    static ExclusionBoxMap* boxMapForView(RenderView*, bool create = false);
+    static void removeBoxMapForView(RenderView* view);
 private:
     WrappingContext(RenderBlock*);
     ~WrappingContext();
@@ -135,7 +140,6 @@ private:
     void pushParentExclusionBoxes(const RenderObject* parentWithNewWrappingContext, ExclusionBoxes&);
 
     RenderBlock* m_block;
-    ExclusionBoxMap m_boxes;
     WrappingContextState m_state;
 };
 

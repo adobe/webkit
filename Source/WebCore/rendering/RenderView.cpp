@@ -38,6 +38,7 @@
 #include "RenderWidget.h"
 #include "RenderWidgetProtector.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -78,6 +79,7 @@ RenderView::RenderView(Node* node, FrameView* view)
 
 RenderView::~RenderView()
 {
+    WrappingContext::removeBoxMapForView(this);
 }
 
 bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)

@@ -1580,7 +1580,6 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
             if (wrappingContext == view()->activeWrappingContext() && wrappingContext->state() == WrappingContext::ExclusionsLayoutPhase) {
                 wrappingContext->setState(WrappingContext::ContentLayoutPhase);
                 view()->setActiveWrappingContext(0);
-                wrappingContext->prepareExlusionRects();
                 setNeedsLayoutForWrappingContextChange();
                 printf("second exclusions layout pass on %p\n", this);
                 layoutBlock(false, pageLogicalHeight);
@@ -2456,6 +2455,65 @@ bool RenderBlock::positionedFloatsNeedRelayout()
     return false;
 }
 
+bool RenderBlock::layoutPositionedObject(RenderBox* r, bool relayoutChildren)
+{
+    bool didFloatingBoxRelayout = false;
+
+    // When a non-positioned block element moves, it may have positioned children that are implicitly positioned relative to the
+    // non-positioned block.  Rather than trying to detect all of these movement cases, we just always lay out positioned
+    // objects that are positioned implicitly like this.  Such objects are rare, and so in typical DHTML menu usage (where everything is
+    // positioned explicitly) this should not incur a performance penalty.
+    if (relayoutChildren || (r->style()->hasStaticBlockPosition(isHorizontalWritingMode()) && r->parent() != this))
+        r->setChildNeedsLayout(true, MarkOnlyThis);
+        
+    // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
+    if (relayoutChildren && r->needsPreferredWidthsRecalculation())
+        r->setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
+    
+    if (!r->needsLayout())
+        r->markForPaginationRelayoutIfNeeded();
+    
+    // FIXME: Technically we could check the old placement and the new placement of the box and only invalidate if
+    // the margin box of the object actually changed.
+    if (r->needsLayout() && r->isFloating())
+        didFloatingBoxRelayout = true;
+
+    // We don't have to do a full layout.  We just have to update our position. Try that first. If we have shrink-to-fit width
+    // and we hit the available width constraint, the layoutIfNeeded() will catch it and do a full layout.
+    if (r->needsPositionedMovementLayoutOnly() && r->tryLayoutDoingPositionedMovementOnly())
+        r->setNeedsLayout(false);
+        
+    // If we are paginated or in a line grid, go ahead and compute a vertical position for our object now.
+    // If it's wrong we'll lay out again.
+    LayoutUnit oldLogicalTop = 0;
+    bool needsBlockDirectionLocationSetBeforeLayout = r->needsLayout() && view()->layoutState()->needsBlockDirectionLocationSetBeforeLayout(); 
+    if (needsBlockDirectionLocationSetBeforeLayout) {
+        if (isHorizontalWritingMode() == r->isHorizontalWritingMode())
+            r->computeLogicalHeight();
+        else
+            r->computeLogicalWidth();
+        oldLogicalTop = logicalTopForChild(r);
+    }
+    
+    r->layoutIfNeeded();
+
+    // Adjust the static position of a center-aligned inline positioned object with a block child now that the child's width has been computed.
+    if (!r->parent()->isRenderView() && r->parent()->isRenderBlock() && r->firstChild() && r->style()->position() == AbsolutePosition
+        && r->style()->isOriginalDisplayInlineType() && (r->style()->textAlign() == CENTER || r->style()->textAlign() == WEBKIT_CENTER)) {
+        RenderBlock* block = toRenderBlock(r->parent());
+        LayoutUnit blockHeight = block->logicalHeight();
+        block->setStaticInlinePositionForChild(r, blockHeight, block->startAlignedOffsetForLine(r, blockHeight, false));
+    }
+
+    // Lay out again if our estimate was wrong.
+    if (needsBlockDirectionLocationSetBeforeLayout && logicalTopForChild(r) != oldLogicalTop) {
+        r->setChildNeedsLayout(true, MarkOnlyThis);
+        r->layoutIfNeeded();
+    }
+
+    return didFloatingBoxRelayout;
+}
+
 bool RenderBlock::layoutPositionedObjects(bool relayoutChildren)
 {
     if (!m_positionedObjects)
@@ -2467,59 +2525,28 @@ bool RenderBlock::layoutPositionedObjects(bool relayoutChildren)
     bool didFloatingBoxRelayout = false;
 
     RenderBox* r;
-    Iterator end = m_positionedObjects->end();
-    for (Iterator it = m_positionedObjects->begin(); it != end; ++it) {
-        r = *it;
-        // When a non-positioned block element moves, it may have positioned children that are implicitly positioned relative to the
-        // non-positioned block.  Rather than trying to detect all of these movement cases, we just always lay out positioned
-        // objects that are positioned implicitly like this.  Such objects are rare, and so in typical DHTML menu usage (where everything is
-        // positioned explicitly) this should not incur a performance penalty.
-        if (relayoutChildren || (r->style()->hasStaticBlockPosition(isHorizontalWritingMode()) && r->parent() != this))
-            r->setChildNeedsLayout(true, MarkOnlyThis);
-            
-        // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
-        if (relayoutChildren && r->needsPreferredWidthsRecalculation())
-            r->setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
-        
-        if (!r->needsLayout())
-            r->markForPaginationRelayoutIfNeeded();
-        
-        // FIXME: Technically we could check the old placement and the new placement of the box and only invalidate if
-        // the margin box of the object actually changed.
-        if (r->needsLayout() && r->isFloating())
-            didFloatingBoxRelayout = true;
-
-        // We don't have to do a full layout.  We just have to update our position. Try that first. If we have shrink-to-fit width
-        // and we hit the available width constraint, the layoutIfNeeded() will catch it and do a full layout.
-        if (r->needsPositionedMovementLayoutOnly() && r->tryLayoutDoingPositionedMovementOnly())
-            r->setNeedsLayout(false);
-            
-        // If we are paginated or in a line grid, go ahead and compute a vertical position for our object now.
-        // If it's wrong we'll lay out again.
-        LayoutUnit oldLogicalTop = 0;
-        bool needsBlockDirectionLocationSetBeforeLayout = r->needsLayout() && view()->layoutState()->needsBlockDirectionLocationSetBeforeLayout(); 
-        if (needsBlockDirectionLocationSetBeforeLayout) {
-            if (isHorizontalWritingMode() == r->isHorizontalWritingMode())
-                r->computeLogicalHeight();
-            else
-                r->computeLogicalWidth();
-            oldLogicalTop = logicalTopForChild(r);
+    bool usedWrappingContextOrder = false; 
+    if (view()->canUseExclusions() && hasOwnWrappingContext()) {
+        WrappingContext* wrappingContext = this->wrappingContext();
+        if (wrappingContext->state() == WrappingContext::ContentLayoutPhase) {
+            usedWrappingContextOrder = true;
+            Vector<RenderBox*> sortedPositionedObjects;
+            sortedPositionedObjects.appendRange(m_positionedObjects->begin(), m_positionedObjects->end());
+            WrappingContext::sortPositionedObjects(sortedPositionedObjects);
+            for (size_t i = 0; i < sortedPositionedObjects.size(); ++i) {
+                r = sortedPositionedObjects.at(i);
+                if (layoutPositionedObject(r, relayoutChildren))
+                    didFloatingBoxRelayout = true;
+            }
         }
-        
-        r->layoutIfNeeded();
+    }
 
-        // Adjust the static position of a center-aligned inline positioned object with a block child now that the child's width has been computed.
-        if (!r->parent()->isRenderView() && r->parent()->isRenderBlock() && r->firstChild() && r->style()->position() == AbsolutePosition
-            && r->style()->isOriginalDisplayInlineType() && (r->style()->textAlign() == CENTER || r->style()->textAlign() == WEBKIT_CENTER)) {
-            RenderBlock* block = toRenderBlock(r->parent());
-            LayoutUnit blockHeight = block->logicalHeight();
-            block->setStaticInlinePositionForChild(r, blockHeight, block->startAlignedOffsetForLine(r, blockHeight, false));
-        }
-
-        // Lay out again if our estimate was wrong.
-        if (needsBlockDirectionLocationSetBeforeLayout && logicalTopForChild(r) != oldLogicalTop) {
-            r->setChildNeedsLayout(true, MarkOnlyThis);
-            r->layoutIfNeeded();
+    if (!usedWrappingContextOrder) {
+        Iterator end = m_positionedObjects->end();
+        for (Iterator it = m_positionedObjects->begin(); it != end; ++it) {
+            r = *it;
+            if (layoutPositionedObject(r, relayoutChildren))
+                didFloatingBoxRelayout = true;
         }
     }
     

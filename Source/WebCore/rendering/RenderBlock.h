@@ -410,6 +410,7 @@ protected:
 
     virtual void layout();
 
+    bool layoutPositionedObject(RenderBox*, bool relayoutChildren);
     bool layoutPositionedObjects(bool relayoutChildren);
 
     virtual void paint(PaintInfo&, const LayoutPoint&);

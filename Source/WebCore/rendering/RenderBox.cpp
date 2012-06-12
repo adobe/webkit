@@ -406,17 +406,13 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
         frame()->view()->recalculateScrollbarOverlayStyle();
     }
 
-    bool wasExclusionBox = oldStyle && oldStyle->isCSSExclusion();
-    if (wasExclusionBox != isExclusionBox()) {
-        RenderBlock* containingBlock = this->containingBlock();
-        if (containingBlock) {
-            WrappingContext* context = containingBlock->wrappingContext(isExclusionBox());
-            if (isExclusionBox()) {
-                ASSERT(context);
-                context->addExclusionBox(this);
-            } else if (context) {
-                context->removeExclusionBox(this);
-            }
+    if (parent()) {
+        bool wasExclusionBox = oldStyle && oldStyle->isCSSExclusion();
+        if (wasExclusionBox != isExclusionBox()) {
+            if (isExclusionBox())
+                WrappingContext::addExclusionBox(this);
+            else
+                WrappingContext::removeExclusionBox(this);
         }
     }
 }

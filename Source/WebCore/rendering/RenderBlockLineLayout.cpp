@@ -1162,7 +1162,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     ExclusionAreaMaintainer exclusionAreaMaintainer(this, wrappingContext());
     if (exclusionAreaMaintainer.hasExclusionBoxes()) {
         for (size_t i = 0; i < exclusionAreaMaintainer.data()->boxes().size(); ++i)
-            printf("%ld - %p\n", i, exclusionAreaMaintainer.data()->boxes().at(i)->renderer());
+            printf(" exclusion %ld - %p\n", i, exclusionAreaMaintainer.data()->boxes().at(i)->renderer());
         layoutState.markForFullLayout();
     }
     // We want to skip ahead to the first dirty line
