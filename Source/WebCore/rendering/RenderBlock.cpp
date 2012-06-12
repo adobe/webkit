@@ -1582,6 +1582,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
                 view()->setActiveWrappingContext(0);
                 setNeedsLayoutForWrappingContextChange();
                 printf("second exclusions layout pass on %p\n", this);
+                layoutPositionedObjects(true);
                 layoutBlock(false, pageLogicalHeight);
                 wrappingContext->setState(WrappingContext::ExclusionsLayoutPhase);
                 return;
