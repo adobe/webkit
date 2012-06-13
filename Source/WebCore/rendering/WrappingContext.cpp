@@ -164,10 +164,6 @@ static bool compareExclusions(const RefPtr<ExclusionBox>& boxA, const RefPtr<Exc
 
 void ExclusionAreaMaintainer::init(RenderBlock* block, WrappingContext* context)
 {
-    Node* nodeToPrint = block->node() ? block->node() : block->parent()->node();
-    String name = (nodeToPrint->isElementNode() && nodeToPrint->hasID()) ? static_cast<Element*>(nodeToPrint)->idForStyleResolution() : "";
-    printf("Layout and runs for \"%s\"\n", name.latin1().data());
-
     m_data = adoptPtr(new ExclusionAreaData(block, context));
     context->exclusionBoxesForBlock(block, m_data->boxes());
     if (!m_data->boxes().size()) {
@@ -213,7 +209,6 @@ void ExclusionAreaMaintainer::prepareExlusionRects()
         RenderBox* renderer = box->renderer();
         // FIXME: We should really just use transforms here.
         box->setBoundingBox(renderer->absoluteBoundingBoxRect());
-        printf("  prepared exclusion (%d %d)\n", box->boundingBox().y(), box->boundingBox().maxY());
     }
 }
 
@@ -240,8 +235,6 @@ void ExclusionAreaMaintainer::adjustLinePositionForExclusions(RootInlineBox* lin
     int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
     int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
     
-    printf("line (%d %d)\n", t0, t1);
-
     bool hadNoChange = false;
     
     // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
@@ -251,7 +244,6 @@ void ExclusionAreaMaintainer::adjustLinePositionForExclusions(RootInlineBox* lin
         for (size_t i = 0; i < m_data->boxes().size(); ++i) {
             ExclusionBox* exclusion = m_data->boxes().at(i).get();
             const IntRect& exclusionBoundingBox = exclusion->boundingBox();
-            printf("   exclusion (%d %d)\n", exclusionBoundingBox.y(), exclusionBoundingBox.maxY());
             if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
                 if (exclusion->renderer()->style()->wrapFlow() != WrapFlowClear)
                     continue;
@@ -355,8 +347,6 @@ void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
     int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
     int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
     
-    printf("line (%d %d)\n", t0, t1);
-
     bool hadNoOffsetChange = false;
     
     // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
@@ -371,7 +361,6 @@ void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
         for (size_t i = 0; i < m_data->boxes().size(); ++i) {
             ExclusionBox* exclusion = m_data->boxes().at(i).get();
             const IntRect& exclusionBoundingBox = exclusion->boundingBox();
-            printf("   exclusion (%d %d)\n", exclusionBoundingBox.y(), exclusionBoundingBox.maxY());
             if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
                 switch (exclusion->renderer()->style()->wrapFlow()) {
                     // FIXME: implement WrapFlowMaximum.
@@ -571,14 +560,11 @@ static bool compareRenderBoxExclusions(const RenderBox* renderBoxA, const Render
 
 void WrappingContext::sortPositionedObjects(Vector<RenderBox*>& list)
 {
-    printf("sorting exclusions\n");
     std::sort(list.begin(), list.end(), compareRenderBoxExclusions);
 }
 
 void WrappingContext::pushParentExclusionBoxes(const RenderObject* parentWithNewWrappingContext, ExclusionBoxes& resultBoxes)
 {
-    printf("push parents %p for \"%s\"\n", m_block, nodeID(m_block->node()).latin1().data());
-
     if (RenderBlock* parentContainingBlock = m_block->containingBlock())
         if (WrappingContext* context = contextForBlock(parentContainingBlock))
             context->pushParentExclusionBoxes(parentWithNewWrappingContext, resultBoxes);
@@ -594,11 +580,6 @@ void WrappingContext::pushParentExclusionBoxes(const RenderObject* parentWithNew
         if (parentWithNewWrappingContext && !box->renderer()->isDescendantOf(parentWithNewWrappingContext))
             continue;
         resultBoxes.append(box);
-
-        printf("-- exclusions check %p - \"%s\"\n", box->renderer(), nodeID(box->renderer()->node()).latin1().data());
-        RenderBlock* cb = box->renderer()->containingBlock();
-        if (cb)
-            printf("-- containing block check %p - \"%s\"\n", cb, nodeID(cb->node()).latin1().data());
     }
 }
 

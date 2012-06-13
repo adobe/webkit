@@ -1204,11 +1204,9 @@ static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, Ro
 void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInlineChild)
 {
     ExclusionAreaMaintainer exclusionAreaMaintainer(this, wrappingContext());
-    if (exclusionAreaMaintainer.hasExclusionBoxes()) {
-        for (size_t i = 0; i < exclusionAreaMaintainer.data()->boxes().size(); ++i)
-            printf(" exclusion %ld - %p\n", i, exclusionAreaMaintainer.data()->boxes().at(i)->renderer());
+    if (exclusionAreaMaintainer.hasExclusionBoxes())
         layoutState.markForFullLayout();
-    }
+
     // We want to skip ahead to the first dirty line
     InlineBidiResolver resolver;
     RootInlineBox* startLine = determineStartPosition(layoutState, resolver);
@@ -1311,7 +1309,6 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
             ExclusionAreaMaintainer::LineSegments exclusionSegments;
             ExclusionAreaMaintainer::active()->getSegments(logicalWidth(), logicalHeight(), lineHeight, adjustment, exclusionSegments);
-            printf("segments at %d - %ld\n", logicalHeight(), exclusionSegments.size());
             if (exclusionSegments.size() == 0) {
                 if (!adjustment)
                     adjustment += 1;
@@ -1323,7 +1320,6 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                 segments.append(LineSegment());
                 LineSegment& segment = segments.last();
 
-                printf("segment %d %d\n", exclusionSegments.at(i).left, exclusionSegments.at(i).right);
                 segment.left = exclusionSegments.at(i).left;
                 segment.right = exclusionSegments.at(i).right;
                 

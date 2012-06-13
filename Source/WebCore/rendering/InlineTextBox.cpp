@@ -475,10 +475,6 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
 
     ASSERT(paintInfo.phase != PaintPhaseSelfOutline && paintInfo.phase != PaintPhaseChildOutlines);
 
-    Color color; color.setRGB(0, 0, 255);
-    paintInfo.context->setStrokeColor(color, m_renderer->style()->colorSpace());
-    paintInfo.context->strokeRect(FloatRect(paintOffset.x() + x(), paintOffset.y() + y(), width(), height()), 2);
-
     LayoutUnit logicalLeftSide = logicalLeftVisualOverflow();
     LayoutUnit logicalRightSide = logicalRightVisualOverflow();
     LayoutUnit logicalStart = logicalLeftSide + (isHorizontal() ? paintOffset.x() : paintOffset.y());

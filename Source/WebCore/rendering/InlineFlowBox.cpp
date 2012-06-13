@@ -1039,11 +1039,6 @@ void InlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     if (!paintInfo.rect.intersects(pixelSnappedIntRect(overflowRect)))
         return;
 
-    Color color;
-    color.setRGB(0, 255, 0);
-    paintInfo.context->setStrokeColor(color, m_renderer->style()->colorSpace());
-    paintInfo.context->strokeRect(overflowRect, 2);
-
     if (paintInfo.phase != PaintPhaseChildOutlines) {
         if (paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) {
             // Add ourselves to the paint info struct's list of inlines that need to paint their
