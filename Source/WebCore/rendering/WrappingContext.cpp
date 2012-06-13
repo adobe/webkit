@@ -253,12 +253,153 @@ void ExclusionAreaMaintainer::adjustLinePositionForExclusions(RootInlineBox* lin
             const IntRect& exclusionBoundingBox = exclusion->boundingBox();
             printf("   exclusion (%d %d)\n", exclusionBoundingBox.y(), exclusionBoundingBox.maxY());
             if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
+                if (exclusion->renderer()->style()->wrapFlow() != WrapFlowClear)
+                    continue;
                 int newDelta = std::max(deltaOffset + t0, exclusionBoundingBox.maxY()) - t0;
                 if (newDelta == deltaOffset)
                     continue;
                 deltaOffset = newDelta;
                 // We need to start checking again.
                 hadNoChange = false;
+                break;
+            }
+        }
+    }
+}
+
+bool insertExclusion(ExclusionAreaMaintainer::LineSegments& segments, LayoutUnit left, LayoutUnit right)
+{
+    if (!segments.size())
+        return false;
+
+    // Find the first and the last segments to fit left and right.
+    size_t first = notFound, last = notFound;
+    
+    for (size_t i = 0; i < segments.size(); ++i) {
+        if (left < segments.at(i).right && right > segments.at(i).left) {
+            first = i;
+            break;
+        }
+    }
+
+    if (first == notFound)
+        return true;
+
+    last = first;
+    for (size_t i = first + 1; i < segments.size(); ++i) {
+        if (segments.at(i).left >= right)
+            break;
+        last = i;
+    }
+
+    ASSERT(first <= last);
+    if (first == last) {
+        ExclusionAreaMaintainer::LineSegment& firstSegment = segments.at(first);
+
+        if (left <= firstSegment.left && right >= firstSegment.right) {
+            // Full coverage. Just delete the segment.
+            segments.remove(first);
+        } else if (left <= firstSegment.left) {
+            // Left part covered only.
+            firstSegment.left = right;
+        } else if (right >= firstSegment.right) {
+            // Right part covered only.
+            firstSegment.right = left;
+        } else {
+            // Exclusion is inside segment. Split the one we had.
+            ExclusionAreaMaintainer::LineSegment newSegment;
+            newSegment.left = right;
+            newSegment.right = firstSegment.right;
+            segments.insert(first + 1, newSegment);
+            // Update the old segment to end before the exclusion.
+            firstSegment.right = left;
+        }
+    } else {
+        size_t middle = last - first - 1;
+        if (middle)
+            segments.remove(first + 1, last - first - 1);
+        last -= middle;
+
+        ExclusionAreaMaintainer::LineSegment& firstSegment = segments.at(first);
+        firstSegment.right = std::min(left, firstSegment.right);
+
+        ExclusionAreaMaintainer::LineSegment& lastSegment = segments.at(last);
+        firstSegment.left = std::min(right, firstSegment.left);
+
+        if (!firstSegment.length()) {
+            segments.remove(first);
+            --last;
+        }
+
+        if (!lastSegment.length())
+            segments.remove(last);
+    }
+
+    return segments.size();
+}
+
+void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, ExclusionAreaMaintainer::LineSegments& segments)
+{
+    ASSERT(m_data.get());
+    RenderBlock* block = m_data->block();
+    LayoutStateDisabler disableLayoutState(block->view());
+
+    deltaOffset = 0;
+        
+    FloatPoint upperLeftCorner = block->localToAbsolute(FloatPoint(0, logicalHeight), false, true);
+    FloatPoint lowerRightCorner = block->localToAbsolute(FloatPoint(logicalWidth, logicalHeight + lineHeight), false, true);
+    
+    int x0 = (int)std::min(upperLeftCorner.x(), lowerRightCorner.x());
+    int x1 = (int)std::max(upperLeftCorner.x(), lowerRightCorner.x());
+
+    int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
+    int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
+    
+    printf("line (%d %d)\n", t0, t1);
+
+    bool hadNoOffsetChange = false;
+    
+    // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
+    // It will be fixed when we will have the shapes in place.
+    while (!hadNoOffsetChange) {
+        segments.clear();
+        LineSegment infSegment;
+        infSegment.left = 0;
+        infSegment.right = x1 - x0;
+        segments.append(infSegment);
+        hadNoOffsetChange = true;
+        for (size_t i = 0; i < m_data->boxes().size(); ++i) {
+            ExclusionBox* exclusion = m_data->boxes().at(i).get();
+            const IntRect& exclusionBoundingBox = exclusion->boundingBox();
+            printf("   exclusion (%d %d)\n", exclusionBoundingBox.y(), exclusionBoundingBox.maxY());
+            if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
+                switch (exclusion->renderer()->style()->wrapFlow()) {
+                    // FIXME: implement WrapFlowMaximum.
+                    case WrapFlowMaximum:
+                    case WrapFlowBoth:
+                        if (insertExclusion(segments, exclusionBoundingBox.x() - x0, exclusionBoundingBox.maxX() - x0))
+                            continue;
+                        break;
+                    case WrapFlowStart:
+                        if (insertExclusion(segments, exclusionBoundingBox.x() - x0, MAX_LAYOUT_UNIT / 2))
+                            continue;
+                        break;
+                    case WrapFlowEnd:
+                        if (insertExclusion(segments, MIN_LAYOUT_UNIT / 2, exclusionBoundingBox.maxX() - x0))
+                            continue;
+                        break;
+                    case WrapFlowClear:
+                        // We cannot use this line at all.
+                        break;
+                    case WrapFlowAuto:
+                        ASSERT_NOT_REACHED();
+                }
+                int newDelta = std::max(deltaOffset + t0, exclusionBoundingBox.maxY()) - t0;
+                if (newDelta == deltaOffset)
+                    continue;
+                deltaOffset = newDelta;
+                // We need to start checking again.
+                hadNoOffsetChange = false;
                 break;
             }
         }
@@ -364,13 +505,11 @@ WrappingContext* WrappingContext::lookupContextForBlock(const RenderBlock* block
     WrappingContextMap::iterator iter = s_wrappingContextMap->find(block);
     if (iter == s_wrappingContextMap->end())
         return 0;
-    printf("lookupContextForBlock for %p - \"%s\" = %p\n", block, nodeID(block->node()).latin1().data(), iter->second);
     return iter->second;
 }
 
 bool WrappingContext::blockHasOwnWrappingContext(const RenderBlock* block)
 {
-    printf("blockHasOwnWrappingContext for %p - \"%s\"\n", block, nodeID(block->node()).latin1().data());
     return lookupContextForBlock(block);
 }
 

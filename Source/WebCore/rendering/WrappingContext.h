@@ -91,6 +91,15 @@ public:
     static ExclusionAreaMaintainer* active() { return s_current; }
 
     void adjustLinePositionForExclusions(RootInlineBox* lineBox, LayoutUnit& deltaOffset);
+    
+    struct LineSegment {
+        LayoutUnit left;
+        LayoutUnit right;
+        LayoutUnit length() const { return std::max(right - left, 0); }
+    };
+    typedef Vector<LineSegment> LineSegments;
+
+    void getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, LineSegments&);
 private:
     void init(RenderBlock*, WrappingContext*);
     void prepareExlusionRects();

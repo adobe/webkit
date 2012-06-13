@@ -75,6 +75,7 @@ class LineWidth {
 public:
     LineWidth(RenderBlock* block, bool isFirstLine)
         : m_block(block)
+        , m_lineSegment(0)
         , m_uncommittedWidth(0)
         , m_committedWidth(0)
         , m_overhangWidth(0)
@@ -89,6 +90,7 @@ public:
     
     LineWidth(RenderBlock* block, bool isFirstLine, LineSegment* lineSegment) 
         : m_block(block)
+        , m_lineSegment(lineSegment)
         , m_uncommittedWidth(0)
         , m_committedWidth(0)
         , m_overhangWidth(0)
@@ -97,9 +99,7 @@ public:
     {
         ASSERT(block);
         ASSERT(lineSegment);
-        m_left = lineSegment->left;
-        m_right = lineSegment->right;
-        computeAvailableWidthFromLeftAndRight();
+        updateAvailableWidth();
     }
 
     bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
@@ -130,6 +130,7 @@ private:
 
 private:
     RenderBlock* m_block;
+    LineSegment* m_lineSegment;
     float m_uncommittedWidth;
     float m_committedWidth;
     float m_overhangWidth; // The amount by which |m_availableWidth| has been inflated to account for possible contraction due to ruby overhang.
@@ -145,6 +146,10 @@ inline void LineWidth::updateAvailableWidth()
     m_left = m_block->pixelSnappedLogicalLeftOffsetForLine(height, m_isFirstLine);
     m_right = m_block->pixelSnappedLogicalRightOffsetForLine(height, m_isFirstLine);
 
+    if (m_lineSegment) {
+        m_lineSegment->left = m_left = std::max(m_left, m_lineSegment->left);
+        m_lineSegment->right = m_right = std::min(m_right, m_lineSegment->right);
+    }
     computeAvailableWidthFromLeftAndRight();
 }
 
@@ -1266,38 +1271,6 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     repaintDirtyFloats(layoutState.floats());
 }
 
-// TODO: cleanup params -> line dims, style & rootstyle
-static bool getSegmentsForLine(RenderBlock* block, Vector<LineSegment>& segments)
-{
-    RenderStyle* currStyle = block->style();
-    RenderStyle* rootStyle = block->document()->documentElement()->renderStyle();
-    
-    CSSWrapShape* shape = block->style()->wrapShapeInside();
-    if (!shape || shape->type() != CSSWrapShape::CSS_WRAP_SHAPE_RECTANGLE)
-            return false;
-    segments.clear();
-    int lineTop = block->logicalHeight();
-    int lineHeight = block->lineHeight(false, HorizontalLine, PositionOfInteriorLineBoxes);
-    CSSWrapShapeRectangle* rect = static_cast<CSSWrapShapeRectangle *>(shape);
-    int shapeLeft = rect->left()->computeLength<int>(currStyle, rootStyle);
-    int shapeWidth = rect->width()->computeLength<int>(currStyle, rootStyle);
-    int shapeTop = rect->top()->computeLength<int>(currStyle, rootStyle);
-    int shapeHeight = rect->height()->computeLength<int>(currStyle, rootStyle);
-    
-    fprintf(stderr, "Line [%d, %d] Shape [%d, %d, %d, %d] \n", lineTop, lineHeight, shapeLeft, shapeWidth, shapeTop, shapeHeight);
-    if (lineTop > shapeTop && lineTop + lineHeight < shapeTop + shapeHeight) {
-        LineSegment segment;
-        segment.left = shapeLeft;
-        segment.right = shapeLeft + shapeWidth / 2 - 5;
-        segments.append(segment);
-        LineSegment segment2;
-        segment2.left = 5 + shapeLeft + shapeWidth / 2;
-        segment2.right = shapeLeft + shapeWidth - 10;
-        segments.append(segment2);
-    }
-    return true;
-}
-
 void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
 {
     RenderStyle* styleToUse = style();
@@ -1332,27 +1305,38 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         
         Vector<LineSegment> segments;
         resolver.m_segmentState.clear();
-        if (getSegmentsForLine(this, segments))
-        {
-            if (segments.size() == 0) {
-                int lineHeight = RenderBlock::lineHeight(false, HorizontalLine, PositionOfInteriorLineBoxes);
-                if (lineHeight <= 0)
-                        lineHeight = 1;
-                setLogicalHeight(logicalHeight() + lineHeight);
+        if (canUseExclusions && ExclusionAreaMaintainer::active()->hasExclusionBoxes()) {
+            LayoutUnit adjustment = 0;
+            LayoutUnit lineHeight = this->lineHeight(layoutState.lineInfo().isFirstLine(), HorizontalLine, PositionOfInteriorLineBoxes);
+
+            ExclusionAreaMaintainer::LineSegments exclusionSegments;
+            ExclusionAreaMaintainer::active()->getSegments(logicalWidth(), logicalHeight(), lineHeight, adjustment, exclusionSegments);
+            printf("segments at %d - %ld\n", logicalHeight(), exclusionSegments.size());
+            if (exclusionSegments.size() == 0) {
+                if (!adjustment)
+                    adjustment += 1;
+                setLogicalHeight(logicalHeight() + adjustment);
                 continue;
             }
-            
-            for (size_t i = 0; i < segments.size(); i++) {
-                segments[i].start = resolver.position();
+
+            for (size_t i = 0; i < exclusionSegments.size(); i++) {
+                segments.append(LineSegment());
+                LineSegment& segment = segments.last();
+
+                printf("segment %d %d\n", exclusionSegments.at(i).left, exclusionSegments.at(i).right);
+                segment.left = exclusionSegments.at(i).left;
+                segment.right = exclusionSegments.at(i).right;
+                
+                segment.start = resolver.position();
                 // todo: insert segment size into linebreaker
                 // todo: actual line break should break this
-                segments[i].end = end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, &segments[i]);
+                segment.end = end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, &segment);
                 resolver.setPositionIgnoringNestedIsolates(end);
             }
 
-            for (size_t i=0; i < segments.size() - 1; i++) {
+            for (size_t i=0; i < segments.size() - 1; i++)
                 resolver.m_segmentState.append(segments[i].end);
-            }
+            
             resolver.setPositionIgnoringNestedIsolates(segments[0].start);
         }
         else
