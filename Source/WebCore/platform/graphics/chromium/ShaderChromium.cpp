@@ -281,7 +281,7 @@ static String formulaForBlendMode(EBlendMode blendMode, EAlphaCompositingMode al
             vec4 composite(float alphaA, float Fa, vec3 Ca, 
                            float alphaB, float Fb, vec3 Cb) {
                 float a = alphaA * Fa + alphaB * Fb;
-                return vec4((alphaA * Fa * Ca + alphaB * Fb * Cb) * a, a);
+                return vec4((alphaA * Fa * Ca + alphaB * Fb * Cb), a);
             }
             vec4 blend(vec4 sourceColor) {
                 vec2 bgTexCoord = gl_FragCoord.xy - backgroundRect.xy;
