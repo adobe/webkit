@@ -1315,9 +1315,12 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                     // todo: insert segment size into linebreaker
                     // todo: actual line break should break this
                     segment.end = end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, &segment);
-                    if (resolver.position() == end) {
+                    if (segment.start == end) {
                         // Nothing fit in this segment.
                         // Remove this segment and try again.
+                        end = segment.start;
+                        resolver.setPositionIgnoringNestedIsolates(segment.start);
+                        removeFloatingObjectsBelow(lastFloatFromPreviousLine, logicalHeight());
                         segments.removeLast();
                         continue;
                     }
