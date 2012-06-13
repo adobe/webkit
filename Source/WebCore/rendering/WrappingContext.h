@@ -99,7 +99,7 @@ public:
     };
     typedef Vector<LineSegment> LineSegments;
 
-    void getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, LineSegments&);
+    bool getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, LineSegments&);
 private:
     void init(RenderBlock*, WrappingContext*);
     void prepareExlusionRects();

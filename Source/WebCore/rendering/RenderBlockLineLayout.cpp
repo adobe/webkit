@@ -73,9 +73,9 @@ public:
 
 class LineWidth {
 public:
-    LineWidth(RenderBlock* block, bool isFirstLine)
+    LineWidth(RenderBlock* block, bool isFirstLine, LineSegment* lineSegment)
         : m_block(block)
-        , m_lineSegment(0)
+        , m_lineSegment(lineSegment)
         , m_uncommittedWidth(0)
         , m_committedWidth(0)
         , m_overhangWidth(0)
@@ -88,20 +88,6 @@ public:
         updateAvailableWidth();
     }
     
-    LineWidth(RenderBlock* block, bool isFirstLine, LineSegment* lineSegment) 
-        : m_block(block)
-        , m_lineSegment(lineSegment)
-        , m_uncommittedWidth(0)
-        , m_committedWidth(0)
-        , m_overhangWidth(0)
-        , m_availableWidth(0)
-        , m_isFirstLine(isFirstLine)
-    {
-        ASSERT(block);
-        ASSERT(lineSegment);
-        updateAvailableWidth();
-    }
-
     bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
     bool fitsOnLine(float extra) const { return currentWidth() + extra <= m_availableWidth; }
     float currentWidth() const { return m_committedWidth + m_uncommittedWidth; }
@@ -1301,6 +1287,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         bool isNewUBAParagraph = layoutState.lineInfo().previousLineBrokeCleanly();
         FloatingObject* lastFloatFromPreviousLine = (m_floatingObjects && !m_floatingObjects->set().isEmpty()) ? m_floatingObjects->set().last() : 0;
         
+        bool hadExclusions = false;
         Vector<LineSegment> segments;
         resolver.m_segmentState.clear();
         if (canUseExclusions && ExclusionAreaMaintainer::active()->hasExclusionBoxes()) {
@@ -1308,35 +1295,52 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             LayoutUnit lineHeight = this->lineHeight(layoutState.lineInfo().isFirstLine(), HorizontalLine, PositionOfInteriorLineBoxes);
 
             ExclusionAreaMaintainer::LineSegments exclusionSegments;
-            ExclusionAreaMaintainer::active()->getSegments(logicalWidth(), logicalHeight(), lineHeight, adjustment, exclusionSegments);
-            if (exclusionSegments.size() == 0) {
-                if (!adjustment)
-                    adjustment += 1;
+            if (ExclusionAreaMaintainer::active()->getSegments(logicalWidth(), logicalHeight(), lineHeight, adjustment, exclusionSegments)) {
+                hadExclusions = true;
+                if (exclusionSegments.size() == 0) {
+                    if (!adjustment)
+                        adjustment += 1;
+                    setLogicalHeight(logicalHeight() + adjustment);
+                    continue;
+                }
                 setLogicalHeight(logicalHeight() + adjustment);
-                continue;
-            }
-            setLogicalHeight(logicalHeight() + adjustment);
-            for (size_t i = 0; i < exclusionSegments.size(); i++) {
-                segments.append(LineSegment());
-                LineSegment& segment = segments.last();
+                for (size_t i = 0; i < exclusionSegments.size(); i++) {
+                    segments.append(LineSegment());
+                    LineSegment& segment = segments.last();
 
-                segment.left = exclusionSegments.at(i).left;
-                segment.right = exclusionSegments.at(i).right;
+                    segment.left = exclusionSegments.at(i).left;
+                    segment.right = exclusionSegments.at(i).right;
+                    
+                    segment.start = resolver.position();
+                    // todo: insert segment size into linebreaker
+                    // todo: actual line break should break this
+                    segment.end = end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, &segment);
+                    if (resolver.position() == end) {
+                        // Nothing fit in this segment.
+                        // Remove this segment and try again.
+                        segments.removeLast();
+                        continue;
+                    }
+                    resolver.setPositionIgnoringNestedIsolates(end);
+                }
+                // If we didn't find any space yet, just try again on next pixel.
+                // FIXME: Should we just use line height here?
+                if (!segments.size()) {
+                    setLogicalHeight(logicalHeight() + 1);
+                    continue;
+                }
+
+                for (size_t i=0; i < segments.size() - 1; i++)
+                    resolver.m_segmentState.append(segments[i].end);
                 
-                segment.start = resolver.position();
-                // todo: insert segment size into linebreaker
-                // todo: actual line break should break this
-                segment.end = end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, &segment);
-                resolver.setPositionIgnoringNestedIsolates(end);
+                resolver.setPositionIgnoringNestedIsolates(segments[0].start);
+            } else {
+                segments.clear();
             }
-
-            for (size_t i=0; i < segments.size() - 1; i++)
-                resolver.m_segmentState.append(segments[i].end);
-            
-            resolver.setPositionIgnoringNestedIsolates(segments[0].start);
         }
-        else
-                end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, 0);
+
+        if (!hadExclusions)
+            end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), lineBreakIteratorInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, 0);
 
         if (resolver.position().atEnd()) {
             // FIXME: We shouldn't be creating any runs in nextLineBreak to begin with!
@@ -2226,7 +2230,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
     bool includeEndWidth = true;
     LineMidpointState& lineMidpointState = resolver.midpointState();
 
-    LineWidth width = segment ? LineWidth(m_block, lineInfo.isFirstLine(), segment) : LineWidth(m_block, lineInfo.isFirstLine());
+    LineWidth width = LineWidth(m_block, lineInfo.isFirstLine(), segment);
 
     skipLeadingWhitespace(resolver, lineInfo, lastFloatFromPreviousLine, width);
 
@@ -2746,7 +2750,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 lBreak.m_pos = current.m_pos - 1;
             } else
                 lBreak.moveTo(last, last->isText() ? last->length() : 0);
-        } else if (lBreak.m_obj) {
+        } else if (lBreak.m_obj && !segment) {
             // Don't ever break in the middle of a word if we can help it.
             // There's no room at all. We just have to be on this line,
             // even though we'll spill out.
@@ -2755,7 +2759,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
     }
 
     // make sure we consume at least one char/object.
-    if (lBreak == resolver.position())
+    if (!segment && lBreak == resolver.position())
         lBreak.increment();
 
     // Sanity check our midpoints.

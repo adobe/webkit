@@ -330,7 +330,7 @@ bool insertExclusion(ExclusionAreaMaintainer::LineSegments& segments, LayoutUnit
     return segments.size();
 }
 
-void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, ExclusionAreaMaintainer::LineSegments& segments)
+bool ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, ExclusionAreaMaintainer::LineSegments& segments)
 {
     ASSERT(m_data.get());
     RenderBlock* block = m_data->block();
@@ -347,6 +347,7 @@ void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
     int t0 = (int)std::min(upperLeftCorner.y(), lowerRightCorner.y());
     int t1 = (int)std::max(upperLeftCorner.y(), lowerRightCorner.y());
     
+    bool hadAnyExclusions = false;
     bool hadNoOffsetChange = false;
     
     // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
@@ -358,10 +359,12 @@ void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
         infSegment.right = x1 - x0;
         segments.append(infSegment);
         hadNoOffsetChange = true;
+        hadAnyExclusions = false;
         for (size_t i = 0; i < m_data->boxes().size(); ++i) {
             ExclusionBox* exclusion = m_data->boxes().at(i).get();
             const IntRect& exclusionBoundingBox = exclusion->boundingBox();
             if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
+                hadAnyExclusions = true;
                 switch (exclusion->renderer()->style()->wrapFlow()) {
                     // FIXME: implement WrapFlowMaximum.
                     case WrapFlowMaximum:
@@ -393,6 +396,8 @@ void ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
             }
         }
     }
+
+    return hadAnyExclusions;
 }
 
 WrappingContext::WrappingContext(RenderBlock* block)
