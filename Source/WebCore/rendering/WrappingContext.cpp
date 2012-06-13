@@ -53,7 +53,11 @@ ExclusionAreaMaintainer* ExclusionAreaMaintainer::s_current = 0;
 
 static String nodeID(Node* node)
 {
-    return (node->isElementNode() && node->hasID()) ? static_cast<Element*>(node)->idForStyleResolution() : "";
+    if (!node)
+        return "NO NODE";
+    String id = (node->isElementNode() && node->hasID()) ? static_cast<Element*>(node)->idForStyleResolution() : "";
+    String renderName = node->renderer() ? node->renderer()->renderName() : "No renderer";
+    return id + " - " + renderName;
 }
 
 ExclusionAreaData::ExclusionAreaData(RenderBlock* block, WrappingContext* context)
@@ -313,12 +317,15 @@ ExclusionBox* WrappingContext::addExclusionBox(const RenderBox* renderBox)
     RefPtr<ExclusionBox> box = ExclusionBox::create(const_cast<RenderBox*>(renderBox));
     boxes->set(renderBox, box);
 
+    printf("added new exclusion box %p - \"%s\"\n", renderBox, nodeID(renderBox->node()).latin1().data());
+
     // Make sure the containing block knows we need a wrapping context.
     RenderBlock* containingBlock = renderBox->containingBlock();
-    if (containingBlock)
+    if (containingBlock) {
+        printf("containingBlock %p - \"%s\"\n", containingBlock, nodeID(containingBlock->node()).latin1().data());
         createContextForBlockIfNeeded(containingBlock);
+    }
 
-    printf("added new exclusion box %p - \"%s\"\n", renderBox, nodeID(renderBox->node()).latin1().data());
     for (RenderObject* o = renderBox->parent(); o ; o = o->parent())
         printf("-- parent box %p - \"%s\"\n", o, nodeID(o->node()).latin1().data());
 
@@ -357,11 +364,13 @@ WrappingContext* WrappingContext::lookupContextForBlock(const RenderBlock* block
     WrappingContextMap::iterator iter = s_wrappingContextMap->find(block);
     if (iter == s_wrappingContextMap->end())
         return 0;
+    printf("lookupContextForBlock for %p - \"%s\" = %p\n", block, nodeID(block->node()).latin1().data(), iter->second);
     return iter->second;
 }
 
 bool WrappingContext::blockHasOwnWrappingContext(const RenderBlock* block)
 {
+    printf("blockHasOwnWrappingContext for %p - \"%s\"\n", block, nodeID(block->node()).latin1().data());
     return lookupContextForBlock(block);
 }
 
@@ -370,7 +379,9 @@ WrappingContext* WrappingContext::createContextForBlockIfNeeded(const RenderBloc
     WrappingContext* context = lookupContextForBlock(block);
     if (!context) {
         context = new WrappingContext(const_cast<RenderBlock*>(block));
-        s_wrappingContextMap = new WrappingContextMap();
+        printf("creating new wrapping context for %p - \"%s\"\n", block, nodeID(block->node()).latin1().data());
+        if (!s_wrappingContextMap)
+            s_wrappingContextMap = new WrappingContextMap();
         s_wrappingContextMap->set(block, context);
     }
     return context;
@@ -378,6 +389,7 @@ WrappingContext* WrappingContext::createContextForBlockIfNeeded(const RenderBloc
 
 void WrappingContext::removeContextForBlock(const RenderBlock* block)
 {
+    printf("removing wrapping context for %p - \"%s\"\n", block, nodeID(block->node()).latin1().data());
     if (!s_wrappingContextMap)
         return;
     WrappingContextMap::iterator iter = s_wrappingContextMap->find(block);

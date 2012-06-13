@@ -1364,6 +1364,15 @@ bool RenderBlock::recomputeLogicalWidth()
     return oldWidth != logicalWidth() || oldColumnWidth != desiredColumnWidth();
 }
 
+static String nodeID(Node* node)
+{
+    if (!node)
+        return "NO NODE";
+    String id = (node->isElementNode() && node->hasID()) ? static_cast<Element*>(node)->idForStyleResolution() : "";
+    String renderName = node->renderer() ? node->renderer()->renderName() : "No renderer";
+    return id + " - " + renderName;
+}
+
 void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight, BlockLayoutPass layoutPass)
 {
     ASSERT(needsLayout());
@@ -1374,12 +1383,17 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     if (!relayoutChildren && simplifiedLayout())
         return;
 
+    printf("LayoutBlock %p - \"%s\" - can use is %s, has wrapping context is %s\n", this, 
+            nodeID(this->node()).latin1().data(), view()->canUseExclusions() ? "true" : "false", 
+            hasOwnWrappingContext() ? "true" : "false");
     if (view()->canUseExclusions() && hasOwnWrappingContext()) {
         WrappingContext* wrappingContext = this->wrappingContext();
+        printf("wrapping state is %s\n", 
+            wrappingContext->state() == WrappingContext::ExclusionsLayoutPhase ? "exclusion" : "content");
         if (wrappingContext->state() == WrappingContext::ExclusionsLayoutPhase) {
             view()->setActiveWrappingContext(wrappingContext);
             setNeedsLayoutForWrappingContextChange();
-            printf("first exclusions pass on %p\n", this);
+            printf("first exclusions pass on %p - \"%s\"\n", this, nodeID(this->node()).latin1().data());
         }
     }
 
@@ -1581,7 +1595,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
                 wrappingContext->setState(WrappingContext::ContentLayoutPhase);
                 view()->setActiveWrappingContext(0);
                 setNeedsLayoutForWrappingContextChange();
-                printf("second exclusions layout pass on %p\n", this);
+                printf("second exclusions layout pass on %p - \"%s\"\n", this, nodeID(this->node()).latin1().data());
                 layoutPositionedObjects(true);
                 layoutBlock(false, pageLogicalHeight);
                 wrappingContext->setState(WrappingContext::ExclusionsLayoutPhase);
