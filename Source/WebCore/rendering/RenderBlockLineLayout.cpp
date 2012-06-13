@@ -1318,7 +1318,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                 setLogicalHeight(logicalHeight() + adjustment);
                 continue;
             }
-
+            setLogicalHeight(logicalHeight() + adjustment);
             for (size_t i = 0; i < exclusionSegments.size(); i++) {
                 segments.append(LineSegment());
                 LineSegment& segment = segments.last();

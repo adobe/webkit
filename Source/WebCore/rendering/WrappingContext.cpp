@@ -276,7 +276,7 @@ bool insertExclusion(ExclusionAreaMaintainer::LineSegments& segments, LayoutUnit
     size_t first = notFound, last = notFound;
     
     for (size_t i = 0; i < segments.size(); ++i) {
-        if (left < segments.at(i).right && right > segments.at(i).left) {
+        if (left <= segments.at(i).right && right >= segments.at(i).left) {
             first = i;
             break;
         }
