@@ -97,6 +97,7 @@ public:
     float committedWidth() const { return m_committedWidth; }
     float availableWidth() const { return m_availableWidth; }
 
+    void updateForSegmentSizeIfNeeded();
     void updateAvailableWidth();
     void shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::FloatingObject*);
     void addUncommittedWidth(float delta) { m_uncommittedWidth += delta; }
@@ -108,6 +109,7 @@ public:
     void applyOverhang(RenderRubyRun*, RenderObject* startRenderer, RenderObject* endRenderer);
     void fitBelowFloats();
 
+    bool hasLineSegment() const { return m_lineSegment; }
 private:
     void computeAvailableWidthFromLeftAndRight()
     {
@@ -126,16 +128,21 @@ private:
     bool m_isFirstLine;
 };
 
+inline void LineWidth::updateForSegmentSizeIfNeeded()
+{
+    if (m_lineSegment) {
+        m_lineSegment->left = m_left = std::max(m_left, m_lineSegment->left);
+        m_lineSegment->right = m_right = std::min(m_right, m_lineSegment->right);
+    }
+}
+
 inline void LineWidth::updateAvailableWidth()
 {
     LayoutUnit height = m_block->logicalHeight();
     m_left = m_block->pixelSnappedLogicalLeftOffsetForLine(height, m_isFirstLine);
     m_right = m_block->pixelSnappedLogicalRightOffsetForLine(height, m_isFirstLine);
 
-    if (m_lineSegment) {
-        m_lineSegment->left = m_left = std::max(m_left, m_lineSegment->left);
-        m_lineSegment->right = m_right = std::min(m_right, m_lineSegment->right);
-    }
+    updateForSegmentSizeIfNeeded();
     computeAvailableWidthFromLeftAndRight();
 }
 
@@ -154,7 +161,7 @@ inline void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::Floa
         if (m_isFirstLine && !m_block->style()->isLeftToRightDirection())
             m_right -= floorToInt(m_block->textIndentOffset());
     }
-
+    updateForSegmentSizeIfNeeded();
     computeAvailableWidthFromLeftAndRight();
 }
 
@@ -174,6 +181,7 @@ void LineWidth::applyOverhang(RenderRubyRun* rubyRun, RenderObject* startRendere
 
 void LineWidth::fitBelowFloats()
 {
+    ASSERT(!m_lineSegment);
     ASSERT(!m_committedWidth);
     ASSERT(!fitsOnLine());
 
@@ -2027,9 +2035,11 @@ void RenderBlock::LineBreaker::skipLeadingWhitespace(InlineBidiResolver& resolve
                 resolver.runs().addRun(createRun(0, 1, object, resolver));
                 lineInfo.incrementRunsFromLeadingWhitespace();
             }
-        } else if (object->isFloating())
-            m_block->positionNewFloatOnLine(m_block->insertFloatingObject(toRenderBox(object)), lastFloatFromPreviousLine, lineInfo, width);
-        else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText() && !toRenderCombineText(object)->isCombined()) {
+        } else if (object->isFloating()) {
+            FloatingObject* floater = m_block->insertFloatingObject(toRenderBox(object));
+            if (!width.hasLineSegment())
+                m_block->positionNewFloatOnLine(floater, lastFloatFromPreviousLine, lineInfo, width);
+        } else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText() && !toRenderCombineText(object)->isCombined()) {
             toRenderCombineText(object)->combineText();
             if (toRenderCombineText(object)->isCombined())
                 continue;
@@ -2264,7 +2274,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
     lineInfo.setPreviousLineBrokeCleanly(false);
 
     bool autoWrapWasEverTrueOnLine = false;
-    bool floatsFitOnLine = true;
+    // FIXME: Disabled floating objects on lines with exclusions for now.
+    bool floatsFitOnLine = !width.hasLineSegment();
 
     // Firefox and Opera will allow a table cell to grow to fit an image inside it under
     // very specific circumstances (in order to match common WinIE renderings).
@@ -2525,7 +2536,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
 
                     applyWordSpacing =  wordSpacing && currentCharacterIsSpace && !previousCharacterIsSpace;
 
-                    if (!width.committedWidth() && autoWrap && !width.fitsOnLine())
+                    if (!width.committedWidth() && !segment && autoWrap && !width.fitsOnLine())
                         width.fitBelowFloats();
 
                     if (autoWrap || breakWords) {
@@ -2693,7 +2704,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 } else if (nextText->isWordBreak())
                     checkForBreak = true;
 
-                if (!width.fitsOnLine() && !width.committedWidth())
+                if (!width.fitsOnLine() && !segment && !width.committedWidth())
                     width.fitBelowFloats();
 
                 bool canPlaceOnLine = width.fitsOnLine() || !autoWrapWasEverTrueOnLine;
@@ -2709,7 +2720,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             if (currentCharacterIsSpace && !ignoringSpaces && currentStyle->collapseWhiteSpace())
                 trailingObjects.clear();
 
-            if (width.committedWidth())
+            if (width.committedWidth() || segment)
                 goto end;
 
             width.fitBelowFloats();

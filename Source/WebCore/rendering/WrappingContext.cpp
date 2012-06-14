@@ -547,7 +547,7 @@ WrappingContext* WrappingContext::contextForBlock(const RenderBlock* block)
 const RenderObject* WrappingContext::parentWithNewWrappingContext(const RenderBlock* block)
 {
     for (const RenderObject* object = block; object && object != m_block; object = object->parent()) {
-        if (object->style()->wrapThrough() == WrapThroughNone)
+        if (object->style()->wrapThrough() == WrapThroughNone || object->style()->isFloating())
             return object;
     }
     return 0;
