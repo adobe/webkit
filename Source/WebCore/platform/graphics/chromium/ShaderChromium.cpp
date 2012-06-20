@@ -276,6 +276,8 @@ static String formulaForBlendMode(EBlendMode blendMode, EAlphaCompositingMode al
     builder.append(
         SHADER(
             vec4 unmultiply(vec4 premultipliedSourceColor) {
+                if (premultipliedSourceColor.a == 0.0)
+                    return vec4(1.0, 1.0, 1.0, 0.0);
                 return vec4(clamp(premultipliedSourceColor.rgb / premultipliedSourceColor.a, 0.0, 1.0), premultipliedSourceColor.a);
             }
             vec4 composite(float alphaA, float Fa, vec3 Ca, 
