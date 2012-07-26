@@ -37,6 +37,7 @@
 #include "RenderTableCell.h"
 #include "RootInlineBox.h"
 #include "Text.h"
+#include "WrappingContext.h"
 
 #include <math.h>
 
@@ -375,7 +376,21 @@ float InlineFlowBox::placeBoxesInInlineDirection(float logicalLeft, bool& needsW
     float minLogicalLeft = startLogicalLeft;
     float maxLogicalRight = logicalLeft;
 
-    for (InlineBox* curr = firstChild(); curr; curr = curr->nextOnLine()) {
+    placeBoxesRangeInInlineDirection(firstChild(), 0, logicalLeft, minLogicalLeft, maxLogicalRight, needsWordSpacing, textBoxDataMap);
+
+    logicalLeft += borderLogicalRight() + paddingLogicalRight();
+    setLogicalWidth(logicalLeft - startLogicalLeft);
+    if (knownToHaveNoOverflow() && (minLogicalLeft < startLogicalLeft || maxLogicalRight > logicalLeft))
+        clearKnownToHaveNoOverflow();
+    return logicalLeft;
+}
+
+float InlineFlowBox::placeBoxesRangeInInlineDirection(InlineBox* firstChild, InlineBox* lastChild, float& logicalLeft, float& minLogicalLeft, float& maxLogicalRight, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap& textBoxDataMap)
+{
+    for (InlineBox* curr = firstChild; curr && curr != lastChild; curr = curr->nextOnLine()) {
+        // Don't change the position of the exclusions on the second pass.
+        if (curr->renderer()->isReplaced() && !ExclusionAreaMaintainer::shouldDisableExclusions() && curr->renderer()->isExclusionBox())
+            continue;
         if (curr->renderer()->isText()) {
             InlineTextBox* text = toInlineTextBox(curr);
             RenderText* rt = toRenderText(text->renderer());
@@ -428,10 +443,6 @@ float InlineFlowBox::placeBoxesInInlineDirection(float logicalLeft, bool& needsW
         }
     }
 
-    logicalLeft += borderLogicalRight() + paddingLogicalRight();
-    setLogicalWidth(logicalLeft - startLogicalLeft);
-    if (knownToHaveNoOverflow() && (minLogicalLeft < startLogicalLeft || maxLogicalRight > logicalLeft))
-        clearKnownToHaveNoOverflow();
     return logicalLeft;
 }
 
@@ -480,6 +491,9 @@ void InlineFlowBox::adjustMaxAscentAndDescent(LayoutUnit& maxAscent, LayoutUnit&
         // positioned elements
         if (curr->renderer()->isOutOfFlowPositioned())
             continue; // Positioned placeholders don't affect calculations.
+        // Don't take into account the exclusions on the second pass.
+        if (curr->renderer()->isReplaced() && !ExclusionAreaMaintainer::shouldDisableExclusions() && curr->renderer()->isExclusionBox())
+            continue;
         if (curr->verticalAlign() == TOP || curr->verticalAlign() == BOTTOM) {
             LayoutUnit lineHeight = curr->lineHeight();
             if (curr->verticalAlign() == TOP) {
@@ -547,8 +561,12 @@ void InlineFlowBox::computeLogicalBoxHeights(RootInlineBox* rootBox, LayoutUnit&
     for (InlineBox* curr = firstChild(); curr; curr = curr->nextOnLine()) {
         if (curr->renderer()->isOutOfFlowPositioned())
             continue; // Positioned placeholders don't affect calculations.
-        
+
         InlineFlowBox* inlineFlowBox = curr->isInlineFlowBox() ? toInlineFlowBox(curr) : 0;
+
+        // Don't take into account the exclusions on the second pass.
+        if (curr->renderer()->isReplaced() && !ExclusionAreaMaintainer::shouldDisableExclusions() && curr->renderer()->isExclusionBox())
+            continue;
         
         bool affectsAscent = false;
         bool affectsDescent = false;
@@ -619,12 +637,16 @@ void InlineFlowBox::placeBoxesInBlockDirection(LayoutUnit top, LayoutUnit maxHei
         if (curr->renderer()->isOutOfFlowPositioned())
             continue; // Positioned placeholders don't affect calculations.
 
+        InlineFlowBox* inlineFlowBox = curr->isInlineFlowBox() ? toInlineFlowBox(curr) : 0;
+        // Don't take into account the exclusions on the second pass.
+        if (curr->renderer()->isReplaced() && !ExclusionAreaMaintainer::shouldDisableExclusions() && curr->renderer()->isExclusionBox())
+            continue;
+
         if (descendantsHaveSameLineHeightAndBaseline()) {
             curr->adjustBlockDirectionPosition(adjustmentForChildrenWithSameLineHeightAndBaseline);
             continue;
         }
 
-        InlineFlowBox* inlineFlowBox = curr->isInlineFlowBox() ? toInlineFlowBox(curr) : 0;
         bool childAffectsTopBottomPos = true;
         if (curr->verticalAlign() == TOP)
             curr->setLogicalTop(top);

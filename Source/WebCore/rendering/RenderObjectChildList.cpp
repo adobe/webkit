@@ -42,6 +42,7 @@
 #include "RenderStyle.h"
 #include "RenderTextFragment.h"
 #include "RenderView.h"
+#include "WrappingContext.h"
 
 namespace WebCore {
 
@@ -128,6 +129,9 @@ RenderObject* RenderObjectChildList::removeChildNode(RenderObject* owner, Render
 
         if (RenderNamedFlowThread* containerFlowThread = renderNamedFlowThreadContainer(owner))
             containerFlowThread->removeFlowChild(oldChild);
+
+        if (oldChild->isBox() && oldChild->isExclusionBox())
+            WrappingContext::removeExclusionBox(toRenderBox(oldChild));
 
 #if ENABLE(SVG)
         // Update cached boundaries in SVG renderers, if a child is removed.
@@ -218,6 +222,9 @@ void RenderObjectChildList::appendChildNode(RenderObject* owner, RenderObject* n
 
         if (RenderNamedFlowThread* containerFlowThread = renderNamedFlowThreadContainer(owner))
             containerFlowThread->addFlowChild(newChild);
+
+        if (newChild->isBox() && newChild->isExclusionBox())
+            WrappingContext::addExclusionBox(toRenderBox(newChild));
     }
 
     if (!owner->documentBeingDestroyed()) {
@@ -289,6 +296,9 @@ void RenderObjectChildList::insertChildNode(RenderObject* owner, RenderObject* c
 
         if (RenderNamedFlowThread* containerFlowThread = renderNamedFlowThreadContainer(owner))
             containerFlowThread->addFlowChild(child, beforeChild);
+
+        if (child->isBox() && child->isExclusionBox())
+            WrappingContext::addExclusionBox(toRenderBox(child));
     }
 
     if (!owner->documentBeingDestroyed()) {

@@ -559,6 +559,8 @@ public:
     bool hasFilter() const { return false; }
 #endif
 
+    bool isExclusionBox() const { return style() && style()->isCSSExclusion(); }
+
     inline bool preservesNewline() const;
 
     // The pseudo element style can be cached or uncached.  Use the cached method if the pseudo element doesn't respect

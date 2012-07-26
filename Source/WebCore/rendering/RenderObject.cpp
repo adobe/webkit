@@ -68,6 +68,7 @@
 #include "Settings.h"
 #include "StyleResolver.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 #include "htmlediting.h"
 #include <algorithm>
 #include <stdio.h>
@@ -2998,3 +2999,4 @@ void showRenderTree(const WebCore::RenderObject* object1, const WebCore::RenderO
 }
 
 #endif
+

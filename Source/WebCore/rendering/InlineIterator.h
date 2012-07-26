@@ -26,6 +26,7 @@
 #include "BidiRun.h"
 #include "RenderBlock.h"
 #include "RenderText.h"
+#include "WrappingContext.h"
 #include <wtf/AlwaysInline.h>
 #include <wtf/StdLibExtras.h>
 

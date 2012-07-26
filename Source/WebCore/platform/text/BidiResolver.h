@@ -248,6 +248,7 @@ protected:
     unsigned m_nestedIsolateCount;
     Vector<Run*> m_isolatedRuns;
 
+    Vector<Iterator> m_segmentState;
 private:
     void raiseExplicitEmbeddingLevel(WTF::Unicode::Direction from, WTF::Unicode::Direction to);
     void lowerExplicitEmbeddingLevel(WTF::Unicode::Direction from);

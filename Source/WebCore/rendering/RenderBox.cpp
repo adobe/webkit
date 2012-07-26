@@ -54,6 +54,7 @@
 #include "RenderView.h"
 #include "ScrollbarTheme.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 #include <algorithm>
 #include <math.h>
 
@@ -291,6 +292,16 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
 
         frame()->view()->recalculateScrollbarOverlayStyle();
     }
+
+    if (parent()) {
+        bool wasExclusionBox = oldStyle && oldStyle->isCSSExclusion();
+        if (wasExclusionBox != isExclusionBox()) {
+            if (isExclusionBox())
+                WrappingContext::addExclusionBox(this);
+            else
+                WrappingContext::removeExclusionBox(this);
+         }
+     }
 }
 
 void RenderBox::updateBoxModelInfoFromStyle()
@@ -1308,7 +1319,7 @@ void RenderBox::mapLocalToContainer(RenderBoxModelObject* repaintContainer, Tran
         // Transform from render flow coordinates into region coordinates.
         RenderRegion* region = toRenderFlowThread(o)->mapFromFlowToRegion(transformState);
         if (region)
-            region->mapLocalToContainer(region->containerForRepaint(), transformState, mode, wasFixed);
+            region->mapLocalToContainer(repaintContainer ? region->containerForRepaint() : 0, transformState, mode, wasFixed);
         return;
     }
 
@@ -1425,6 +1436,9 @@ void RenderBox::dirtyLineBoxes(bool fullLayout)
 void RenderBox::positionLineBox(InlineBox* box)
 {
     if (isOutOfFlowPositioned()) {
+        // Do not change the position of the element when are in the second pass of the exclusions layout.
+        if (!ExclusionAreaMaintainer::shouldDisableExclusions() && isExclusionBox())
+            return;
         // Cache the x position only if we were an INLINE type originally.
         bool wasInline = style()->isOriginalDisplayInlineType();
         if (wasInline) {

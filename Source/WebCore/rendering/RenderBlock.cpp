@@ -60,6 +60,7 @@
 #include "SVGTextRunRenderingContext.h"
 #include "ShadowRoot.h"
 #include "TransformState.h"
+#include "WrappingContext.h"
 #include <wtf/StdLibExtras.h>
 
 using namespace std;
@@ -1420,6 +1421,39 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     if (!relayoutChildren && simplifiedLayout())
         return;
 
+    if (tryExclusionsLayout(relayoutChildren, pageLogicalHeight))
+        return;
+
+    layoutBlockAfterExclusionsApplied(relayoutChildren, pageLogicalHeight);
+}
+
+bool RenderBlock::tryExclusionsLayout(bool relayoutChildren, LayoutUnit pageLogicalHeight)
+{
+    if (ExclusionAreaMaintainer::active() && ExclusionAreaMaintainer::shouldDisableExclusions())
+        return false;
+
+    WrappingContext* context = wrappingContext();
+    if (!context)
+        return false;
+
+    ExclusionAreaMaintainer exclusionAreaMaintainer(this, context);
+    if (exclusionAreaMaintainer.hasExclusionBoxes()) {
+        // Do a first layout with no exclusions enabled.
+        context->setIsDisabled(true);
+        layoutBlockAfterExclusionsApplied(relayoutChildren, pageLogicalHeight);
+        context->setIsDisabled(false);
+
+        exclusionAreaMaintainer.layoutExclusionBoxes();
+
+        // Store all the existing rects.
+        exclusionAreaMaintainer.prepareExlusionRects();
+    }
+    layoutBlockAfterExclusionsApplied(relayoutChildren, pageLogicalHeight);
+    return true;
+}
+
+void RenderBlock::layoutBlockAfterExclusionsApplied(bool relayoutChildren, LayoutUnit pageLogicalHeight) 
+{
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
 
     if (recomputeLogicalWidth())
@@ -1446,6 +1480,11 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
             relayoutChildren = true;
     }
     computeInitialRegionRangeForBlock();
+
+    if (ExclusionAreaMaintainer::active()) {
+        // We always need to relayout when exclusion area is active.
+        relayoutChildren = true;
+    }
 
     // We use four values, maxTopPos, maxTopNeg, maxBottomPos, and maxBottomNeg, to track
     // our current maximal positive and negative margins.  These values are used when we
@@ -2273,12 +2312,16 @@ void RenderBlock::setLogicalTopForChild(RenderBox* child, LayoutUnit logicalTop,
 
 void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloatLogicalBottom)
 {
+    bool shouldDisableExclusions = ExclusionAreaMaintainer::shouldDisableExclusions();
+
     if (gPercentHeightDescendantsMap) {
         if (HashSet<RenderBox*>* descendants = gPercentHeightDescendantsMap->get(this)) {
             HashSet<RenderBox*>::iterator end = descendants->end();
             for (HashSet<RenderBox*>::iterator it = descendants->begin(); it != end; ++it) {
                 RenderBox* box = *it;
                 while (box != this) {
+                    if (!shouldDisableExclusions && box->isExclusionBox() && !box->isAnonymous())
+                        continue;
                     if (box->normalChildNeedsLayout())
                         break;
                     box->setChildNeedsLayout(true, MarkOnlyThis);
@@ -2316,6 +2359,9 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloa
     while (next) {
         RenderBox* child = next;
         next = child->nextSiblingBox();
+
+        if (!shouldDisableExclusions && child->isExclusionBox() && !child->isAnonymous())
+            continue;
 
         if (childToExclude == child)
             continue; // Skip this child, since it will be positioned by the specialized subclass (fieldsets and ruby runs).
@@ -2519,7 +2565,7 @@ void RenderBlock::simplifiedNormalFlowLayout()
 
 bool RenderBlock::simplifiedLayout()
 {
-    if ((!posChildNeedsLayout() && !needsSimplifiedNormalFlowLayout()) || normalChildNeedsLayout() || selfNeedsLayout())
+    if ((!posChildNeedsLayout() && !needsSimplifiedNormalFlowLayout()) || normalChildNeedsLayout() || selfNeedsLayout() || hasOwnWrappingContext())
         return false;
 
     LayoutStateMaintainer statePusher(view(), this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
@@ -2561,10 +2607,16 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren)
     if (hasColumns())
         view()->layoutState()->clearPaginationInformation(); // Positioned objects are not part of the column flow, so they don't paginate with the columns.
 
+    bool layoutExclusions = ExclusionAreaMaintainer::shouldDisableExclusions();
     RenderBox* r;
     Iterator end = m_positionedObjects->end();
     for (Iterator it = m_positionedObjects->begin(); it != end; ++it) {
         r = *it;
+        // Ignore exclusions in the second pass.
+        if (!layoutExclusions && r->isExclusionBox()) {
+            ASSERT(!r->needsLayout());
+            continue;
+        }
         // When a non-positioned block element moves, it may have positioned children that are implicitly positioned relative to the
         // non-positioned block.  Rather than trying to detect all of these movement cases, we just always lay out positioned
         // objects that are positioned implicitly like this.  Such objects are rare, and so in typical DHTML menu usage (where everything is
@@ -7419,6 +7471,16 @@ RenderBlock* RenderBlock::createAnonymousColumnSpanWithParentRenderer(const Rend
     RenderBlock* newBox = new (parent->renderArena()) RenderBlock(parent->document() /* anonymous box */);
     newBox->setStyle(newStyle.release());
     return newBox;
+}
+
+WrappingContext* RenderBlock::wrappingContext() const
+{
+    return WrappingContext::contextForBlock(this);
+}
+
+bool RenderBlock::hasOwnWrappingContext() const
+{
+    return WrappingContext::blockHasOwnWrappingContext(this);
 }
 
 #ifndef NDEBUG

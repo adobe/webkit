@@ -39,6 +39,7 @@ struct BidiRun : BidiCharacterRun {
         , m_object(object)
         , m_box(0)
         , m_hasHyphen(false)
+        , m_startsSegment(false)
     {
     }
 
@@ -61,6 +62,7 @@ public:
     RenderObject* m_object;
     InlineBox* m_box;
     bool m_hasHyphen;
+    bool m_startsSegment;
 };
 
 }

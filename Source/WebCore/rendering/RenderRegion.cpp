@@ -177,6 +177,11 @@ void RenderRegion::layout()
             oldRegionRect = oldRegionRect.transposedRect();
         if (oldRegionRect.width() != logicalWidthForFlowThreadContent() || oldRegionRect.height() != logicalHeightForFlowThreadContent())
             m_flowThread->invalidateRegions();
+
+        if (RenderBlock* parentBlock = containingBlock()) {
+            if (parentBlock->wrappingContext())
+                m_flowThread->invalidateRegions();                
+        }
     }
 
     // FIXME: We need to find a way to set up overflow properly. Our flow thread hasn't gotten a layout
