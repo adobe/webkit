@@ -2331,7 +2331,7 @@ void RenderBox::resetBeforeAfterMarginsComputed()
     m_marginBeforeComputed = m_marginAfterComputed = false;
 }
     
-void RenderBox::computeBlockDirectionMarginsBefore(RenderBlock* containingBlock)
+void RenderBox::computeBlockDirectionMarginsBefore(const RenderBlock* containingBlock)
 {
     if (m_marginBeforeComputed)
         return;
@@ -2353,7 +2353,7 @@ void RenderBox::computeBlockDirectionMarginsBefore(RenderBlock* containingBlock)
     containingBlock->setMarginBeforeForChild(this, minimumValueForLength(style()->marginBeforeUsing(containingBlockStyle), cw, renderView));
 }
 
-void RenderBox::computeBlockDirectionMarginsAfter(RenderBlock* containingBlock)
+void RenderBox::computeBlockDirectionMarginsAfter(const RenderBlock* containingBlock)
 {
     if (m_marginAfterComputed)
         return;
