@@ -1327,7 +1327,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                 if (paginated) {
                     LayoutUnit adjustment = 0;
                     if (adjustLinePositionForPagination(lineBox, adjustment)) {
-                        LayoutUnit oldLineWidth = availableLogicalWidthForLine(oldLogicalHeight, layoutState.lineInfo().isFirstLine());
+                        LayoutUnit oldLineWidth = availableLogicalWidthForLine(oldLogicalHeight + paginationStrut(), layoutState.lineInfo().isFirstLine());
                         lineBox->adjustBlockDirectionPosition(adjustment);
                         if (layoutState.usesRepaintBounds())
                             layoutState.updateRepaintRangeFromBox(lineBox);
@@ -1336,7 +1336,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                         updateRegionStyleForOffset(oldLogicalHeight + adjustment + paginationStrut());
 
                         // FIXME: The invalidation logic needs to be reworked; for now just assume that if the block has paginationStrut the line needs to be recreated.
-                        if (availableLogicalWidthForLine(oldLogicalHeight + adjustment, layoutState.lineInfo().isFirstLine()) != oldLineWidth || m_invalidateLines) {
+                        if (availableLogicalWidthForLine(oldLogicalHeight + adjustment + paginationStrut(), layoutState.lineInfo().isFirstLine()) != oldLineWidth || m_invalidateLines) {
                             m_invalidateLines = false;
                             
                             // We have to delete this line, remove all floats that got added, and let line layout re-run.

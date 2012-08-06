@@ -1585,8 +1585,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
                 repaintRectangle(reflectedRect(repaintRect));
         }
     }
-    
-    resetHasRegionStyle();
+
     setNeedsLayout(false);
 }
 
@@ -2359,7 +2358,6 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloa
 
         // Lay out the child.
         layoutBlockChild(child, marginInfo, previousFloatLogicalBottom, maxFloatLogicalBottom);
-        child->resetHasRegionStyle();
     }
     
     // Now do the handling of the bottom of the block, adding in our bottom border/padding and
@@ -2521,6 +2519,8 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
         if (newHeight != height())
             setLogicalHeight(newHeight);
     }
+    
+    child->resetHasRegionStyle();
 
     ASSERT(oldLayoutDelta == view()->layoutDelta());
 }
@@ -7167,7 +7167,7 @@ RenderRegion* RenderBlock::regionAtBlockOffset(LayoutUnit blockOffset) const
     if (!flowThread || !flowThread->hasValidRegionInfo())
         return 0;
 
-    return flowThread->renderRegionForLine(offsetFromLogicalTopOfFirstPage() + blockOffset, true);
+    return flowThread->renderRegionForLine(offsetFromLogicalTopOfFirstPage() + blockOffset + paginationStrut(), true);
 }
 
 void RenderBlock::setStaticInlinePositionForChild(RenderBox* child, LayoutUnit blockOffset, LayoutUnit inlinePosition)
