@@ -1747,7 +1747,6 @@ void RenderBlock::adjustFloatingBlock(const MarginInfo& marginInfo)
     updateRegionStyleForOffset(logicalHeight());
     positionNewFloats();
     setLogicalHeight(logicalHeight() - marginOffset);
-    updateRegionStyleForOffset(logicalHeight());
 }
 
 bool RenderBlock::handleSpecialChild(RenderBox* child, const MarginInfo& marginInfo)
@@ -2363,7 +2362,6 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloa
     // Now do the handling of the bottom of the block, adding in our bottom border/padding and
     // determining the correct collapsed bottom margin information.
     handleAfterSideOfBlock(beforeEdge, afterEdge, marginInfo);
-    updateRegionStyleForOffset(logicalHeight());
 }
 
 void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, LayoutUnit& previousFloatLogicalBottom, LayoutUnit& maxFloatLogicalBottom)
@@ -6203,10 +6201,14 @@ void RenderBlock::updateRegionStyleForOffset(LayoutUnit blockOffset)
     if (!flowThread || !flowThread->hasValidRegionInfo())
         return;
     
+    RenderRegion* region = regionAtBlockOffset(blockOffset);
+    if (!region)
+        return;
+    
     // HACK to skip the regions with height 0.
     // The region style used should be the one where content is actually laid out.
     LayoutUnit pageLogicalHeight = pageLogicalHeightForOffset(blockOffset);
-    if (!pageLogicalHeight)
+    if (!pageLogicalHeight && !region->isLastRegion())
         return updateRegionStyleForOffset(blockOffset + 1);
     
     flowThread->updateRegionStyleIfNecessary(offsetFromLogicalTopOfFirstPage() + blockOffset, this);
@@ -7174,6 +7176,7 @@ RenderRegion* RenderBlock::regionAtBlockOffset(LayoutUnit blockOffset) const
     if (!flowThread || !flowThread->hasValidRegionInfo())
         return 0;
 
+    // FIXME: Is it correct to add the pagination strut? In mid-layout it's possible to shift a block in the next region and we need to account for it.
     return flowThread->renderRegionForLine(offsetFromLogicalTopOfFirstPage() + blockOffset + paginationStrut(), true);
 }
 
