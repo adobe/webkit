@@ -6192,7 +6192,8 @@ bool RenderBlock::containsNonZeroBidiLevel() const
     }
     return false;
 }
-    
+
+// Call this to trigger a region style update in the render tree.
 void RenderBlock::updateRegionStyleForOffset(LayoutUnit blockOffset)
 {
     if (!inRenderFlowThread())
@@ -6201,6 +6202,12 @@ void RenderBlock::updateRegionStyleForOffset(LayoutUnit blockOffset)
     RenderFlowThread* flowThread = enclosingRenderFlowThread();
     if (!flowThread || !flowThread->hasValidRegionInfo())
         return;
+    
+    // HACK to skip the regions with height 0.
+    // The region style used should be the one where content is actually laid out.
+    LayoutUnit pageLogicalHeight = pageLogicalHeightForOffset(blockOffset);
+    if (!pageLogicalHeight)
+        return updateRegionStyleForOffset(blockOffset + 1);
     
     flowThread->updateRegionStyleIfNecessary(offsetFromLogicalTopOfFirstPage() + blockOffset, this);
 }

@@ -132,14 +132,6 @@ public:
     StyleDifference updateRegionStyleIfNecessary(RenderRegion*, RenderBox*, bool);
     void updateRegionStyleIfNecessary(LayoutUnit position, RenderBlock* block, bool propagate = true);
     void resetCurrentRegion(RenderObject*);
-    
-    enum PositionInRegion {
-        PositionUndefined,
-        PositionStart,
-        PositionEnd
-    };
-    
-    PositionInRegion getRegionPositionForBox(RenderBox*);
 
 protected:
     virtual const char* renderName() const = 0;

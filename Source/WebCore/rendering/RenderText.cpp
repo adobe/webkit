@@ -215,6 +215,15 @@ void RenderText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyl
     if (needsResetText || oldTransform != newStyle->textTransform() || oldSecurity != newStyle->textSecurity()) 
         transformText();
 }
+    
+void RenderText::styleInRegionDidChange(StyleDifference diff, const RenderStyle* oldStyle)
+{
+    RenderObject::styleInRegionDidChange(diff, oldStyle);
+    
+    if (oldStyle->fontSize() != style()->fontSize()) {
+        setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
+    }
+}
 
 void RenderText::removeAndDestroyTextBoxes()
 {

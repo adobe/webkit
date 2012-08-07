@@ -1063,6 +1063,8 @@ private:
 private:
     // Store state between styleWillChange and styleDidChange
     static bool s_affectsParentBlock;
+    
+    // MEGAHACK: For the sake of simplicity and hackability these fields are in RenderObject; find a better place for them in the real patch
     bool m_hasRegionStyle;
     RefPtr<RenderStyle> m_beforeRegionStyle;
 };

@@ -1121,6 +1121,8 @@ protected:
     mutable signed m_lineHeight : 29;
     unsigned m_beingDestroyed : 1;
     unsigned m_hasMarkupTruncation : 1;
+    
+    // HACK flag that indicates mid-layout that the laid out lines need to be removed and recomputed
     unsigned m_invalidateLines : 1;
 
     // RenderRubyBase objects need to be able to split and merge, moving their children around

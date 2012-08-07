@@ -138,6 +138,7 @@ protected:
 
     virtual void styleWillChange(StyleDifference, const RenderStyle*) { }
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
+    virtual void styleInRegionDidChange(StyleDifference, const RenderStyle*);
 
     virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual UChar previousCharacter() const;

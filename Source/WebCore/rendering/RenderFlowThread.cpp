@@ -893,22 +893,5 @@ void RenderFlowThread::updateRegionStyleIfNecessary(LayoutUnit position, RenderB
         updateRegionStyleIfNecessary(regionForPosition, block, propagate);
     }
 }
-    
-RenderFlowThread::PositionInRegion RenderFlowThread::getRegionPositionForBox(RenderBox* box)
-{
-    RenderRegionRangeMap::iterator it = m_regionRangeMap.find(box);
-    if (it == m_regionRangeMap.end())
-        return PositionUndefined;
-    
-    RenderRegionRange& range = it->second;
-    if (range.currentRegion()) {
-        if (range.currentRegion() == range.startRegion())
-            return PositionStart;
-        if (range.currentRegion() == range.endRegion())
-            return PositionEnd;
-    }
-    
-    return PositionUndefined;
-}
 
 } // namespace WebCore
