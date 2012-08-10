@@ -354,7 +354,7 @@ static bool insertExclusion(ExclusionAreaMaintainer::LineSegments& segments, XSh
         return false;
 
     Vector<XSInterval> intervals;
-    shape->getInsideIntervals(y0, y1, intervals);
+    shape->getOutsideIntervals(y0, y1, intervals);
     if (!intervals.size())
         return true;
 

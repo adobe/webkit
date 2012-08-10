@@ -55,6 +55,8 @@
 #include "ScrollbarTheme.h"
 #include "TransformState.h"
 #include "WrappingContext.h"
+#include "XShape.h"
+#include "XSInterval.h"
 #include <algorithm>
 #include <math.h>
 
@@ -869,6 +871,27 @@ void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& pai
     // The theme will tell us whether or not we should also paint the CSS border.
     if ((!style()->hasAppearance() || (!themePainted && theme()->paintBorderOnly(this, paintInfo, snappedPaintRect))) && style()->hasBorder())
         paintBorder(paintInfo, paintRect, style(), bleedAvoidance);
+
+    if (WrapShape* shape = style()->wrapShapeOutside()) {
+        printf("painting xshape\n");
+        TransformationMatrix matrix;
+        matrix.translate(paintRect.x(), paintRect.y());
+        RefPtr<XShape> xshape = XShape::createXShape(shape, LayoutRect(LayoutPoint(), paintRect.size()), matrix);
+        if (xshape) {
+            paintInfo.context->setFillColor(Color(makeRGBA(255, 0, 0, 50)), ColorSpaceDeviceRGB);
+            Vector<XSInterval> intervals;
+            for (float y = paintRect.y(), maxY = paintRect.maxY(); y < maxY; ++y) {
+                intervals.clear();
+                xshape->getInsideIntervals(y, y + 1, intervals);
+                if (!intervals.size())
+                    continue;
+                for (size_t i = 0; i < intervals.size(); ++i) {
+                    const XSInterval& interval = intervals.at(i);
+                    paintInfo.context->fillRect(FloatRect(interval.x1, y, interval.x2 - interval.x1, 1));
+                }
+            }
+        }
+    }       
 
     if (bleedAvoidance == BackgroundBleedUseTransparencyLayer)
         paintInfo.context->endTransparencyLayer();
