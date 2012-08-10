@@ -31,7 +31,9 @@
 #include "ExclusionBox.h"
 
 #include "RenderBox.h"
+#include "XShape.h"
 
 namespace WebCore {
+
 
 } // namespace WebCore

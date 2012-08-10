@@ -37,6 +37,8 @@
 #include "RenderLayer.h"
 #include "RenderFlowThread.h"
 #include "RenderRegion.h"
+#include "XShape.h"
+#include "XSInterval.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/StdLibExtras.h>
 
@@ -60,6 +62,11 @@ ExclusionAreaData::ExclusionAreaData(RenderBlock* block)
 
 ExclusionAreaData::~ExclusionAreaData()
 {
+}
+
+void ExclusionAreaData::setShapeInside(PassRefPtr<XShape> shape)
+{
+    m_shapeInside = shape;
 }
 
 static bool findLayerInList(Vector<RenderLayer*>* list, RenderLayer* layer, size_t& position)
@@ -204,10 +211,38 @@ void ExclusionAreaMaintainer::destroy()
 
 void ExclusionAreaMaintainer::prepareExlusionRects()
 {
-    LayoutStateDisabler disableLayoutState(m_data->block()->view());
+    RenderBlock* block = m_data->block();
+    LayoutStateDisabler disableLayoutState(block->view());
+
+    FloatRect blockBoundingBox = block->localToAbsoluteQuad(FloatQuad(LayoutRect(0, 0, 1, 1))).boundingBox();
+
+    ShapesMap& shapesMap = m_data->shapesMap();
+    shapesMap.clear();
+
     for (size_t i = 0; i < m_data->boxes().size(); ++i) {
         ExclusionBox* box = m_data->boxes().at(i).get();
         RenderBox* renderer = box->renderer();
+
+        WrapShape* exclusionShape = renderer->style()->wrapShapeOutside();
+        if (exclusionShape) {
+            // FIXME: produce a proper exclusion transform in here.
+            LayoutRect borderBox = renderer->borderBoxRect();
+            FloatRect boundingBox = renderer->localToAbsoluteQuad(FloatQuad(borderBox)).boundingBox();
+
+            printf("translating exclusion %f %f from %f %f by %f %f\n",
+                boundingBox.x(), boundingBox.y(),
+                blockBoundingBox.x(), blockBoundingBox.y(),
+                boundingBox.x() - blockBoundingBox.x(), 
+                boundingBox.y() - blockBoundingBox.y());
+            TransformationMatrix matrix;
+            matrix.translate(boundingBox.x() - blockBoundingBox.x(), 
+                             boundingBox.y() - blockBoundingBox.y());
+            
+            RefPtr<XShape> shape = XShape::createXShape(exclusionShape, borderBox, matrix);
+            if (shape.get())
+                shapesMap.set(box, shape.release());
+        }
+
         if (box->isPositioned() && !renderer->isDescendantOf(m_context->block()))
             continue;
         
@@ -310,6 +345,57 @@ static bool insertExclusion(ExclusionAreaMaintainer::LineSegments& segments, Lay
     return segments.size();
 }
 
+static bool insertExclusion(ExclusionAreaMaintainer::LineSegments& segments, XShape* shape, WrapFlow type, bool& hadAnyExclusions, LayoutUnit y0, LayoutUnit y1, LayoutUnit left, LayoutUnit right)
+{
+    if (!shape)
+        return insertExclusion(segments, left, right);
+    
+    if (!segments.size())
+        return false;
+
+    Vector<XSInterval> intervals;
+    shape->getInsideIntervals(y0, y1, intervals);
+    if (!intervals.size())
+        return true;
+
+    hadAnyExclusions = true;
+
+    float start = left, end = right;
+    printf("exclusion interval %f %f: ", start, end);
+
+    switch (type) {
+        case WrapFlowMaximum:
+        case WrapFlowBoth:
+            for (size_t i = 0; i < intervals.size(); ++i) {
+                const XSInterval& interval = intervals.at(i);
+                printf("(%f %f) ", interval.x1, interval.x2);
+                if (!insertExclusion(segments, interval.x1, interval.x2)) {
+                    printf("=> out of segments \n");
+                    return false;
+                }
+            }
+            break;
+        case WrapFlowStart:
+            if (!insertExclusion(segments, intervals.first().x1, end))
+                return false;
+            break;
+        case WrapFlowEnd:
+            if (!insertExclusion(segments, start, intervals.last().x2))
+                return false;
+            break;
+        case WrapFlowClear:
+            if (!insertExclusion(segments, start, end))
+                return false;
+            break;
+        case WrapFlowAuto:
+            ASSERT_NOT_REACHED();
+    }
+    
+    
+    printf("=> %s\n", segments.size() ? "got some" : "out of segments \n");
+    return segments.size();
+}
+
 bool ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit logicalHeight, LayoutUnit lineHeight, LayoutUnit& deltaOffset, ExclusionAreaMaintainer::LineSegments& segments)
 {
     ASSERT(m_data.get());
@@ -337,6 +423,8 @@ bool ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
     
     bool hadAnyExclusions = false;
     bool hadNoOffsetChange = false;
+
+    ShapesMap& shapesMap = m_data->shapesMap();
     
     // FIXME: This is totaly wrong because we don't account for transforms in deltaOffset.
     // It will be fixed when we will have the shapes in place.
@@ -351,29 +439,49 @@ bool ExclusionAreaMaintainer::getSegments(LayoutUnit logicalWidth, LayoutUnit lo
         for (size_t i = 0; i < m_data->boxes().size(); ++i) {
             ExclusionBox* exclusion = m_data->boxes().at(i).get();
             const LayoutRect& exclusionBoundingBox = exclusion->boundingBox();
-            if (overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
-                hadAnyExclusions = true;
-                switch (exclusion->renderer()->style()->wrapFlow()) {
+            XShape* shape = 0;
+            ShapesMap::iterator shapeIter = shapesMap.find(exclusion);
+            if (shapeIter != shapesMap.end())
+                shape = shapeIter->second.get();
+            if (shape || overlapping(t0 + deltaOffset, t1 + deltaOffset, exclusionBoundingBox.y(), exclusionBoundingBox.maxY())) {
+                bool hasHitTheShape = false;
+                if (!shape)
+                    hadAnyExclusions = true;
+                WrapFlow type = exclusion->renderer()->style()->wrapFlow();
+                switch (type) {
                     // FIXME: implement WrapFlowMaximum.
                     case WrapFlowMaximum:
                     case WrapFlowBoth:
-                        if (insertExclusion(segments, exclusionBoundingBox.x() - x0, exclusionBoundingBox.maxX() - x0))
+                        if (insertExclusion(segments, shape, type, hasHitTheShape, logicalHeight, logicalHeight + lineHeight, exclusionBoundingBox.x() - x0, exclusionBoundingBox.maxX() - x0)) {
+                            hadAnyExclusions |= hasHitTheShape;
                             continue;
+                        }
                         break;
                     case WrapFlowStart:
-                        if (insertExclusion(segments, exclusionBoundingBox.x() - x0, MAX_LAYOUT_UNIT / 2))
+                        if (insertExclusion(segments, shape, type, hasHitTheShape, logicalHeight, logicalHeight + lineHeight, exclusionBoundingBox.x() - x0, MAX_LAYOUT_UNIT / 2)) {
+                            hadAnyExclusions |= hasHitTheShape;
                             continue;
+                        }
                         break;
                     case WrapFlowEnd:
-                        if (insertExclusion(segments, MIN_LAYOUT_UNIT / 2, exclusionBoundingBox.maxX() - x0))
+                        if (insertExclusion(segments, shape, type, hasHitTheShape, logicalHeight, logicalHeight + lineHeight, MIN_LAYOUT_UNIT / 2, exclusionBoundingBox.maxX() - x0)) {
+                            hadAnyExclusions |= hasHitTheShape;
                             continue;
+                        }
                         break;
                     case WrapFlowClear:
                         // We cannot use this line at all.
+                        if (shape && insertExclusion(segments, shape, type, hasHitTheShape, logicalHeight, logicalHeight + lineHeight, MIN_LAYOUT_UNIT / 2, MAX_LAYOUT_UNIT / 2)) {
+                            hadAnyExclusions |= hasHitTheShape;
+                            continue;
+                        }
                         break;
                     case WrapFlowAuto:
                         ASSERT_NOT_REACHED();
                 }
+                if (shape && !hasHitTheShape)
+                    continue;
+                hadAnyExclusions = true;
                 LayoutUnit newDelta = std::max(deltaOffset + t0, exclusionBoundingBox.maxY()) - t0;
                 if (newDelta == deltaOffset)
                     continue;

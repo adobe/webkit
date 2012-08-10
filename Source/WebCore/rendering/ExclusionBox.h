@@ -53,6 +53,7 @@ public:
 
     void setIsPositioned(bool positioned) { m_isPositioned = positioned; }
     bool isPositioned() const { return m_isPositioned; }
+
 private:
     ExclusionBox(RenderBox* box)
         : m_renderBox(box)

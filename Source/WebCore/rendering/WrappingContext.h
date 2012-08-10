@@ -47,10 +47,11 @@ class RenderObject;
 class RenderView;
 class WrappingContext;
 class RootInlineBox;
+class XShape;
 
 typedef HashMap<const RenderBox*, RefPtr<ExclusionBox> > ExclusionBoxMap;
 typedef Vector<RefPtr<ExclusionBox> > ExclusionBoxes;
-
+typedef HashMap<const ExclusionBox*, RefPtr<XShape> > ShapesMap;
 class ExclusionAreaData {
 public:
     ExclusionAreaData(RenderBlock*);
@@ -64,8 +65,15 @@ public:
     void setBoundingBox(const IntRect& boundingBox) { m_boundingBox = boundingBox; }
     const IntRect& boundingBox() const { return m_boundingBox; }
 
+    XShape* shapeInside() const { return m_shapeInside.get(); }
+    void setShapeInside(PassRefPtr<XShape>);
+
+    ShapesMap& shapesMap() { return m_shapesMap; }
+
 private:
     ExclusionBoxes m_boxes;
+    RefPtr<XShape> m_shapeInside;
+    ShapesMap m_shapesMap;
     RenderBlock* m_block;
     IntRect m_boundingBox;
 };

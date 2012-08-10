@@ -42,9 +42,11 @@
 
 namespace WebCore {
 
+class TransformationMatrix;
+
 class XShape : public RefCounted<XShape> {
 public:
-    static PassRefPtr<XShape> createXShape(const WrapShape*, const LayoutRect& borderBox);
+    static PassRefPtr<XShape> createXShape(const WrapShape*, const LayoutRect& borderBox, const TransformationMatrix&);
 
     virtual ~XShape() { }
 

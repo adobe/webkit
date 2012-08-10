@@ -36,6 +36,7 @@
 #include <wtf/MathExtras.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
+#include "TransformationMatrix.h"
 
 namespace WebCore {
 
@@ -62,7 +63,7 @@ static PassRefPtr<XShape> createXSPolygon(PassOwnPtr<Vector<float> > coordinates
     return adoptRef(new XSPolygon(coordinates, fillRule));
 }
 
-PassRefPtr<XShape> XShape::createXShape(const WrapShape *wrapShape, const LayoutRect& borderBox) 
+PassRefPtr<XShape> XShape::createXShape(const WrapShape *wrapShape, const LayoutRect& borderBox, const TransformationMatrix& matrix) 
 {
     if (!wrapShape)
         return 0;
@@ -106,9 +107,11 @@ PassRefPtr<XShape> XShape::createXShape(const WrapShape *wrapShape, const Layout
             const Vector<Length>& values = polygon->values();
             size_t valuesSize = values.size();
             Vector<float> *cv = new Vector<float>(valuesSize);
-            for (unsigned i = 0; i < valuesSize; i += 2) {
-                cv->at(i) = floatValueForLength(values.at(i), boxWidth);
-                cv->at(i+1) = floatValueForLength(values.at(i+1), boxHeight);
+            for (unsigned i = 0; i + 1 < valuesSize; i += 2) {
+                FloatPoint point(floatValueForLength(values.at(i), boxWidth), floatValueForLength(values.at(i + 1), boxWidth));
+                FloatPoint resultPoint = matrix.mapPoint(point);
+                cv->at(i) = resultPoint.x();
+                cv->at(i+1) = resultPoint.y();
             }
             return createXSPolygon(adoptPtr(cv), polygon->windRule());
         }
