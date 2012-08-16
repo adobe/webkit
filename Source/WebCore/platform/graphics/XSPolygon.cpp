@@ -31,8 +31,6 @@
 #include "XSPolygon.h"
 #include <wtf/MathExtras.h>
 
-// FIXME: remove use of iterators
-
 namespace WebCore {
 
 struct MaxEdgeYComparator {    
@@ -232,20 +230,6 @@ float XSPolygon::rightVertexY(size_t index) const
         return getXAt(i1) > getXAt(i2) ? getYAt(i1) : getYAt(i2);
 }
 
-static Vector<XSIntersection>::iterator skipMinMaxYPairs(Vector<XSIntersection>::iterator itr, Vector<XSIntersection>::const_iterator end)
-{
-    while (itr + 1 < end)
-    {
-        const XSIntersection& i1 = *itr;
-        const XSIntersection& i2 = *(itr + 1);
-        if ((i1.type == i2.type) && (i1.type == YMIN || i2.type == YMAX) && (i1.x == i2.x))
-            itr += 2;
-        else 
-            break;
-    }
-    return itr;
-}
-
 static bool appendIntervalX(float x, bool inside, Vector<XSInterval>& v)
 {
     if (!inside)
@@ -260,31 +244,49 @@ void XSPolygon::computeXIntersections(float y, Vector<XSInterval>& rv) const
 {
     Vector<XSEdge*> overlappingEdges;
     m_edgeTree->findEdgesThatOverlapY(y, overlappingEdges);
-    
+
     Vector<XSIntersection> intersections;
     XSIntersection intersection;
     for(size_t i = 0; i < overlappingEdges.size(); i++)
     {   
-        if (computeXIntersection(overlappingEdges[i], y, intersection))
+        if (computeXIntersection(overlappingEdges[i], y, intersection) && intersection.type != YBOTH) {
             intersections.append(intersection);
+        }
     }
+    if (intersections.size() < 2)
+        return;
     
     std::sort(intersections.begin(), intersections.end(), IntersectionXComparator());
-    Vector<XSIntersection>::iterator intersectionsItr = intersections.begin();
+    
+    size_t index = 0;
     int windCount = 0;
     bool inside = false;
     
-    while ((intersectionsItr = skipMinMaxYPairs(intersectionsItr, intersections.end())) < intersections.end())
+    while (index < intersections.size())
     {
-        const XSIntersection& thisInt = *intersectionsItr++;
+        const XSIntersection& thisInt = intersections[index];
+
+        if (index + 1 < intersections.size()) {
+            const XSIntersection& nextInt = intersections[index +1];
+            if ((thisInt.x == nextInt.x) && (thisInt.type == YMIN || thisInt.type == YMAX)) {
+                // skip YMAX,YMAX and YMIN,YMIN
+                if (thisInt.type == nextInt.type)
+                    index += 2;
+                else {
+                    // YMIN,YMAX or YMAX,YIN => YMIN
+                    if (nextInt.type == YMAX)
+                        intersections[index + 1] = thisInt;
+                    index += 1;
+                }
+                continue;
+            }
+        }
+        
         const XSEdge& thisEdge = *thisInt.edge;
-        
-        if (thisInt.type == YBOTH)
-            continue;
-        
         bool crossing = windCount == 0; 
-        if (fillRule() == RULE_EVENODD) {
-            windCount += (getYAt(thisEdge.i2) > getYAt(thisEdge.i1)) ? +1 : -1;            
+        
+         if (fillRule() == RULE_EVENODD) {
+            windCount += (getYAt(thisEdge.i2) > getYAt(thisEdge.i1)) ? +1 : -1;
             crossing = crossing || windCount == 0;
         }
         
@@ -297,6 +299,8 @@ void XSPolygon::computeXIntersections(float y, Vector<XSInterval>& rv) const
             if (crossing && rightVertexY(vi) > y)
                 inside = appendIntervalX(thisEdge.maxX(), inside, rv);
         }
+        
+        index += 1;
     }
 }
 
