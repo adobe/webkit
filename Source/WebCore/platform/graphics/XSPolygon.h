@@ -107,10 +107,10 @@ public:
 };
 
 enum XSIntersectionType {
-    NORMAL = 0,
-    YMIN = 1,
-    YMAX = 2,
-    YBOTH = 3
+    Normal = 0,
+    VertexYMin = 1,
+    VertexYMax = 2,
+    VertexYBoth = 3
 };
 
 struct XSIntersection {
@@ -123,7 +123,7 @@ struct XSIntersection {
         : edge(0)
         , x(0)
         , y(0)
-        , type(NORMAL) 
+        , type(Normal) 
     { 
     }
 };

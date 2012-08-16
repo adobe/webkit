@@ -199,19 +199,19 @@ static bool computeXIntersection(const XSEdge* ep, float y, XSIntersection& i)
     i.y = y;
     
     if (dy == 0) {
-        i.type = YBOTH;
+        i.type = VertexYBoth;
         i.x = e.minX();
     }
     else if (y == e.minY()) {
-        i.type = YMIN;
+        i.type = VertexYMin;
         i.x = (y1 < y2) ? x1 : x2;
     }
     else if (y == e.maxY()) {
-        i.type = YMAX;
+        i.type = VertexYMax;
         i.x = (y1 > y2) ? x1 : x2;
     }
     else {
-        i.type = NORMAL;
+        i.type = Normal;
         i.x = ((y - y1) * (x2 - x1) / dy) + x1;
     }
     
@@ -249,9 +249,8 @@ void XSPolygon::computeXIntersections(float y, Vector<XSInterval>& rv) const
     XSIntersection intersection;
     for(size_t i = 0; i < overlappingEdges.size(); i++)
     {   
-        if (computeXIntersection(overlappingEdges[i], y, intersection) && intersection.type != YBOTH) {
+        if (computeXIntersection(overlappingEdges[i], y, intersection) && intersection.type != VertexYBoth)
             intersections.append(intersection);
-        }
     }
     if (intersections.size() < 2)
         return;
@@ -268,13 +267,13 @@ void XSPolygon::computeXIntersections(float y, Vector<XSInterval>& rv) const
 
         if (index + 1 < intersections.size()) {
             const XSIntersection& nextInt = intersections[index +1];
-            if ((thisInt.x == nextInt.x) && (thisInt.type == YMIN || thisInt.type == YMAX)) {
-                // skip YMAX,YMAX and YMIN,YMIN
-                if (thisInt.type == nextInt.type)
+            if ((thisInt.x == nextInt.x) && (thisInt.type == VertexYMin || thisInt.type == VertexYMax)) {
+                if (thisInt.type == nextInt.type) {
+                    // skip VertexYMax,VertexYMax and VertexYMin,VertexYMin
                     index += 2;
-                else {
-                    // YMIN,YMAX or YMAX,YIN => YMIN
-                    if (nextInt.type == YMAX)
+                } else {
+                    // VertexYMin,VertexYMax or VertexYMax,VertexYMin => VertexYMin
+                    if (nextInt.type == VertexYMax)
                         intersections[index + 1] = thisInt;
                     index += 1;
                 }
@@ -290,11 +289,10 @@ void XSPolygon::computeXIntersections(float y, Vector<XSInterval>& rv) const
             crossing = crossing || windCount == 0;
         }
         
-        if ((thisInt.type == NORMAL) || (thisInt.type == YMIN)) {
+        if ((thisInt.type == Normal) || (thisInt.type == VertexYMin)) {
             if (crossing)
                 inside = appendIntervalX(thisInt.x, inside, rv);
-        }
-        else if (thisInt.type == YMAX) { 
+        } else if (thisInt.type == VertexYMax) { 
             int vi = (getYAt(thisEdge.i2) > getYAt(thisEdge.i1)) ? thisEdge.i2 : thisEdge.i1;
             if (crossing && rightVertexY(vi) > y)
                 inside = appendIntervalX(thisEdge.maxX(), inside, rv);
