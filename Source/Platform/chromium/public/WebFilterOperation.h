@@ -31,8 +31,19 @@
 #include "WebColor.h"
 #include "WebPoint.h"
 #include "WebRect.h"
+#include "WebVector.h"
+#include "WebPrivatePtr.h"
+#include "WebCustomFilterParameter.h"
 
 namespace WebKit {
+
+class WebCustomFilterProgram;
+class WebCustomFilterOperationPrivate;
+
+enum WebCustomFilterMeshType {
+    WebMeshTypeAttached,
+    WebMeshTypeDetached
+};
 
 class WebFilterOperation {
 public:
@@ -49,6 +60,7 @@ public:
         FilterTypeDropShadow,
         FilterTypeColorMatrix,
         FilterTypeZoom,
+        FilterTypeCustom
     };
 
     FilterType type() const { return m_type; }
@@ -102,6 +114,7 @@ public:
     static WebFilterOperation createDropShadowFilter(WebPoint offset, float stdDeviation, WebColor color) { return WebFilterOperation(FilterTypeDropShadow, offset, stdDeviation, color); }
     static WebFilterOperation createColorMatrixFilter(SkScalar matrix[20]) { return WebFilterOperation(FilterTypeColorMatrix, matrix); }
     static WebFilterOperation createZoomFilter(WebRect rect, int inset) { return WebFilterOperation(FilterTypeZoom, rect, inset); }
+    static WebFilterOperation createCustomFilter() { return WebFilterOperation(FilterTypeCustom); }
 
     bool equals(const WebFilterOperation& other) const;
 
@@ -145,6 +158,31 @@ public:
         m_zoomRect = rect;
     }
 
+    WEBKIT_EXPORT WebCustomFilterProgram* filterProgram() const;
+    WEBKIT_EXPORT void setFilterProgram(WebCustomFilterProgram*);
+
+    WEBKIT_EXPORT WebCustomFilterMeshType meshType() const;
+    WEBKIT_EXPORT void setMeshType(WebCustomFilterMeshType);
+
+    WEBKIT_EXPORT int meshRows() const;
+    WEBKIT_EXPORT void setMeshRows(int);
+    
+    WEBKIT_EXPORT int meshColumns() const;
+    WEBKIT_EXPORT void setMeshColumns(int);
+
+    WEBKIT_EXPORT void customFilterParameters(WebVector<WebCustomFilterParameter>&) const;
+    WEBKIT_EXPORT void setCustomFilterParameters(const WebVector<WebCustomFilterParameter>&);
+    WEBKIT_EXPORT void appendCustomFilterParameter(const WebCustomFilterParameter&);
+
+    WEBKIT_EXPORT WebFilterOperation(const WebFilterOperation&);
+    WEBKIT_EXPORT void assign(const WebFilterOperation&);
+    WebFilterOperation& operator=(const WebFilterOperation& other) {
+        assign(other);
+        return *this;
+    }
+    ~WebFilterOperation() {
+        destroy();
+    }
 private:
     FilterType m_type;
 
@@ -153,6 +191,9 @@ private:
     WebColor m_dropShadowColor;
     SkScalar m_matrix[20];
     WebRect m_zoomRect;
+
+    WebPrivatePtr<WebCustomFilterOperationPrivate> m_customFilterPrivate;
+    WEBKIT_EXPORT void ensureCustomFilterOperationPrivate();
 
     WebFilterOperation(FilterType type, float amount)
     {
@@ -180,6 +221,15 @@ private:
         m_amount = inset;
         m_zoomRect = rect;
     }
+
+    WebFilterOperation(FilterType type)
+        : m_type(type)
+    {
+        if (m_type == FilterTypeCustom)
+            ensureCustomFilterOperationPrivate();
+    }
+
+    WEBKIT_EXPORT void destroy();
 };
 
 inline bool operator==(const WebFilterOperation& a, const WebFilterOperation& b)

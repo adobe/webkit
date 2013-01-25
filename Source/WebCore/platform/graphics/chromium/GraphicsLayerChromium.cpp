@@ -77,6 +77,14 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(CSS_SHADERS)
+#include "ChromiumPlatformCompiledProgram.h"
+#include "CustomFilterParameter.h"
+#include "CustomFilterValidatedProgram.h"
+#include "ValidatedCustomFilterOperation.h"
+#include <public/WebCustomFilterParameter.h>
+#endif
+
 using namespace std;
 using namespace WebKit;
 
@@ -361,8 +369,40 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
         }
 #if ENABLE(CSS_SHADERS)
         case FilterOperation::CUSTOM:
-        case FilterOperation::VALIDATED_CUSTOM:
-            return false; // Not supported.
+            ASSERT_NOT_REACHED();
+            return false;
+        case FilterOperation::VALIDATED_CUSTOM: {
+            const ValidatedCustomFilterOperation& customFilterOp = *static_cast<const ValidatedCustomFilterOperation*>(&op);
+            ASSERT(customFilterOp.validatedProgram()->isInitialized());
+            RefPtr<CustomFilterValidatedProgram> program = customFilterOp.validatedProgram();
+            /*RefPtr<WebCustomFilterProgram> webCustomFilterProgram;
+            if (program->client())
+                webCustomFilterProgram = static_cast<WebCustomFilterProgram*>(program->client());
+            else {
+                webCustomFilterProgram = WebCustomFilterProgram::create();
+                program->setClient(webCustomFilterProgram);
+            }*/
+
+            WebFilterOperation filterOperation = WebFilterOperation::createCustomFilter();
+            filterOperation.setMeshRows(customFilterOp.meshRows());
+            filterOperation.setMeshColumns(customFilterOp.meshColumns());
+
+            const CustomFilterProgramInfo& programInfo = program->programInfo();
+            filterOperation.setMeshType(programInfo.meshType() == MeshTypeAttached ? WebMeshTypeAttached : WebMeshTypeDetached);
+            
+            // filterOperation.setFilterProgram(webCustomFilterProgram);
+
+            const CustomFilterParameterList& parameters = customFilterOp.parameters();
+            for (size_t i = 0; i < parameters.size(); ++i) {
+                RefPtr<CustomFilterParameter> parameter = parameters[i];
+                WebCustomFilterParameter webParameter;
+                webParameter.name = parameter->name();
+                filterOperation.appendCustomFilterParameter(webParameter);
+            }
+
+            webFilters.append(filterOperation);
+            break;
+        }
 #endif
         case FilterOperation::PASSTHROUGH:
         case FilterOperation::NONE:

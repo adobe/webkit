@@ -3999,6 +3999,8 @@
             'platform/graphics/filters/skia/SkiaImageFilterBuilder.h',
             'platform/graphics/filters/skia/DropShadowImageFilter.cpp',
             'platform/graphics/filters/skia/DropShadowImageFilter.h',
+            'platform/graphics/filters/chromium/ChromiumPlatformCompiledProgram.h',
+            'platform/graphics/filters/chromium/CustomFilterValidatedProgramChromium.cpp',
             'platform/graphics/freetype/FontCacheFreeType.cpp',
             'platform/graphics/freetype/FontCustomPlatformDataFreeType.cpp',
             'platform/graphics/freetype/FontPlatformData.h',
