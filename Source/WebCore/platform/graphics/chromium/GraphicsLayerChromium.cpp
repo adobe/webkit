@@ -82,6 +82,7 @@
 #include "CustomFilterParameter.h"
 #include "CustomFilterValidatedProgram.h"
 #include "ValidatedCustomFilterOperation.h"
+#include "WebCustomFilterProgramImpl.h"
 #include <public/WebCustomFilterParameter.h>
 #endif
 
@@ -373,24 +374,27 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
             return false;
         case FilterOperation::VALIDATED_CUSTOM: {
             const ValidatedCustomFilterOperation& customFilterOp = *static_cast<const ValidatedCustomFilterOperation*>(&op);
-            ASSERT(customFilterOp.validatedProgram()->isInitialized());
             RefPtr<CustomFilterValidatedProgram> program = customFilterOp.validatedProgram();
-            /*RefPtr<WebCustomFilterProgram> webCustomFilterProgram;
-            if (program->client())
-                webCustomFilterProgram = static_cast<WebCustomFilterProgram*>(program->client());
+            ASSERT(program->isInitialized());
+
+            ChromiumPlatformCompiledProgram* platformCompiledProgram = program->platformCompiledProgram();
+            RefPtr<WebCustomFilterProgramImpl> webCustomFilterProgram;
+            if (platformCompiledProgram->client())
+                webCustomFilterProgram = static_cast<WebCustomFilterProgramImpl*>(platformCompiledProgram->client());
             else {
-                webCustomFilterProgram = WebCustomFilterProgram::create();
-                program->setClient(webCustomFilterProgram);
-            }*/
+                webCustomFilterProgram = WebCustomFilterProgramImpl::create();
+                webCustomFilterProgram->setVertexShader(program->validatedVertexShader());
+                webCustomFilterProgram->setFragmentShader(program->validatedFragmentShader());
+                platformCompiledProgram->setClient(webCustomFilterProgram);
+            }
 
             WebFilterOperation filterOperation = WebFilterOperation::createCustomFilter();
+            filterOperation.setCustomFilterProgram(webCustomFilterProgram.get());
             filterOperation.setMeshRows(customFilterOp.meshRows());
             filterOperation.setMeshColumns(customFilterOp.meshColumns());
 
             const CustomFilterProgramInfo& programInfo = program->programInfo();
             filterOperation.setMeshType(programInfo.meshType() == MeshTypeAttached ? WebMeshTypeAttached : WebMeshTypeDetached);
-            
-            // filterOperation.setFilterProgram(webCustomFilterProgram);
 
             const CustomFilterParameterList& parameters = customFilterOp.parameters();
             for (size_t i = 0; i < parameters.size(); ++i) {

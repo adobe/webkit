@@ -158,8 +158,8 @@ public:
         m_zoomRect = rect;
     }
 
-    WEBKIT_EXPORT WebCustomFilterProgram* filterProgram() const;
-    WEBKIT_EXPORT void setFilterProgram(WebCustomFilterProgram*);
+    WEBKIT_EXPORT WebCustomFilterProgram* customFilterProgram() const;
+    WEBKIT_EXPORT void setCustomFilterProgram(WebCustomFilterProgram*);
 
     WEBKIT_EXPORT WebCustomFilterMeshType meshType() const;
     WEBKIT_EXPORT void setMeshType(WebCustomFilterMeshType);

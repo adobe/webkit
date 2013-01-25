@@ -26,9 +26,11 @@
 #ifndef WebCustomFilterOperationPrivate_h
 #define WebCustomFilterOperationPrivate_h
 
-#include <wtf/RefCounted.h>
 #include <public/WebFilterOperation.h>
 #include <public/WebCustomFilterParameter.h>
+#include <public/WebCustomFilterProgram.h>
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
 namespace WebKit {
 
@@ -47,11 +49,13 @@ public:
     void parameters(WebVector<WebCustomFilterParameter>&) const;
     void setParameters(const WebVector<WebCustomFilterParameter>&);
     void addParameter(const WebCustomFilterParameter&);
+
+    void setProgram(PassRefPtr<WebCustomFilterProgram> program);
+    WebCustomFilterProgram* program() const;
 private:
     WebCustomFilterOperationPrivate();
 
-// WebCustomFilterProgram* m_webCustomFilterProgram;
-
+    RefPtr<WebCustomFilterProgram> m_program;
     Vector<WebCustomFilterParameter> m_parameters;
 };
 

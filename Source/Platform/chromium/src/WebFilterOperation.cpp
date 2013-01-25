@@ -90,6 +90,18 @@ void WebFilterOperation::ensureCustomFilterOperationPrivate()
         m_customFilterPrivate = WebCustomFilterOperationPrivate::create();
 }
 
+WebCustomFilterProgram* WebFilterOperation::customFilterProgram() const
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    return m_customFilterPrivate->program();
+}
+
+void WebFilterOperation::setCustomFilterProgram(WebCustomFilterProgram* program)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->setProgram(program);
+}
+
 WebCustomFilterMeshType WebFilterOperation::meshType() const
 {
     WEBKIT_ASSERT(m_type == FilterTypeCustom);

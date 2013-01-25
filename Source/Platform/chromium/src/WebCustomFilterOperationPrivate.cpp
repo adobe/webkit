@@ -32,7 +32,8 @@ bool operator==(const WebCustomFilterOperationPrivate& a, const WebCustomFilterO
 {
     return a.meshRows == b.meshRows
         && a.meshColumns == b.meshColumns
-        && a.meshType == b.meshType;
+        && a.meshType == b.meshType
+        && a.program() == b.program();
 }
 
 WebCustomFilterOperationPrivate::WebCustomFilterOperationPrivate()
@@ -44,6 +45,16 @@ WebCustomFilterOperationPrivate::WebCustomFilterOperationPrivate()
 
 WebCustomFilterOperationPrivate::~WebCustomFilterOperationPrivate()
 {
+}
+
+void WebCustomFilterOperationPrivate::setProgram(PassRefPtr<WebCustomFilterProgram> program)
+{
+    m_program = program;
+}
+
+WebCustomFilterProgram* WebCustomFilterOperationPrivate::program() const
+{
+    return m_program.get();
 }
 
 void WebCustomFilterOperationPrivate::parameters(WebVector<WebCustomFilterParameter>& result) const

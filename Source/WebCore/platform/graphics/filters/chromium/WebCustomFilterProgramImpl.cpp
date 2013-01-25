@@ -23,28 +23,37 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebCustomFilterProgram_h
-#define WebCustomFilterProgram_h
+#include "config.h"
+#include "WebCustomFilterProgramImpl.h"
 
-#include "WebCommon.h"
-#include "WebString.h"
+namespace WebCore {
 
-namespace WebKit {
+WebCustomFilterProgramImpl::WebCustomFilterProgramImpl()
+{
+}
 
-class WebCustomFilterProgram {
-public:
-    virtual WebString vertexShader() const = 0;
-    virtual WebString fragmentShader() const = 0;
+WebCustomFilterProgramImpl::~WebCustomFilterProgramImpl()
+{
+}
 
-    void ref() { refFromWebCustomFilterProgram(); }
-    void deref() { derefFromCustomFilterProgram(); }
+WebKit::WebString WebCustomFilterProgramImpl::vertexShader() const
+{
+    return m_vertexShader;
+}
 
-private:
-    virtual void refFromWebCustomFilterProgram() = 0;
-    virtual void derefFromCustomFilterProgram() = 0;
-};
+void WebCustomFilterProgramImpl::setVertexShader(const WebKit::WebString& vertexShader)
+{
+    m_vertexShader.assign(vertexShader);
+}
 
-} // namespace WebKit
+WebKit::WebString WebCustomFilterProgramImpl::fragmentShader() const
+{
+    return m_fragmentShader;
+}
 
-#endif // WebCustomFilterProgram_h
+void WebCustomFilterProgramImpl::setFragmentShader(const WebKit::WebString& fragmentShader)
+{
+    m_fragmentShader.assign(fragmentShader);
+}
 
+} // namespace WebCore

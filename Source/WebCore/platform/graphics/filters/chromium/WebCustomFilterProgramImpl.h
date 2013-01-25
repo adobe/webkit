@@ -23,28 +23,48 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebCustomFilterProgram_h
-#define WebCustomFilterProgram_h
+#ifndef WebCustomFilterOperationPrivate_h
+#define WebCustomFilterOperationPrivate_h
 
-#include "WebCommon.h"
-#include "WebString.h"
+#include "ChromiumPlatformCompiledProgram.h"
+#include <public/WebCustomFilterProgram.h>
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
-namespace WebKit {
+namespace WebCore {
 
-class WebCustomFilterProgram {
+class WebCustomFilterProgramImpl: public RefCounted<WebCustomFilterProgramImpl>, public WebKit::WebCustomFilterProgram, public ChromiumPlatformCompiledProgramClient {
 public:
-    virtual WebString vertexShader() const = 0;
-    virtual WebString fragmentShader() const = 0;
+    using RefCounted<WebCustomFilterProgramImpl>::ref;
+    using RefCounted<WebCustomFilterProgramImpl>::deref;
 
-    void ref() { refFromWebCustomFilterProgram(); }
-    void deref() { derefFromCustomFilterProgram(); }
+    static PassRefPtr<WebCustomFilterProgramImpl> create()
+    {
+        return adoptRef(new WebCustomFilterProgramImpl());
+    }
+    virtual ~WebCustomFilterProgramImpl();
+    
+    virtual WebKit::WebString vertexShader() const;
+    virtual void setVertexShader(const WebKit::WebString&);
+
+    virtual WebKit::WebString fragmentShader() const;
+    virtual void setFragmentShader(const WebKit::WebString&);
 
 private:
-    virtual void refFromWebCustomFilterProgram() = 0;
-    virtual void derefFromCustomFilterProgram() = 0;
+    virtual void refFromWebCustomFilterProgram() { ref(); }
+    virtual void derefFromCustomFilterProgram() { deref(); }
+
+    virtual void refFromValidatedProgram() { ref(); }
+    virtual void derefFromValidatedProgram() { deref(); } 
+
+    WebCustomFilterProgramImpl();
+
+    WebKit::WebString m_vertexShader;
+    WebKit::WebString m_fragmentShader;
 };
 
-} // namespace WebKit
 
-#endif // WebCustomFilterProgram_h
+} // namespace WebCore
+
+#endif // WebCustomFilterOperationPrivate_h
 
