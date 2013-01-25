@@ -28,13 +28,27 @@
 
 #include "WebCommon.h"
 #include "WebString.h"
+#include "WebTransformationMatrix.h"
 
 namespace WebKit {
 
 class WebCustomFilterParameter {
 public:
-    WebString name;
+    enum ParameterType {
+        ParameterTypeNumber,
+        ParameterTypeArray,
+        ParameterTypeTransform
+    };
 
+    ParameterType type;
+    WebString name;
+    WebVector<double> values;
+    WebTransformationMatrix matrix;
+
+    WebCustomFilterParameter()
+        : type(ParameterTypeNumber)
+    {
+    }
 };
 
 } // namespace WebKit

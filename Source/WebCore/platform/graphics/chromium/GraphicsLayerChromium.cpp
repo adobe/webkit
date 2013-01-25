@@ -80,6 +80,9 @@
 #if ENABLE(CSS_SHADERS)
 #include "ChromiumPlatformCompiledProgram.h"
 #include "CustomFilterParameter.h"
+#include "CustomFilterNumberParameter.h"
+#include "CustomFilterArrayParameter.h"
+#include "CustomFilterTransformParameter.h"
 #include "CustomFilterValidatedProgram.h"
 #include "ValidatedCustomFilterOperation.h"
 #include "WebCustomFilterProgramImpl.h"
@@ -401,6 +404,38 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
                 RefPtr<CustomFilterParameter> parameter = parameters[i];
                 WebCustomFilterParameter webParameter;
                 webParameter.name = parameter->name();
+
+                switch (parameter->parameterType()) {
+                case CustomFilterParameter::NUMBER: {
+                    webParameter.type = WebCustomFilterParameter::ParameterTypeNumber;
+                    CustomFilterNumberParameter* numberParameter = static_cast<CustomFilterNumberParameter*>(parameter.get());
+                    WebVector<double> values((size_t)numberParameter->size());
+                    for (unsigned i = 0; i < numberParameter->size(); ++i)
+                        values[i] = numberParameter->valueAt(i);
+                    webParameter.values.swap(values);
+                    break;
+                }
+                case CustomFilterParameter::ARRAY: {
+                    webParameter.type = WebCustomFilterParameter::ParameterTypeArray;
+                    CustomFilterArrayParameter* arrayParameter = static_cast<CustomFilterArrayParameter*>(parameter.get());
+                    WebVector<double> values((size_t)arrayParameter->size());
+                    for (unsigned i = 0; i < arrayParameter->size(); ++i)
+                        values[i] = arrayParameter->valueAt(i);
+                    webParameter.values.swap(values);
+                    break;
+                }
+                case CustomFilterParameter::TRANSFORM: {
+                    webParameter.type = WebCustomFilterParameter::ParameterTypeTransform;
+                    CustomFilterTransformParameter* transformParameter = static_cast<CustomFilterTransformParameter*>(parameter.get());
+                    // FIXME: Use the right layer size in here.
+                    FloatSize size;
+                    TransformationMatrix matrix;
+                    transformParameter->operations().apply(size, matrix);
+                    webParameter.matrix = WebTransformationMatrix(matrix);
+                    break;
+                }
+                }
+
                 filterOperation.appendCustomFilterParameter(webParameter);
             }
 

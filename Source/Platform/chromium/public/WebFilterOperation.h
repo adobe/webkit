@@ -33,10 +33,10 @@
 #include "WebRect.h"
 #include "WebVector.h"
 #include "WebPrivatePtr.h"
-#include "WebCustomFilterParameter.h"
 
 namespace WebKit {
 
+class WebCustomFilterParameter;
 class WebCustomFilterProgram;
 class WebCustomFilterOperationPrivate;
 
