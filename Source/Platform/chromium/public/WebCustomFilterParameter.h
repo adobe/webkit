@@ -51,6 +51,13 @@ public:
     }
 };
 
+WEBKIT_EXPORT bool operator==(const WebCustomFilterParameter& a, const WebCustomFilterParameter& b);
+
+inline bool operator!=(const WebCustomFilterParameter& a, const WebCustomFilterParameter& b)
+{
+    return !(a == b);
+}
+
 } // namespace WebKit
 
 #endif // WebCustomFilterParameter_h

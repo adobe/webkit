@@ -52,6 +52,8 @@ public:
 
     void setProgram(PassRefPtr<WebCustomFilterProgram> program);
     WebCustomFilterProgram* program() const;
+
+    bool operator==(const WebCustomFilterOperationPrivate& other) const;
 private:
     WebCustomFilterOperationPrivate();
 
@@ -59,7 +61,6 @@ private:
     Vector<WebCustomFilterParameter> m_parameters;
 };
 
-bool operator==(const WebCustomFilterOperationPrivate& a, const WebCustomFilterOperationPrivate& b);
 
 } // namespace WebKit
 

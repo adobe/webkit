@@ -28,12 +28,36 @@
 
 namespace WebKit {
 
-bool operator==(const WebCustomFilterOperationPrivate& a, const WebCustomFilterOperationPrivate& b)
+bool operator==(const WebCustomFilterParameter& a, const WebCustomFilterParameter& b)
 {
-    return a.meshRows == b.meshRows
-        && a.meshColumns == b.meshColumns
-        && a.meshType == b.meshType
-        && a.program() == b.program();
+    if (a.type != b.type || a.name != b.name)
+        return false;
+    switch (a.type) {
+    case WebCustomFilterParameter::ParameterTypeNumber:
+    case WebCustomFilterParameter::ParameterTypeArray:
+        if (a.values.size() != b.values.size())
+            return false;
+        for (size_t i = 0; i < a.values.size(); ++i)
+            if (a.values[i] != b.values[i])
+                return false;
+        return true;
+    case WebCustomFilterParameter::ParameterTypeTransform:
+        return a.matrix == b.matrix;
+    }
+}
+
+bool WebCustomFilterOperationPrivate::operator==(const WebCustomFilterOperationPrivate& other) const
+{
+    if (meshRows != other.meshRows
+        || meshColumns != other.meshColumns
+        || meshType != other.meshType
+        || m_program.get() != other.m_program.get()
+        || m_parameters.size() != other.m_parameters.size())
+        return false;
+    for (size_t i = 0; i < m_parameters.size(); ++i)
+        if (m_parameters[i] != other.m_parameters[i])
+            return false;
+    return true;
 }
 
 WebCustomFilterOperationPrivate::WebCustomFilterOperationPrivate()
