@@ -111,5 +111,25 @@ bool SharedGraphicsContext3D::createForImplThread()
     return getOrCreateContextForImplThread(Create);
 }
 
+// Custom Filters.
+
+static PassRefPtr<GraphicsContext3D> getOrCreateContextForCustomFiltersOnImplThead(ContextOperation op)
+{
+    DEFINE_STATIC_LOCAL(SharedGraphicsContext3DImpl, impl, ());
+    return op == Create ? impl.createContext() : impl.getContext();
+}
+
+PassRefPtr<GraphicsContext3D> SharedGraphicsContext3D::getForCustomFiltersOnImplThread()
+{
+    ASSERT(!isMainThread());
+    return getOrCreateContextForCustomFiltersOnImplThead(Get);
+}
+
+bool SharedGraphicsContext3D::createForCustomFiltersOnImplThread()
+{
+    ASSERT(isMainThread());
+    return getOrCreateContextForCustomFiltersOnImplThead(Create);
+}
+
 }
 

@@ -66,5 +66,22 @@ bool WebSharedGraphicsContext3D::createCompositorThreadContext()
     return SharedGraphicsContext3D::createForImplThread();
 }
 
+// Custom Filters.
+
+bool WebSharedGraphicsContext3D::createCompositorThreadCustomFilterContext()
+{
+    return SharedGraphicsContext3D::createForCustomFiltersOnImplThread();
+}
+
+WebGraphicsContext3D* WebSharedGraphicsContext3D::compositorThreadCustomFilterContext()
+{
+    return GraphicsContext3DPrivate::extractWebGraphicsContext3D(SharedGraphicsContext3D::getForCustomFiltersOnImplThread().get());
+}
+
+GrContext* WebSharedGraphicsContext3D::compositorThreadCustomFilterGrContext()
+{
+    return SharedGraphicsContext3D::getForCustomFiltersOnImplThread() ? SharedGraphicsContext3D::getForCustomFiltersOnImplThread()->grContext() : 0;
+}
+
 }
 

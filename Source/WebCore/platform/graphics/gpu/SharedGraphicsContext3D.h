@@ -49,6 +49,10 @@ public:
     // This call creates the context unconditionally, but does not touch it.
     // Should only be called on the main thread.
     static bool createForImplThread();
+
+    // Custom Filters.
+    static PassRefPtr<GraphicsContext3D> getForCustomFiltersOnImplThread();
+    static bool createForCustomFiltersOnImplThread();
 };
 
 }
