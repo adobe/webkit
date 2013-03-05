@@ -78,9 +78,9 @@ WebGraphicsContext3D* WebSharedGraphicsContext3D::compositorThreadCustomFilterCo
     return GraphicsContext3DPrivate::extractWebGraphicsContext3D(SharedGraphicsContext3D::getForCustomFiltersOnImplThread().get());
 }
 
-GrContext* WebSharedGraphicsContext3D::compositorThreadCustomFilterGrContext()
+WebGraphicsContext3D* WebSharedGraphicsContext3D::mainThreadCustomFilterContext()
 {
-    return SharedGraphicsContext3D::getForCustomFiltersOnImplThread() ? SharedGraphicsContext3D::getForCustomFiltersOnImplThread()->grContext() : 0;
+    return GraphicsContext3DPrivate::extractWebGraphicsContext3D(SharedGraphicsContext3D::getForCustomFiltersOnMainThread().get());
 }
 
 }

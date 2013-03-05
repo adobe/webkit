@@ -62,6 +62,7 @@ public:
     WEBKIT_EXPORT static GrContext* compositorThreadGrContext();
 
     // Custom Filters.
+    WEBKIT_EXPORT static WebGraphicsContext3D* mainThreadCustomFilterContext();
     WEBKIT_EXPORT static bool createCompositorThreadCustomFilterContext();
     WEBKIT_EXPORT static WebGraphicsContext3D* compositorThreadCustomFilterContext();
     WEBKIT_EXPORT static GrContext* compositorThreadCustomFilterGrContext();

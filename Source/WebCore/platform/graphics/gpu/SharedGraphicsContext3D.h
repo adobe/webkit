@@ -51,6 +51,7 @@ public:
     static bool createForImplThread();
 
     // Custom Filters.
+    static PassRefPtr<GraphicsContext3D> getForCustomFiltersOnMainThread();
     static PassRefPtr<GraphicsContext3D> getForCustomFiltersOnImplThread();
     static bool createForCustomFiltersOnImplThread();
 };
