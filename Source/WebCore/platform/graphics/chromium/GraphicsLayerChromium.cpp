@@ -77,6 +77,18 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(CSS_SHADERS)
+#include "ChromiumPlatformCompiledProgram.h"
+#include "CustomFilterParameter.h"
+#include "CustomFilterNumberParameter.h"
+#include "CustomFilterArrayParameter.h"
+#include "CustomFilterTransformParameter.h"
+#include "CustomFilterValidatedProgram.h"
+#include "ValidatedCustomFilterOperation.h"
+#include "WebCustomFilterProgramImpl.h"
+#include <public/WebCustomFilterParameter.h>
+#endif
+
 using namespace std;
 using namespace WebKit;
 
@@ -361,8 +373,75 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
         }
 #if ENABLE(CSS_SHADERS)
         case FilterOperation::CUSTOM:
-        case FilterOperation::VALIDATED_CUSTOM:
-            return false; // Not supported.
+            ASSERT_NOT_REACHED();
+            return false;
+        case FilterOperation::VALIDATED_CUSTOM: {
+            const ValidatedCustomFilterOperation& customFilterOp = *static_cast<const ValidatedCustomFilterOperation*>(&op);
+            RefPtr<CustomFilterValidatedProgram> program = customFilterOp.validatedProgram();
+            ASSERT(program->isInitialized());
+
+            ChromiumPlatformCompiledProgram* platformCompiledProgram = program->platformCompiledProgram();
+            RefPtr<WebCustomFilterProgramImpl> webCustomFilterProgram;
+            if (platformCompiledProgram->client())
+                webCustomFilterProgram = static_cast<WebCustomFilterProgramImpl*>(platformCompiledProgram->client());
+            else {
+                webCustomFilterProgram = WebCustomFilterProgramImpl::create();
+                webCustomFilterProgram->setVertexShader(program->validatedVertexShader());
+                webCustomFilterProgram->setFragmentShader(program->validatedFragmentShader());
+                platformCompiledProgram->setClient(webCustomFilterProgram);
+            }
+
+            WebFilterOperation filterOperation = WebFilterOperation::createCustomFilter();
+            filterOperation.setCustomFilterProgram(webCustomFilterProgram.get());
+            filterOperation.setMeshRows(customFilterOp.meshRows());
+            filterOperation.setMeshColumns(customFilterOp.meshColumns());
+
+            const CustomFilterProgramInfo& programInfo = program->programInfo();
+            filterOperation.setMeshType(programInfo.meshType() == MeshTypeAttached ? WebMeshTypeAttached : WebMeshTypeDetached);
+
+            const CustomFilterParameterList& parameters = customFilterOp.parameters();
+            for (size_t i = 0; i < parameters.size(); ++i) {
+                RefPtr<CustomFilterParameter> parameter = parameters[i];
+                WebCustomFilterParameter webParameter;
+                webParameter.name = parameter->name();
+
+                switch (parameter->parameterType()) {
+                case CustomFilterParameter::NUMBER: {
+                    webParameter.type = WebCustomFilterParameter::ParameterTypeNumber;
+                    CustomFilterNumberParameter* numberParameter = static_cast<CustomFilterNumberParameter*>(parameter.get());
+                    WebVector<double> values((size_t)numberParameter->size());
+                    for (unsigned i = 0; i < numberParameter->size(); ++i)
+                        values[i] = numberParameter->valueAt(i);
+                    webParameter.values.swap(values);
+                    break;
+                }
+                case CustomFilterParameter::ARRAY: {
+                    webParameter.type = WebCustomFilterParameter::ParameterTypeArray;
+                    CustomFilterArrayParameter* arrayParameter = static_cast<CustomFilterArrayParameter*>(parameter.get());
+                    WebVector<double> values((size_t)arrayParameter->size());
+                    for (unsigned i = 0; i < arrayParameter->size(); ++i)
+                        values[i] = arrayParameter->valueAt(i);
+                    webParameter.values.swap(values);
+                    break;
+                }
+                case CustomFilterParameter::TRANSFORM: {
+                    webParameter.type = WebCustomFilterParameter::ParameterTypeTransform;
+                    CustomFilterTransformParameter* transformParameter = static_cast<CustomFilterTransformParameter*>(parameter.get());
+                    // FIXME: Use the right layer size in here.
+                    FloatSize size;
+                    TransformationMatrix matrix;
+                    transformParameter->operations().apply(size, matrix);
+                    webParameter.matrix = WebTransformationMatrix(matrix);
+                    break;
+                }
+                }
+
+                filterOperation.appendCustomFilterParameter(webParameter);
+            }
+
+            webFilters.append(filterOperation);
+            break;
+        }
 #endif
         case FilterOperation::PASSTHROUGH:
         case FilterOperation::NONE:

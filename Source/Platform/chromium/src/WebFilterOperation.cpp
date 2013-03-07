@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include <public/WebFilterOperation.h>
+#include <src/WebCustomFilterOperationPrivate.h>
 
 #include <string.h>
 
@@ -40,7 +41,9 @@ bool WebFilterOperation::equals(const WebFilterOperation& other) const
         return m_amount == other.m_amount
             && m_dropShadowOffset == other.m_dropShadowOffset
             && m_dropShadowColor == other.m_dropShadowColor;
-    } else
+    } else if (m_type == FilterTypeCustom)
+        return *m_customFilterPrivate.get() == *other.m_customFilterPrivate.get();
+    else
         return m_amount == other.m_amount;
 }
 
@@ -49,6 +52,108 @@ WebFilterOperation::WebFilterOperation(FilterType type, SkScalar matrix[20])
     WEBKIT_ASSERT(type == FilterTypeColorMatrix);
     m_type = type;
     memcpy(m_matrix, matrix, sizeof(m_matrix));
+}
+
+WebFilterOperation::WebFilterOperation(const WebFilterOperation& o)
+    : m_type(o.m_type)
+    , m_amount(o.m_amount)
+    , m_dropShadowOffset(o.m_dropShadowOffset)
+    , m_dropShadowColor(o.m_dropShadowColor)
+    , m_zoomRect(o.m_zoomRect)
+    , m_customFilterPrivate(o.m_customFilterPrivate)
+{
+    if (m_type == FilterTypeColorMatrix)
+        memcpy(m_matrix, o.m_matrix, sizeof(m_matrix));
+}
+
+void WebFilterOperation::assign(const WebFilterOperation& o)
+{
+    m_type = o.m_type;
+    m_amount = o.m_amount;
+    m_dropShadowOffset = o.m_dropShadowOffset;
+    m_dropShadowColor = o.m_dropShadowColor;
+    m_zoomRect = o.m_zoomRect;
+    m_customFilterPrivate = o.m_customFilterPrivate;
+    if (m_type == FilterTypeColorMatrix)
+        memcpy(m_matrix, o.m_matrix, sizeof(m_matrix));
+}
+
+void WebFilterOperation::destroy()
+{
+    m_customFilterPrivate.reset();
+}
+
+void WebFilterOperation::ensureCustomFilterOperationPrivate()
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    if (!m_customFilterPrivate.get())
+        m_customFilterPrivate = WebCustomFilterOperationPrivate::create();
+}
+
+WebCustomFilterProgram* WebFilterOperation::customFilterProgram() const
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    return m_customFilterPrivate->program();
+}
+
+void WebFilterOperation::setCustomFilterProgram(WebCustomFilterProgram* program)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->setProgram(program);
+}
+
+WebCustomFilterMeshType WebFilterOperation::meshType() const
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    return m_customFilterPrivate->meshType;
+}
+
+void WebFilterOperation::setMeshType(WebCustomFilterMeshType meshType)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->meshType = meshType;
+}
+
+int WebFilterOperation::meshRows() const
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    return m_customFilterPrivate->meshRows;
+}
+
+void WebFilterOperation::setMeshRows(int meshRows)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->meshRows = meshRows;
+}
+
+int WebFilterOperation::meshColumns() const
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    return m_customFilterPrivate->meshColumns;
+}
+
+void WebFilterOperation::setMeshColumns(int meshColumns)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->meshColumns = meshColumns;
+}
+
+void WebFilterOperation::customFilterParameters(WebVector<WebCustomFilterParameter>& result) const
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->parameters(result);
+}
+
+void WebFilterOperation::setCustomFilterParameters(const WebVector<WebCustomFilterParameter>& parameters)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->setParameters(parameters);
+}
+
+void WebFilterOperation::appendCustomFilterParameter(const WebCustomFilterParameter& parameter)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate->addParameter(parameter);
 }
 
 } // namespace WebKit

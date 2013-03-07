@@ -31,10 +31,6 @@
 #ifndef WebTransformationMatrix_h
 #define WebTransformationMatrix_h
 
-#if WEBKIT_IMPLEMENTATION
-#include "TransformationMatrix.h"
-#endif
-
 #include "WebCommon.h"
 #include "WebPrivateOwnPtr.h"
 

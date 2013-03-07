@@ -56,6 +56,13 @@ public:
     {
     }
 
+    WebPrivatePtr(const WebPrivatePtr<T>& other)
+    {
+        m_ptr = other.m_ptr;
+        if (m_ptr)
+            m_ptr->ref();
+    }
+
     void reset()
     {
         assign(0);
@@ -89,6 +96,7 @@ public:
 #endif
 
 private:
+
 #if WEBKIT_IMPLEMENTATION
     void assign(T* p)
     {

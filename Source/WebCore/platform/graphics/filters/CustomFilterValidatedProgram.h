@@ -58,6 +58,11 @@ class TextureMapperPlatformCompiledProgram;
 typedef TextureMapperPlatformCompiledProgram PlatformCompiledProgram;
 #endif
 
+#if PLATFORM(CHROMIUM)
+class ChromiumPlatformCompiledProgram;
+typedef ChromiumPlatformCompiledProgram PlatformCompiledProgram;
+#endif
+
 //
 // A unique combination of vertex shader and fragment shader is only validated and compiled once.
 // All shaders are validated through ANGLE in CustomFilterValidatedProgram before being compiled by the GraphicsContext3D in CustomFilterCompiledProgram.
@@ -98,7 +103,7 @@ public:
         return m_validatedFragmentShader; 
     }
 
-#if PLATFORM(BLACKBERRY) || USE(TEXTURE_MAPPER)
+#if PLATFORM(BLACKBERRY) || USE(TEXTURE_MAPPER) || PLATFORM(CHROMIUM)
     PlatformCompiledProgram* platformCompiledProgram();
 #endif
 
@@ -131,7 +136,7 @@ private:
     String m_validatedFragmentShader;
 
     RefPtr<CustomFilterCompiledProgram> m_compiledProgram;
-#if PLATFORM(BLACKBERRY) || USE(TEXTURE_MAPPER)
+#if PLATFORM(BLACKBERRY) || USE(TEXTURE_MAPPER) || PLATFORM(CHROMIUM)
     PlatformCompiledProgram* m_platformCompiledProgram;
 #endif
 

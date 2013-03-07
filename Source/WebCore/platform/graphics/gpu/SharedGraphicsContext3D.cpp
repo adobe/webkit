@@ -97,6 +97,18 @@ public:
         m_context = GraphicsContext3D::create(attributes, 0);
         return m_context;
     }
+
+    PassRefPtr<GraphicsContext3D> createCustomFilterContext()
+    {
+        // Same attributes as CustomFilterGlobalContext::prepareContextIfNeeded.
+        GraphicsContext3D::Attributes attributes;
+        attributes.preserveDrawingBuffer = true;
+        attributes.premultipliedAlpha = false;
+        attributes.shareResources = true;
+        attributes.preferDiscreteGPU = true;
+        m_context = GraphicsContext3D::create(attributes, 0);
+        return m_context;
+    }
 private:
     RefPtr<GraphicsContext3D> m_context;
 };
@@ -132,6 +144,42 @@ bool SharedGraphicsContext3D::createForImplThread()
 {
     ASSERT(isMainThread());
     return getOrCreateContextForImplThread(Create);
+}
+
+// Custom Filters.
+
+// Main thread.
+
+static PassRefPtr<GraphicsContext3D> getOrCreateContextForCustomFiltersOnMainThread()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(SharedGraphicsContext3DImpl, impl, ());
+    return impl.getContext() ? impl.getContext() : impl.createCustomFilterContext();
+}
+
+PassRefPtr<GraphicsContext3D> SharedGraphicsContext3D::getForCustomFiltersOnMainThread()
+{
+    return getOrCreateContextForCustomFiltersOnMainThread();
+}
+
+// Impl thread.
+
+static PassRefPtr<GraphicsContext3D> getOrCreateContextForCustomFiltersOnImplThead(ContextOperation op)
+{
+    DEFINE_STATIC_LOCAL(SharedGraphicsContext3DImpl, impl, ());
+    return op == Create ? impl.createCustomFilterContext() : impl.getContext();
+}
+
+PassRefPtr<GraphicsContext3D> SharedGraphicsContext3D::getForCustomFiltersOnImplThread()
+{
+    ASSERT(!isMainThread());
+    return getOrCreateContextForCustomFiltersOnImplThead(Get);
+}
+
+bool SharedGraphicsContext3D::createForCustomFiltersOnImplThread()
+{
+    ASSERT(isMainThread());
+    return getOrCreateContextForCustomFiltersOnImplThead(Create);
 }
 
 }

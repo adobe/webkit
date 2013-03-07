@@ -116,6 +116,7 @@
       '../platform/graphics/cpu/arm',
       '../platform/graphics/cpu/arm/filters',
       '../platform/graphics/filters',
+      '../platform/graphics/filters/chromium',
       '../platform/graphics/filters/skia',
       '../platform/graphics/gpu',
       '../platform/graphics/opentype',

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Adobe Systems Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,40 +23,46 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SharedGraphicsContext3D_h
-#define SharedGraphicsContext3D_h
+#ifndef WebCustomFilterOperationPrivate_h
+#define WebCustomFilterOperationPrivate_h
 
-#include "GraphicsContext3D.h"
+#include <public/WebFilterOperation.h>
+#include <public/WebCustomFilterParameter.h>
+#include <public/WebCustomFilterProgram.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
-namespace WebCore {
+namespace WebKit {
 
-class SharedGraphicsContext3D {
+class WebCustomFilterOperationPrivate: public RefCounted<WebCustomFilterOperationPrivate> {
 public:
-    // The caller may ref this pointer, and hang onto it as long as they like.
-    // However, the context should be checked periodically to determine if it
-    // has been lost. The easiest way to do that is to simply call this
-    // function again. Note that the return value may be 0 if the
-    // GPU is unavailable.
-    static PassRefPtr<GraphicsContext3D> get();
-    // This one returns the context, and does not touch it or re-create it.
-    // Should only be called on the impl thread.
-    static PassRefPtr<GraphicsContext3D> getForImplThread();
-    // This one returns if the threaded utility context exists.
-    // Should only be called on the main thread.
-    static bool haveForImplThread();
-    // This call creates the context unconditionally, but does not touch it.
-    // Should only be called on the main thread.
-    static bool createForImplThread();
+    static PassRefPtr<WebCustomFilterOperationPrivate> create()
+    {
+        return adoptRef(new WebCustomFilterOperationPrivate());
+    }
+    ~WebCustomFilterOperationPrivate();
 
-    // Custom Filters.
-    static PassRefPtr<GraphicsContext3D> getForCustomFiltersOnMainThread();
-    static PassRefPtr<GraphicsContext3D> getForCustomFiltersOnImplThread();
-    static bool createForCustomFiltersOnImplThread();
+    int meshRows;
+    int meshColumns;
+    WebCustomFilterMeshType meshType;
+
+    void parameters(WebVector<WebCustomFilterParameter>&) const;
+    void setParameters(const WebVector<WebCustomFilterParameter>&);
+    void addParameter(const WebCustomFilterParameter&);
+
+    void setProgram(PassRefPtr<WebCustomFilterProgram> program);
+    WebCustomFilterProgram* program() const;
+
+    bool operator==(const WebCustomFilterOperationPrivate& other) const;
+private:
+    WebCustomFilterOperationPrivate();
+
+    RefPtr<WebCustomFilterProgram> m_program;
+    Vector<WebCustomFilterParameter> m_parameters;
 };
 
-}
 
-#endif // SharedGraphicsContext3D_h
+} // namespace WebKit
+
+#endif // WebCustomFilterOperationPrivate_h
 

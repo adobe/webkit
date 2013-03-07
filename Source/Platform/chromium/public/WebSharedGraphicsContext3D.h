@@ -60,6 +60,12 @@ public:
     // Returns a ganesh context associated with the compositor thread shared context. The ganesh context has the same lifetime as the compositor thread
     // shared WebGraphicsContext3D.
     WEBKIT_EXPORT static GrContext* compositorThreadGrContext();
+
+    // Custom Filters.
+    WEBKIT_EXPORT static WebGraphicsContext3D* mainThreadCustomFilterContext();
+    WEBKIT_EXPORT static bool createCompositorThreadCustomFilterContext();
+    WEBKIT_EXPORT static WebGraphicsContext3D* compositorThreadCustomFilterContext();
+    WEBKIT_EXPORT static GrContext* compositorThreadCustomFilterGrContext();
 };
 
 }
