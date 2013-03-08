@@ -164,6 +164,10 @@ public:
 
     WEBKIT_EXPORT WebCustomFilterProgram* customFilterProgram() const;
     WEBKIT_EXPORT void setCustomFilterProgram(WebCustomFilterProgram*);
+    // Used in the compositor to make a copy of the old private
+    // structure before updating the program. Also, this clone
+    // will be owned by the compositor thread.
+    WEBKIT_EXPORT void setCustomFilterProgramClone(WebCustomFilterProgram*);
 
     WEBKIT_EXPORT WebCustomFilterMeshType meshType() const;
     WEBKIT_EXPORT void setMeshType(WebCustomFilterMeshType);

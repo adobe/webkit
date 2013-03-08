@@ -102,6 +102,13 @@ void WebFilterOperation::setCustomFilterProgram(WebCustomFilterProgram* program)
     m_customFilterPrivate->setProgram(program);
 }
 
+void WebFilterOperation::setCustomFilterProgramClone(WebCustomFilterProgram* program)
+{
+    WEBKIT_ASSERT(m_type == FilterTypeCustom);
+    m_customFilterPrivate = WebCustomFilterOperationPrivate::createCopyWithNoProgram(*m_customFilterPrivate.get());
+    m_customFilterPrivate->setProgram(program);
+}
+
 WebCustomFilterMeshType WebFilterOperation::meshType() const
 {
     WEBKIT_ASSERT(m_type == FilterTypeCustom);

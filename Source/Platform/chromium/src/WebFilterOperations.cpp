@@ -112,11 +112,12 @@ void WebFilterOperations::getOutsets(int& top, int& right, int& bottom, int& lef
 bool WebFilterOperations::hasFilterThatMovesPixels() const
 {
     for (size_t i = 0; i < m_private->operations.size(); ++i) {
-        const WebFilterOperation op = m_private->operations[i];
+        const WebFilterOperation& op = m_private->operations[i];
         switch (op.type()) {
         case WebFilterOperation::FilterTypeBlur:
         case WebFilterOperation::FilterTypeDropShadow:
         case WebFilterOperation::FilterTypeZoom:
+        case WebFilterOperation::FilterTypeCustom:
             return true;
         default:
             break;
@@ -128,12 +129,13 @@ bool WebFilterOperations::hasFilterThatMovesPixels() const
 bool WebFilterOperations::hasFilterThatAffectsOpacity() const
 {
     for (size_t i = 0; i < m_private->operations.size(); ++i) {
-        const WebFilterOperation op = m_private->operations[i];
+        const WebFilterOperation& op = m_private->operations[i];
         switch (op.type()) {
         case WebFilterOperation::FilterTypeOpacity:
         case WebFilterOperation::FilterTypeBlur:
         case WebFilterOperation::FilterTypeDropShadow:
         case WebFilterOperation::FilterTypeZoom:
+        case WebFilterOperation::FilterTypeCustom:
             return true;
         case WebFilterOperation::FilterTypeColorMatrix: {
             const SkScalar* matrix = op.matrix();
@@ -150,12 +152,26 @@ bool WebFilterOperations::hasFilterThatAffectsOpacity() const
     return false;
 }
 
+bool WebFilterOperations::hasCustomFilters() const {
+    for (size_t i = 0; i < m_private->operations.size(); ++i) {
+        const WebFilterOperation& op = m_private->operations[i];
+        if (op.type() == WebFilterOperation::FilterTypeCustom)
+            return true;
+    }
+    return false;
+}
+
 size_t WebFilterOperations::size() const
 {
     return m_private->operations.size();
 }
 
-WebFilterOperation WebFilterOperations::at(size_t i) const
+const WebFilterOperation& WebFilterOperations::at(size_t i) const
+{
+    return m_private->operations.at(i);
+}
+
+WebFilterOperation& WebFilterOperations::at(size_t i)
 {
     return m_private->operations.at(i);
 }

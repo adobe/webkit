@@ -62,9 +62,11 @@ public:
     WEBKIT_EXPORT void getOutsets(int& top, int& right, int& bottom, int& left) const;
     WEBKIT_EXPORT bool hasFilterThatMovesPixels() const;
     WEBKIT_EXPORT bool hasFilterThatAffectsOpacity() const;
+    WEBKIT_EXPORT bool hasCustomFilters() const;
 
     WEBKIT_EXPORT size_t size() const;
-    WEBKIT_EXPORT WebFilterOperation at(size_t) const;
+    WEBKIT_EXPORT WebFilterOperation& at(size_t);
+    WEBKIT_EXPORT const WebFilterOperation& at(size_t) const;
 
 private:
     WEBKIT_EXPORT void initialize();

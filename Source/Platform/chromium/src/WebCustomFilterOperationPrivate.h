@@ -40,6 +40,14 @@ public:
     {
         return adoptRef(new WebCustomFilterOperationPrivate());
     }
+    static PassRefPtr<WebCustomFilterOperationPrivate> createCopyWithNoProgram(const WebCustomFilterOperationPrivate& other)
+    {
+        RefPtr<WebCustomFilterOperationPrivate> filterOperationPrivate = create();
+        filterOperationPrivate->meshRows = other.meshRows;
+        filterOperationPrivate->meshColumns = other.meshColumns;
+        filterOperationPrivate->m_parameters = other.m_parameters;
+        return filterOperationPrivate.release();
+    }
     ~WebCustomFilterOperationPrivate();
 
     int meshRows;
