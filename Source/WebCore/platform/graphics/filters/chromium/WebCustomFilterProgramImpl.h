@@ -43,6 +43,8 @@ public:
         return adoptRef(new WebCustomFilterProgramImpl());
     }
     virtual ~WebCustomFilterProgramImpl();
+
+    virtual unsigned id() const { return m_id; }
     
     virtual WebKit::WebString vertexShader() const;
     virtual void setVertexShader(const WebKit::WebString&);
@@ -58,6 +60,9 @@ private:
     virtual void derefFromValidatedProgram() { deref(); } 
 
     WebCustomFilterProgramImpl();
+
+    unsigned m_id;
+    static unsigned s_idGenerator;
 
     WebKit::WebString m_vertexShader;
     WebKit::WebString m_fragmentShader;

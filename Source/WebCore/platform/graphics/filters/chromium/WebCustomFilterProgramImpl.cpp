@@ -28,7 +28,10 @@
 
 namespace WebCore {
 
+unsigned WebCustomFilterProgramImpl::s_idGenerator = 0;
+
 WebCustomFilterProgramImpl::WebCustomFilterProgramImpl()
+    : m_id(++WebCustomFilterProgramImpl::s_idGenerator)
 {
 }
 

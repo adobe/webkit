@@ -51,7 +51,7 @@ bool WebCustomFilterOperationPrivate::operator==(const WebCustomFilterOperationP
     if (meshRows != other.meshRows
         || meshColumns != other.meshColumns
         || meshType != other.meshType
-        || m_program.get() != other.m_program.get()
+        || (m_program.get() != other.m_program.get() && (!m_program.get() || !other.m_program.get() || *m_program.get() != *other.m_program.get()))
         || m_parameters.size() != other.m_parameters.size())
         return false;
     for (size_t i = 0; i < m_parameters.size(); ++i)

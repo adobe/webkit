@@ -33,11 +33,17 @@ namespace WebKit {
 
 class WebCustomFilterProgram {
 public:
+    // The implementation should make sure that IDs are unique.
+    virtual unsigned id() const = 0;
     virtual WebString vertexShader() const = 0;
     virtual WebString fragmentShader() const = 0;
 
     void ref() { refFromWebCustomFilterProgram(); }
     void deref() { derefFromCustomFilterProgram(); }
+
+    // Use IDs to avoid the whole shader strings.
+    bool operator==(const WebCustomFilterProgram& other) const { return id() == other.id(); }
+    bool operator!=(const WebCustomFilterProgram& other) const { return !(*this == other); }
 
 private:
     virtual void refFromWebCustomFilterProgram() = 0;
