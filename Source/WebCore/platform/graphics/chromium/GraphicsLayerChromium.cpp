@@ -388,6 +388,8 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
                 webCustomFilterProgram = WebCustomFilterProgramImpl::create();
                 webCustomFilterProgram->setVertexShader(program->validatedVertexShader());
                 webCustomFilterProgram->setFragmentShader(program->validatedFragmentShader());
+                webCustomFilterProgram->setProgramType(program->programInfo().programType() == PROGRAM_TYPE_NO_ELEMENT_TEXTURE ?
+                    WebKit::WebProgramTypeNoElementTexture : WebKit::WebProgramTypeBlendsElementTexture);
                 platformCompiledProgram->setClient(webCustomFilterProgram);
             }
 
@@ -396,8 +398,7 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
             filterOperation.setMeshRows(customFilterOp.meshRows());
             filterOperation.setMeshColumns(customFilterOp.meshColumns());
 
-            const CustomFilterProgramInfo& programInfo = program->programInfo();
-            filterOperation.setMeshType(programInfo.meshType() == MeshTypeAttached ? WebMeshTypeAttached : WebMeshTypeDetached);
+            filterOperation.setMeshType(customFilterOp.meshType() == MeshTypeAttached ? WebMeshTypeAttached : WebMeshTypeDetached);
 
             const CustomFilterParameterList& parameters = customFilterOp.parameters();
             for (size_t i = 0; i < parameters.size(); ++i) {

@@ -45,6 +45,7 @@ public:
         RefPtr<WebCustomFilterOperationPrivate> filterOperationPrivate = create();
         filterOperationPrivate->meshRows = other.meshRows;
         filterOperationPrivate->meshColumns = other.meshColumns;
+        filterOperationPrivate->meshType = other.meshType;
         filterOperationPrivate->m_parameters = other.m_parameters;
         return filterOperationPrivate.release();
     }

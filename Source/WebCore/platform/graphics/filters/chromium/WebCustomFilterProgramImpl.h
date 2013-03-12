@@ -45,12 +45,15 @@ public:
     virtual ~WebCustomFilterProgramImpl();
 
     virtual unsigned id() const { return m_id; }
+
+    virtual WebKit::WebCustomFilterProgramType programType() const { return m_programType; }
+    void setProgramType(WebKit::WebCustomFilterProgramType programType) { m_programType = programType; }
     
     virtual WebKit::WebString vertexShader() const;
-    virtual void setVertexShader(const WebKit::WebString&);
+    void setVertexShader(const WebKit::WebString&);
 
     virtual WebKit::WebString fragmentShader() const;
-    virtual void setFragmentShader(const WebKit::WebString&);
+    void setFragmentShader(const WebKit::WebString&);
 
 private:
     virtual void refFromWebCustomFilterProgram() { ref(); }
@@ -63,6 +66,8 @@ private:
 
     unsigned m_id;
     static unsigned s_idGenerator;
+
+    WebKit::WebCustomFilterProgramType m_programType;
 
     WebKit::WebString m_vertexShader;
     WebKit::WebString m_fragmentShader;

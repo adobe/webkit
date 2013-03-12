@@ -31,12 +31,18 @@
 
 namespace WebKit {
 
+enum WebCustomFilterProgramType {
+    WebProgramTypeNoElementTexture,
+    WebProgramTypeBlendsElementTexture
+};
+
 class WebCustomFilterProgram {
 public:
     // The implementation should make sure that IDs are unique.
     virtual unsigned id() const = 0;
     virtual WebString vertexShader() const = 0;
     virtual WebString fragmentShader() const = 0;
+    virtual WebCustomFilterProgramType programType() const = 0;
 
     void ref() { refFromWebCustomFilterProgram(); }
     void deref() { derefFromCustomFilterProgram(); }
