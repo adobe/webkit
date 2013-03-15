@@ -59,6 +59,7 @@ public:
     int tileSizeLocation() const { return m_tileSizeLocation; }
     int meshSizeLocation() const { return m_meshSizeLocation; }
     int samplerLocation() const { return m_samplerLocation; }
+    int samplerScaleLocation() const { return m_samplerScaleLocation; }
     int contentSamplerLocation() const { return m_contentSamplerLocation; }
     int samplerSizeLocation() const { return m_samplerSizeLocation; }
 
@@ -86,6 +87,7 @@ private:
     int m_tileSizeLocation;
     int m_meshSizeLocation;
     int m_samplerLocation;
+    int m_samplerScaleLocation;
     int m_samplerSizeLocation;
     int m_contentSamplerLocation;
     

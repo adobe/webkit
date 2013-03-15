@@ -268,12 +268,13 @@ void CustomFilterValidatedProgram::rewriteMixFragmentShader()
     // author code for security reasons.
     builder.append(SHADER(
         uniform sampler2D css_u_texture;
+        uniform mediump vec2 css_u_textureScale;
         varying mediump vec2 css_v_texCoord;
 
         void main()
         {
             css_main();
-            mediump vec4 originalColor = texture2D(css_u_texture, css_v_texCoord);
+            mediump vec4 originalColor = texture2D(css_u_texture, css_v_texCoord * css_u_textureScale);
             mediump vec4 multipliedColor = clamp(css_ColorMatrix * originalColor, 0.0, 1.0);
             mediump vec3 blendedColor = css_BlendColor(multipliedColor.rgb, css_MixColor.rgb);
             mediump vec3 weightedColor = (1.0 - multipliedColor.a) * css_MixColor.rgb + multipliedColor.a * blendedColor;

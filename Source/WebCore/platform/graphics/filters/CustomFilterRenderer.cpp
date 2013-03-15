@@ -243,6 +243,11 @@ void CustomFilterRenderer::bindProgramAndBuffers(Platform3DObject inputTexture)
         m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR);
         m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE);
         m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE);
+
+        if (m_compiledProgram->samplerScaleLocation()) {
+            // This is only needed by the compositor for now. It allows us to use different size input textures.
+            m_context->uniform2f(m_compiledProgram->samplerScaleLocation(), 1.0, 1.0);
+        }
     }
 
     if (m_compiledProgram->projectionMatrixLocation() != -1) {
