@@ -110,6 +110,7 @@
 #include "SiblingTraversalStrategies.h"
 #include "SkewTransformOperation.h"
 #include "StyleBuilder.h"
+#include "StyleCustomFilterProgramCache.h"
 #include "StyleCachedImage.h"
 #include "StyleGeneratedImage.h"
 #include "StylePendingImage.h"
@@ -4645,13 +4646,39 @@ void StyleResolver::loadPendingShaders()
             CustomFilterOperation* customFilter = static_cast<CustomFilterOperation*>(filterOperation.get());
             ASSERT(customFilter->program());
             StyleCustomFilterProgram* program = static_cast<StyleCustomFilterProgram*>(customFilter->program());
+            if (!program->hasPendingShaders())
+                continue;
+            
+            KURL vertexShader;
+            KURL fragmentShader;
+
             if (program->vertexShader() && program->vertexShader()->isPendingShader()) {
                 WebKitCSSShaderValue* shaderValue = static_cast<StylePendingShader*>(program->vertexShader())->cssShaderValue();
-                program->setVertexShader(shaderValue->cachedShader(cachedResourceLoader));
+                vertexShader = shaderValue->completeURL(cachedResourceLoader);
             }
             if (program->fragmentShader() && program->fragmentShader()->isPendingShader()) {
                 WebKitCSSShaderValue* shaderValue = static_cast<StylePendingShader*>(program->fragmentShader())->cssShaderValue();
-                program->setFragmentShader(shaderValue->cachedShader(cachedResourceLoader));
+                fragmentShader = shaderValue->completeURL(cachedResourceLoader);
+            }
+
+            if (!m_customFilterProgramCache)
+                m_customFilterProgramCache = adoptPtr(new StyleCustomFilterProgramCache());
+            
+            RefPtr<StyleCustomFilterProgram> styleProgram = m_customFilterProgramCache->lookup(vertexShader, fragmentShader);
+            if (styleProgram.get())
+                customFilter->setProgram(styleProgram.release());
+            else {
+                if (program->vertexShader() && program->vertexShader()->isPendingShader()) {
+                    WebKitCSSShaderValue* shaderValue = static_cast<StylePendingShader*>(program->vertexShader())->cssShaderValue();
+                    program->setVertexShader(shaderValue->cachedShader(cachedResourceLoader));
+                }
+                if (program->fragmentShader() && program->fragmentShader()->isPendingShader()) {
+                    WebKitCSSShaderValue* shaderValue = static_cast<StylePendingShader*>(program->fragmentShader())->cssShaderValue();
+                    program->setFragmentShader(shaderValue->cachedShader(cachedResourceLoader));
+                }
+                program->setVertexShaderURL(vertexShader);
+                program->setFragmentShaderURL(fragmentShader);
+                m_customFilterProgramCache->set(program);
             }
         }
     }

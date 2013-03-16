@@ -2642,6 +2642,7 @@
             'rendering/style/StyleCachedImageSet.cpp',
             'rendering/style/StyleCachedShader.h',
             'rendering/style/StyleCachedShader.cpp',
+            'rendering/style/StyleCustomFilterProgram.cpp',
             'rendering/style/StyleCustomFilterProgram.h',
             'rendering/style/StyleDeprecatedFlexibleBoxData.cpp',
             'rendering/style/StyleFilterData.cpp',
