@@ -75,20 +75,8 @@ public:
     }
 
 private:
-    struct KURLPairHash : WTF::PairHash<KURL, KURL> {
-        static unsigned hash(const std::pair<KURL, KURL>& p)
-        {
-            // Custom Filters can have either one or two shaders, so we need to
-            // check that the URLs are valid before computing the hash.
-            ASSERT(p.first.isValid() || p.second.isValid());
-            return WTF::pairIntHash(
-                p.first.isValid() ? DefaultHash<KURL>::Hash::hash(p.first) : 0,
-                p.second.isValid() ? DefaultHash<KURL>::Hash::hash(p.second) : 0);
-        }
-    };
-
     typedef pair<KURL, KURL> CacheKey;
-    typedef HashMap<CacheKey, StyleCustomFilterProgram*, KURLPairHash> CacheMap;
+    typedef HashMap<CacheKey, StyleCustomFilterProgram*> CacheMap;
 
     CacheKey programCacheKey(StyleCustomFilterProgram* program) 
     {
