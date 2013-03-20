@@ -35,15 +35,12 @@
 #include "CachedResourceHandle.h"
 #include "CachedShader.h"
 #include "CustomFilterProgram.h"
-#include "KURL.h"
 #include "StyleShader.h"
 #include <wtf/FastAllocBase.h>
 
 namespace WebCore {
 
 // CSS Shaders
-
-class StyleCustomFilterProgramCache;
 
 class StyleCustomFilterProgram : public CustomFilterProgram, public CachedResourceClient {
     WTF_MAKE_FAST_ALLOCATED;
@@ -53,10 +50,10 @@ public:
         return adoptRef(new StyleCustomFilterProgram(vertexShader, fragmentShader, programType, mixSettings, meshType));
     }
     
-    void setVertexShader(PassRefPtr<StyleShader> shader) { ASSERT(!m_cache); m_vertexShader = shader; }
+    void setVertexShader(PassRefPtr<StyleShader> shader) { m_vertexShader = shader; }
     StyleShader* vertexShader() const { return m_vertexShader.get(); }
     
-    void setFragmentShader(PassRefPtr<StyleShader> shader) { ASSERT(!m_cache); m_fragmentShader = shader; }
+    void setFragmentShader(PassRefPtr<StyleShader> shader) { m_fragmentShader = shader; }
     StyleShader* fragmentShader() const { return m_fragmentShader.get(); }
     
     virtual String vertexShaderString() const
@@ -75,9 +72,6 @@ public:
     {
         // Do not use the CachedResource:isLoaded method here, because it actually means !isLoading(),
         // so missing and canceled resources will have isLoaded set to true, even if they are not loaded yet.
-        ASSERT(!m_vertexShader || m_vertexShader->isCachedShader());
-        ASSERT(!m_fragmentShader || m_fragmentShader->isCachedShader());
-        ASSERT(m_cachedVertexShader.get() || m_cachedFragmentShader.get());
         return (!m_cachedVertexShader.get() || m_isVertexShaderLoaded)
             && (!m_cachedFragmentShader.get() || m_isFragmentShaderLoaded);
     }
@@ -120,13 +114,6 @@ public:
         if (isLoaded())
             notifyClients();
     }
-
-    bool hasPendingShaders() const {
-        return (m_vertexShader && m_vertexShader->isPendingShader()) 
-            || (m_fragmentShader && m_fragmentShader->isPendingShader());
-    }
-
-    void setCache(StyleCustomFilterProgramCache* cache) { m_cache = cache; }
     
     CachedShader* cachedVertexShader() const { return m_vertexShader ? m_vertexShader->cachedShader() : 0; }
     CachedShader* cachedFragmentShader() const { return m_fragmentShader ? m_fragmentShader->cachedShader() : 0; }
@@ -142,35 +129,21 @@ public:
         return cachedVertexShader() == other->cachedVertexShader() && cachedFragmentShader() == other->cachedFragmentShader();
     }
 
-    KURL vertexShaderURL() const { return m_vertexShaderURL; }
-    void setVertexShaderURL(const KURL& url) { m_vertexShaderURL = url; }
-
-    KURL fragmentShaderURL() const { return m_fragmentShaderURL; }
-    void setFragmentShaderURL(const KURL& url) { m_fragmentShaderURL = url; }
-
 private:
     StyleCustomFilterProgram(PassRefPtr<StyleShader> vertexShader, PassRefPtr<StyleShader> fragmentShader, CustomFilterProgramType programType, const CustomFilterProgramMixSettings& mixSettings, CustomFilterMeshType meshType)
         : CustomFilterProgram(programType, mixSettings, meshType)
         , m_vertexShader(vertexShader)
         , m_fragmentShader(fragmentShader)
-        , m_cache(0)
         , m_isVertexShaderLoaded(false)
         , m_isFragmentShaderLoaded(false)
     {
     }
-
-    ~StyleCustomFilterProgram();
     
     RefPtr<StyleShader> m_vertexShader;
     RefPtr<StyleShader> m_fragmentShader;
     
     CachedResourceHandle<CachedShader> m_cachedVertexShader;
     CachedResourceHandle<CachedShader> m_cachedFragmentShader;
-
-    KURL m_vertexShaderURL;
-    KURL m_fragmentShaderURL;
-
-    StyleCustomFilterProgramCache* m_cache;
     
     bool m_isVertexShaderLoaded;
     bool m_isFragmentShaderLoaded;

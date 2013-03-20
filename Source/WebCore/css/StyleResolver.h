@@ -86,7 +86,6 @@ class RuleData;
 class RuleSet;
 class Settings;
 class StaticCSSRuleList;
-class StyleCustomFilterProgramCache;
 class StyleBuilder;
 class StyleScopeResolver;
 class StyleImage;
@@ -670,8 +669,6 @@ private:
     InspectorCSSOMWrappers m_inspectorCSSOMWrappers;
 
     State m_state;
-
-    OwnPtr<StyleCustomFilterProgramCache> m_customFilterProgramCache;
 
     friend class StyleBuilder;
     friend bool operator==(const MatchedProperties&, const MatchedProperties&);

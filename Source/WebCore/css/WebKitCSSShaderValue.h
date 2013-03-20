@@ -37,7 +37,6 @@
 namespace WebCore {
 
 class CachedResourceLoader;
-class KURL;
 class StyleCachedShader;
 class StyleShader;
 
@@ -49,7 +48,6 @@ public:
     const String& format() const { return m_format; }
     void setFormat(const String& format) { m_format = format; }
 
-    KURL completeURL(CachedResourceLoader* loader);
     StyleCachedShader* cachedShader(CachedResourceLoader*);
     StyleShader* cachedOrPendingShader();
 
