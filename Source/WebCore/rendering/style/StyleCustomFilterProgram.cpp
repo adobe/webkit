@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
+ * Copyright (C) 2013 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,49 +27,24 @@
  * SUCH DAMAGE.
  */
 
-#ifndef WebKitCSSShaderValue_h
-#define WebKitCSSShaderValue_h
+#include "config.h"
 
 #if ENABLE(CSS_SHADERS)
 
-#include "CSSValue.h"
+#include "StyleCustomFilterProgram.h"
+
+#include "StyleCustomFilterProgramCache.h"
 
 namespace WebCore {
 
-class CachedResourceLoader;
-class KURL;
-class StyleCachedShader;
-class StyleShader;
 
-class WebKitCSSShaderValue : public CSSValue {
-public:
-    static PassRefPtr<WebKitCSSShaderValue> create(const String& url) { return adoptRef(new WebKitCSSShaderValue(url)); }
-    ~WebKitCSSShaderValue();
-
-    const String& format() const { return m_format; }
-    void setFormat(const String& format) { m_format = format; }
-
-    KURL completeURL(CachedResourceLoader*) const;
-    StyleCachedShader* cachedShader(CachedResourceLoader*);
-    StyleShader* cachedOrPendingShader();
-
-    String customCssText() const;
-
-    bool equals(const WebKitCSSShaderValue&) const;
-
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
-
-private:
-    WebKitCSSShaderValue(const String& url);
-
-    String m_url;
-    String m_format;
-    RefPtr<StyleShader> m_shader;
-    bool m_accessedShader;
-};
+StyleCustomFilterProgram::~StyleCustomFilterProgram()
+{
+    if (m_cache)
+        m_cache->remove(this);
+}
 
 } // namespace WebCore
 
 #endif // ENABLE(CSS_SHADERS)
 
-#endif // WebKitCSSShaderValue_h

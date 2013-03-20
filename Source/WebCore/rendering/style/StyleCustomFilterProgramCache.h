@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
+ * Copyright (C) 2013 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,49 +27,39 @@
  * SUCH DAMAGE.
  */
 
-#ifndef WebKitCSSShaderValue_h
-#define WebKitCSSShaderValue_h
+#ifndef StyleCustomFilterProgramCache_h
+#define StyleCustomFilterProgramCache_h
 
 #if ENABLE(CSS_SHADERS)
-
-#include "CSSValue.h"
+#include "CustomFilterProgramInfo.h"
+#include <wtf/FastAllocBase.h>
+#include <wtf/HashMap.h>
 
 namespace WebCore {
 
-class CachedResourceLoader;
-class KURL;
-class StyleCachedShader;
-class StyleShader;
+class StyleCustomFilterProgram;
+class CustomFilterProgramInfo;
 
-class WebKitCSSShaderValue : public CSSValue {
+class StyleCustomFilterProgramCache {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<WebKitCSSShaderValue> create(const String& url) { return adoptRef(new WebKitCSSShaderValue(url)); }
-    ~WebKitCSSShaderValue();
+    StyleCustomFilterProgramCache();
+    ~StyleCustomFilterProgramCache();
 
-    const String& format() const { return m_format; }
-    void setFormat(const String& format) { m_format = format; }
+    // Lookups a StyleCustomFilterProgram that has similar parameters with the specified program.
+    StyleCustomFilterProgram* lookup(StyleCustomFilterProgram*) const;
+    StyleCustomFilterProgram* lookup(const CustomFilterProgramInfo&) const;
 
-    KURL completeURL(CachedResourceLoader*) const;
-    StyleCachedShader* cachedShader(CachedResourceLoader*);
-    StyleShader* cachedOrPendingShader();
-
-    String customCssText() const;
-
-    bool equals(const WebKitCSSShaderValue&) const;
-
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    void add(StyleCustomFilterProgram*);
+    void remove(StyleCustomFilterProgram*);
 
 private:
-    WebKitCSSShaderValue(const String& url);
-
-    String m_url;
-    String m_format;
-    RefPtr<StyleShader> m_shader;
-    bool m_accessedShader;
+    typedef HashMap<CustomFilterProgramInfo, StyleCustomFilterProgram*> CacheMap;
+    CacheMap m_cache;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(CSS_SHADERS)
 
-#endif // WebKitCSSShaderValue_h
+#endif // StyleCustomFilterProgramCache_h
