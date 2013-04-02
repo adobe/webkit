@@ -175,10 +175,10 @@ CustomFilterValidatedProgram::CustomFilterValidatedProgram(CustomFilterGlobalCon
     // Shaders referenced from the CSS mix function use a different validator than regular WebGL shaders. See CustomFilterGlobalContext.h for more details.
     bool blendsElementTexture = (programInfo.programType() == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE);
     ANGLEWebKitBridge* validator = blendsElementTexture ? m_globalContext->mixShaderValidator() : m_globalContext->webglShaderValidator();
-    String vertexShaderLog, fragmentShaderLog;
+    String validatedVertexShader, validatedFragmentShader, vertexShaderLog, fragmentShaderLog;
     Vector<ANGLEShaderSymbol> symbols;
-    bool vertexShaderValid = validator->compileShaderSource(originalVertexShader.utf8().data(), SHADER_TYPE_VERTEX, m_validatedVertexShader, vertexShaderLog, symbols);
-    bool fragmentShaderValid = validator->compileShaderSource(originalFragmentShader.utf8().data(), SHADER_TYPE_FRAGMENT, m_validatedFragmentShader, fragmentShaderLog, symbols);
+    bool vertexShaderValid = validator->compileShaderSource(originalVertexShader.utf8().data(), SHADER_TYPE_VERTEX, validatedVertexShader, vertexShaderLog, symbols);
+    bool fragmentShaderValid = validator->compileShaderSource(originalFragmentShader.utf8().data(), SHADER_TYPE_FRAGMENT, validatedFragmentShader, fragmentShaderLog, symbols);
     if (!vertexShaderValid || !fragmentShaderValid) {
         // FIXME: Report the validation errors.
         // https://bugs.webkit.org/show_bug.cgi?id=74416
@@ -193,8 +193,9 @@ CustomFilterValidatedProgram::CustomFilterValidatedProgram(CustomFilterGlobalCon
 
     // We need to add texture access, blending, and compositing code to shaders that are referenced from the CSS mix function.
     if (blendsElementTexture) {
-        rewriteMixVertexShader(symbols);
-        rewriteMixFragmentShader();
+        m_validatedVertexShader = rewriteMixVertexShader(validatedVertexShader, symbols);
+        m_validatedFragmentShader = rewriteMixFragmentShader(validatedFragmentShader, false);
+        m_validatedFragmentShaderWithPremultipliedInput = rewriteMixFragmentShader(validatedFragmentShader, true);
     }
 
     m_isInitialized = true;
@@ -218,9 +219,12 @@ bool CustomFilterValidatedProgram::needsInputTexture() const
         && m_programInfo.mixSettings().compositeOperator != CompositeCopy;
 }
 
-void CustomFilterValidatedProgram::rewriteMixVertexShader(const Vector<ANGLEShaderSymbol>& symbols)
+String CustomFilterValidatedProgram::rewriteMixVertexShader(const String& validatedVertexShader, const Vector<ANGLEShaderSymbol>& symbols)
 {
     ASSERT(m_programInfo.programType() == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE);
+
+    StringBuilder builder;
+    builder.append(validatedVertexShader);
 
     // If the author defined a_texCoord, we can use it to shuttle the texture coordinate to the fragment shader.
     // Note that vertex attributes are read-only in GLSL, so the author could not have changed a_texCoord's value.
@@ -232,12 +236,12 @@ void CustomFilterValidatedProgram::rewriteMixVertexShader(const Vector<ANGLEShad
     }
 
     if (!texCoordAttributeDefined)
-        m_validatedVertexShader.append("attribute mediump vec2 a_texCoord;");
+        builder.append("attribute mediump vec2 a_texCoord;");
 
     // During validation, ANGLE renamed the author's "main" function to "css_main".
     // We write our own "main" function and call "css_main" from it.
     // This makes rewriting easy and ensures that our code runs after all author code.
-    m_validatedVertexShader.append(SHADER(
+    builder.append(SHADER(
         varying mediump vec2 css_v_texCoord;
 
         void main()
@@ -246,9 +250,11 @@ void CustomFilterValidatedProgram::rewriteMixVertexShader(const Vector<ANGLEShad
             css_v_texCoord = a_texCoord;
         }
     ));
+
+    return builder.toString();
 }
 
-void CustomFilterValidatedProgram::rewriteMixFragmentShader()
+String CustomFilterValidatedProgram::rewriteMixFragmentShader(const String& validatedFragmentShader, bool unmultiplyInput)
 {
     ASSERT(m_programInfo.programType() == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE);
 
@@ -260,9 +266,10 @@ void CustomFilterValidatedProgram::rewriteMixFragmentShader()
         mediump vec4 css_MixColor = vec4(0.0);
         mediump mat4 css_ColorMatrix = mat4(1.0);
     ));
-    builder.append(m_validatedFragmentShader);
+    builder.append(validatedFragmentShader);
     builder.append(blendFunctionString(m_programInfo.mixSettings().blendMode));
     builder.append(compositeFunctionString(m_programInfo.mixSettings().compositeOperator));
+    builder.append(texture2DFunctionString(unmultiplyInput));
     // We define symbols like "css_u_texture" after the author's shader code, which makes them inaccessible to author code.
     // In particular, "css_u_texture" represents the DOM element texture, so it's important to keep it inaccessible to
     // author code for security reasons.
@@ -274,14 +281,35 @@ void CustomFilterValidatedProgram::rewriteMixFragmentShader()
         void main()
         {
             css_main();
-            mediump vec4 originalColor = texture2D(css_u_texture, css_v_texCoord * css_u_textureScale);
+            mediump vec4 originalColor = css_Texture2D(css_u_texture, css_v_texCoord * css_u_textureScale);
             mediump vec4 multipliedColor = clamp(css_ColorMatrix * originalColor, 0.0, 1.0);
             mediump vec3 blendedColor = css_BlendColor(multipliedColor.rgb, css_MixColor.rgb);
             mediump vec3 weightedColor = (1.0 - multipliedColor.a) * css_MixColor.rgb + multipliedColor.a * blendedColor;
             gl_FragColor = css_Composite(multipliedColor.rgb, multipliedColor.a, weightedColor.rgb, css_MixColor.a);
         }
     ));
-    m_validatedFragmentShader = builder.toString();
+    return builder.toString();
+}
+
+String CustomFilterValidatedProgram::texture2DFunctionString(bool unmultiplyInput)
+{
+    if (unmultiplyInput) {
+        return String(SHADER(
+            mediump vec4 css_Texture2D(sampler2D sampler, mediump vec2 coord)
+            {
+                mediump vec4 premultipliedColor = texture2D(sampler, coord);
+                mediump float nonZeroAlpha = max(premultipliedColor.a, 0.00001);
+                return vec4(premultipliedColor.rgb / nonZeroAlpha, premultipliedColor.a);
+            }
+        ));
+    }
+    
+    return String(SHADER(
+        mediump vec4 css_Texture2D(sampler2D sampler, mediump vec2 coord)
+        {
+            return texture2D(sampler, coord);
+        }
+    ));
 }
 
 String CustomFilterValidatedProgram::blendFunctionString(BlendMode blendMode)

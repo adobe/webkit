@@ -103,6 +103,12 @@ public:
         return m_validatedFragmentShader; 
     }
 
+    const String& validatedFragmentShaderWithPremultipliedInput() const
+    {
+        ASSERT(m_isInitialized);
+        return m_validatedFragmentShaderWithPremultipliedInput;
+    }
+
 #if PLATFORM(BLACKBERRY) || USE(TEXTURE_MAPPER) || PLATFORM(CHROMIUM)
     PlatformCompiledProgram* platformCompiledProgram();
 #endif
@@ -123,9 +129,10 @@ private:
 
     static String blendFunctionString(BlendMode);
     static String compositeFunctionString(CompositeOperator);
+    static String texture2DFunctionString(bool);
 
-    void rewriteMixVertexShader(const Vector<ANGLEShaderSymbol>& symbols);
-    void rewriteMixFragmentShader();
+    String rewriteMixVertexShader(const String&, const Vector<ANGLEShaderSymbol>& symbols);
+    String rewriteMixFragmentShader(const String&, bool);
 
     bool needsInputTexture() const;
 
@@ -134,6 +141,7 @@ private:
 
     String m_validatedVertexShader;
     String m_validatedFragmentShader;
+    String m_validatedFragmentShaderWithPremultipliedInput;
 
     RefPtr<CustomFilterCompiledProgram> m_compiledProgram;
 #if PLATFORM(BLACKBERRY) || USE(TEXTURE_MAPPER) || PLATFORM(CHROMIUM)

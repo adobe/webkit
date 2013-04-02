@@ -387,7 +387,7 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
             else {
                 webCustomFilterProgram = WebCustomFilterProgramImpl::create();
                 webCustomFilterProgram->setVertexShader(program->validatedVertexShader());
-                webCustomFilterProgram->setFragmentShader(program->validatedFragmentShader());
+                webCustomFilterProgram->setFragmentShader(program->validatedFragmentShaderWithPremultipliedInput());
                 webCustomFilterProgram->setProgramType(program->programInfo().programType() == PROGRAM_TYPE_NO_ELEMENT_TEXTURE ?
                     WebKit::WebProgramTypeNoElementTexture : WebKit::WebProgramTypeBlendsElementTexture);
                 platformCompiledProgram->setClient(webCustomFilterProgram);
