@@ -59,7 +59,7 @@ public:
     WEBKIT_EXPORT WebPoint localPoint() const;
 
     // If a link (eg. anchor or area tag) is hit, return the element.
-    // Return null otheriwse.
+    // Return null otherwise.
     WEBKIT_EXPORT WebElement urlElement() const;
 
     // If an image is hit, return the image source. Return empty otherwise.
